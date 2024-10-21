@@ -1,0 +1,52 @@
+col lengo
+col legno
+piu
+più
+Piu
+Più
+tres 
+très 
+trés 
+très 
+Tres 
+Très 
+a. 2
+a 2
+a.2
+a 2
+a2
+a 2
+a3
+a 3
+a. 3
+a 3
+a.3
+a 3
+a4
+a 4
+a. 4
+a 4
+a.4
+a 4
+Modere
+Modéré
+Cedez
+Cédez
+sub 
+sub. 
+pos nat
+pos. nat.
+marcato.
+marcato
+con. sord
+con sord.
+div. 2
+div. a 2
+div. 3
+div. a 3
+div. 4
+div. a 4
+ord. vib
+vib. norm.
+vib. ord
+vib. norm.

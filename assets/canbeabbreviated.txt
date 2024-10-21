@@ -1,0 +1,66 @@
+con sordino
+con sord.
+senza sordino
+senza sord.
+sul ponticello
+sul pont.
+vibrato normale
+vib. norm.
+molto vibrato
+molto vib.
+senza vibrato
+senza vib.
+poco vibrato
+poco vib.
+ordinario
+ord.
+flautando
+flaut.
+fluttertongue
+flz.
+flutter tongue
+flz.
+flzg.
+flz.
+flatterzunge
+flz.
+con flaut.
+flaut.
+con flz.
+flz.
+con vib.
+vib.
+subito
+sub.
+without pedal
+senza Ped.
+senza pedal
+senza Ped.
+senza pedale
+senza Ped.
+with pedal
+con Ped.
+con pedal
+con Ped.
+con pedale
+con Ped.
+divisi
+div.
+unisono
+unis.
+unison
+unis.
+simile
+sim.
+espressivo
+espress.
+normal vib
+vibr. norm.
+normal vibr
+vibr. norm.
+normal vib.
+vibr. norm.
+normal vibr.
+vibr. norm.
+normal vibrato
+vibr. norm.

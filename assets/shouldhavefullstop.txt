@@ -1,0 +1,33 @@
+con sord
+senza sord
+via sord
+pizz
+ord
+sul pont
+poco sul pont
+molto sul pont
+estremamente sul pont
+s.t
+p.s.t
+m.s.t
+s.p
+p.s.p
+m.s.p
+sub. s.p
+sub. ord
+sub. s.t
+norm
+pos. nat
+l.v
+cresc
+decresc
+dim
+rall
+rit
+accel
+div
+unis
+sim
+espress
+au mouvt
+ad lib

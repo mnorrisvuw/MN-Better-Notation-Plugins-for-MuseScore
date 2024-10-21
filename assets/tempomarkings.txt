@@ -1,0 +1,75 @@
+larghissimo
+adagissimo
+grave
+largo
+lento
+larghetto
+adagio
+adagietto
+agitato
+andante
+andantino
+marcia moderato
+andante moderato
+moderato
+allegretto
+allegro moderato
+allegro
+vivace
+vivacissimo
+vivacissimamente
+vivo
+allegrissimo
+allegro vivace
+presto
+prestissimo
+assai
+a tempo
+con grazia
+con moto
+furioso
+furibondo
+lamentoso
+l'istesso tempo
+lo stesso tempo
+maestoso
+più mosso
+meno mosso
+poco più mosso
+poco meno mosso
+tempo comodo
+tempo di
+tempo giusto
+tempo primo
+tempo 1°
+tempo 1o
+tempo semplice
+au mouvement
+grave
+lent
+moins vif
+modéré
+vif
+très vif
+très vite
+très lent
+très grave
+vite
+rapide
+kräftig
+langsam
+lebhaft
+mäßig
+rasch
+schnell
+bewegt
+very slow
+slow
+fast
+very fast
+faster
+slower
+energetic
+doppio movimento
+doppio più mosso
+precipitando

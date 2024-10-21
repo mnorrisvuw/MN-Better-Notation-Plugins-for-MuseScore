@@ -1,0 +1,9 @@
+accel.
+accelerando
+rall.
+rallentando
+rit.
+ritardando
+ritenuto
+allargando
+allarg.
