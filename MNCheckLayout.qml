@@ -90,6 +90,7 @@ MuseScore {
 		
 		for (var i = 0; i < numStaves; i++) instrumentIds.push(staves[i].part.instrumentId);
 
+		// **********************  CHECK SCORE & PAGE SETTINGS ************************** // 
 		// **** 1A: CHECK MARGINS ****
 		var maxMargin = 15;
 		var numMarginsTooBig = 0;
@@ -110,49 +111,31 @@ MuseScore {
 			maxSize = 6.7;
 			minSize = 6.2;
 		}
-
 		if (numStaves == 3) {
 			maxSize = 6.5;
 			minSize = 5.5;
 		}
-
 		if (numStaves > 3 && numStaves < 8) {
 			maxSize = 6.5 - ((numStaves - 3) * 0.1);
 			minSize = 5.5 - ((numStaves - 3) * 0.1);
 		}
-
 		if (numStaves > 7) {
 			maxSize = 5.4;
 			minSize = 4.4;
 		}
 		
-		if (staffSize > maxSize) {
-			pageSettingsComments +=  "\nDecrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm";
-		}
-		
-		if (staffSize < minSize) {
-			pageSettingsComments += "\nDecrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm";
-		}
-		
+		if (staffSize > maxSize) pageSettingsComments +=  "\nDecrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm";		
+		if (staffSize < minSize) pageSettingsComments += "\nDecrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm";
 		
 		// **** 1C: CHECK STAFF SPACING
 		
 		// **** 1D: CHECK SYSTEM SPACING
 		if (hasMoreThanOneSystem) {
-			if (minSystemDistance < 12) {
-				styleComments += "\n(Page tab) Increase your Minimum System Distance to at least 12";
-			}
-			if (minSystemDistance > 16) {
-				styleComments += "\n(Page tab) Decrease your Minimum System Distance to no more than 16";
-			}
-			if (maxSystemDistance < 12) {
-				styleComments += "\n(Page tab) Increase your Maximum System Distance to at least 12";
-			}
-			if (maxSystemDistance > 16) {
-				styleComments += "\n(Page tab) Decrease your Maximum System Distance to no more than 16";
-			}
+			if (minSystemDistance < 12) styleComments += "\n(Page tab) Increase your Minimum System Distance to at least 12";
+			if (minSystemDistance > 16) styleComments += "\n(Page tab) Decrease your Minimum System Distance to no more than 16";
+			if (maxSystemDistance < 12) styleComments += "\n(Page tab) Increase your Maximum System Distance to at least 12";
+			if (maxSystemDistance > 16) styleComments += "\n(Page tab) Decrease your Maximum System Distance to no more than 16";
 		}
-		
 		
 		// ** CHECK FOR STAFF NAMES ** //
 		var numGrandStaves = 0;
@@ -193,14 +176,10 @@ MuseScore {
 			if (style.value("hideInstrumentNameIfOneInstrument") == false && numParts == 1) {
 				styleComments += "\n(Score tab) Tick ‘Hide if there is only one instrument’";
 			} else {
-				if (firstStaffNameVisible) {
-					styleComments += "\nYou do not need the instrument names visible for a solo work.";
-				}
+				if (firstStaffNameVisible) styleComments += "\nYou do not need the instrument names visible for a solo work.";
 			}
 		} else {
-			if (!firstStaffNameVisible) {
-				styleComments += "\nYou should have all instrument names showing on the first system."
-			}
+			if (!firstStaffNameVisible) styleComments += "\nYou should have all instrument names showing on the first system."
 		}
 		var subsStaffNamesVisible = style.value("subsSystemInstNameVisibility");
 		dialog.msg += "\nsubsStaffNamesVisible: "+subsStaffNamesVisible;
@@ -279,8 +258,8 @@ MuseScore {
 					nTextObjects++;
 				}
 			}
-
 		}
+		
 		dialog.msg += "\nFOUND "+nTextObjects+" TEXT OBJECTS";
 		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) {
@@ -334,9 +313,13 @@ MuseScore {
 		//var composerExists = false;
 		//var titleExists = false;
 		var title = curScore.title;
+		var subtitle = curScore.subtitle;
 		var composer = curScore.composer;
+		if (subtitle === 'Subtitle') {
+			showError( "You haven’t changed the Subtitle in File → Project Properties","top");
+		}
 		if (title === 'Untitled score') {
-			showError( "You haven’t changed the default title","top");
+			showError( "You haven’t changed the Work Title in File → Project Properties","top");
 		} else {
 			var lowerCaseText = title.toLowerCase();
 			for (var j = 0; j < spellingerrorsatstart.length / 2; j++) {
@@ -369,9 +352,7 @@ MuseScore {
 			}
 		}
 				
-		if (composer === 'Composer / arranger') {
-			showError( "You haven’t changed the default composer","top");
-		}
+		if (composer === 'Composer / arranger') showError( "You haven’t changed the default composer in File → Project Properties","top");
 		
 		for (var i = 0; i < textObjects.length; i++) {
 			var textObject = textObjects[i];
@@ -450,8 +431,8 @@ MuseScore {
 					if (lowerCaseText === "normale") showError("Abbreviate ‘normale’ as ‘norm.’ or ‘ord.’.",textObject);
 					
 					// ** CHECK STRAIGHT/CURLY QUOTES ** //
-					if (lowerCaseText.includes("'")) showError("This text has a straight single quote mark in it ('). Change to curly — ‘ or ’.",textObject);
-					if (lowerCaseText.includes('"')) showError('This text has a straight double quote mark in it ("). Change to curly — “ or ”.',textObject);
+					if (lowerCaseText.includes("'")) showError("This text has a straight single quote mark in it (').\nChange to curly — ‘ or ’.",textObject);
+					if (lowerCaseText.includes('"')) showError('This text has a straight double quote mark in it (").\nChange to curly — “ or ”.',textObject);
 					
 					// ** CHECK FOR STYLES ** //
 					if (styledText.includes("<i>arco")) showError("‘arco’ should not be italicised.",textObject);
@@ -460,7 +441,7 @@ MuseScore {
 					if (styledText.includes("<i>senza sord")) showError("‘senza sord.’ should not be italicised.",textObject);
 					if (styledText.includes("<i>ord.")) showError("‘ord.’ should not be italicised.",textObject);
 					if (styledText.includes("<i>sul ")) showError("String techniques should not be italicised.",textObject);
-					if (styledText.slice(3) === "<b>") showError("In general, you never need to manually set text to bold. Are you sure you want this text bold?",textObject);
+					if (styledText.slice(3) === "<b>") showError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);
 					
 					// ** IS THIS A DYNAMICS SYMBOL OR MANUALLY ENTERED DYNAMICS? ** //
 					var isDyn = styledText.includes('<sym>dynamics');
@@ -476,7 +457,7 @@ MuseScore {
 					if (tn == "expression") {
 						for (var j = 0; j < techniques.length; j ++) {
 							if (lowerCaseText.includes(techniques[j])) {
-								showError("This looks like a technique, but has been incorrectlyt entered as Expression text. Please check whether this should be in Technique Text instead.",textObject);
+								showError("This looks like a technique, but has been incorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
 								shouldBeTechnique = true;
 							}
 						}
