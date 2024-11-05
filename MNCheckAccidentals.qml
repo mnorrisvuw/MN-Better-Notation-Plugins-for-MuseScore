@@ -45,6 +45,7 @@ MuseScore {
 	property var prevAlterationLabel: ""
 	property var keySig
 	property var prevWhichNoteToRewrite
+	property var commentPosArray: []
 
   onRun: {
 		if (!curScore) return;
@@ -79,6 +80,7 @@ MuseScore {
 		currAccs = Array(120).fill(0);
 		currPCAccs = Array(120).fill(0);
 		barAltered = Array(120).fill(0);
+		commentPosArray = Array(10000).fill(0);
 		
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;		
@@ -398,8 +400,8 @@ MuseScore {
 										foundNote = true;
 									}
 									if (!foundNote) {
-										var weighting1 = Maths.abs(weightings[prevDiatonicPitchClass] + (prevAcc * 7) - keySig);
-										var weighting2 = Maths.abs(weightings[diatonicPitchClass] + (acc * 7) - keySig);
+										var weighting1 = Math.abs(weightings[prevDiatonicPitchClass] + (prevAcc * 7) - keySig);
+										var weighting2 = Math.abs(weightings[diatonicPitchClass] + (acc * 7) - keySig);
 										// rewrite the one that is the most outlying
 										if (weighting1 > weighting2) {
 											whichNoteToRewrite = 1;
@@ -616,6 +618,8 @@ MuseScore {
 	}
 	
 	function showError (text, element, staffNum) {
+		var commentOffset = 1;
+		
 		curScore.startCmd()
 		
 		// add a text object at the location where the element is
@@ -629,7 +633,7 @@ MuseScore {
 		comment.frameWidth = 0.2;
 		comment.frameBgColor = "yellow";
 		comment.frameFgColor = "black";
-		comment.fontSize = 8.0;
+		comment.fontSize = 7.0;
 		comment.fontFace = "Helvetica"
 		comment.autoplace = false;
 		var commentHeight = comment.bbox.height;
@@ -641,7 +645,7 @@ MuseScore {
 			var firstMeasure = curScore.firstMeasure;
 			var pagePos = firstMeasure.pagePos;
 			element = firstMeasure;
-			comment.offsetY = 4.0-pagePos.y;
+			//comment.offsetY = 4.0-pagePos.y;
 			
 		} else {
 			if (element.type == Element.NOTE) {
@@ -656,41 +660,54 @@ MuseScore {
 				
 			}
 			
-			comment.offsetY = element.posY - 2.0 - elementHeight;
 			comment.offsetX = element.posX;
 				
 
 		}
 		
-			// check staff height
-	//	var measure = segment.parent;
-		//dialog.msg += "\nmeasure = "+measure;
-		var theMeasurePos = segment.pagePos;
-		//dialog.msg += "\ntheMeasurePos = "+theMeasurePos;
-		
-		var staffTop = theMeasurePos.y;
-	
-		//dialog.msg += "\nPlacing comment at tick "+tick;
-		
-		// add text object to score
 		var cursor = curScore.newCursor();
 		cursor.staffIdx = staffNum;
 		cursor.rewindToTick(tick);
 		cursor.add(comment);
-
-		var commentBottom = comment.pagePos.y + commentHeight;
-		dialog.msg += "\nStaff top = "+staffTop+"; commentBottom is = "+commentBottom;
+		// style the element
+		element.color = "hotpink";
 		
-		if (commentBottom > staffTop) {
+		
+		comment.offsetY = -commentHeight;
+		var commentTopRounded = Math.round(comment.pagePos.y);
+		dialog.msg += "\ncommentTopRounded is "+commentTopRounded;
+		
+		while (commentPosArray[commentTopRounded+1000]) {
+			commentTopRounded -= commentOffset;
+			comment.offsetY -= commentOffset;
+			dialog.msg += "\ncomment.offsetY is now "+comment.offsetY;
+		}
+		
+		commentPosArray[commentTopRounded+1000] = true;
+			// check staff height
+	//	var measure = segment.parent;
+		//
+		//var theMeasurePos = segment.pagePos;
+		//dialog.msg += "\ntheMeasurePos = "+theMeasurePos;
+		
+		//var staffTop = theMeasurePos.y;
+	
+		//dialog.msg += "\nPlacing comment at tick "+tick;
+		
+		// add text object to score
+
+
+		//var commentBottom = comment.pagePos.y + commentHeight;
+		//dialog.msg += "\nStaff top = "+staffTop+"; commentBottom is = "+commentBottom;
+		
+		/*if (commentBottom > staffTop) {
 			var offset = commentBottom - staffTop;
 			comment.offsetY -= offset;
 			dialog.msg += "\nShifting comment top by -"+offset+": is now "+comment.pagePos.y;
 			
-		}
+		}*/
+			curScore.endCmd();
 		
-		// style the element
-		element.color = "hotpink";
-		curScore.endCmd();
 	}
 	
 	ApplicationWindow {
