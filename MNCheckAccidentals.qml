@@ -43,7 +43,7 @@ MuseScore {
 	property var prevNote
 	property var prevPrevNote
 	property var prevAlterationLabel: ""
-	property var keySig
+	property var currentKeySig
 	property var prevWhichNoteToRewrite
 	property var commentPosArray: []
 
@@ -53,19 +53,7 @@ MuseScore {
 		// **** GATHER VARIABLES **** //
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
-		var parts = curScore.parts;
-		var numParts = parts.length;
-		var firstMeasure = curScore.firstMeasure;
-		var lastMeasure = curScore.lastMeasure;
-		var firstSystem = firstMeasure.parent;
-		var lastSystem = lastMeasure.parent;
-		var firstPage = firstSystem.parent;
-		var lastPage = lastSystem.parent;
-		var hasMoreThanOneSystem = !lastSystem.is(firstSystem);	
-		var style = curScore.style;
-		var keySigs = [];
-		var numKeySigs = 0;
-		var notes = [];
+		currentKeySig = 0;
 		
 		// **** EXTEND SELECTION? **** //
 		if (!curScore.selection.isRange) {
@@ -149,7 +137,7 @@ MuseScore {
 			// go back to beginning
 			cursor.rewind(Cursor.SELECTION_START);
 			var segment = cursor.segment;
-			var keySig = cursor.keySignature;
+			currentKeySig = cursor.keySignature;
 			//dialog.msg += "\nkeySig = "+keySig;
 			currBar = firstBarInSelection;
 			var barNum = firstBarNum;
@@ -163,8 +151,8 @@ MuseScore {
 					for (var track = startTrack; track < endTrack; track++) {
 						if (segment.elementAt(track) && segment.elementAt(track).type == Element.KEYSIG) {
 							cursor.rewindToTick(segment.tick);
-							keySig = cursor.keySignature;
-							//dialog.msg += "\nkeySig = "+keySig;
+							currentKeySig = cursor.keySignature;
+							dialog.msg += "\ncurrentKeySig = "+currentKeySig;
 							// ** MAYBE ONLY NEED TO DO THIS WHEN TRACK IS STARTTRACK? ** //
 						}
 						
@@ -249,35 +237,36 @@ MuseScore {
 			}
 			var MIDIpitch = note.pitch;
 			var octave = Math.trunc(MIDIpitch/12);
-			var diatonicPitchClass = Math.round((((tpc+1)%7)*7+5) % 7);
+			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
 			
 			var diatonicPitch = diatonicPitchClass+octave*7;
-			//dialog.msg += "\noctave = "+octave+";\ndp = "+diatonicPitch+"; dpc = "+diatonicPitchClass+"; p = "+MIDIpitch;
+			//dialog.msg += "\nN: tpc="+tpc+" oct="+octave+" dp="+diatonicPitch+" dpc="+diatonicPitchClass+" p="+MIDIpitch;
+			dialog.msg += "\nks = "+currentKeySig;
 
 			var accIsInKS = false;
-			if (keySig == 0 && accType == Accidental.NATURAL) accIsInKS = true;
-			if (keySig > 0) {
+			if (currentKeySig == 0 && accType == Accidental.NATURAL) accIsInKS = true;
+			if (currentKeySig > 0) {
 				accOrder = ((diatonicPitchClass + 4) * 2) % 7;
 				if (accType == Accidental.SHARP) {
 					//dialog.msg += "\nhere";
-					accIsInKS = accOrder < keySig;
+					accIsInKS = accOrder < currentKeySig;
 				}
-				if (accType == Accidental.NATURAL) accIsInKS = (accOrder + 1) > keySig; 
+				if (accType == Accidental.NATURAL) accIsInKS = (accOrder + 1) > currentKeySig; 
 			}
-			if (keySig < 0) {
+			if (currentKeySig < 0) {
 				accOrder = (2 * (13 - diatonicPitchClass)) % 7;
-				if (accType == Accidental.FLAT) accIsInKS = accOrder < Math.abs(keySig);
-				if (accType == Accidental.NATURAL) accIsInKS = (accOrder + 1) > Math.abs(keySig);
+				if (accType == Accidental.FLAT) accIsInKS = accOrder < Math.abs(currentKeySig);
+				if (accType == Accidental.NATURAL) accIsInKS = (accOrder + 1) > Math.abs(currentKeySig);
 			}
-			//dialog.msg += "accInKeySig = "+accIsInKS;
+			//dialog.msg += "accInKeySig = "+accIsInKS+"; accType = "+accType+";";
 
 			if (!note.tieBack) {
 				var noteLabel = pitchLabels[diatonicPitchClass]+accidentals[acc+2];
 				isBadAcc = false;
 	
 				// ** CHECK Cb OR Fb ** //
-				if (keySig > -3) isBadAcc = (tpc == 6 || tpc == 7);
-				if (!isBadAcc && keySig < 3) isBadAcc = (tpc == 25 || tpc == 26);
+				if (currentKeySig > -3) isBadAcc = (tpc == 6 || tpc == 7);
+				if (!isBadAcc && currentKeySig < 3) isBadAcc = (tpc == 25 || tpc == 26);
 				// check redundant accidentals
 
 				// case 1: acc is different from prev, but prev was a long time a go
@@ -332,9 +321,10 @@ MuseScore {
 				var scalarIntervalAbs, scalarIntervalClass, chromaticIntervalAbs, chromaticIntervalClass;
 				
 				if (prevMIDIPitch != -1) {
+					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
 					chromaticInterval = MIDIpitch - prevMIDIPitch;
-					
+					dialog.msg += "\ndp="+diatonicPitch+" pdp="+prevDiatonicPitch+" si="+scalarInterval+" ci="+chromaticInterval;
 					if (chromaticInterval != 0) {
 						if (scalarInterval < 0) {
 							direction = -1;
@@ -355,6 +345,7 @@ MuseScore {
 						if (scalarIntervalAbs == 7 && chromaticIntervalClass > 9) chromaticIntervalClass = chromaticIntervalClass - 12;
 						var dci = defaultChromaticInterval[scalarIntervalClass];
 						var alteration = chromaticIntervalClass - dci;
+						dialog.msg += "\ndci="+dci+" alt="+alteration;
 
 						// **		IS THIS AUGMENTED OR DIMINISHED? 		** //
 						var isFourthFifthOrUnison = (scalarIntervalClass == 0 || scalarIntervalClass == 3 || scalarIntervalClass == 4);
@@ -368,55 +359,70 @@ MuseScore {
 							isAug = alteration > 0;
 						}
 						isAugDim = isAug || isDim;
-						//dialog.msg += "\nisAug: "+isAug+"; isDim: "+isDim;
 
 						if (isAugDim) {
+							//dialog.msg += "\nisAug: "+isAug+"; isDim: "+isDim;
+							
 							var neverOK = false;
 							var neverOKRewriteIfPoss = false;
 							var OKRewriteIfPoss = true;
-							doShowError = false;
+							// = false;
 
-							if (OKRewriteIfPoss || neverOKRewriteIfPoss) {
-								if (OKRewriteIfPoss) {
-									doShowError = prevIsAugDim;
+							//if (OKRewriteIfPoss || neverOKRewriteIfPoss) {
+							//if (OKRewriteIfPoss) {
+							
+							doShowError = prevIsAugDim;
 	
-									// EXCEPTIONS
-									// IGNORE AUG UNISON IF FOLLOWED BY ANOTHER ONE OR A TRITONE
-									if (chromaticIntervalClass == 1 && (prevChromaticInterval == chromaticInterval || prevChromaticIntervalClass == 6)) doShowError = false;
+							// EXCEPTIONS
+							// IGNORE AUG UNISON IF FOLLOWED BY ANOTHER ONE OR A TRITONE
+							if (chromaticIntervalClass == 1 && (prevChromaticInterval == chromaticInterval || prevChromaticIntervalClass == 6)) doShowError = false;
 	
-									// IGNORE TRITONE IF FOLLOWED BY ANOTHER ONE OR A SEMITONE
-									if (chromaticIntervalClass == 6 && (prevChromaticIntervalClass == 1 || prevChromaticIntervalClass == 6)) doShowError = false;
+							// IGNORE TRITONE IF FOLLOWED BY ANOTHER ONE OR A SEMITONE
+							if (chromaticIntervalClass == 6 && (prevChromaticIntervalClass == 1 || prevChromaticIntervalClass == 6)) doShowError = false;
+							
+							//}
+							//if (neverOKRewriteIfPoss) doShowError = true;
+								
+							if (doShowError) {
+								var foundNote = false;
+								
+								if (!prevAccVisible && accVisible) {
+									dialog.msg += "\nwhichNoteToRewrite = 2";
+									whichNoteToRewrite = 2;
+									foundNote = true;
 								}
-								if (neverOKRewriteIfPoss) doShowError = true;
-								if (doShowError) {
-									var foundNote = false;
-									
-									if (!prevAccVisible && accVisible) {
-										whichNoteToRewrite = 2;
-										foundNote = true;
-									}
-									if (prevAccVisible && !accVisible) {
+								if (prevAccVisible && !accVisible) {
+									dialog.msg += "\nwhichNoteToRewrite = 1";
+									whichNoteToRewrite = 1;
+									foundNote = true;
+								}
+								if (!foundNote) {
+									var weighting1 = Math.abs(weightings[prevDiatonicPitchClass] + (prevAcc * 7) - currentKeySig);
+									var weighting2 = Math.abs(weightings[diatonicPitchClass] + (acc * 7) - currentKeySig);
+									// rewrite the one that is the most outlying
+									dialog.msg += "\nW1: prevDiatonicPitchClass="+prevDiatonicPitchClass+"; prevAcc * 7: "+prevAcc * 7+"; keySig: "+currentKeySig;
+
+									if (weighting1 > weighting2) {
 										whichNoteToRewrite = 1;
-										foundNote = true;
+									} else {
+										whichNoteToRewrite = 2;
 									}
-									if (!foundNote) {
-										var weighting1 = Math.abs(weightings[prevDiatonicPitchClass] + (prevAcc * 7) - keySig);
-										var weighting2 = Math.abs(weightings[diatonicPitchClass] + (acc * 7) - keySig);
-										// rewrite the one that is the most outlying
-										if (weighting1 > weighting2) {
-											whichNoteToRewrite = 1;
-										} else {
-											whichNoteToRewrite = 2;
-										}
-									} // if !foundNote
-								} // if doshowerror
-							} //OKRewriteIfPoss || neverOKRewriteIfPoss*/
+									dialog.msg += "\nWeighting1: "+weighting1+"; weighting2: "+weighting2+"; ntr = "+whichNoteToRewrite;
+									
+								} // if !foundNote
+							} // if doshowerror
+							
+								//
+							
+								//} //OKRewriteIfPoss || neverOKRewriteIfPoss*/
 							
 							// don't show error if we decide it"s the same note that needs to change
 							if (prevShowError && prevWhichNoteToRewrite == 2 && whichNoteToRewrite == 1) doShowError = false;
 							if (doShowError) {
 								// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 								scalarIntervalLabel = intervalNames[scalarIntervalAbs];
+
+								dialog.msg += "\nscalarIntervalAbs = "+scalarIntervalAbs+"; scalarIntervalLabel="+scalarIntervalLabel;
 								article = (alterationLabel === "augmented") ? "an" : "a";
 								noteToHighlight = note;
 								theAccToChange = acc;
@@ -439,44 +445,51 @@ MuseScore {
 									thePitchClassToChange = prevDiatonicPitchClass;
 									noteToHighlight = prevNote;
 									prevNext = "next";
+									dialog.msg += "\nChoosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
+									
+								} else {
+									dialog.msg += "\nChoosing curr note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
+									
 								}
 								
+								var j =0;
 								switch (theAccToChange) {
 									case -2:
 										if (!flatten) dialog.msg += "Error found with "+noteLabel+" in bar "+barNum+": should be spelt enharmonically downwards";
 									//	trace ("bb");
-										var i = thePitchClassToChange - 1;
-										if (i < 0) i = i + 7;
-										var newNotePitch = pitchLabels[i];
+										j = thePitchClassToChange - 1;
+										if (j < 0) j += 7;
+										var newNotePitch = pitchLabels[j];
 										if (newNotePitch === "B" || newNotePitch === "E") {
 											newNoteAccidental = "b";
 										} else {
 											newNoteAccidental = "♮";
 										}
+										dialog.msg += "\n-2 ";
+										
 										break;
 						
 									case -1:
 										if (!flatten) dialog.msg += "Error found with "&noteLabel&" in bar "&barNum&": should be spelt enharmonically downwards";
-										i = thePitchClassToChange - 1;
-										if (i < 0) i = i + 7;
-										newNotePitch = pitchLabels[i];
+										j = thePitchClassToChange - 1;
+										if (j < 0) j+=7;
+										newNotePitch = pitchLabels[j];
 										if (newNotePitch === "B" || newNotePitch === "E") {
 											newNoteAccidental = "♮";
 										} else {
 											newNoteAccidental = "#";
 										}
+										dialog.msg += "\n-1 ";
 										break;
 						
 									case 0:
 										if (flatten) {
-											i = thePitchClassToChange - 1;
-											if (i < 0) {
-												i = i + 7;
-											}
+											j = thePitchClassToChange - 1;
+											if (j < 0) j += 7;
 										} else {
-											i = (thePitchClassToChange + 1) % 7;
+											j = (thePitchClassToChange + 1) % 7;
 										}
-										newNotePitch = pitchLabels[i];
+										newNotePitch = pitchLabels[j];
 										if (flatten) {
 											if (newNotePitch === "E" || newNotePitch === "B") {
 												newNoteAccidental = "#";
@@ -490,42 +503,51 @@ MuseScore {
 												newNoteAccidental = "bb";
 											}
 										}
+										dialog.msg += "\n0 ";
 										break;
 						
 									case 1:
 										if (!sharpen) dialog.msg += "Error with "+noteLabel+" in bar "+barNum+" — should be spelt enharmonically upwards";
-										i = (thePitchClassToChange + 1) % 7;
-										newNotePitch = pitchLabels[i];
+										j = (thePitchClassToChange + 1) % 7;
+										newNotePitch = pitchLabels[j];
 										if (newNotePitch === "F" || newNotePitch === "C") {
 											newNoteAccidental = "♮";
 										} else {
 											newNoteAccidental = "b";
 										}
+										dialog.msg += "\n1 ";
 										break;
 						
 									case 2: 
 										if (!sharpen) dialog.msg += "\nError with "+noteLabel+" in bar "+barNum+" — should be spelt enharmonically upwards";
-										i = (thePitchClassToChange + 1) % 7;
-										newNotePitch = pitchLabels[i];
+										j = (thePitchClassToChange + 1) % 7;
+										newNotePitch = pitchLabels[j];
 										if (newNotePitch === "F" || newNotePitch === "C") {
 											newNoteAccidental = "#";
 										} else {
 											newNoteAccidental = "♮";
 										}
+										dialog.msg += "\n2 ";
 										break;
 								}
 								if (newNotePitch === "") dialog.msg += "\nCouldnt find new note pitch";
 								var newNoteLabel = newNotePitch+newNoteAccidental;
 
-								if (neverOKRewriteIfPoss || OKRewriteIfPoss) {
-									var isBad = false;
-									if (keySig > -3) isBad = (newNoteLabel === "Cb") || (newNoteLabel === "Fb");
-									if (keySig < 3) isBad = (newNoteLabel === "B#") || (newNoteLabel === "E#");
-									if (isBad) doShowError = false;
+								//if (neverOKRewriteIfPoss || OKRewriteIfPoss) {
+									var changeIsBad = false;
+									if (currentKeySig > -3) changeIsBad = (newNoteLabel === "Cb") || (newNoteLabel === "Fb");
+									if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B#") || (newNoteLabel === "E#");
+									//if (isBad) doShowError = false;
+									//}
+								if (doShowError && !changeIsBad) {
+									var t = "Interval with "+prevNext+" pitch is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel;
+									dialog.msg += "\n"+t;
+									dialog.msg += "\n"+noteToHighlight;
+									dialog.msg += "\n"+staffNum;
+									showError(t,noteToHighlight,staffNum);
+								} else {
+									dialog.msg += "\nDid not show error cos doShowError="+doShowError+" & changeIsBad="+changeIsBad;
 								}
-								article = (alterationLabel === "augmented") ? "an":"a";
-								scalarIntervalLabel = intervalNames[scalarIntervalAbs];
-								if (doShowError) showError("Interval with "+prevNext+" new pitch is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel,noteToHighlight,staffNum);
 											
 							} // end if doShowError
 
@@ -675,12 +697,12 @@ MuseScore {
 		
 		comment.offsetY = -commentHeight;
 		var commentTopRounded = Math.round(comment.pagePos.y);
-		dialog.msg += "\ncommentTopRounded is "+commentTopRounded;
+		//dialog.msg += "\ncommentTopRounded is "+commentTopRounded;
 		
 		while (commentPosArray[commentTopRounded+1000]) {
 			commentTopRounded -= commentOffset;
 			comment.offsetY -= commentOffset;
-			dialog.msg += "\ncomment.offsetY is now "+comment.offsetY;
+			//dialog.msg += "\ncomment.offsetY is now "+comment.offsetY;
 		}
 		
 		commentPosArray[commentTopRounded+1000] = true;

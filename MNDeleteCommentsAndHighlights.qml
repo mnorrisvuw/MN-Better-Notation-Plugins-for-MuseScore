@@ -59,7 +59,7 @@ MuseScore {
 		}
 		curScore.endCmd();
 		
-		dialog.show();
+		//dialog.show();
 		
 	}
 	
