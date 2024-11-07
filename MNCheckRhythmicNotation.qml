@@ -88,6 +88,7 @@ MuseScore {
 		lastBarInScore = curScore.lastMeasure;
 		cursor.rewind(Cursor.SELECTION_END);
 		lastBarInSelection = cursor.measure;
+		
 		if (lastBarInSelection == null) lastBarInSelection = lastBarInScore;
 		lastTickInSelection = cursor.tick;
 		if (lastTickInSelection == 0) lastTickInSelection = curScore.lastSegment.tick + 1;
@@ -96,6 +97,7 @@ MuseScore {
 			lastBarNum ++;
 			currentBar = currentBar.nextMeasure;
 		}
+		dialog.msg += "\nlastBarNum: "+lastBarNum;
 		
 		// ** GET ALL TIME SIGS ** //
 		cursor.filter = Segment.All;
@@ -160,27 +162,24 @@ MuseScore {
 			wasTied = false;
 			
 			// ** REWIND TO START OF SELECTION ** //
+			cursor.filter = Segment.All;
 			cursor.rewind(Cursor.SELECTION_START);
 			cursor.staffIdx = currentStaffNum;
 			cursor2.staffIdx = currentStaffNum;
 			cursor.filter = Segment.ChordRest;
 			cursor2.filter = Segment.ChordRest;
 			currentBar = cursor.measure;
-			currentBarNum = firstBarNum;
+			dialog.msg += "\n—————————————————\nStaff: "+currentStaffNum;
+			dialog.msg += "\ncurrentBar: "+currentBar;
 			
-			while (currentBar) {
+			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 				
-				numBarsProcessed ++;
-				dialog.msg += "\n—————————————————\nStaff: "+currentStaffNum+"; Bar num: "+currentBarNum;
+				dialog.msg += "\nBar num: "+currentBarNum;
 				
 				// ** UPDATE PROGRESS MESSAGE ** //
-				
 								
 				// **** GET TIME SIGNATURE **** //
-				currentTimeSig = currentBar.timesigActual; //getTimeSignatureForBar(currentBar);
-				//dialog.msg += "\ncurrentTimeSig = "+currentTimeSig;
-				
-				dialog.msg += "\nts = "+currentTimeSig.numerator+"/"+currentTimeSig.denominator;
+				currentTimeSig = currentBar.timesigActual;
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
 				var barTick = currentBar.firstSegment.tick;
@@ -202,12 +201,8 @@ MuseScore {
 					if (isCompound) beatLength = DottedCrotchet;
 				}
 				if (timeSigDenom == 4 || timeSigDenom == 2) isCompound = !(timeSigNum % 3) && (timeSigNum > 3);
-				if (isCompound && timeSigDenom > 4) {
-					canCheckThisBar = true;
-				} else {
-					if (timeSigNum < 5 || !(timeSigNum % 2) || timeSigDenom == 4) canCheckThisBar = true;
-				}
-
+				canCheckThisBar = ((isCompound && timeSigDenom > 4) || timeSigNum < 5 || !(timeSigNum % 2) || timeSigDenom == 4);
+				if (!canCheckThisBar) dialog.msg += "\ncouldn't check this bar as time sig was too batty";
 	
 				// ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
 				if (canCheckThisBar) {
@@ -243,24 +238,43 @@ MuseScore {
 						cursor2.voice = track;
 						cursor.rewindToTick(barTick);
 						//cursor.next();
-						dialog.msg += "\ncursorTick = "+cursor.tick;
-						dialog.msg += "\ncursor.element = "+cursor.element;
+						//dialog.msg += "\ncursorTick = "+cursor.tick;
+						dialog.msg += "\nTrack "+track;
 						
 							// ** LOOP THROUGH EACH VOICE ** //
 					
 						totalDur = 0;
-						currentBar = cursor.measure;
+						//currentBar = cursor.measure;
 						var processingThisBar = cursor.element;
 						while (processingThisBar) {
+							var pos = cursor.tick;
 							var noteRest = cursor.element;
 							var isHidden = !noteRest.visible;
-							var pos = cursor.tick;
-							var nextItemPos;
+							var isRest = noteRest.type == Element.REST;
+							var isNote = !isRest;
+							var displayDur = noteRest.duration.ticks;
+							var soundingDur = noteRest.actualDuration.ticks;
+							var tuplet = noteRest.tuplet;
+							if (noteRest.tuplet) {
+								var tupletNumerator = noteRest.tuplet.actualDuration.numerator;
+								//if (tupletNumerator == 2 || tupletNumerator == 4) {
+									
+									//}
+								dialog.msg += "\nisRest = "+isRest+"; dur = "+displayDur+"; sounding = "+soundingDur;
+								
+							} else {
+								dialog.msg += "\nisRest = "+isRest+"; dur = "+soundingDur;
+								
+							}
+							var pos = cursor.tick - barTick;
+							dialog.msg += "\npos = "+pos;
+							
+							/*var nextItemPos;
 							cursor2.rewindToTick(pos);
-							if (cursor2) dialog.msg += "\n1 cursor2Tick = "+cursor2.tick;
+							//if (cursor2) dialog.msg += "\n1 cursor2Tick = "+cursor2.tick;
 							
 							cursor2.next();
-							if (cursor2) dialog.msg += "\n2 cursor2Tick now = "+cursor2.tick;
+							//if (cursor2) dialog.msg += "\n2 cursor2Tick now = "+cursor2.tick;
 							
 							var actualDur;
 							
@@ -274,7 +288,7 @@ MuseScore {
 							}
 								
 							totalDur = totalDur + actualDur;
-							dialog.msg += "\nactualDur = "+actualDur+"; totalDur = "+totalDur;
+							dialog.msg += "\nactualDur = "+actualDur+"; totalDur = "+totalDur;*/
 						
 							if (isHidden) {
 								numRests = 0;
@@ -282,6 +296,29 @@ MuseScore {
 								restStartedOnBeat = false;
 								isLastRest = false;
 							}
+							// ** GET ALL THE VALUES FOR THE VARIOUS PARAMETERS ** //
+							
+							var isTied = false;
+							var lastNoteInTie = false;
+							var posFrac = pos%beatLength;
+							//isAcc = noteRest.IsAcciaccatura or noteRest.IsAppoggiatura;
+							//isDoubleTremolo = noteRest.DoubleTremolos > 0;
+							var isOnTheBeat = !posFrac;
+							var beam = null;
+							if (isNote) beam = noteRest.beam;	
+							//nextNextItem = null;
+							//nextNextItemDur = 0;
+							//nextItemIsNote = false;
+							//nextNextItemIsNote = false;
+							//nextItemNoteCount = 0;
+							//nextItemPitch = 0;
+							var pitch = 0;
+							if (isNote) pitch = noteRest.notes[0].pitch;
+							// hasPause = noteRest.GetArticulation(TriPauseArtic) or noteRest.GetArticulation(PauseArtic) or noteRest.GetArticulation(SquarePauseArtic);
+							// nextItemHasPause = false;
+							//nextItemIsHidden = false;
+							dialog.msg += "\npitch = "+pitch+"; beam = "+beam;
+							
 							
 							if (cursor.next()) {
 								processingThisBar = cursor.measure.is(currentBar);
@@ -292,7 +329,18 @@ MuseScore {
 						} // end while processingThisBar
 					} // end track loop
 				} // end if canCheckThisBar
-			} // end while currentBar	
+				
+				if (currentBar) {
+					dialog.msg += "\nTrying to get next measure";
+					currentBar = currentBar.nextMeasure;
+				}
+				if (!currentBar) dialog.msg += "\nnextMeasure failed";
+
+				numBarsProcessed ++;
+				
+				dialog.msg += "\nProcessed "+numBarsProcessed+" bars";
+				
+			} // end for currentBarNum	
 		} // end for currentStaff
 		
 		dialog.show();
@@ -348,19 +396,27 @@ MuseScore {
 		property var msg: "Warning message here."
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
-	      // Qt.WindowStaysOnTopHint => dialog always on top
-	      // Qt.FramelessWindowHint  => dialog without title bar
 		width: 500
 		height: 400        
 
-		StyledTextLabel {
-			text: dialog.msg            
+		ScrollView {
+			id: view
 			anchors {
-				top: parent.top 
-				horizontalCenter: parent.horizontalCenter                
-				margins:20 
-			} 
+				fill: parent
+				horizontalCenter: parent.horizontalCenter
+				verticalCenter: parent.verticalCenter
+				margins: 2
+			}
+			background: Rectangle {
+				color: "white"
+			}
+			ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+			TextArea {
+				text: dialog.msg
+				wrapMode: TextEdit.Wrap         
+			}
 		}
+		
 		FlatButton {            
 			accentButton: true
 			text: "Ok"
