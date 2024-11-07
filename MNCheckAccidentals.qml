@@ -110,6 +110,8 @@ MuseScore {
 //		dialog.msg += "\nfirstBarNum="+firstBarNum+"; lastBarNum="+lastBarNum;
 		
 		// ** LOOP THROUGH NOTES **//
+		// ** NB — endStaff IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
+
 		for (var staffNum = startStaff; staffNum < endStaff; staffNum ++) {
 			//dialog.msg += "\nStaff "+staffNum;
 			
