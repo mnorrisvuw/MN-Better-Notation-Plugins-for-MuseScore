@@ -264,13 +264,32 @@ MuseScore {
 							var noteStart = cursor.tick - barStart;
 							var noteEnd = noteStart + soundingDur;
 							dialog.msg += "\nnoteStart = "+noteStart+"; noteEnd = "+noteEnd;
-							/*var nextItemPos;
-							cursor2.rewindToTick(pos);
-							//if (cursor2) dialog.msg += "\n1 cursor2Tick = "+cursor2.tick;
 							
-							cursor2.next();
-							//if (cursor2) dialog.msg += "\n2 cursor2Tick now = "+cursor2.tick;
+							// calculate next item and next next item
+							var nextItem = null, nextItemIsNote, nextItemPos, nextItemDur, nextItemBeat;
+							var nextNextItem = null, nextNextItemIsNote, nextNextItemPos, nextNextItemDur, nextNextItemBeat;
 							
+							cursor2.rewindToTick(cursor.tick);
+							if (cursor2.next()) {
+								if (cursor2.measure.is(currentBar)) {
+									nextItem = cursor2.element;
+									nextItemIsNote = nextItem.type != Element.REST;
+									nextItemPos = cursor2.tick - barStart;
+									nextItemDur = nextItem.actualDuration.ticks;
+									nextItemBeat = Math.trunc(nextItemPos / beatLength);
+									if (cursor2.next()) {
+										if (cursor2.measure.is(currentBar)) {
+											nextNextItem = cursor2.element;
+											nextNextItemIsNote = nextNextItem.type != Element.REST;
+											nextNextItemPos = cursor2.tick - barStart;
+											nextNextItemDur = nextNextItem.actualDuration.ticks;
+											nextNextItemBeat = Math.trunc(nextNextItemPos / beatLength);
+										}
+									}
+								}
+							}
+
+							/*
 							var actualDur;
 							
 							if (cursor2) {
@@ -536,6 +555,29 @@ MuseScore {
 								}
 							} // end if beamBroken
 							
+							// ** ————————————————————————————————————————————————— ** //
+							// **       CHECK 4: BEAMED to NOTES IN NEXT BEAT       ** //
+							// ** ————————————————————————————————————————————————— ** //
+
+							// ** If note is off the beat, at the end of the beat, continuous beam, next beam is continuous or single, then the beam continues over the beat
+						
+							// ADD — 
+							if (nextItem) {
+								if (hasBeam && nextItemBeat > noteStartBeat) {
+									dialog.msg += "\n beamed to notes in next beat"
+									// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
+									var exception1 = isNote && soundingDur == Quaver && prevSoundingDur == Quaver && nextItemDur == Quaver && nextNextItemDur == Quaver && nextNextItemIsNote;
+									//var exception2 = barLength == Semibreve && noteStartBeat == 1;
+									if ( !exception1 ) {
+									
+										if (isNote) {
+											showError( "Note should not be beamed to notes in next beat\nSwitch any subsequent note(s)/rest(s) beam types to AUTO",noteRest);
+										} else {
+											showError( "Rest should not be included in beam group of next beat\nSwitch its beam type to AUTO", noteRest);
+										}
+									}
+								}
+							}
 							
 							if (cursor.next()) {
 								processingThisBar = cursor.measure.is(currentBar);
@@ -602,7 +644,7 @@ MuseScore {
 		} else {
 			
 			var objectHeight = element.bbox.height;
-			comment.offsetY = element.posY - 5.0 - objectHeight;
+			comment.offsetY = element.posY - 2.0 - objectHeight;
 			comment.offsetX = element.posX;
 			
 		}
@@ -615,7 +657,13 @@ MuseScore {
 		cursor.add(comment);
 		
 		// style the element
-		element.color = "hotpink";
+		if (element.type == Element.CHORD) {
+			element.color = "hotpink";
+			
+			for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
+		} else {
+			element.color = "hotpink";
+		}
 		curScore.endCmd();
 	}
 	
