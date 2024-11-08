@@ -181,10 +181,10 @@ MuseScore {
 				currentTimeSig = currentBar.timesigActual;
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
-				var barTick = currentBar.firstSegment.tick;
-				var barLength = currentBar.lastSegment.tick - barTick;
+				var barStart = currentBar.firstSegment.tick;
+				var barLength = currentBar.lastSegment.tick - barStart;
 				
-				dialog.msg += "\nbarTick = "+barTick+"; barLength = "+barLength;
+				dialog.msg += "\nbarStart = "+barStart+"; barLength = "+barLength;
 				
 				var beatLength = Crotchet;
 				var isPickupBar = false;
@@ -235,7 +235,7 @@ MuseScore {
 						//segment = currentBar.firstSegment;
 						cursor.voice = track;
 						cursor2.voice = track;
-						cursor.rewindToTick(barTick);
+						cursor.rewindToTick(barStart);
 						//cursor.next();
 						//dialog.msg += "\ncursorTick = "+cursor.tick;
 						dialog.msg += "\nTrack "+track;
@@ -261,7 +261,7 @@ MuseScore {
 								dialog.msg += "\nisRest = "+isRest+"; dur = "+soundingDur;
 								
 							}
-							var noteStart = cursor.tick - barTick;
+							var noteStart = cursor.tick - barStart;
 							var noteEnd = noteStart + soundingDur;
 							dialog.msg += "\nnoteStart = "+noteStart+"; noteEnd = "+noteEnd;
 							/*var nextItemPos;
@@ -297,7 +297,6 @@ MuseScore {
 							var lastNoteInTie = false;
 							var noteStartFrac = noteStart % beatLength;
 							var noteStartBeat = Math.trunc(noteStart/beatLength);
-							
 							var noteEndFrac = noteEnd % beatLength;
 							var noteEndBeat = Math.trunc(noteEnd/beatLength);
 							var noteFinishesBeat = !noteEndFrac;
@@ -313,8 +312,7 @@ MuseScore {
 							
 							//isAcc = noteRest.IsAcciaccatura or noteRest.IsAppoggiatura;
 							//isDoubleTremolo = noteRest.DoubleTremolos > 0;
-							var beam = null;
-							if (isNote) beam = noteRest.beam;	
+							var beam = noteRest.beam;	
 							//nextNextItem = null;
 							//nextNextItemDur = 0;
 							//nextItemIsNote = false;
@@ -326,7 +324,9 @@ MuseScore {
 							// hasPause = noteRest.GetArticulation(TriPauseArtic) or noteRest.GetArticulation(PauseArtic) or noteRest.GetArticulation(SquarePauseArtic);
 							// nextItemHasPause = false;
 							//nextItemIsHidden = false;
-							dialog.msg += "\npitch = "+pitch+"; beam = "+beam;
+							if (beam) dialog.msg += "\nBEAM = "+noteRest.beamMode;
+							var hasBeam = beam != null;
+							
 							var noteTypeString = "Note";
 							if (isRest) noteTypeString = "Rest";
 							
@@ -481,6 +481,60 @@ MuseScore {
 								}
 							} // end if hidesBeat
 									
+							// ** ————————————————————————————————————————————————— ** //
+							// **       CHECK 3: NOTE/REST SHOULD NOT BREAK BEAM    ** //
+							// ** ————————————————————————————————————————————————— ** //
+						
+							
+							var thisNoteAndPrevAreLessThanCrotchets = displayDur < Crotchet && prevDisplayDur < Crotchet && prevItemIsNote;
+							var restAtEndOfBeat = isRest && noteFinishesBeat;
+							var beamBroken = !isOnTheBeat && !hasBeam;
+							dialog.msg += "\nbeamBroken = "+beamBroken;
+
+
+							if (beamBroken && thisNoteAndPrevAreLessThanCrotchets && !restAtEndOfBeat) {
+								// go through rest of beat looking for a note
+								//trace("Here 1");
+								var dontBreakBeam = true;
+								if (!noteFinishesBeat) {
+									cursor2.rewindToTick(cursor.tick);
+									if (cursor2.next()) {
+										if (cursor2.measure.is(currentBar)) {
+											var tempPos = cursor2.tick;
+											var tempBeat = noteStartBeat;
+											var tempNote = cursor2.element;
+											var dontBreakBeam = false;
+											while (tempNote && tempBeat == noteStartBeat && !dontBreakBeam ) {
+												tempPos = cursor2.tick - barStart;
+												tempBeat = Math.trunc(tempPos / beatLength);
+												dialog.msg += "Here 3: tempPos = "+tempPos+"; tempBeat = "+tempBeat;
+												dontBreakBeam = tempNote.actualDuration.ticks < Crotchet && tempBeat == noteStartBeat;
+												var tempNoteIsRest = tempNote.type == Element.REST;
+												if (tempNoteIsRest) {
+													cursor2.next();
+													if (!cursor2.measure.is(currentBar)) {
+														tempNote = null;
+														tempBeat = startBeat + 1;
+													} else {
+														tempNote = cursor2.element;
+														tempPos = cursor2.ticks-barStart;
+														tempBeat = Math.trunc(tempPos / beatLength);
+													}
+												} else {
+													tempBeat = noteStartBeat + 1;
+												}
+											}
+										}
+									}
+								}
+								if (dontBreakBeam) {
+									if (isNote) {
+										showError("Note should be beamed to previous note",noteRest);
+									} else {
+										showError("Rest should not break beam of previous note",noteRest);
+									}
+								}
+							} // end if beamBroken
 							
 							
 							if (cursor.next()) {
@@ -488,7 +542,19 @@ MuseScore {
 							} else {
 								processingThisBar = false;
 							}
-							
+							//wasTied = isTied;	
+							//if (!isTied) {
+								//tiedActualDur = 0;
+								//tiedDisplayDur = 0;
+								//}
+
+							prevSoundingDur = soundingDur;
+							prevDisplayDur = displayDur;
+							prevItemIsNote = isNote;
+							//prevNoteWasDoubleTremolo = isDoubleTremolo;
+							//prevNoteCount = noteCount;
+							prevPitch = pitch;
+							//prevTupletSubdiv = tupletSubdiv;
 						} // end while processingThisBar
 					} // end track loop
 				} // end if canCheckThisBar
