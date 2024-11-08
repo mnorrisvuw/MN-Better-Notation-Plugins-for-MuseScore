@@ -144,8 +144,8 @@ MuseScore {
 		var numBarsProcessed;
 		var wasTied;
 		var currentTimeSig;
-		var prevActualDur, prevDisplayDur, prevNoteWasDoubleTremolo;
-		var tiedActualDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
+		var prevSoundingDur, prevDisplayDur, prevNoteWasDoubleTremolo;
+		var tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var numRests, restCrossesBeat, restStartedOnBeat, isLastRest;
 		var prevItemIsNote, prevNoteCount, prevPitch, prevTupletSubDiv;
 		var lastNoteInBar, lastRest;
@@ -208,11 +208,11 @@ MuseScore {
 				
 					// ** INITIALISE PARAMETERS ** //
 			
-					prevActualDur = 0;
+					prevSoundingDur = 0;
 					prevDisplayDur = 0;
 					prevNoteWasDoubleTremolo = false;
 					numComments = 0;
-					tiedActualDur = 0;
+					tiedSoundingDur = 0;
 					tiedDisplayDur = 0;
 					tieStartedOnBeat = false;
 					isTied = false;
@@ -302,12 +302,17 @@ MuseScore {
 							var noteEndBeat = Math.trunc(noteEnd/beatLength);
 							var noteFinishesBeat = !noteEndFrac;
 							var numBeatsHidden = noteEndBeat-noteStartBeat-noteFinishesBeat;
+							var noteHidesBeat = numBeatsHidden > 0;
+							var isOnTheBeat = !noteStartFrac;
+							var hasPause = false; // TO FIX
+							var isBarRest = isRest && soundingDur == barLength;
+							var isManuallyEnteredBarRest = isBarRest && noteRest.durationType.type < 14;
+							
 							
 							dialog.msg += "\nnoteStartFrac = "+noteStartFrac+"; noteStartBeat = "+noteStartBeat+"\nnoteEndFrac = "+noteEndFrac+"; noteEndBeat = "+noteEndBeat+"\nnoteFinishesBeat = "+noteFinishesBeat+"; numBeatsHidden = "+numBeatsHidden;
 							
 							//isAcc = noteRest.IsAcciaccatura or noteRest.IsAppoggiatura;
 							//isDoubleTremolo = noteRest.DoubleTremolos > 0;
-							var isOnTheBeat = !noteStartFrac;
 							var beam = null;
 							if (isNote) beam = noteRest.beam;	
 							//nextNextItem = null;
@@ -329,24 +334,154 @@ MuseScore {
 							// **   CHECK 1: CHECK FOR MANUALLY ENTERED BAR REST    ** //
 							// ** ————————————————————————————————————————————————— ** //
 							
-							var isManuallyEnteredBarRest = false;
-							if (isRest) {
-								if (soundingDur == barLength && noteRest.durationType.type < 14){
-									//if (isPickupBar) {
-										//if (actualDur > (Semibreve/timeSigDenom)) {
-										
-											//comment[numComments] = "Split rest to show beats in a pickup bar";
-										
-											//}
-									//} else {
+							if (isManuallyEnteredBarRest) showError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar, and press delete to revert to a correctly positioned bar rest.",noteRest);
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// **         CHECK 2: DOES THE NOTE HIDE THE BEAT??    ** //
+							// ** ————————————————————————————————————————————————— ** //
+
+							// check special case rests
+							var hidingBeatError = noteHidesBeat && !isBarRest; // make a temp version
+							if (hidingBeatError) {
+								if (isOnTheBeat) {
+									// ON THE BEAT RESTS
+									if (isRest) {
+										// dotted minim in 4/4 (anywhere)
+										if (timeSigNum == 4 && timeSigDenom == 4) {
+											if (soundingDur == DottedMinim) hidingBeatError = !hasPause;
+											if (soundingDur == Minim) hidingBeatError = (noteStartBeat == 1) && !hasPause;
+										}
+				
+										// dotted minim in 12/8
+										if (timeSigNum == 12 && timeSigDenom == 8) {
+											if (soundingDur == DottedMinim) hidingBeatError = (noteStartBeat == 1) && !hasPause;
+										}
+			
+										// minim in 3/4 (anywhere)
+										if (timeSigNum == 3 && timeSigDenom == 4) {
+											if (soundingDur == Minim) hidingBeatError = !hasPause;
+										}
+								
+										// onbeat dotted crotchet in 4
+										if (!isCompound && timeSigDenom > 2) {
+											if (soundingDur == DottedCrotchet) hidingBeatError = !hasPause;
+										}
+								
+										if (timeSigNum == 5 && timeSigDenom == 4) hidingBeatError = (soundingDur == Semibreve);
+									} else {
+										if (isCompound) {
+											if (soundingDur == beatLength * 2 || soundingDur == beatLength * 4) hidingBeatError = false;
+					
+										} else {
 									
-										//comment[numComments] = ;
-										//commentPosition[numComments] = pos;
-										//numComments = numComments + 1;
-									isManuallyEnteredBarRest = true;
-									showError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar, and press delete to revert to a correctly positioned bar rest.",noteRest);
+											// no semibreves in 5/4
+											if (timeSigNum == 5 && timeSigDenom == 4) {
+												hidingBeatError = (soundingDur == Semibreve);
+											} else {
+												hidingBeatError = false;
+											}
+										}
+									}			
+			
+								} else {
+									// ** OFF THE BEAT ** //
+									// ** FIRST, WE ASSUME THAT THE NOTE IS HIDING THE BEAT ** //
+
+									// ** exclude dotted crotchet if on 0.5 or 2.5
+			
+									// ** exclude crotchet if on 0.5 or 2.5
+									if (timeSigDenom == 4) {
+										if (timeSigNum == 4) {
+											if ((noteStart == Quaver || noteStart == Minim+Quaver) && (soundingDur == Crotchet || soundingDur == DottedCrotchet) && isNote) {
+												hidingBeatError = false; // OK to use crotchet or dotted crotchet,  rest or dotted rest here
+											}
+										} else {
+											if ((noteStartFrac == Quaver || noteStartFrac == 0) && (soundingDur == Crotchet || soundingDur == DottedCrotchet) && isNote) {
+												hidingBeatError = false; // OK to use crotchet or dotted crotchet,  rest or dotted rest here
+											}
+										}
+									}
+
+									// ** EXCLUDE LONG TUPLET
+									//if (tupletPlayedDuration > Crotchet) hidingBeatError = false;
+									// TO FIX
+
+									// ** EXCLUDE DOUBLE TREMOLOS ** //
+									//if (isDoubleTremolo) hidingBeatError = false;
+									// TO FIX
+
+									//if (actualDur == prevActualDur && prevNoteWasDoubleTremolo) hidingBeatError = false;
 								}
-							}
+								
+								if (hidingBeatError) {
+									if (isNote) {
+										if (timeSigNum == 5 && timeSigDenom == 4 && soundingDur == Semibreve) {
+											showError("Never use a semibreve in 5/4\nsplit the note to show the bar division of either 2+3 or 3+2",noteRest);
+										} else {
+											if (numBeatsHidden == 1) {
+												showError("Note hides beat "+(noteStartBeat + 2)+"\nsplit with a tie",noteRest);
+											} else {
+												var errStr = "Note hides beats ";
+
+												for (var i = 0; i < numBeatsHidden; i++) {
+													dialog.msg += "\ni="+i+"; nbh="+numBeatsHidden;
+													var beatStr = (noteStartBeat+2+i).toString();
+													errStr += beatStr;
+													dialog.msg += "\nerrStr="+errStr;
+													
+													if (i < numBeatsHidden - 2) {
+														errStr += ", ";
+														dialog.msg += "\nerrStr="+errStr;
+														
+													} else {
+														if (i == numBeatsHidden - 2) {
+															errStr += " + ";
+															dialog.msg += "\nerrStr="+errStr;
+															
+														} else {
+															errStr += " — split with a tie";
+															dialog.msg += "\nerrStr="+errStr;
+															
+														}
+													}
+												}
+												dialog.msg += "\nFinal errStr=‘"+errStr+"’";
+												
+												showError(errStr,noteRest);
+											}
+										}
+									} else {
+										if (timeSigNum == 5 && timeSigDenom == 4 && soundingDur == Semibreve) {
+											showError("Never use a semibreve rest in 5/4\nsplit the rest to show the bar division of either 2+3 or 3+2",noteRest);
+										} else {
+											showError( "Rest hides beat "+(noteStartBeat + 2)+" — split into two rests",noteRest);
+											if (numBeatsHidden = 1) {
+												showError( "Rest hides beat "+(noteStartBeat + 2)+" — split into two rests",noteRest);
+											} else {
+												var errStr = "Rest hides beats ";
+
+												for (var i = 0; i < numBeatsHidden; i++) {
+													var beatStr = (noteStartBeat+2+i).toString();
+													
+													errStr += beatStr;
+													if (i < numBeatsHidden - 2) {
+														errStr += ", ";
+													} else {
+														if (i == numBeatsHidden - 2) {
+															errStr += " + ";
+														} else {
+															errStr += " — split into two rests";
+														}
+													}
+												}
+												showError(errStr,noteRest);
+											}
+										}
+									}
+								}
+							} // end if hidesBeat
+									
+							
 							
 							if (cursor.next()) {
 								processingThisBar = cursor.measure.is(currentBar);
