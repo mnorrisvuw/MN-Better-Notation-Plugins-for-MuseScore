@@ -169,12 +169,11 @@ MuseScore {
 			cursor.filter = Segment.ChordRest;
 			cursor2.filter = Segment.ChordRest;
 			currentBar = cursor.measure;
-			dialog.msg += "\n—————————————————\nStaff: "+currentStaffNum;
-			dialog.msg += "\ncurrentBar: "+currentBar;
+			//dialog.msg += "\ncurrentBar: "+currentBar;
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 				
-				dialog.msg += "\nBar num: "+currentBarNum;
+				dialog.msg += "\n—————————————————\nBAR "+currentBarNum;
 				
 				// ** UPDATE PROGRESS MESSAGE ** //
 								
@@ -247,7 +246,6 @@ MuseScore {
 						//currentBar = cursor.measure;
 						var processingThisBar = cursor.element;
 						while (processingThisBar) {
-							var pos = cursor.tick;
 							var noteRest = cursor.element;
 							var isHidden = !noteRest.visible;
 							var isRest = noteRest.type == Element.REST;
@@ -257,18 +255,15 @@ MuseScore {
 							var tuplet = noteRest.tuplet;
 							if (noteRest.tuplet) {
 								var tupletNumerator = noteRest.tuplet.actualDuration.numerator;
-								//if (tupletNumerator == 2 || tupletNumerator == 4) {
-									
-									//}
 								dialog.msg += "\nisRest = "+isRest+"; dur = "+displayDur+"; sounding = "+soundingDur;
 								
 							} else {
 								dialog.msg += "\nisRest = "+isRest+"; dur = "+soundingDur;
 								
 							}
-							var pos = cursor.tick - barTick;
-							dialog.msg += "\npos = "+pos;
-							
+							var noteStart = cursor.tick - barTick;
+							var noteEnd = noteStart + soundingDur;
+							dialog.msg += "\nnoteStart = "+noteStart+"; noteEnd = "+noteEnd;
 							/*var nextItemPos;
 							cursor2.rewindToTick(pos);
 							//if (cursor2) dialog.msg += "\n1 cursor2Tick = "+cursor2.tick;
@@ -300,10 +295,19 @@ MuseScore {
 							
 							var isTied = false;
 							var lastNoteInTie = false;
-							var posFrac = pos%beatLength;
+							var noteStartFrac = noteStart % beatLength;
+							var noteStartBeat = Math.trunc(noteStart/beatLength);
+							
+							var noteEndFrac = noteEnd % beatLength;
+							var noteEndBeat = Math.trunc(noteEnd/beatLength);
+							var noteFinishesBeat = !noteEndFrac;
+							var numBeatsHidden = noteEndBeat-noteStartBeat-noteFinishesBeat;
+							
+							dialog.msg += "\nnoteStartFrac = "+noteStartFrac+"; noteStartBeat = "+noteStartBeat+"\nnoteEndFrac = "+noteEndFrac+"; noteEndBeat = "+noteEndBeat+"\nnoteFinishesBeat = "+noteFinishesBeat+"; numBeatsHidden = "+numBeatsHidden;
+							
 							//isAcc = noteRest.IsAcciaccatura or noteRest.IsAppoggiatura;
 							//isDoubleTremolo = noteRest.DoubleTremolos > 0;
-							var isOnTheBeat = !posFrac;
+							var isOnTheBeat = !noteStartFrac;
 							var beam = null;
 							if (isNote) beam = noteRest.beam;	
 							//nextNextItem = null;
@@ -318,7 +322,31 @@ MuseScore {
 							// nextItemHasPause = false;
 							//nextItemIsHidden = false;
 							dialog.msg += "\npitch = "+pitch+"; beam = "+beam;
+							var noteTypeString = "Note";
+							if (isRest) noteTypeString = "Rest";
 							
+							// ** ————————————————————————————————————————————————— ** //
+							// **   CHECK 1: CHECK FOR MANUALLY ENTERED BAR REST    ** //
+							// ** ————————————————————————————————————————————————— ** //
+							
+							var isManuallyEnteredBarRest = false;
+							if (isRest) {
+								if (soundingDur == barLength && noteRest.durationType.type < 14){
+									//if (isPickupBar) {
+										//if (actualDur > (Semibreve/timeSigDenom)) {
+										
+											//comment[numComments] = "Split rest to show beats in a pickup bar";
+										
+											//}
+									//} else {
+									
+										//comment[numComments] = ;
+										//commentPosition[numComments] = pos;
+										//numComments = numComments + 1;
+									isManuallyEnteredBarRest = true;
+									showError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar, and press delete to revert to a correctly positioned bar rest.",noteRest);
+								}
+							}
 							
 							if (cursor.next()) {
 								processingThisBar = cursor.measure.is(currentBar);
@@ -373,7 +401,7 @@ MuseScore {
 		} else {
 			
 			var objectHeight = element.bbox.height;
-			comment.offsetY = element.posY - 2.0 - objectHeight;
+			comment.offsetY = element.posY - 5.0 - objectHeight;
 			comment.offsetX = element.posX;
 			
 		}
