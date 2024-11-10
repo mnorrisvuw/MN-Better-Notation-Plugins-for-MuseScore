@@ -23,6 +23,8 @@ MuseScore {
 	// **** GLOBALS **** //
 	property var timeSigs: []
 	property var timeSigTicks: []
+	property var commentPosArray: []
+	
 
   onRun: {
 		if (!curScore) return;
@@ -55,9 +57,11 @@ MuseScore {
 		var possibleOnbeatSimplificationLabels = ["semiquaver","dotted semiquaver","quaver","dotted quaver","double-dotted quaver","crotchet","dotted crotchet","minim","dotted minim","semibreve"];
 		var possibleOffbeatSimplificationDurs = [Semiquaver,DottedSemiquaver,Quaver,DottedQuaver,DoubleDottedQuaver,Crotchet,DottedCrotchet];
 		var	possibleOffbeatSimplificationLabels = ["semiquaver","dotted semiquaver","quaver","dotted quaver","double-dotted quaver","crotchet","dotted crotchet"];
+		commentPosArray = Array(10000).fill(0);
 
 		
 		dialog.msg = "";
+		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
 		if (!curScore.selection.isRange) {
@@ -149,7 +153,7 @@ MuseScore {
 		var numRests, restCrossesBeat, restStartedOnBeat, isLastRest;
 		var prevItemIsNote, prevNoteCount, prevPitch, prevTupletSubDiv;
 		var lastNoteInBar, lastRest;
-		var numComments, totalDur;
+		var totalDur;
 		
 		numBarsProcessed = 0;
 		
@@ -571,7 +575,7 @@ MuseScore {
 									if ( !exception1 ) {
 									
 										if (isNote) {
-											showError( "Note should not be beamed to notes in next beat\nSwitch any subsequent note(s)/rest(s) beam types to AUTO",noteRest);
+											showError( "Note should not be beamed to notes in next beat\nSwitch all following note(s)/rest(s) under the beam to AUTO",noteRest);
 										} else {
 											showError( "Rest should not be included in beam group of next beat\nSwitch its beam type to AUTO", noteRest);
 										}
@@ -618,10 +622,12 @@ MuseScore {
 	}
 	
 	function showError (text, element) {
+		var staff = element.staff;
+		var staffNum = 0;
+		while (!curScore.staves[staffNum].is(staff)) staffNum ++;
+		var commentOffset = 1;
 		curScore.startCmd()
-		
 		// add a text object at the location where the element is
-
 		var comment = newElement(Element.STAFF_TEXT);
 		comment.text = text;
 		
@@ -631,30 +637,37 @@ MuseScore {
 		comment.frameWidth = 0.2;
 		comment.frameBgColor = "yellow";
 		comment.frameFgColor = "black";
-		comment.fontSize = 8.0;
+		comment.fontSize = 7.0;
 		comment.fontFace = "Helvetica"
 		comment.autoplace = false;
+		var commentHeight = comment.bbox.height;
+		var elementHeight = element.bbox.height;
+		var tick = 0;
+		var segment = curScore.firstSegment();
 		
 		if (element === "top") {
 			var firstMeasure = curScore.firstMeasure;
 			var pagePos = firstMeasure.pagePos;
-			element = firstMeasure;
-			comment.offsetY = 4.0-pagePos.y;
-			
+			element = firstMeasure;			
 		} else {
-			
-			var objectHeight = element.bbox.height;
-			comment.offsetY = element.posY - 2.0 - objectHeight;
 			comment.offsetX = element.posX;
-			
 		}
 		var segment = element.parent;
 		var tick = segment.tick;
 		
 		// add text object to score
 		var cursor = curScore.newCursor();
+		cursor.staffIdx = staffNum;
 		cursor.rewindToTick(tick);
 		cursor.add(comment);
+		comment.offsetY = -commentHeight;
+		var commentTopRounded = Math.round(comment.pagePos.y);
+		
+		while (commentPosArray[commentTopRounded+1000]) {
+			commentTopRounded -= commentOffset;
+			comment.offsetY -= commentOffset;
+		}
+		commentPosArray[commentTopRounded+1000] = true;
 		
 		// style the element
 		if (element.type == Element.CHORD) {
@@ -665,6 +678,54 @@ MuseScore {
 			element.color = "hotpink";
 		}
 		curScore.endCmd();
+	}
+	
+	function deleteAllCommentsAndHighlights () {
+		// ** SAVE CURRENT SELECTION ** //
+		var s = curScore.selection;
+		var startStaff = s.startStaff;
+		var endStaff = s.endStaff;
+		var startTick = 0;
+		if (s.startSegment) startTick = s.startSegment.tick;
+		var endTick = curScore.lastSegment.tick;
+		if (s.endSegment) endTick = s.endSegment.tick + 1;
+		
+		// **** GET ALL ITEMS **** //
+		curScore.startCmd()
+		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
+		curScore.endCmd()
+		var elems = curScore.selection.elements;
+		dialog.msg = "Num elemns: "+elems.length;
+		var elementsToRemove = [];
+		var elementsToRecolor = [];
+		for (var i = 0; i < elems.length; i++) {
+
+			var e = elems[i];
+			var t = e.type;
+			var c = e.color;
+			
+			// style the element
+			if (Qt.colorEqual(c,"hotpink")) {
+				elementsToRecolor.push(e);
+			} else {
+				if (t == Element.STAFF_TEXT) {
+					if (Qt.colorEqual(e.frameBgColor,"yellow") && Qt.colorEqual(e.frameFgColor,"black")) {
+						elementsToRemove.push(e);
+					}
+				}
+			}
+		}
+		curScore.startCmd();
+		for (var i = 0; i < elementsToRecolor.length; i++) {
+			elementsToRecolor[i].color = "black";
+		}
+		for (var i = 0; i < elementsToRemove.length; i++) {
+			removeElement(elementsToRemove[i]);
+		}
+		
+		curScore.selection.selectRange(0,endTick,startStaff,endStaff);
+		curScore.endCmd();
+		
 	}
 	
 	ApplicationWindow {

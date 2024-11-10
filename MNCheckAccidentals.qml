@@ -643,11 +643,8 @@ MuseScore {
 	
 	function showError (text, element, staffNum) {
 		var commentOffset = 1;
-		
 		curScore.startCmd()
-		
 		// add a text object at the location where the element is
-
 		var comment = newElement(Element.STAFF_TEXT);
 		comment.text = text;
 		
