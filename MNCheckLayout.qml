@@ -796,29 +796,23 @@ MuseScore {
 		var subsequentStaffNamesShouldBeHidden = numParts < 6;
 		
 		// ** are the first staff names visible? ** //
-		var firstStaffNameVisible = style.value("firstSystemInstNameVisibility") != 0; // note that 0 = long names, 1 = short names, 2 = hidden
+		var firstStaffNameVisibleSetting = style.value("firstSystemInstNameVisibility"); // note that 0 = long names, 1 = short names, 2 = hidden
 		//dialog.msg += "\nfirstSystemInstNameVisibility value = "+firstStaffNameVisible;
 		
-		if (firstStaffNameVisible) {
-			firstStaffNameVisible = false;
+		if (firstStaffNameVisibleSetting == 0 || firstStaffNameVisibleSetting == 1) {
+			firstStaffNameVisibleSetting = 2;
 			for (var i = 0; i < numParts; i++) {
 				if (parts[i].longName != "") {
-					firstStaffNameVisible = true;
+					firstStaffNameVisibleSetting = 0;
 					break;
 				}
 			}
 		}
 		//dialog.msg += "\nfirstStaffNameVisible: "+firstStaffNameVisible;
 		
-		if (firstStaffNameShouldBeHidden) {
-			if (!style.value("hideInstrumentNameIfOneInstrument")) {
-				styleComments += "\n(Score tab) Tick ‘Hide if there is only one instrument’";
-			} else {
-				if (firstStaffNameVisible) styleComments += "\n(Score tab) Hide the staff names for a solo work.";
-			}
-		} else {
-			if (!firstStaffNameVisible) styleComments += "\n(Score tab) Set Instrument names→On first system of sections to ‘Long name’."
-		}
+		if (firstStaffNameShouldBeHidden && !style.value("hideInstrumentNameIfOneInstrument")) styleComments += "\n(Score tab) Tick ‘Hide if there is only one instrument’";
+		if (!firstStaffNameShouldBeHidden && firstStaffNameVisibleSetting == 2) styleComments += "\n(Score tab) Set Instrument names→On first system of sections to ‘Long name’."
+
 		var subsStaffNamesVisible = style.value("subsSystemInstNameVisibility") != 1;
 		//dialog.msg += "\nsubsStaffNamesVisible: "+subsStaffNamesVisible;
 		
@@ -844,20 +838,23 @@ MuseScore {
 		
 		// ** POST STYLE COMMENTS
 		if (styleComments != "") {
+			styleComments = styleComments.substring(1); // delete first \n
 			if (styleComments.split('\n').length == 1) {
-				styleComments = "I recommend making the following change to the score’s Style (Format→Style…):"+styleComments;
+				styleComments = "I recommend making the following change to the score’s Style (Format→Style…):\n"+styleComments;
 			} else {
-				styleComments = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+styleComments.substring(1).split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
+				styleComments = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+styleComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
 			}
 			showError(styleComments,"pagetop");
 		}
 		
 		// ** SHOW PAGE SETTINGS ERROR ** //
 		if (pageSettingsComments != "") {
+			pageSettingsComments = pageSettingsComments.substring(1); // delete first \n
+			
 			if (pageSettingsComments.split('\n').length == 1) {	
-				pageSettingsComments = "I recommend making the following change to the score’s Page Settings (Format→Page settings…)"+pageSettingsComments;
+				pageSettingsComments = "I recommend making the following change to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments;
 			} else {
-				pageSettingsComments = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.substring(1).split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
+				pageSettingsComments = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
 			}
 			showError(pageSettingsComments,"pagetop");
 		}
