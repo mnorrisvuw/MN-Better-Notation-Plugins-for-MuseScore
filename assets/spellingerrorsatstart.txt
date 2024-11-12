@@ -50,3 +50,5 @@ ord. vib
 vib. norm.
 vib. ord
 vib. norm.
+à tempo
+a tempo
