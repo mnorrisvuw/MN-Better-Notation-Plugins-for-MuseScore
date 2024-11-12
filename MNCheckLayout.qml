@@ -71,6 +71,10 @@ MuseScore {
 	property var tempomarkings: ""
 	property var tempochangemarkings: ""
 	property var prevTimeSig: ""
+	property var currentInstrumentName: ""
+	property var prevClef: null
+	property var errorStrings: []
+	property var errorObjects: []
 	
   onRun: {
 		if (!curScore) return;
@@ -104,11 +108,15 @@ MuseScore {
 		var flaggedLedgerLines = false;
 		var cursor = curScore.newCursor();
 		var cursor2 = curScore.newCursor();
+		var instrumentNames = [];
 		
 		// **** INITIALISE PROPERTIES AND ARRAYS **** //
 		var isSpellingError = false;
 		initialTempoExists = false;
-		for (var i = 0; i < numStaves; i++) instrumentIds.push(staves[i].part.instrumentId);
+		for (var i = 0; i < numStaves; i++) {
+			instrumentIds.push(staves[i].part.instrumentId);
+			instrumentNames.push(staves[i].part.longName);
+		}
 		
 		// ********************** DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS ********************** //
 		deleteAllCommentsAndHighlights();
@@ -129,7 +137,7 @@ MuseScore {
 			
 		// ************************ PREP FOR A FULL LOOP THROUGH THE SCORE ********************** //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied;
-		var firstStaffNum, firstBarNum, firstBarInScore, firstBarInSelection, firstTickInSelection, firstStaffInSelection;
+		var firstStaffNum, firstBarNum, firstBarInScore, firstSegmentInScore, firstBarInSelection, firstTickInSelection, firstStaffInSelection;
 		var lastStaffNum, lastBarNum, lastBarInScore, lastBarInSelection, lastTickInSelection, lastStaffInSelection;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 
@@ -138,6 +146,7 @@ MuseScore {
 		
 		// **** CALCULATE FIRST BAR IN SCORE & SELECTION **** //
 		firstBarInScore = curScore.firstMeasure;
+		
 		cursor.rewind(Cursor.SELECTION_START);
 		firstBarInSelection = cursor.measure;
 		firstTickInSelection = cursor.tick;
@@ -171,57 +180,93 @@ MuseScore {
 			previousKeySigSharps = -99;
 			previousKeySigBarNum = 0;
 			prevTimeSig = "";
+			prevBarNum = 0;
+			prevClef = null;
 			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
 			cursor.filter = Segment.HeaderClef;
 			cursor.staffIdx = currentStaffNum;
 			cursor.voice = 0;
-			cursor.track = currentStaffNum * 4;
 			cursor.rewind(Cursor.SCORE_START);
 			if (cursor.element == null) cursor.next();
 			currentBar = cursor.measure;
-			prevBarNum = 0;
 			var clef = cursor.element;
+			currentInstrumentName = instrumentNames[currentStaffNum];
 			//dialog.msg += "\nHeader clef = "+clef.subtypeName();
 			
 			if (clef == null) {
 				dialog.msg += "\nNO CLEF OBJECT FOUND";
 			} else {
-				setCurrentClefVariables(clef);
+				checkClef(clef);
 			}
-			
-			cursor.filter = Segment.All;
-			cursor.next();
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 				
 				var barStart = currentBar.firstSegment.tick;
 				var barLength = currentBar.lastSegment.tick - barStart;
 				var startTrack = currentStaffNum * 4;
-				var endTrack = startTrack + 4;
 				dialog.msg += "\n*** currentBar = "+currentBarNum;
 				
-				for (var track = startTrack; track < endTrack; track++) {
+				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
+					//dialog.msg += "\n*** track = "+currentTrack;
 					
-					cursor.track = track;
-					cursor2.track = track;
+					cursor.filter = Segment.All;
+					cursor.track = currentTrack;
+					//cursor2.voice = voice;
 					cursor.rewindToTick(barStart);
 				
 					var processingThisBar = cursor.element;
 					while (processingThisBar) {
+						var currSeg = cursor.segment;
+						var annotations = currSeg.annotations;
+						//dialog.msg += "Found "
 						var elem = cursor.element;
 						var eType = elem.type;
+						var eName = elem.name;
+						
+						if (currentStaffNum == 0 && currentBarNum == 3) {
+							dialog.msg+= "\nelem = "+eName+" "+eType;
+						}
 						
 						// **** FOUND A CLEF **** //
-						if (eType === Element.CLEF) setCurrentClefVariables(elem);
+						if (eType === Element.CLEF) checkClef(elem);
 						
+						// **** FOUND A KEY SIGNATURE **** //
 						if (eType === Element.KEYSIG && currentStaffNum == firstStaffNum) checkKeySignature(elem,cursor.keySignature);
 						
-						if (eType === Element.TEXT || eType === Element.TEMPO_TEXT || eType === Element.STAFF_TEXT || eType === Element.SYSTEM_TEXT) checkTextObject(element, currentBarNum);
-						
+						// **** FOUND A TIME SIGNATURE **** //
 						if (eType === Element.TIMESIG) checkTimeSignature(elem);
 						
+						// GO THROUGH ANNOTATIONS
+						
+						if (annotations && annotations.length) {
+							for (var aIndex in annotations) {
+								var theAnnotation = annotations[aIndex];
+								dialog.msg+="\nanno track = "+theAnnotation.track+" MATCH = "+(theAnnotation.track == currentTrack);
+								if (theAnnotation.track == currentTrack) {
+									var aName = theAnnotation.name;
+									var aType = theAnnotation.type;
+									var aText = theAnnotation.text;
+									//if (aText) dialog.msg += "\nAnno has text! "+aText;
+									//if (currentStaffNum == 0 && currentBarNum == 3) {
+										//dialog.msg+= "\nanno = "+aName+" "+aType+" "+Element.EXPRESSION;
+										//dialog.msg+= "\nisExpression = "+(aType == Element.EXPRESSION);
+										
+										//}
+									// **** FOUND A TEXT OBJECT **** //
+									if (aText) checkTextObject(theAnnotation, currentBarNum);
+								
+						
+									// **** FOUND AN OTTAVA **** //
+									if (aType === Element.OTTAVA || aType === Element.OTTAVA_SEGMENT) checkOttava(theAnnotation);
+								}
+							}
+						}
+						
+						
+						
+						// **** FOUND A CHORD **** //
 						if (eType === Element.CHORD) {
 							var noteRest = cursor.element;
 							var isHidden = !noteRest.visible;
@@ -266,36 +311,36 @@ MuseScore {
 								if (!flaggedLedgerLines) {
 									if (numLedgerLines > 5) {
 										if (isBassClef && (readsTenor || readsTreble)) {
-											showError("This passage is very high for bass clef;\nit may be better in tenor or treble clef",noteRest);
+											addError("This passage is very high for bass clef;\nit may be better in tenor or treble clef",noteRest);
 											flaggedLedgerLines = true;
 										}
 										if (isTenorClef && readsTreble) {
-											showError("This passage is very high for tenor clef;\nit may be better in treble clef",noteRest);
+											addError("This passage is very high for tenor clef;\nit may be better in treble clef",noteRest);
 											flaggedLedgerLines = true;
 										}
 										if (isTrebleClef && reads8va) {
-											showError("This passage is very high for treble clef;\nit may be better with an 8va symbol",noteRest);
+											addError("This passage is very high for treble clef;\nit may be better with an 8va symbol",noteRest);
 											flaggedLedgerLines = true;
 										}
 									}
 									if (numLedgerLines < -5) {
 										if (isTrebleClef) {
 											if (readsBass) {
-												showError(errors,"This passage is very low for treble clef;\nit may be better in bass clef",noteRest);
+												addError(errors,"This passage is very low for treble clef;\nit may be better in bass clef",noteRest);
 												flaggedLedgerLines = true;
 											} else {
 												if (readsAlto) {
-													showError("This passage is very low for treble clef;\nit may be better in alto clef",noteRest);
+													addError("This passage is very low for treble clef;\nit may be better in alto clef",noteRest);
 													flaggedLedgerLines = true;
 												}
 											}
 										}
 										if (isTenorClef && readsBass) {
-											showError(errors,"This passage is very low for tenor clef;\nit may be better in bass clef",noteRest);
+											addError(errors,"This passage is very low for tenor clef;\nit may be better in bass clef",noteRest);
 											flaggedLedgerLines = true;
 										}
 										if (isBassClef && reads8va) {
-											showError(errors,"This passage is very low for bass clef;\nit may be better with an 8ba",noteRest);
+											addError(errors,"This passage is very low for bass clef;\nit may be better with an 8ba",noteRest);
 											flaggedLedgerLines = true;
 										}
 									}
@@ -304,40 +349,40 @@ MuseScore {
 										if (isBassClef) {
 											//trace(averageNumLedgerLines);
 											if (readsTenor && averageNumLedgerLines > 2) {
-												showError("This passage is very high;\nit may be better in tenor or treble clef",noteRest);
+												addError("This passage is very high;\nit may be better in tenor or treble clef",noteRest);
 												flaggedLedgerLines = true;
 											}
 											if (readsTreble && averageNumLedgerLines > 3) {
-												showError("This passage is very high;\nit may be better in treble clef",noteRest);
+												addError("This passage is very high;\nit may be better in treble clef",noteRest);
 												flaggedLedgerLines = true;
 											}
 											if (reads8va && averageNumLedgerLines < -4) {
-												showError("This passage is very low;\nit may be better with an 8ba",noteRest);
+												addError("This passage is very low;\nit may be better with an 8ba",noteRest);
 												flaggedLedgerLines = true;
 											}
 										}
 					
 										if (isTenorClef) {
 											if (readsTreble && averageNumLedgerLines > 2) {
-												showError("This passage is very high;\nit may be better in treble clef",noteRest);
+												addError("This passage is very high;\nit may be better in treble clef",noteRest);
 												flaggedLedgerLines = true;
 											}
 											if (readsBass && averageNumLedgerLines < -1) {
-												showError("This passage is very low;\nit may be better in bass clef",noteRest);
+												addError("This passage is very low;\nit may be better in bass clef",noteRest);
 												flaggedLedgerLines = true;
 											}
 										}
 										if (isTrebleClef) {
 											if (reads8va && averageNumLedgerLines > 4) {
-												showError("This passage is very high;\nit may be better with an 8va",noteRest);
+												addError("This passage is very high;\nit may be better with an 8va",noteRest);
 												flaggedLedgerLines = true;
 											}
 											if (readsTenor && averageNumLedgerLines < -1) {
-												showError("This passage is very low;\nit may be better in tenor clef",noteRest);
+												addError("This passage is very low;\nit may be better in tenor clef",noteRest);
 												flaggedLedgerLines = true;
 											} else {
 												if (readsBass && averageNumLedgerLines < -2) {
-													showError("This passage is very low;\nit may be better in bass clef",noteRest);
+													addError("This passage is very low;\nit may be better in bass clef",noteRest);
 													flaggedLedgerLines = true;
 												}
 											}
@@ -361,7 +406,7 @@ MuseScore {
 							processingThisBar = false;
 						}
 					} // end while processingThisBar
-				} // end track loop
+				} // end voice loop
 				if (currentBar) currentBar = currentBar.nextMeasure;
 				numBarsProcessed ++;
 			}// end currentBar num
@@ -370,8 +415,12 @@ MuseScore {
 		// mop up any last tests
 		
 		// ** CHECK FOR OMITTED INITIAL TEMPO ** //
-		if (!initialTempoExists) showError('I couldn’t find an initial tempo marking','top');
+		if (!initialTempoExists) addError('I couldn’t find an initial tempo marking','top');
 		
+		// ** SHOW ALL OF THE ERRORS ** //
+		showAllErrors();
+		
+		// ** SHOW INFO DIALOG ** //
 		dialog.show();
 	}
 	
@@ -482,15 +531,19 @@ MuseScore {
 	
 	function checkTextObject (textObject,barNum) {
 		var eType = textObject.type;
-		dialog.msg += "\nChecking textObject "+textObject;
+		var eName = textObject.name;
+		var styledText = textObject.text;
+		
+		dialog.msg += "\nstyledtext = "+styledText;
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
 		if (!Qt.colorEqual(textObject.frameBgColor,"yellow") || !Qt.colorEqual(textObject.frameFgColor,"black")) {	
 			var textStyle = textObject.subStyle;
 			var tn = textObject.name.toLowerCase();
-			//dialog.msg += "\nText style is "+textStyle+"; tn = "+tn;
-			var styledText = textObject.text;
-			var plainText = styledText.replace(/<\/[^>]+(>|$)/g, "");
+			dialog.msg += "\nText style is "+textStyle+"; tn = "+tn;
+			var plainText = styledText.replace(/<[^>]+>/g, "");
 			var lowerCaseText = plainText.toLowerCase();
+			dialog.msg += "\nplainText = "+plainText+" lowerCaseText "+lowerCaseText;
+			
 			if (lowerCaseText != '') {
 				var len = plainText.length;
 				var isVisible = textObject.visible;
@@ -508,9 +561,9 @@ MuseScore {
 					}
 				}
 				if (isTempoChangeMarking) {
-					if (eTypetype != Element.TEMPO_TEXT) showError( "‘"+plainText+"’ is a tempo change marking\nbut has not been entered as Tempo Text",textObject);
+					if (eTypetype != Element.TEMPO_TEXT) addError( "‘"+plainText+"’ is a tempo change marking\nbut has not been entered as Tempo Text",textObject);
 					// check capitalisation
-					if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) showError("‘"+plainText+"’ looks like it is a temporary change of tempo\nif it is, it should not have a capital first letter (see Behind Bars, p. 182)",textObject);
+					if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo\nif it is, it should not have a capital first letter (see Behind Bars, p. 182)",textObject);
 				}
 		
 				// ** CHECK TEMPO MARKING NOT IN TEMPO TEXT ** //
@@ -524,59 +577,59 @@ MuseScore {
 				}
 				if (isTempoMarking) {
 					// check is in tempo text
-					if (eType != Element.TEMPO_TEXT) showError("Text ‘"+plainText+"’ is a tempo marking\nbut has not been entered as Tempo Text",textObject);
+					if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking\nbut has not been entered as Tempo Text",textObject);
 				
 					// check capitalisation
-					if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) showError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See Behind Bars, p. 182)",textObject);
+					if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See Behind Bars, p. 182)",textObject);
 				}
 			
 				// ** CHECK WRITTEN OUT TREM ** //
-				if (lowerCaseText === "trem" || lowerCaseText === "trem." || lowerCaseText === "tremolo") showError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
+				if (lowerCaseText === "trem" || lowerCaseText === "trem." || lowerCaseText === "tremolo") addError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
 		
 				// ** CHECK COMMON MISSPELLINGS ** //
-				if (lowerCaseText === "mute" || lowerCaseText === "with mute" || lowerCaseText === "add mute" || lowerCaseText === "put on mute" || lowerCaseText === "put mute on" || lowerCaseText === "muted") showError( "This is best written as ‘con sord.’",textObject);
-				if (lowerCaseText === "unmuted" || lowerCaseText === "no mute" || lowerCaseText === "remove mute" || lowerCaseText === "take off mute" || lowerCaseText === "take mute off") showError( "This is best written as ‘senza sord.’",textObject);
-				if (lowerCaseText.substring(0,5) === "arco.") showError( "‘arco’ should not have a full-stop at the end.",textObject);
-				if (lowerCaseText.substring(0,10) === "sul tasto.") showError( "‘tasto’ should not have a full-stop at the end.",textObject);
-				if (lowerCaseText === "norm") showError( "‘norm’ should have a full-stop at the end\n(but is more commonly written as ‘ord.’).",textObject);
-				if (lowerCaseText.includes("sul. ")) showError( "‘sul’ should not have a full-stop after it.",textObject);
-				if (lowerCaseText.includes("  ")) showError( "This text has a double-space in it.",textObject);
-				if (lowerCaseText === "normale") showError("Abbreviate ‘normale’ as ‘norm.’ or ‘ord.’.",textObject);
+				if (lowerCaseText === "mute" || lowerCaseText === "with mute" || lowerCaseText === "add mute" || lowerCaseText === "put on mute" || lowerCaseText === "put mute on" || lowerCaseText === "muted") addError( "This is best written as ‘con sord.’",textObject);
+				if (lowerCaseText === "unmuted" || lowerCaseText === "no mute" || lowerCaseText === "remove mute" || lowerCaseText === "take off mute" || lowerCaseText === "take mute off") addError( "This is best written as ‘senza sord.’",textObject);
+				if (lowerCaseText.substring(0,5) === "arco.") addError( "‘arco’ should not have a full-stop at the end.",textObject);
+				if (lowerCaseText.substring(0,10) === "sul tasto.") addError( "‘tasto’ should not have a full-stop at the end.",textObject);
+				if (lowerCaseText === "norm") addError( "‘norm’ should have a full-stop at the end\n(but is more commonly written as ‘ord.’).",textObject);
+				if (lowerCaseText.includes("sul. ")) addError( "‘sul’ should not have a full-stop after it.",textObject);
+				if (lowerCaseText.includes("  ")) addError( "This text has a double-space in it.",textObject);
+				if (lowerCaseText === "normale") addError("Abbreviate ‘normale’ as ‘norm.’ or ‘ord.’.",textObject);
 			
 				// ** CHECK STRAIGHT/CURLY QUOTES ** //
-				if (lowerCaseText.includes("'")) showError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.",textObject);
-				if (lowerCaseText.includes('"')) showError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.',textObject);
+				if (lowerCaseText.includes("'")) addError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.",textObject);
+				if (lowerCaseText.includes('\"')) addError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.',textObject);
 			
 				// ** CHECK FOR STYLES ** //
-				if (styledText.includes("<i>arco")) showError("‘arco’ should not be italicised.",textObject);
-				if (styledText.includes("<i>pizz")) showError("‘pizz.’ should not be italicised.",textObject);
-				if (styledText.includes("<i>con sord")) showError("‘con sord.’ should not be italicised.",textObject);
-				if (styledText.includes("<i>senza sord")) showError("‘senza sord.’ should not be italicised.",textObject);
-				if (styledText.includes("<i>ord.")) showError("‘ord.’ should not be italicised.",textObject);
-				if (styledText.includes("<i>sul ")) showError("String techniques should not be italicised.",textObject);
-				if (styledText.slice(3) === "<b>") showError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);
+				if (styledText.includes("<i>arco")) addError("‘arco’ should not be italicised.",textObject);
+				if (styledText.includes("<i>pizz")) addError("‘pizz.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>con sord")) addError("‘con sord.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>senza sord")) addError("‘senza sord.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>ord.")) addError("‘ord.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>sul ")) addError("String techniques should not be italicised.",textObject);
+				if (styledText.slice(3) === "<b>") addError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);
 			
 				// ** IS THIS A DYNAMICS SYMBOL OR MANUALLY ENTERED DYNAMICS? ** //
 				var isDyn = styledText.includes('<sym>dynamics') || isDynamic(lowerCaseText);
-			
+				dialog.msg += "\n"+lowerCaseText+" isDyn = "+isDyn;
 				// ** CHECK FOR DYNAMIC ENTERED AS EXPRESSION (OR OTHER) TEXT ** //
 			
-				if (isDyn && tn != "dynamics") showError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette",textObject);
+				if (isDyn && tn != "dynamics") addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette",textObject);
 			
 				// ** CHECK FOR TECHNIQUES ENTERED AS EXPRESSION TEXT ** //
 				var shouldBeTechnique = false;
-				if (tn == "expression") {
+				if (tn === "expression") {
 					for (var i = 0; i < techniques.length; i ++) {
 						if (lowerCaseText.includes(techniques[i])) {
-							showError("This looks like a technique, but has been incorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
+							addError("This looks like a technique, but has been incorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
 							shouldBeTechnique = true;
 							break;
 						}
 					}
 				}
 				// ** CHECK STARTING WITH SPACE OR NON-ALPHANUMERIC
-				if (plainText.charCodeAt(0) == 32) showError("‘"+plainText+"’ begins with a space, which could be deleted.",textObject);
-				if (plainText.charCodeAt(0) < 32) showError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?",textObject);
+				if (plainText.charCodeAt(0) == 32) addError("‘"+plainText+"’ begins with a space, which could be deleted.",textObject);
+				if (plainText.charCodeAt(0) < 32) addError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?",textObject);
 			
 				// ** CHECK TEXT THAT SHOULD NOT BE CAPITALISED ** //
 				for (var i = 0; i < shouldbelowercase.length; i++) {
@@ -584,7 +637,7 @@ MuseScore {
 					if (plainText.length >= lowercaseMarking.length) {
 						var subs = plainText.substring(0,lowercaseMarking.length);
 						if (subs === lowercaseMarking) {
-							if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) showError("‘"+plainText+"’ should not have a capital first letter.",textObject);
+							if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ should not have a capital first letter.",textObject);
 							break;
 						}
 					}
@@ -593,7 +646,7 @@ MuseScore {
 				// ** CHECK TEXT THAT SHOULD HAVE A FULL-STOP AT THE END ** //
 				for (var i = 0; i < shouldhavefullstop.length; i++) {
 					if (plainText === shouldhavefullstop[i]) {
-						showError("‘"+plainText+"’ should have a full-stop at the end.",textObject);
+						addError("‘"+plainText+"’ should have a full-stop at the end.",textObject);
 						break;
 					}
 				}
@@ -612,7 +665,7 @@ MuseScore {
 						} else {
 							correctText = correctSpelling;
 						}
-						showError("‘"+plainText+"’ is misspelled; it should be ‘"+correctText+"’.",textObject);
+						addError("‘"+plainText+"’ is misspelled; it should be ‘"+correctText+"’.",textObject);
 						break;
 					}
 				}
@@ -624,7 +677,7 @@ MuseScore {
 							isSpellingError = true;
 							var correctSpelling = spellingerrorsanywhere[i*2+1];
 							var correctText = plainText.replace(spellingError,correctSpelling);
-							showError("‘"+plainText+"’ is misspelled; it should be ‘"+correctText+"’.",textObject);
+							addError("‘"+plainText+"’ is misspelled; it should be ‘"+correctText+"’.",textObject);
 							break;
 						}
 					}
@@ -636,7 +689,7 @@ MuseScore {
 						if (plainText.includes(fullText)) {
 							var abbreviatedText = canbeabbreviated[i*2+1];
 							var correctText = plainText.replace(fullText,abbreviatedText);
-							showError("‘"+plainText+"’ can be abbreviated to ‘"+correctText+"’.",textObject);
+							addError("‘"+plainText+"’ can be abbreviated to ‘"+correctText+"’.",textObject);
 							break;
 						}
 					}
@@ -645,7 +698,7 @@ MuseScore {
 		}		
 	}
 	
-	function setCurrentClefVariables (clef) {
+	function checkClef (clef) {
 		var clefId = clef.subtypeName();
 		isTrebleClef = clefId.includes("Treble clef");
 		isAltoClef = clefId === "Alto clef";
@@ -662,17 +715,75 @@ MuseScore {
 		if (clefIs8va) diatonicPitchOfMiddleLine += 7;
 		if (clefIs15ma) diatonicPitchOfMiddleLine += 14;
 		if (clefIs8ba) diatonicPitchOfMiddleLine -= 7;
+		
+		// **** CHECK FOR CLEFS THAT THIS INSTRUMENT DOESN'T READ **** //
+		if (checkClefs) {
+			if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef.",clef);
+			if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef.",clef);
+			if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef.",clef);
+			if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef.",clef);
+		}
+		if (clef.is(prevClef)) addError("This clef is redundant; already was ".clefId.toLowerCase(),clef);
+		prevClef = clef;
+	}
+	
+	function checkOttava (ottava) {
+		dialog.msg += "Found OTTAVA: "+ottava.subtypeName()+" "+ottava.subtype+" "+ottava.lineType;
+		/*	if (l.StyleId = "line.staff.octava.minus8") {
+				if (clefId = "clef.alto") {
+					storeError(errors,"Never use 8vb in alto clef.",l.Type,l);
+				}
+				if (clefId = "clef.percussion") {
+					storeError(errors,"Never use 8vb in percussion clef.",l.Type,l);
+				}
+				if (clefId = "clef.treble") {
+					if (readsBass) {
+						storeError(errors,"Never use 8vb in treble clef. Change to bass clef instead.",l.Type,l);
+					} else {
+						storeError(errors,"Never use 8vb in treble clef.",l.Type,l);
+					}
+				}
+				if (clefId = "clef.tenor") {
+					storeError(errors,"Never use 8vb in tenor clef. Change to bass clef instead.",l.Type,l);
+				}
+				if (reads8va = false) {
+					storeError(errors,"This instrument does not normally read 8vb lines. It’s best to write the note(s) out at pitch.",l.Type,l);
+				}
+			}
+			if (l.StyleId = "line.staff.octava.plus8" or l.StyleId = "line.staff.octava.plus15") {
+				line = "8va";
+				if (l.StyleId = "line.staff.octava.plus15") {
+					line = "15ma";
+				}
+				if (clefId = "clef.alto") {
+					storeError(errors,"Never use "&line&" in alto clef. Change to treble clef instead.",l.Type,l);
+				}
+				if (clefId = "clef.percussion") {
+					storeError(errors,"Never use "&line&" in percussion clef.",l.Type,l);
+				}
+				if (clefId = "clef.bass") {
+					storeError(errors,"Never use "&line&" in bass clef. Change to tenor or treble clef instead.",l.Type,l);
+				}
+				if (clefId = "clef.tenor") {
+					storeError(errors,"Never use "&line&" in tenor clef. Change to treble clef instead.",l.Type,l);
+				}
+				if (reads8va = false) {
+					storeError(errors,"This instrument does not normally read "&line&" lines. It’s best to write the note(s) out at pitch.",l.Type,l);
+				}
+			}
+		}	*/
 	}
 	
 	function checkScoreText() {
 		var title = curScore.title;
 		var subtitle = curScore.subtitle;
 		var composer = curScore.composer;
-		if (subtitle === 'Subtitle') showError( "You haven’t changed the Subtitle in File→Project Properties","pagetop");
+		if (subtitle === 'Subtitle') addError( "You haven’t changed the Subtitle in File→Project Properties","pagetop");
 		if (title === 'Untitled score') {
-			showError( "You haven’t changed the Work Title in File→Project Properties","pagetop");
+			addError( "You haven’t changed the Work Title in File→Project Properties","pagetop");
 		} else {
 			var lowerCaseText = title.toLowerCase();
+			var isSpellingError = false;
 			for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
 				var spellingError = spellingerrorsatstart[i*2];
 				if (lowerCaseText.substring(0,spellingError.length) === spellingError) {
@@ -685,7 +796,7 @@ MuseScore {
 					} else {
 						correctText = correctSpelling;
 					}
-					showError("The title has a spelling error in it\nit should be ‘"+correctText+"’.","pagetop");
+					addError("The title has a spelling error in it\nit should be ‘"+correctText+"’.","pagetop");
 					break;
 				}
 			}
@@ -696,33 +807,33 @@ MuseScore {
 						isSpellingError = true;
 						var correctSpelling = spellingerrorsanywhere[i*2+1];
 						var correctText = title.replace(spellingError,correctSpelling);
-						showError("The title has a spelling error in it; it should be ‘"+correctText+"’.","pagetop");
+						addError("The title has a spelling error in it; it should be ‘"+correctText+"’.","pagetop");
 						break;
 					}
 				}
 			}
 		}
 				
-		if (composer === 'Composer / arranger') showError( "You haven’t changed the default composer in File → Project Properties","pagetop");
+		if (composer === 'Composer / arranger') addError( "You haven’t changed the default composer in File → Project Properties","pagetop");
 	}
 	
 	function checkKeySignature (keySig,sharps) {
 		// *********************** KEY SIGNATURE ERRORS *********************** //
 		var keySigSegment = keySig.parent;
 		if (sharps != previousKeySigSharps) {
-			if (sharps > 6) showError("This key signature has "+sharps+" sharps,\nand would be easier to read if rescored as "+(12-sharps)+" flats.",keySig);
-			if (sharps < -6) showError("This key signature has "+Math.abs(sharps)+" flats, and would be easier to read if rescored as "+(12+sharps)+" sharps.",keySig);
-			if (currentBarNum - previousKeySigBarNum  < 16) showError("This key change comes only "+ (currentBarNum - previousKeySigBarNum) +" bars after the previous one.\nPerhaps the previous one could be avoided by using accidentals instead.",keySig);
+			if (sharps > 6) addError("This key signature has "+sharps+" sharps,\nand would be easier to read if rescored as "+(12-sharps)+" flats.",keySig);
+			if (sharps < -6) addError("This key signature has "+Math.abs(sharps)+" flats, and would be easier to read if rescored as "+(12+sharps)+" sharps.",keySig);
+			if (currentBarNum - previousKeySigBarNum  < 16) addError("This key change comes only "+ (currentBarNum - previousKeySigBarNum) +" bars after the previous one.\nPerhaps the previous one could be avoided by using accidentals instead.",keySig);
 			previousKeySigSharps = sharps;
 			previousKeySigBarNum = currentBarNum;
 		} else {
-			showError("This key signature is the same as the one in bar "+previousKeySigBarNum+".\nPerhaps delete it?",keySig);
+			addError("This key signature is the same as the one in bar "+previousKeySigBarNum+".\nPerhaps delete it?",keySig);
 		}
 	}
 	
 	function checkTimeSignature (timeSig) {
 		var ts = timeSig.str;
-		if (ts === prevTimeSig) showError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",timeSig);
+		if (ts === prevTimeSig) addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",timeSig);
 		prevTimeSig = ts;
 	}
 	
@@ -844,7 +955,7 @@ MuseScore {
 			} else {
 				styleComments = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+styleComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
 			}
-			showError(styleComments,"pagetop");
+			addError(styleComments,"pagetop");
 		}
 		
 		// ** SHOW PAGE SETTINGS ERROR ** //
@@ -856,7 +967,7 @@ MuseScore {
 			} else {
 				pageSettingsComments = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
 			}
-			showError(pageSettingsComments,"pagetop");
+			addError(pageSettingsComments,"pagetop");
 		}
 	}
 	
@@ -921,7 +1032,7 @@ MuseScore {
 			if (checkGrandStaffOrder) {
 				for (var i = 0; i < numGrandStaves;i++) {
 					var bottomGrandStaffNum = grandStaves[i*2+1];
-					if (bottomGrandStaffNum < numStaves && !isGrandStaff[bottomGrandStaffNum+1]) showError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Instruments tab.","pagetop");
+					if (bottomGrandStaffNum < numStaves && !isGrandStaff[bottomGrandStaffNum+1]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Instruments tab.","pagetop");
 				}
 			}
 		}
@@ -977,18 +1088,18 @@ MuseScore {
 			// **** CHECK WIND QUINTET STAFF ORDER **** //
 			if (numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
 				if (flStaff != 0) {
-					showError("You appear to be composing a wind quintet\nbut the flute should be the top staff.","topfunction ");
+					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.","topfunction ");
 				} else {
 					if (obStaff != 1) {
-						showError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.","pagetop");
+						addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.","pagetop");
 					} else {
 						if (clStaff != 2) {
-							showError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.","pagetop");
+							addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.","pagetop");
 						} else {
 							if (hnStaff != 3) {
-								showError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.","pagetop");
+								addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.","pagetop");
 							} else {
-								if (bsnStaff != 4) showError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.","pagetop");
+								if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.","pagetop");
 							}
 						}
 					}
@@ -998,18 +1109,18 @@ MuseScore {
 			// **** CHECK BRASS QUINTET STAFF ORDER **** //
 			if (numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
 				if (tpt1Staff != 0) {
-					showError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
+					addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
 				} else {
 					if (tpt2Staff != 1) {
-						showError("You appear to be composing a brass quintet\nbut the second trumpet should be the second staff.","pagetop");
+						addError("You appear to be composing a brass quintet\nbut the second trumpet should be the second staff.","pagetop");
 					} else {
 						if (hnStaff != 2) {
-							showError("You appear to be composing a brass quintet\nbut the horn should be the third staff.","pagetop");
+							addError("You appear to be composing a brass quintet\nbut the horn should be the third staff.","pagetop");
 						} else {
 							if (tbnStaff != 3) {
-								showError("You appear to be composing a brass quintet\nbut the trombone should be the fourth staff.","pagetop");
+								addError("You appear to be composing a brass quintet\nbut the trombone should be the fourth staff.","pagetop");
 							} else {
-								if (tbaStaff != 4) showError("You appear to be composing a brass quintet\nbut the tuba should be the bottom staff.","pagetop");
+								if (tbaStaff != 4) addError("You appear to be composing a brass quintet\nbut the tuba should be the bottom staff.","pagetop");
 							}
 						}
 					}
@@ -1018,82 +1129,89 @@ MuseScore {
 		}
 	}
 	
-	function showError (text, element) {
-		var staffNum = 0;
-		var elementHeight = 0;
-		var commentOffset = 1.0;
-		
-		if (element !== "top" && element !== "pagetop") {
-			// calculate the staff number that this element is on
-			elementHeight = element.bbox.height;
-			var elemStaff = element.staff;
-			while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++;
-		}
+	function addError (text,element) {
+		errorStrings.push(text);
+		errorObjects.push(element);
+	}
+	
+	function showAllErrors () {
 		curScore.startCmd()
-		// add a text object at the location where the element is
-		var comment = newElement(Element.STAFF_TEXT);
-		comment.text = text;
 		
-		// style the text object
-		comment.frameType = 1;
-		comment.framePadding = 0.6;
-		comment.frameWidth = 0.2;
-		comment.frameBgColor = "yellow";
-		comment.frameFgColor = "black";
-		comment.fontSize = 7.0;
-		comment.fontFace = "Helvetica"
-		comment.autoplace = false;;
-		var tick = 0;
-		var segment = curScore.firstSegment();
-		var firstMeasure = curScore.firstMeasure;
-		var desiredPosX = 0;
-		var desiredPosY = 0;
-		if (element === "top") {
-			// do nothing
-		} else {
-			if (element === "pagetop") {
-				desiredPosX = 2.5;
-				desiredPosY = 10.;
-			} else {
-				segment = element.parent;
-				tick = segment.tick;
+		for (var i in errorStrings) {
+			var text = errorStrings[i];
+			var element = errorObjects[i];
+			var staffNum = 0;
+			var elementHeight = 0;
+			var commentOffset = 1.0;
+		
+			if (element !== "top" && element !== "pagetop") {
+				// calculate the staff number that this element is on
+				elementHeight = element.bbox.height;
+				var elemStaff = element.staff;
+				while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++;
 			}
-		}
+			// add a text object at the location where the element is
+			var comment = newElement(Element.STAFF_TEXT);
+			comment.text = text;
 		
-		// add text object to score
-		var cursor = curScore.newCursor();
-		cursor.staffIdx = staffNum;
-		cursor.rewindToTick(tick);
-		cursor.add(comment);
-		comment.z = 9600;
-		dialog.msg +=  "\nz: "+comment.z;
-		var commentHeight = comment.bbox.height;
-		if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
-		if (desiredPosY != 0) {
-			comment.offsetY = desiredPosY - comment.pagePos.y;
-		} else {
-			comment.offsetY -= commentHeight;
-		}
-		if (element === "pagetop") {
-			dialog.msg+="\npagePos = "+comment.pagePos.x+","+comment.pagePos.y;
-		}
-		var commentTopRounded = Math.round(comment.pagePos.y);
-		
-		
-		while (commentPosArray[commentTopRounded+1000]) {
-			commentTopRounded -= commentOffset;
-			comment.offsetY -= commentOffset;
-			comment.offsetX += commentOffset;
-		}
-		commentPosArray[commentTopRounded+1000] = true;
-		
-		// style the element
-		if (element !== "pagetop" && element !== "top") {
-			if (element.type == Element.CHORD) {
-				element.color = "hotpink";
-				for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
+			// style the text object
+			comment.frameType = 1;
+			comment.framePadding = 0.6;
+			comment.frameWidth = 0.2;
+			comment.frameBgColor = "yellow";
+			comment.frameFgColor = "black";
+			comment.fontSize = 7.0;
+			comment.fontFace = "Helvetica"
+			comment.autoplace = false;;
+			var tick = 0;
+			var segment = curScore.firstSegment();
+			var firstMeasure = curScore.firstMeasure;
+			var desiredPosX = 0;
+			var desiredPosY = 0;
+			if (element === "top") {
+				// do nothing
 			} else {
-				element.color = "hotpink";
+				if (element === "pagetop") {
+					desiredPosX = 2.5;
+					desiredPosY = 10.;
+				} else {
+					segment = element.parent;
+					tick = segment.tick;
+				}
+			}
+		
+			// add text object to score
+			var cursor = curScore.newCursor();
+			cursor.staffIdx = staffNum;
+			cursor.rewindToTick(tick);
+			cursor.add(comment);
+			comment.z = 9600;
+			//dialog.msg +=  "\nz: "+comment.z;
+			var commentHeight = comment.bbox.height;
+			if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
+			if (desiredPosY != 0) {
+				comment.offsetY = desiredPosY - comment.pagePos.y;
+			} else {
+				comment.offsetY -= commentHeight;
+			}
+			var commentTopRounded = Math.round(comment.pagePos.y);
+		
+		
+			while (commentPosArray[commentTopRounded+1000]) {
+				commentTopRounded -= commentOffset;
+				comment.offsetY -= commentOffset;
+				comment.offsetX += commentOffset;
+			}
+			commentPosArray[commentTopRounded+1000] = true;
+		
+			// style the element
+			if (element !== "pagetop" && element !== "top") {
+				if (element.type == Element.CHORD) {
+					element.color = "hotpink";
+					for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
+				} else {
+					element.color = "hotpink";
+				}
 			}
 		}
 		curScore.endCmd();
