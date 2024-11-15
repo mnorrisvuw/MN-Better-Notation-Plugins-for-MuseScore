@@ -56,6 +56,7 @@ MuseScore {
 	property var commentPosArray: []
 	property var instrumentIds: []
 	property var isGrandStaff: []
+	property var isTopOfGrandStaff: []
 	property var grandStaves: []
 	property var scoreHasStrings: false
 	property var scoreHasWinds: false
@@ -89,6 +90,10 @@ MuseScore {
 	property var currentMute: ""
 	property var currentPlayingTechnique: ""
 	property var currentContactPoint: ""
+	property var ledgerLines: []
+	property var flaggedLedgerLines: false;
+	property var fullInstNamesShowing: false
+	property var shortInstNamesShowing: false
 	
   onRun: {
 		if (!curScore) return;
@@ -118,7 +123,6 @@ MuseScore {
 		var firstPage = firstSystem.parent;
 		var lastPage = lastSystem.parent;
 		hasMoreThanOneSystem = !lastSystem.is(firstSystem);	
-		var ledgerLines = [];
 		var flaggedLedgerLines = false;
 		var cursor = curScore.newCursor();
 		var cursor2 = curScore.newCursor();
@@ -132,24 +136,24 @@ MuseScore {
 			instrumentNames.push(staves[i].part.longName);
 		}
 		
-		// ************ DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS ************ //
+		// ************  DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 	************ //
 		deleteAllCommentsAndHighlights();
 
-		// ************  CHECK SCORE & PAGE SETTINGS ************ // 
+		// ************  				CHECK SCORE & PAGE SETTINGS 					************ // 
 		checkScoreAndPageSettings();
 			
-		// ************ SELECT ENTIRE SCORE ************ //
+		// ************  							SELECT ENTIRE SCORE 						************ //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
 		curScore.endCmd();
 		
-		// ************ CHECK SCORE TEXT ************ //
+		// ************ 								CHECK SCORE TEXT							************ //
 		checkScoreText();
 		
-		// ************ CHECK FOR STAFF ORDER ISSUES ************ //
+		// ************ 					CHECK FOR STAFF ORDER ISSUES 				************ //
 		checkStaffOrder();
 			
-		// ************ PREP FOR A FULL LOOP THROUGH THE SCORE ************ //
+		// ************ 		PREP FOR A FULL LOOP THROUGH THE SCORE 		************ //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied;
 		var firstStaffNum, firstBarNum, firstBarInScore, firstSegmentInScore, firstBarInSelection, firstTickInSelection, firstStaffInSelection;
 		var lastStaffNum, lastBarNum, lastBarInScore, lastBarInSelection, lastTickInSelection, lastStaffInSelection;
@@ -158,7 +162,7 @@ MuseScore {
 		firstStaffNum = 0;
 		lastStaffNum = numStaves;
 		
-		// ************ CALCULATE FIRST BAR IN SCORE & SELECTION ************ //
+		// ************ 		CALCULATE FIRST BAR IN SCORE & SELECTION 	************ //
 		firstBarInScore = curScore.firstMeasure;
 		
 		cursor.rewind(Cursor.SELECTION_START);
@@ -171,7 +175,7 @@ MuseScore {
 			currentBar = currentBar.nextMeasure;
 		}
 		
-		// ************ CALCULATE LAST BAR IN SCORE & SELECTION ************ //
+		// ************ 		CALCULATE LAST BAR IN SCORE & SELECTION 	************ //
 		lastBarInScore = curScore.lastMeasure;
 		cursor.rewind(Cursor.SELECTION_END);
 		lastBarInSelection = cursor.measure;
@@ -186,7 +190,7 @@ MuseScore {
 		}
 		dialog.msg += "\n————————\n\nSTARTING LOOP\n\n";
 		
-		// ************ START LOOP THROUGH WHOLE SCORE ************ //
+		// ************ 		START LOOP THROUGH WHOLE SCORE 						************ //
 		for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
 			dialog.msg += "\n——— currentStaff = "+currentStaffNum;
 			
@@ -202,6 +206,7 @@ MuseScore {
 			currentPlayingTechnique = "arco";
 			currentContactPoint = "ord";
 			ledgerLines = [];
+			flaggedLedgerLines = false;
 			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
@@ -225,20 +230,15 @@ MuseScore {
 			}
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
-				
 				var barStart = currentBar.firstSegment.tick;
 				var barLength = currentBar.lastSegment.tick - barStart;
 				var startTrack = currentStaffNum * 4;
 				dialog.msg += "\nBAR "+currentBarNum;
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
-					//dialog.msg += "\n*** track = "+currentTrack;
-					
 					cursor.filter = Segment.All;
 					cursor.track = currentTrack;
-					//cursor2.voice = voice;
 					cursor.rewindToTick(barStart);
-				
 					var processingThisBar = cursor.element;
 					while (processingThisBar) {
 						var currSeg = cursor.segment;
@@ -247,10 +247,6 @@ MuseScore {
 						var elem = cursor.element;
 						var eType = elem.type;
 						var eName = elem.name;
-						
-						if (currentStaffNum == 0 && currentBarNum == 3) {
-							dialog.msg+= "\nelem = "+eName+" "+eType;
-						}
 						
 						// ************ FOUND A CLEF ************ //
 						if (eType === Element.CLEF) checkClef(elem);
@@ -294,116 +290,19 @@ MuseScore {
 								ledgerLines = [];
 								flaggedLedgerLines = false;
 							}
-							// numNoteRests = numNoteRests + 1;
-							var pos = cursor.tick - barStart;
-							var nn = 0;
-							if (isNote) nn = noteRest.notes.length;
-							var pitch = 0;
-							if (isNote) pitch = noteRest.notes[0].MIDIpitch;
-						
+							var pos = cursor.tick - barStart;						
 							var augDot = (Math.log2((displayDur * 64.) / (division * 3.)) % 1.0) == 0.;
-						
-							var beam = noteRest.beam;	
 							var isCrossStaff = false;
+							
 							//if (beam) isCrossStaff = beam.cross;
 							// TO FIX
 							//dialog.msg += "\nFOUND NOTE";
 							
 							// CHECK THE PASSAGE'S REGISTER
 							if (!isRest && !isCrossStaff) {
-
+								
 								prevBarNum = currentBarNum;
-								// get the 'centre line offset'
-								// this returns how many lines/spaces the note is above the middle line
-								var maxNumLedgerLines = getMaxNumLedgerLines(noteRest);
-								var numberOfLedgerLinesToCheck = 4;
-								if (ledgerLines.length > numberOfLedgerLinesToCheck) ledgerLines = ledgerLines.slice(1);
-								ledgerLines.push(maxNumLedgerLines);
-								if (!flaggedLedgerLines) {
-									if (maxNumLedgerLines > 5) {
-										if (isBassClef && (readsTenor || readsTreble)) {
-											addError("This passage is very high for bass clef;\nit may be better in tenor or treble clef",noteRest);
-											flaggedLedgerLines = true;
-										}
-										if (isTenorClef && readsTreble) {
-											addError("This passage is very high for tenor clef;\nit may be better in treble clef",noteRest);
-											flaggedLedgerLines = true;
-										}
-										if (isTrebleClef && reads8va) {
-											addError("This passage is very high for treble clef;\nit may be better with an 8va symbol",noteRest);
-											flaggedLedgerLines = true;
-										}
-									}
-									if (maxNumLedgerLines < -5) {
-										if (isTrebleClef) {
-											if (readsBass) {
-												addError("This passage is very low for treble clef;\nit may be better in bass clef",noteRest);
-												flaggedLedgerLines = true;
-											} else {
-												if (readsAlto) {
-													addError("This passage is very low for treble clef;\nit may be better in alto clef",noteRest);
-													flaggedLedgerLines = true;
-												}
-											}
-										}
-										if (isTenorClef && readsBass) {
-											addError("This passage is very low for tenor clef;\nit may be better in bass clef",noteRest);
-											flaggedLedgerLines = true;
-										}
-										if (isBassClef && reads8va) {
-											addError("This passage is very low for bass clef;\nit may be better with an 8ba",noteRest);
-											flaggedLedgerLines = true;
-										}
-									}
-									if (!flaggedLedgerLines && ledgerLines.length >= numberOfLedgerLinesToCheck) {
-										var averageNumLedgerLines = ledgerLines.reduce((a,b) => a+b) / ledgerLines.length;
-										if (isBassClef) {
-											//trace(averageNumLedgerLines);
-											if (readsTenor && averageNumLedgerLines > 2) {
-												addError("This passage is quite high;\nit may be better in tenor or treble clef",noteRest);
-												flaggedLedgerLines = true;
-											} else {
-												if (readsTreble && averageNumLedgerLines > 3) {
-													addError("This passage is very high;\nit may be better in treble clef",noteRest);
-													flaggedLedgerLines = true;
-												} else {
-													if (reads8va && averageNumLedgerLines < -4) {
-														addError("This passage is very low;\nit may be better with an 8ba",noteRest);
-														flaggedLedgerLines = true;
-													}
-												}
-											}
-										}
-					
-										if (isTenorClef) {
-											if (readsTreble && averageNumLedgerLines > 2) {
-												addError("This passage is quite high;\nit may be better in treble clef",noteRest);
-												flaggedLedgerLines = true;
-											} else {
-												if (readsBass && averageNumLedgerLines < -1) {
-													addError("This passage is quite low;\nit may be better in bass clef",noteRest);
-													flaggedLedgerLines = true;
-												}
-											}
-										}
-										if (isTrebleClef) {
-											if (reads8va && averageNumLedgerLines > 4) {
-												addError("This passage is very high;\nit may be better with an 8va",noteRest);
-												flaggedLedgerLines = true;
-											} else {
-												if (readsTenor && averageNumLedgerLines < -1) {
-													addError("This passage is quite low;\nit may be better in tenor clef",noteRest);
-													flaggedLedgerLines = true;
-												} else {
-													if (readsBass && averageNumLedgerLines < -2) {
-														addError("This passage is quite low;\nit may be better in bass clef",noteRest);
-														flaggedLedgerLines = true;
-													}
-												}
-											}
-										}
-									}
-								}
+								checkLedgerLines(noteRest);
 							}
 						} // end if eType === Element.Chord
 
@@ -980,6 +879,7 @@ MuseScore {
 			
 			// **** CHECK COL LEGNO BATT & TRATTO **** //
 			if (lowerCaseText.includes("col legno")) {
+				
 				if (lowerCaseText.includes("batt")) {
 					if (currentPlayingTechnique === "clb") {
 						if (!isBracketed) {
@@ -997,16 +897,17 @@ MuseScore {
 								return;
 							}
 						} else {
-							currentPlayingTechnique === "clt";
+							currentPlayingTechnique = "clt";
 						}
 					} else {
-							addError("You should specify if this is\ncol legno batt. or col legno tratto",textObject);
-							currentPlayingTechnique = "cl";
-						}
+						addError("You should specify if this is\ncol legno batt. or col legno tratto",textObject);
+						currentPlayingTechnique = "cl";
+						return;
 					}
 				}
 			}
-		
+			
+				
 			// **** CHECK ALREADY PLAYING ON THE BRIDGE **** //
 			if (lowerCaseText.includes("otb") || lowerCaseText.includes("o.t.b") ||
 			(lowerCaseText.includes("bridge") && lowerCaseText.includes("on "))) {
@@ -1019,7 +920,7 @@ MuseScore {
 					currentContactPoint = "on bridge";
 				}
 			}
-		
+					
 			// **** CHECK ALREADY PLAYING BEYOND THE BRIDGE **** //
 			if (lowerCaseText.includes("btb") || lowerCaseText.includes("b.t.b") ||
 			(lowerCaseText.includes("bridge") && (lowerCaseText.includes("beyond") || lowerCaseText.includes("past") || lowerCaseText.includes("wrong side")))) {
@@ -1032,6 +933,8 @@ MuseScore {
 					currentContactPoint = "beyond bridge";
 				}
 			}
+			
+		
 		} // end isStringInstrument
 		
 		// **** CHECK ALREADY PLAYING MUTED **** //
@@ -1298,48 +1201,55 @@ MuseScore {
 		}
 		
 		// ** CHECK FOR STAFF NAMES ** //
-		var firstStaffNameShouldBeHidden = numParts == 1;
+		var isSoloScore = (numParts == 1);
 		//dialog.msg += "\nfirstStaffNameShouldBeHidden = "+firstStaffNameShouldBeHidden;
 		
 		var subsequentStaffNamesShouldBeHidden = numParts < 6;
 		
 		// ** are the first staff names visible? ** //
-		var firstStaffNameVisibleSetting = style.value("firstSystemInstNameVisibility"); // note that 0 = long names, 1 = short names, 2 = hidden
-		//dialog.msg += "\nfirstSystemInstNameVisibility value = "+firstStaffNameVisible;
-		
-		if (firstStaffNameVisibleSetting == 0 || firstStaffNameVisibleSetting == 1) {
-			firstStaffNameVisibleSetting = 2;
+		var firstStaffNamesVisible = false;
+		var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
+		var hideInstrumentNameForSolo = isSoloScore && style.value("hideInstrumentNameIfOneInstrument");
+		if (!hideInstrumentNameForSolo && firstStaffNamesVisibleSetting < 2) {
 			for (var i = 0; i < numParts; i++) {
-				if (parts[i].longName != "") {
-					firstStaffNameVisibleSetting = 0;
+				var partName = "";
+				if (firstStaffNamesVisibleSetting == 0) {
+					partName = parts[i].longName;
+				} else {
+					partName = parts[i].shortName;
+				}
+				if (partName !== "") {
+					firstStaffNamesVisible = true;
 					break;
 				}
 			}
 		}
-		//dialog.msg += "\nfirstStaffNameVisible: "+firstStaffNameVisible;
 		
-		if (firstStaffNameShouldBeHidden && !style.value("hideInstrumentNameIfOneInstrument")) styleComments += "\n(Score tab) Tick ‘Hide if there is only one instrument’";
-		if (!firstStaffNameShouldBeHidden && firstStaffNameVisibleSetting == 2) styleComments += "\n(Score tab) Set Instrument names→On first system of sections to ‘Long name’."
-
-		var subsStaffNamesVisible = style.value("subsSystemInstNameVisibility") != 1;
-		//dialog.msg += "\nsubsStaffNamesVisible: "+subsStaffNamesVisible;
-		
-		// CHECK IF PART NAMES WERE MANUALLY DELETED
-
-		if (subsStaffNamesVisible) {
-			subsStaffNamesVisible = false;
+		if (isSoloScore && !hideInstrumentNameForSolo) styleComments += "\n(Score tab) Tick ‘Hide if there is only one instrument’";
+		if (!isSoloScore && firstStaffNamesVisibleSetting != 0) styleComments += "\n(Score tab) Set Instrument names→On first system of sections to ‘Long name’."
+		var subsequentStaffNamesVisibleSetting = style.value("subsSystemInstNameVisibility");  //  0 = long names, 1 = short names, 2 = hidden
+		var subsequentStaffNamesVisible = false;
+		if (!hideInstrumentNameForSolo && subsequentStaffNamesVisibleSetting < 2) {
 			for (var i = 0; i < numParts; i++) {
-				if (parts[i].shortName != "") {
-					subsStaffNamesVisible = true;
+				var partName = "";
+				if (subsequentStaffNamesVisibleSetting == 0) {
+					partName = parts[i].longName;
+				} else {
+					partName = parts[i].shortName;
+				}
+				if (partName !== "") {
+					subsequentStaffNamesVisible = true;
 					break;
 				}
 			}
 		}
+		fullInstNamesShowing = (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 0) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 0);
+		shortInstNamesShowing =  (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 1) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 1);
 		
 		if (subsequentStaffNamesShouldBeHidden) {
-			if (subsStaffNamesVisible) styleComments += "\n(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble";
+			if (subsequentStaffNamesVisible) styleComments += "\n(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble";
 		} else {
-			if (!subsStaffNamesVisible) styleComments += "\n(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble";
+			if (!subsequentStaffNamesVisible) styleComments += "\n(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble";
 		}
 		
 		// ** OTHER STYLE ISSUES ** //
@@ -1365,6 +1275,153 @@ MuseScore {
 				pageSettingsComments = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
 			}
 			addError(pageSettingsComments,"pagetop");
+		}
+	}
+	
+	function checkStaffNames () {
+		var numStaves = curScore.nstaves;
+		var staves = curScore.staves;
+		var cursor = curScore.newCursor();
+		cursor.rewind(SCORE_START);
+		for (var i = 0; i < numStaves; i++) {
+			cursor.staffidx = i;
+			cursor.voice = 0;
+			var firstStaffMeasure = cursor.measure;
+			var firstSystem = firstStaffMeasure.parent;
+			while (cursor && cursor.measure.parent == firstSystem) cursor.nextMeasure();
+			var secondStaffMeasure = nil;
+			if (cursor) secondStaffMeasure = cursor.measure;
+			var full1 = staves[i].part.longName;
+			var short1 = staves[i].part.shortName;
+			var checkThisStaff = true;
+			if (full1 === "" && short1 === "") checkThisStaff = false;
+			if (isGrandStaff[i] && !isTopOfGrandStaff[i]) checkThisStaff = false;
+			if (checkThisStaff) {
+				for (var j = i+1; j< numStaves+1; j++) {
+					if (isGrandStaff[j] && !isTopOfGrandStaff[j]) checkThisStaff = false;
+					if (checkThisStaff) {
+						var staff2 = staves[j];
+						var full2 = staff2.part.longName;
+						var short2 = staff2.part.shortName;
+						//inst2 = staff2.InstrumentName;
+						if (fullInstNamesShowing) {
+							if (full1 === full2 && full1 != "") addError("Staff name ‘"+full1+"’ appears twice.\nRename one of them, or rename as ‘"+full1+" I’ & ‘"+full1+" II’", firstStaffMeasure);
+							if (full1 === full2 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" II’?", firstStaffMeasure);
+							if (full2 === full1 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" II’?", firstStaffMeasure);
+							if (full1 === full2 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" I’?", firstStaffMeasure);
+							if (full2 === full1 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" I’?", firstStaffMeasure);
+							if (full1 === full2 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" 2’?", firstStaffMeasure);
+							if (full2 === full1 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" 2’?", firstStaffMeasure);
+							if (full1 === full2 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" 1’?", firstStaffMeasure);
+							if (full2 === full1 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" 1’?", firstStaffMeasure);
+						}
+						if (shortInstNamesShowing && secondStaffMeasure != nil) {
+							if (short1 === short2 && short1 != "") storeError(errors,"Staff name ‘"+short1+"’ appears twice. Do you want to rename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’?",secondStaffMeasure);
+							if (short1 === short2 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" II’?",secondStaffMeasure);
+							if (short2 === short1 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" II’?",secondStaffMeasure);
+							if (short1 === short2 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" I’?",secondStaffMeasure);
+							if (short2 === short1 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" I’?",secondStaffMeasure);
+							if (short1 === short2 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" 2’?",secondStaffMeasure);
+							if (short2 === short1 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" 2’?",secondStaffMeasure);
+							if (short1 === short2 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" 1’?",secondStaffMeasure);
+							if (short2 === short1 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" 1’?",secondStaffMeasure);
+						}
+					}
+				}
+			}
+		}	
+	}
+	
+	function checkLedgerLines (noteRest) {
+		var maxNumLedgerLines = getMaxNumLedgerLines(noteRest);
+		dialog.msg += "maxNumLL = "+maxNumLedgerLines;
+		var numberOfLedgerLinesToCheck = 4;
+		if (ledgerLines.length > numberOfLedgerLinesToCheck) ledgerLines = ledgerLines.slice(1);
+		ledgerLines.push(maxNumLedgerLines);
+		if (!flaggedLedgerLines) {
+			if (maxNumLedgerLines > 3) {
+				if (isBassClef && (readsTenor || readsTreble)) {
+					addError("This passage is very high for bass clef;\nit may be better in tenor or treble clef",noteRest);
+					flaggedLedgerLines = true;
+				}
+				if (isTenorClef && readsTreble) {
+					addError("This passage is very high for tenor clef;\nit may be better in treble clef",noteRest);
+					flaggedLedgerLines = true;
+				}
+				if (isTrebleClef && reads8va) {
+					addError("This passage is very high for treble clef;\nit may be better with an 8va symbol",noteRest);
+					flaggedLedgerLines = true;
+				}
+			}
+			if (maxNumLedgerLines < -5) {
+				if (isTrebleClef) {
+					if (readsBass) {
+						addError("This passage is very low for treble clef;\nit may be better in bass clef",noteRest);
+						flaggedLedgerLines = true;
+					} else {
+						if (readsAlto) {
+							addError("This passage is very low for treble clef;\nit may be better in alto clef",noteRest);
+							flaggedLedgerLines = true;
+						}
+					}
+				}
+				if (isTenorClef && readsBass) {
+					addError("This passage is very low for tenor clef;\nit may be better in bass clef",noteRest);
+					flaggedLedgerLines = true;
+				}
+				if (isBassClef && reads8va) {
+					addError("This passage is very low for bass clef;\nit may be better with an 8ba",noteRest);
+					flaggedLedgerLines = true;
+				}
+			}
+			if (!flaggedLedgerLines && ledgerLines.length >= numberOfLedgerLinesToCheck) {
+				var averageNumLedgerLines = ledgerLines.reduce((a,b) => a+b) / ledgerLines.length;
+				if (isBassClef) {
+					//trace(averageNumLedgerLines);
+					if (readsTenor && averageNumLedgerLines > 2) {
+						addError("This passage is quite high;\nit may be better in tenor or treble clef",noteRest);
+						flaggedLedgerLines = true;
+					} else {
+						if (readsTreble && averageNumLedgerLines > 3) {
+							addError("This passage is very high;\nit may be better in treble clef",noteRest);
+							flaggedLedgerLines = true;
+						} else {
+							if (reads8va && averageNumLedgerLines < -4) {
+								addError("This passage is very low;\nit may be better with an 8ba",noteRest);
+								flaggedLedgerLines = true;
+							}
+						}
+					}
+				}
+
+				if (isTenorClef) {
+					if (readsTreble && averageNumLedgerLines > 2) {
+						addError("This passage is quite high;\nit may be better in treble clef",noteRest);
+						flaggedLedgerLines = true;
+					} else {
+						if (readsBass && averageNumLedgerLines < -1) {
+							addError("This passage is quite low;\nit may be better in bass clef",noteRest);
+							flaggedLedgerLines = true;
+						}
+					}
+				}
+				if (isTrebleClef) {
+					if (reads8va && averageNumLedgerLines > 4) {
+						addError("This passage is very high;\nit may be better with an 8va",noteRest);
+						flaggedLedgerLines = true;
+					} else {
+						if (readsTenor && averageNumLedgerLines < -1) {
+							addError("This passage is quite low;\nit may be better in tenor clef",noteRest);
+							flaggedLedgerLines = true;
+						} else {
+							if (readsBass && averageNumLedgerLines < -2) {
+								addError("This passage is quite low;\nit may be better in bass clef",noteRest);
+								flaggedLedgerLines = true;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	
@@ -1399,21 +1456,25 @@ MuseScore {
 	function checkStaffOrder () {
 		var numGrandStaves = 0;
 		var prevPart = null;
+		var prevPrevPart = null;
 		var parts = curScore.parts;
 		var numParts = parts.length;
 		var numStaves = curScore.nstaves;
 		
 		for (var i = 0; i < curScore.nstaves; i++) {
 			var part = curScore.staves[i].part;
-			if (part.is(prevPart)) {
+			if (i > 0 && part.is(prevPart)) {
 				isGrandStaff[i-1] = true;
 				isGrandStaff[i] = true;
+				if (prevPart != prevPrevPart) isTopOfGrandStaff[i-1] = true;
 				grandStaves.push(i-1);
 				grandStaves.push(i);
 				numGrandStaves ++;
 			} else {
+				isTopOfGrandStaff[i] = false;
 				isGrandStaff[i] = false;
 			}
+			prevPrevPart = prevPart;
 			prevPart = part;
 		}
 		
