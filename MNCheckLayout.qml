@@ -94,6 +94,9 @@ MuseScore {
 	property var flaggedLedgerLines: false;
 	property var fullInstNamesShowing: false
 	property var shortInstNamesShowing: false
+	property var firstBarInScore: null
+	property var lastBarInScore: null
+	property var firstBarInSecondSystem: null
 	
   onRun: {
 		if (!curScore) return;
@@ -116,10 +119,10 @@ MuseScore {
 		// **** GATHER VARIABLES **** //
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
-		var firstMeasure = curScore.firstMeasure;
-		var lastMeasure = curScore.lastMeasure;
-		var firstSystem = firstMeasure.parent;
-		var lastSystem = lastMeasure.parent;
+		firstBarInScore = curScore.firstMeasure;
+		lastBarInScore = curScore.lastMeasure;
+		var firstSystem = firstBarInScore.parent;
+		var lastSystem = lastBarInScore.parent;
 		var firstPage = firstSystem.parent;
 		var lastPage = lastSystem.parent;
 		hasMoreThanOneSystem = !lastSystem.is(firstSystem);	
@@ -127,6 +130,15 @@ MuseScore {
 		var cursor = curScore.newCursor();
 		var cursor2 = curScore.newCursor();
 		var instrumentNames = [];
+		
+		// WORK OUT THE MEASURE THAT STARTS THE SECOND SYSTEM
+		if (hasMoreThanOneSystem) {
+			firstBarInSecondSystem = curScore.firstMeasure;
+			while (firstBarInSecondSystem.parent.is(firstSystem)) {
+				firstBarInSecondSystem = firstBarInSecondSystem.nextMeasure;
+				//dialog.msg += "\nnextMeasure";
+			}
+		}
 		
 		// **** INITIALISE PROPERTIES AND ARRAYS **** //
 		var isSpellingError = false;
@@ -141,6 +153,7 @@ MuseScore {
 
 		// ************  				CHECK SCORE & PAGE SETTINGS 					************ // 
 		checkScoreAndPageSettings();
+		
 			
 		// ************  							SELECT ENTIRE SCORE 						************ //
 		curScore.startCmd();
@@ -150,48 +163,33 @@ MuseScore {
 		// ************ 								CHECK SCORE TEXT							************ //
 		checkScoreText();
 		
+		// ************  								CHECK STAFF NAMES 					************ // 
+		checkStaffNames();
+		
 		// ************ 					CHECK FOR STAFF ORDER ISSUES 				************ //
 		checkStaffOrder();
 			
 		// ************ 		PREP FOR A FULL LOOP THROUGH THE SCORE 		************ //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied;
-		var firstStaffNum, firstBarNum, firstBarInScore, firstSegmentInScore, firstBarInSelection, firstTickInSelection, firstStaffInSelection;
-		var lastStaffNum, lastBarNum, lastBarInScore, lastBarInSelection, lastTickInSelection, lastStaffInSelection;
+		var firstStaffNum, firstBarNum, firstSegmentInScore;
+		var lastBarNum;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
-
-		firstStaffNum = 0;
-		lastStaffNum = numStaves;
 		
-		// ************ 		CALCULATE FIRST BAR IN SCORE & SELECTION 	************ //
+		// ************ 		CALCULATE LAST BAR NUMBER								 	************ //
 		firstBarInScore = curScore.firstMeasure;
-		
-		cursor.rewind(Cursor.SELECTION_START);
-		firstBarInSelection = cursor.measure;
-		firstTickInSelection = cursor.tick;
-		firstBarNum = 1;
-		currentBar = firstBarInScore;
-		while (!currentBar.is(firstBarInSelection)) {
-			firstBarNum ++;
-			currentBar = currentBar.nextMeasure;
-		}
-		
-		// ************ 		CALCULATE LAST BAR IN SCORE & SELECTION 	************ //
 		lastBarInScore = curScore.lastMeasure;
-		cursor.rewind(Cursor.SELECTION_END);
-		lastBarInSelection = cursor.measure;
-		if (lastBarInSelection == null) lastBarInSelection = lastBarInScore;
-		lastTickInSelection = cursor.tick;
-		if (lastTickInSelection == 0) lastTickInSelection = curScore.lastSegment.tick + 1;
-		lastBarNum = firstBarNum;
+		cursor.rewind(Cursor.SCORE_END);
+		lastBarNum = 1;
+		currentBar = curScore.firstMeasure;
 		
-		while (!currentBar.is(lastBarInSelection)) {
+		while (!currentBar.is(lastBarInScore)) {
 			lastBarNum ++;
 			currentBar = currentBar.nextMeasure;
 		}
 		dialog.msg += "\n————————\n\nSTARTING LOOP\n\n";
 		
 		// ************ 		START LOOP THROUGH WHOLE SCORE 						************ //
-		for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
+		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			dialog.msg += "\n——— currentStaff = "+currentStaffNum;
 			
 			// INITIALISE VARIABLES ON A PER-STAFF BASIS
@@ -229,7 +227,7 @@ MuseScore {
 				checkClef(clef);
 			}
 			
-			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
+			for (currentBarNum = 1; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 				var barStart = currentBar.firstSegment.tick;
 				var barLength = currentBar.lastSegment.tick - barStart;
 				var startTrack = currentStaffNum * 4;
@@ -879,7 +877,6 @@ MuseScore {
 			
 			// **** CHECK COL LEGNO BATT & TRATTO **** //
 			if (lowerCaseText.includes("col legno")) {
-				
 				if (lowerCaseText.includes("batt")) {
 					if (currentPlayingTechnique === "clb") {
 						if (!isBracketed) {
@@ -906,7 +903,6 @@ MuseScore {
 					}
 				}
 			}
-			
 				
 			// **** CHECK ALREADY PLAYING ON THE BRIDGE **** //
 			if (lowerCaseText.includes("otb") || lowerCaseText.includes("o.t.b") ||
@@ -933,8 +929,6 @@ MuseScore {
 					currentContactPoint = "beyond bridge";
 				}
 			}
-			
-		
 		} // end isStringInstrument
 		
 		// **** CHECK ALREADY PLAYING MUTED **** //
@@ -1282,22 +1276,20 @@ MuseScore {
 		var numStaves = curScore.nstaves;
 		var staves = curScore.staves;
 		var cursor = curScore.newCursor();
-		cursor.rewind(SCORE_START);
-		for (var i = 0; i < numStaves; i++) {
-			cursor.staffidx = i;
-			cursor.voice = 0;
-			var firstStaffMeasure = cursor.measure;
-			var firstSystem = firstStaffMeasure.parent;
-			while (cursor && cursor.measure.parent == firstSystem) cursor.nextMeasure();
-			var secondStaffMeasure = nil;
-			if (cursor) secondStaffMeasure = cursor.measure;
-			var full1 = staves[i].part.longName;
-			var short1 = staves[i].part.shortName;
+		cursor.rewind(Cursor.SCORE_START);
+
+		dialog.msg += "fullInstNamesShowing = "+fullInstNamesShowing+"; shortInstNamesShowing = "+shortInstNamesShowing;
+		for (var i = 0; i < numStaves-1 ; i++) {
+			var staff1 = staves[i];
+
+			var full1 = staff1.part.longName;
+			var short1 = staff1.part.shortName;
+			dialog.msg += "\nStaff "+i+" long = "+full1+" short = "+short1;
 			var checkThisStaff = true;
 			if (full1 === "" && short1 === "") checkThisStaff = false;
 			if (isGrandStaff[i] && !isTopOfGrandStaff[i]) checkThisStaff = false;
 			if (checkThisStaff) {
-				for (var j = i+1; j< numStaves+1; j++) {
+				for (var j = i+1; j < numStaves; j++) {
 					if (isGrandStaff[j] && !isTopOfGrandStaff[j]) checkThisStaff = false;
 					if (checkThisStaff) {
 						var staff2 = staves[j];
@@ -1305,26 +1297,27 @@ MuseScore {
 						var short2 = staff2.part.shortName;
 						//inst2 = staff2.InstrumentName;
 						if (fullInstNamesShowing) {
-							if (full1 === full2 && full1 != "") addError("Staff name ‘"+full1+"’ appears twice.\nRename one of them, or rename as ‘"+full1+" I’ & ‘"+full1+" II’", firstStaffMeasure);
-							if (full1 === full2 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" II’?", firstStaffMeasure);
-							if (full2 === full1 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" II’?", firstStaffMeasure);
-							if (full1 === full2 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" I’?", firstStaffMeasure);
-							if (full2 === full1 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" I’?", firstStaffMeasure);
-							if (full1 === full2 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" 2’?", firstStaffMeasure);
-							if (full2 === full1 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" 2’?", firstStaffMeasure);
-							if (full1 === full2 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’. Do you want to rename as ‘"+full2+" 1’?", firstStaffMeasure);
-							if (full2 === full1 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’. Do you want to rename as ‘"+full1+" 1’?", firstStaffMeasure);
+							if (full1 === full2 && full1 != "") addError("Staff name ‘"+full1+"’ appears twice.\nRename one of them, or rename as ‘"+full1+" I’ & ‘"+full1+" II’", "system1 "+i);
+							if (full1 === full2 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" II’?", "system1 "+i);
+							if (full2 === full1 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" II’?", "system1 "+i);
+							if (full1 === full2 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" I’?", "system1 "+i);
+							if (full2 === full1 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" I’?", "system1 "+i);
+							if (full1 === full2 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 2’?", "system1 "+i);
+							if (full2 === full1 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 2’?", "system1 "+i);
+							if (full1 === full2 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 1’?", "system1 "+i);
+							if (full2 === full1 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 1’?", "system1 "+i);
 						}
-						if (shortInstNamesShowing && secondStaffMeasure != nil) {
-							if (short1 === short2 && short1 != "") storeError(errors,"Staff name ‘"+short1+"’ appears twice. Do you want to rename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’?",secondStaffMeasure);
-							if (short1 === short2 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" II’?",secondStaffMeasure);
-							if (short2 === short1 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" II’?",secondStaffMeasure);
-							if (short1 === short2 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" I’?",secondStaffMeasure);
-							if (short2 === short1 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" I’?",secondStaffMeasure);
-							if (short1 === short2 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" 2’?",secondStaffMeasure);
-							if (short2 === short1 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" 2’?",secondStaffMeasure);
-							if (short1 === short2 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’. Do you want to rename as ‘"+short2+" 1’?",secondStaffMeasure);
-							if (short2 === short1 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’. Do you want to rename as ‘"+short1+" 1’?",secondStaffMeasure);
+						if (shortInstNamesShowing) {
+							dialog.msg += "\nhere — "+short1+" "+short2
+							if (short1 === short2 && short1 != "") storeError(errors,"Staff name ‘"+short1+"’ appears twice.\nRename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’","system2 "+i);
+							if (short1 === short2 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" II’?","system2 "+i);
+							if (short2 === short1 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" II’?","system2 "+i);
+							if (short1 === short2 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" I’?","system2 "+i);
+							if (short2 === short1 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" I’?","system2 "+i);
+							if (short1 === short2 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 2’?","system2 "+i);
+							if (short2 === short1 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 2’?","system2 "+i);
+							if (short1 === short2 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 1’?","system2 "+i);
+							if (short2 === short1 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 1’?","system2 "+i);
 						}
 					}
 				}
@@ -1452,8 +1445,8 @@ MuseScore {
 		return diatonicPitch - diatonicPitchOfMiddleLine; // 41 = treble B
 	}
 	
-		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
 	function checkStaffOrder () {
+		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
 		var numGrandStaves = 0;
 		var prevPart = null;
 		var prevPrevPart = null;
@@ -1605,12 +1598,29 @@ MuseScore {
 			var staffNum = 0;
 			var elementHeight = 0;
 			var commentOffset = 1.0;
-		
-			if (element !== "top" && element !== "pagetop") {
+			
+			// the errorObjects array contains a list of the Elements to attach the text object to
+			// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
+			// Here are the strings, and where the text object will be attached
+			// 		top 				— top of bar 1, staff 1
+			// 		pagetop			— top left of page 1
+			//		system1 n		— top of bar 1, staff n
+			//		system2 n		— first bar in second system, staff n
+			
+			var isString = typeof element === 'string';
+			var theLocation = element;
+			if (isString) {
+				if (element.includes(' ')) {
+					staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
+					theLocation = element.split(' ')[0];
+					if (theLocation === "system2") dialog.msg += "\nsystem2";
+					if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
+				}
+			} else {
 				// calculate the staff number that this element is on
 				elementHeight = element.bbox.height;
 				var elemStaff = element.staff;
-				while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++;
+				while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I REALLY wish a staff object could just tell me its staff index
 			}
 			// add a text object at the location where the element is
 			var comment = newElement(Element.STAFF_TEXT);
@@ -1623,23 +1633,21 @@ MuseScore {
 			comment.frameBgColor = "yellow";
 			comment.frameFgColor = "black";
 			comment.fontSize = 7.0;
-			comment.fontFace = "Helvetica"
-			comment.autoplace = false;;
-			var tick = 0;
-			var segment = curScore.firstSegment();
-			var firstMeasure = curScore.firstMeasure;
-			var desiredPosX = 0;
-			var desiredPosY = 0;
-			if (element === "top") {
-				// do nothing
-			} else {
-				if (element === "pagetop") {
+			comment.fontFace = "Helvetica";
+			comment.autoplace = false;
+			var tick = 0, desiredPosX = 0, desiredPosY = 0;
+			if (isString) {
+				if (theLocation === "pagetop") {
 					desiredPosX = 2.5;
 					desiredPosY = 10.;
-				} else {
-					segment = element.parent;
-					tick = segment.tick;
 				}
+				if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
+				if (theLocation === "system2") {
+					tick = firstBarInSecondSystem.firstSegment.tick;
+					dialog.msg += "\nPlacing system2 at tick: "+tick;
+				}
+			} else {
+				tick = element.parent.tick;
 			}
 		
 			// add text object to score
@@ -1647,8 +1655,7 @@ MuseScore {
 			cursor.staffIdx = staffNum;
 			cursor.rewindToTick(tick);
 			cursor.add(comment);
-			comment.z = 9600;
-			//dialog.msg +=  "\nz: "+comment.z;
+			comment.z = 16384;
 			var commentHeight = comment.bbox.height;
 			if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 			if (desiredPosY != 0) {
@@ -1657,8 +1664,6 @@ MuseScore {
 				comment.offsetY -= commentHeight;
 			}
 			var commentTopRounded = Math.round(comment.pagePos.y);
-		
-		
 			while (commentPosArray[commentTopRounded+1000]) {
 				commentTopRounded -= commentOffset;
 				comment.offsetY -= commentOffset;
