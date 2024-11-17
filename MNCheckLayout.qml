@@ -32,6 +32,9 @@ MuseScore {
 	FileIO { id: tempomarkingsfile; source: Qt.resolvedUrl("./assets/tempomarkings.txt").toString().slice(8); onError: { console.log(msg); } }
 	FileIO { id: tempochangemarkingsfile; source: Qt.resolvedUrl("./assets/tempochangemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
 
+	// ** DEBUG **
+	property var debug: true
+	
 	// **** PROPERTIES **** //
 	property var checkClefs: false
 	property var reads8va: false
@@ -134,10 +137,7 @@ MuseScore {
 		// WORK OUT THE MEASURE THAT STARTS THE SECOND SYSTEM
 		if (hasMoreThanOneSystem) {
 			firstBarInSecondSystem = curScore.firstMeasure;
-			while (firstBarInSecondSystem.parent.is(firstSystem)) {
-				firstBarInSecondSystem = firstBarInSecondSystem.nextMeasure;
-				//dialog.msg += "\nnextMeasure";
-			}
+			while (firstBarInSecondSystem.parent.is(firstSystem)) firstBarInSecondSystem = firstBarInSecondSystem.nextMeasure;
 		}
 		
 		// **** INITIALISE PROPERTIES AND ARRAYS **** //
@@ -160,6 +160,9 @@ MuseScore {
 		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
 		curScore.endCmd();
 		
+		// ************ 								CHECK TIME SIGNATURES							************ //
+		checkTimeSignatures();
+		
 		// ************ 								CHECK SCORE TEXT							************ //
 		checkScoreText();
 		
@@ -177,25 +180,19 @@ MuseScore {
 		
 		// ************ 		CALCULATE LAST BAR NUMBER								 	************ //
 		firstBarInScore = curScore.firstMeasure;
+		currentBar = firstBarInScore;
 		lastBarInScore = curScore.lastMeasure;
+		lastBarNum = curScore.nmeasures;
 		cursor.rewind(Cursor.SCORE_END);
-		lastBarNum = 1;
-		currentBar = curScore.firstMeasure;
-		
-		while (!currentBar.is(lastBarInScore)) {
-			lastBarNum ++;
-			currentBar = currentBar.nextMeasure;
-		}
 		dialog.msg += "\n————————\n\nSTARTING LOOP\n\n";
 		
 		// ************ 		START LOOP THROUGH WHOLE SCORE 						************ //
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			dialog.msg += "\n——— currentStaff = "+currentStaffNum;
 			
-			// INITIALISE VARIABLES ON A PER-STAFF BASIS
-			prevKeySigSharps = -99;
+			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
+			prevKeySigSharps = -99; // placeholder/dummy variable
 			prevKeySigBarNum = 0;
-			prevTimeSig = "";
 			prevBarNum = 0;
 			prevClef = null;
 			prevDynamic = "";
@@ -227,21 +224,31 @@ MuseScore {
 				checkClef(clef);
 			}
 			
+			prevTimeSig = currentBar.timesigNominal.str;
+			
+						
 			for (currentBarNum = 1; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
-				var barStart = currentBar.firstSegment.tick;
-				var barLength = currentBar.lastSegment.tick - barStart;
+				var barStartTick = currentBar.firstSegment.tick;
+				var barEndTick = currentBar.lastSegment.tick;
+				var barLength = barEndTick - barStartTick;
 				var startTrack = currentStaffNum * 4;
+				var goneToNextBar = false;
 				dialog.msg += "\nBAR "+currentBarNum;
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					cursor.filter = Segment.All;
 					cursor.track = currentTrack;
-					cursor.rewindToTick(barStart);
+					cursor.rewindToTick(barStartTick);
 					var processingThisBar = cursor.element;
 					while (processingThisBar) {
 						var currSeg = cursor.segment;
+						if (currSeg.tick == barEndTick) {
+							if (!goneToNextBar) {
+								goneToNextBar = true;
+								//currentBarNum ++;
+							}
+						} 
 						var annotations = currSeg.annotations;
-						//dialog.msg += "Found "
 						var elem = cursor.element;
 						var eType = elem.type;
 						var eName = elem.name;
@@ -251,9 +258,7 @@ MuseScore {
 						
 						// ************ FOUND A KEY SIGNATURE ************ //
 						if (eType === Element.KEYSIG && currentStaffNum == firstStaffNum) checkKeySignature(elem,cursor.keySignature);
-						
-						// ************ FOUND A TIME SIGNATURE ************ //
-						if (eType === Element.TIMESIG) checkTimeSignature(elem);
+					
 						
 						// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
 						
@@ -269,7 +274,7 @@ MuseScore {
 									if (aText) checkTextObject(theAnnotation, currentBarNum);
 								
 									// **** FOUND AN OTTAVA **** // — // DOESN'T WORK — TO FIX
-									if (aType === Element.OTTAVA || aType === Element.OTTAVA_SEGMENT) checkOttava(theAnnotation);
+									if (aType == Element.OTTAVA || aType === Element.OTTAVA_SEGMENT) checkOttava(theAnnotation);
 								}
 							}
 						}
@@ -288,7 +293,7 @@ MuseScore {
 								ledgerLines = [];
 								flaggedLedgerLines = false;
 							}
-							var pos = cursor.tick - barStart;						
+							var pos = cursor.tick - barStartTick;						
 							var augDot = (Math.log2((displayDur * 64.) / (division * 3.)) % 1.0) == 0.;
 							var isCrossStaff = false;
 							
@@ -325,6 +330,18 @@ MuseScore {
 		showAllErrors();
 		
 		// ** SHOW INFO DIALOG ** //
+		if (!debug) {
+			var numErrors = errorStrings.length;
+			if (numErrors == 0) {
+				dialog.msg = "COMPLETED! No errors found!";
+			}
+			if (numErrors == 1) {
+				dialog.msg = "COMPLETED! One error found.";
+			}
+			if (numErrors > 1) {
+				dialog.msg = "COMPLETED! I found "+numErrors+" errors";
+			}
+		}
 		dialog.show();
 	}
 	
@@ -598,16 +615,19 @@ MuseScore {
 						.replace('<sym>dynamicsubito</sym>','s')
 						.replace('<sym>dynamicz</sym>','z');
 					//dialog.msg += "\nprevDynamicBarNum = "+prevDynamicBarNum;
+					var dynamicException = plainDynamicMark.includes("fp") || plainDynamicMark.includes("sf") || plainDynamicMark.includes("fz");
+					
 					if (prevDynamicBarNum > 0) {
 						var barsSincePrevDynamic = barNum - prevDynamicBarNum;
-						var dynamicException = plainDynamicMark.includes("fp") || plainDynamicMark.includes("sfz");
 						if (plainDynamicMark === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
 							addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicBarNum+".",textObject);
 							isError = true;
 						}
 					}
-					prevDynamicBarNum = barNum;
-					prevDynamic = plainDynamicMark;
+					if (!dynamicException) {
+						prevDynamicBarNum = barNum;
+						prevDynamic = plainDynamicMark;
+					}
 					if (isError) return;
 				}
 				//dialog.msg += "\n"+lowerCaseText+" isDyn = "+isDyn;
@@ -729,7 +749,7 @@ MuseScore {
 		}
 		if (isStringInstrument) {
 			
-			dialog.msg += "IsString: checking "+lowerCaseText;
+			//dialog.msg += "IsString: checking "+lowerCaseText;
 			// **** CHECK INCORRECT 'A 2 / A 3' MARKINGS **** //
 			if (lowerCaseText === "a 2" || lowerCaseText === "a 3") {
 				addEerror("Don’t use ‘"+lowerCaseText+"’ for strings; write ‘unis.’ etc. instead",textObject);
@@ -977,14 +997,14 @@ MuseScore {
 		
 		// **** CHECK FOR INAPPROPRIATE CLEFS **** //
 		if (checkClefs) {
-			if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef.",clef);
-			if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef.",clef);
-			if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef.",clef);
-			if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef.",clef);
+			if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef",clef);
+			if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef",clef);
+			if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef",clef);
+			if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef",clef);
 		}
 		
 		// **** CHECK FOR REDUNDANT CLEFS **** //
-		if (clef.is(prevClef)) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted.",clef);
+		if (clef.is(prevClef)) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
 		prevClef = clef;
 	}
 	
@@ -1125,15 +1145,28 @@ MuseScore {
 		}
 	}
 	
-	function checkTimeSignature (timeSig) {
-		var ts = timeSig.str;
-		if (ts === prevTimeSig) addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",timeSig);
-		prevTimeSig = ts;
+	function checkTimeSignatures () {
+		var segment = curScore.firstSegment();
+		prevTimeSig = "";
+		while (segment) {
+			if (segment.segmentType == Segment.TimeSig) {
+				var theTimeSig = segment.elementAt(0);
+				if (theTimeSig.type == Element.TIMESIG) {
+					var theTimeSigStr = theTimeSig.timesig.str;
+					dialog.msg += "\n found time sig "+theTimeSigStr;
+					if (theTimeSigStr === prevTimeSig) {
+						addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",theTimeSig);
+					}
+					prevTimeSig = theTimeSigStr;
+				}
+			}
+			segment = segment.next;
+		}
 	}
 	
 	function checkScoreAndPageSettings () {
-		var styleComments = "";
-		var pageSettingsComments = ""
+		var styleComments = [];
+		var pageSettingsComments = [];
 		var parts = curScore.parts;
 		var numParts = parts.length;
 		var style = curScore.style;
@@ -1154,13 +1187,15 @@ MuseScore {
 		var pageOddTopMargin = style.value("pageOddTopMargin")*inchesToMM;
 		var pageEvenBottomMargin = style.value("pageEvenBottomMargin")*inchesToMM;
 		var pageOddBottomMargin = style.value("pageOddBottomMargin")*inchesToMM;
+		var tupletsFontFace = style.value("tupletFontFace");
+		var tupletsFontStyle = style.value("tupletFontStyle");
 		//dialog.msg += "Margins = "+pageEvenLeftMargin+" "+pageOddLeftMargin+" "+pageEvenTopMargin+" "+pageOddTopMargin+" "+pageEvenBottomMargin+" "+pageOddBottomMargin;
 		
 		// **** TEST 1A: CHECK MARGINS ****
 		var maxMargin = 15;
 		var minMargin = 5;
-		if ((pageEvenLeftMargin > maxMargin) + (pageOddLeftMargin > maxMargin) + (pageEvenTopMargin > maxMargin) + (pageOddTopMargin > maxMargin) +  (pageEvenBottomMargin > maxMargin) + (pageOddBottomMargin > maxMargin)) pageSettingsComments += "\nDecrease your margins to no more than "+maxMargin+"mm";
-		if ((pageEvenLeftMargin < minMargin) + (pageOddLeftMargin < minMargin) + (pageEvenTopMargin < minMargin) + (pageOddTopMargin < minMargin) +  (pageEvenBottomMargin < minMargin) + (pageOddBottomMargin < minMargin)) pageSettingsComments += "\nIncrease your margins to at least "+minMargin+"mm";
+		if ((pageEvenLeftMargin > maxMargin) + (pageOddLeftMargin > maxMargin) + (pageEvenTopMargin > maxMargin) + (pageOddTopMargin > maxMargin) +  (pageEvenBottomMargin > maxMargin) + (pageOddBottomMargin > maxMargin)) pageSettingsComments.push("Decrease your margins to no more than "+maxMargin+"mm");
+		if ((pageEvenLeftMargin < minMargin) + (pageOddLeftMargin < minMargin) + (pageEvenTopMargin < minMargin) + (pageOddTopMargin < minMargin) +  (pageEvenBottomMargin < minMargin) + (pageOddBottomMargin < minMargin)) pageSettingsComments.push("Increase your margins to at least "+minMargin+"mm");
 		// **** TEST 1B: CHECK STAFF SIZE ****
 		var maxSize = 6.8;
 		var minSize = 6.5;
@@ -1181,17 +1216,17 @@ MuseScore {
 			minSize = 4.4;
 		}
 		
-		if (staffSize > maxSize) pageSettingsComments +=  "\nDecrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm";		
-		if (staffSize < minSize) pageSettingsComments += "\nDecrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm";
+		if (staffSize > maxSize) pageSettingsComments.push("Decrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");		
+		if (staffSize < minSize) pageSettingsComments.push("Decrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
 		
 		// **** 1C: CHECK STAFF SPACING
 		
 		// **** 1D: CHECK SYSTEM SPACING
 		if (hasMoreThanOneSystem) {
-			if (minSystemDistance < 12) styleComments += "\n(Page tab) Increase the ‘Min. system distance’ to at least 12";
-			if (minSystemDistance > 16) styleComments += "\n(Page tab) Decrease the ‘Min. system distance’ to no more than 16";
-			if (maxSystemDistance < 12) styleComments += "\n(Page tab) Increase the ‘Max. system distance’ to at least 12";
-			if (maxSystemDistance > 16) styleComments += "\n(Page tab) Decrease the ‘Max. system distance’ to no more than 16";
+			if (minSystemDistance < 12) styleComments.push("(Page tab) Increase the ‘Min. system distance’ to at least 12");
+			if (minSystemDistance > 16) styleComments.push("(Page tab) Decrease the ‘Min. system distance’ to no more than 16");
+			if (maxSystemDistance < 12) styleComments.push("(Page tab) Increase the ‘Max. system distance’ to at least 12");
+			if (maxSystemDistance > 16) styleComments.push("(Page tab) Decrease the ‘Max. system distance’ to no more than 16");
 		}
 		
 		// ** CHECK FOR STAFF NAMES ** //
@@ -1219,8 +1254,8 @@ MuseScore {
 			}
 		}
 		
-		if (isSoloScore && !hideInstrumentNameForSolo) styleComments += "\n(Score tab) Tick ‘Hide if there is only one instrument’";
-		if (!isSoloScore && firstStaffNamesVisibleSetting != 0) styleComments += "\n(Score tab) Set Instrument names→On first system of sections to ‘Long name’."
+		if (isSoloScore && !hideInstrumentNameForSolo) styleComments.push("(Score tab) Tick ‘Hide if there is only one instrument’");
+		if (!isSoloScore && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
 		var subsequentStaffNamesVisibleSetting = style.value("subsSystemInstNameVisibility");  //  0 = long names, 1 = short names, 2 = hidden
 		var subsequentStaffNamesVisible = false;
 		if (!hideInstrumentNameForSolo && subsequentStaffNamesVisibleSetting < 2) {
@@ -1241,34 +1276,38 @@ MuseScore {
 		shortInstNamesShowing =  (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 1) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 1);
 		
 		if (subsequentStaffNamesShouldBeHidden) {
-			if (subsequentStaffNamesVisible) styleComments += "\n(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble";
+			if (subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble");
 		} else {
-			if (!subsequentStaffNamesVisible) styleComments += "\n(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble";
+			if (!subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble");
 		}
+		
+		//dialog.msg += "tupletsFontFace = "+tupletsFontFace+" tupletsFontStyle = "+tupletsFontStyle;
+		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) We recommend using Times New Roman italic for tuplets");
 		
 		// ** OTHER STYLE ISSUES ** //
 		
 		// ** POST STYLE COMMENTS
-		if (styleComments != "") {
-			styleComments = styleComments.substring(1); // delete first \n
-			if (styleComments.split('\n').length == 1) {
-				styleComments = "I recommend making the following change to the score’s Style (Format→Style…):\n"+styleComments;
+		if (styleComments.length>0) {
+			var styleCommentsStr = "";
+			if (styleComments.length == 1) {
+				styleCommentsStr = "I recommend making the following change to the score’s Style (Format→Style…):\n"+styleComments.join('\n');
 			} else {
-				styleComments = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+styleComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
+				var theList = styleComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
+				styleCommentsStr = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+theList;
 			}
-			addError(styleComments,"pagetop");
+			addError(styleCommentsStr,"pagetop");
 		}
 		
 		// ** SHOW PAGE SETTINGS ERROR ** //
-		if (pageSettingsComments != "") {
-			pageSettingsComments = pageSettingsComments.substring(1); // delete first \n
-			
-			if (pageSettingsComments.split('\n').length == 1) {	
-				pageSettingsComments = "I recommend making the following change to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments;
+		if (pageSettingsComments.length > 0) {
+			var pageSettingsCommentsStr = "";
+			if (pageSettingsComments.length == 1) {	
+				pageSettingsCommentsStr = "I recommend making the following change to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.join("\n");
 			} else {
-				pageSettingsComments = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.split('\n').map((line, index) => `${index + 1}) ${line}`).join('\n');
+				var theList = pageSettingsComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
+				pageSettingsCommentsStr = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+theList;
 			}
-			addError(pageSettingsComments,"pagetop");
+			addError(pageSettingsCommentsStr,"pagetop");
 		}
 	}
 	
@@ -1278,13 +1317,13 @@ MuseScore {
 		var cursor = curScore.newCursor();
 		cursor.rewind(Cursor.SCORE_START);
 
-		dialog.msg += "fullInstNamesShowing = "+fullInstNamesShowing+"; shortInstNamesShowing = "+shortInstNamesShowing;
+	//	dialog.msg += "fullInstNamesShowing = "+fullInstNamesShowing+"; shortInstNamesShowing = "+shortInstNamesShowing;
 		for (var i = 0; i < numStaves-1 ; i++) {
 			var staff1 = staves[i];
 
 			var full1 = staff1.part.longName;
 			var short1 = staff1.part.shortName;
-			dialog.msg += "\nStaff "+i+" long = "+full1+" short = "+short1;
+			//dialog.msg += "\nStaff "+i+" long = "+full1+" short = "+short1;
 			var checkThisStaff = true;
 			if (full1 === "" && short1 === "") checkThisStaff = false;
 			if (isGrandStaff[i] && !isTopOfGrandStaff[i]) checkThisStaff = false;
@@ -1308,7 +1347,6 @@ MuseScore {
 							if (full2 === full1 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 1’?", "system1 "+i);
 						}
 						if (shortInstNamesShowing) {
-							dialog.msg += "\nhere — "+short1+" "+short2
 							if (short1 === short2 && short1 != "") storeError(errors,"Staff name ‘"+short1+"’ appears twice.\nRename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’","system2 "+i);
 							if (short1 === short2 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" II’?","system2 "+i);
 							if (short2 === short1 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" II’?","system2 "+i);
@@ -1327,7 +1365,7 @@ MuseScore {
 	
 	function checkLedgerLines (noteRest) {
 		var maxNumLedgerLines = getMaxNumLedgerLines(noteRest);
-		dialog.msg += "maxNumLL = "+maxNumLedgerLines;
+		//dialog.msg += "maxNumLL = "+maxNumLedgerLines;
 		var numberOfLedgerLinesToCheck = 4;
 		if (ledgerLines.length > numberOfLedgerLinesToCheck) ledgerLines = ledgerLines.slice(1);
 		ledgerLines.push(maxNumLedgerLines);
@@ -1613,14 +1651,14 @@ MuseScore {
 				if (element.includes(' ')) {
 					staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
 					theLocation = element.split(' ')[0];
-					if (theLocation === "system2") dialog.msg += "\nsystem2";
+					//if (theLocation === "system2") dialog.msg += "\nsystem2";
 					if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
 				}
 			} else {
 				// calculate the staff number that this element is on
 				elementHeight = element.bbox.height;
 				var elemStaff = element.staff;
-				while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I REALLY wish a staff object could just tell me its staff index
+				while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
 			}
 			// add a text object at the location where the element is
 			var comment = newElement(Element.STAFF_TEXT);
@@ -1644,7 +1682,7 @@ MuseScore {
 				if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
 				if (theLocation === "system2") {
 					tick = firstBarInSecondSystem.firstSegment.tick;
-					dialog.msg += "\nPlacing system2 at tick: "+tick;
+					//dialog.msg += "\nPlacing system2 at tick: "+tick;
 				}
 			} else {
 				tick = element.parent.tick;
@@ -1677,6 +1715,7 @@ MuseScore {
 					element.color = "hotpink";
 					for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
 				} else {
+					if (element.type == Element.TIMESIG) dialog.msg += "\ncoloring time sig "+element.timesigNominal.str;
 					element.color = "hotpink";
 				}
 			}
