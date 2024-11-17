@@ -101,6 +101,7 @@ MuseScore {
 	property var lastBarInScore: null
 	property var firstBarInSecondSystem: null
 	property var articulations: []
+	property var scoreHasRehearsalMarks: false
 	
   onRun: {
 		if (!curScore) return;
@@ -194,10 +195,10 @@ MuseScore {
 		checkStaffOrder();
 			
 		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
-		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied;
-		var firstStaffNum, firstBarNum, firstSegmentInScore;
-		var lastBarNum;
+		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
+		var firstStaffNum, firstBarNum, firstSegmentInScore, lastBarNum;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
+		var containsTransposingInstruments = false;
 		
 		// ************ 				CALCULATE LAST BAR NUMBER									 	************ //
 		firstBarInScore = curScore.firstMeasure;
@@ -223,6 +224,7 @@ MuseScore {
 			currentContactPoint = "ord";
 			ledgerLines = [];
 			flaggedLedgerLines = false;
+			isFirstNote = true;
 			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
@@ -336,9 +338,21 @@ MuseScore {
 							// TO FIX
 							//dialog.msg += "\nFOUND NOTE";
 							
-							// CHECK THE PASSAGE'S REGISTER
 							if (!isRest && !isCrossStaff) {
 								
+								// ************ CHECK IF SCORE IS TRANSPOSED ************ //
+								
+								if (isFirstNote && !containsTransposingInstruments) {
+									isFirstNote = false;
+									var note = noteRest.notes[0];
+									var containsTransposingInstruments = note.tpc1 != note.tpc2;
+									//dialog.msg += "\nThis staff is transposing = "+containsTransposingInstruments;
+									if (containsTransposingInstruments) {
+										var scoreIsInConcert = note.tpc == note.tpc1;
+										//dialog.msg += "\nscoreIsInConcert = "+scoreIsInConcert;
+										if (scoreIsInConcert) addError("This score includes a transposing instrument, but the score is currently in Concert pitch.\nIt is generally preferred to have the score transposed.\nUntick ‘Concert pitch’ in the bottom right to view the transposed score.","pagetop");
+									}
+								}
 								prevBarNum = currentBarNum;
 								
 								// ************ CHECK LEDGER LINES ************ //
@@ -368,6 +382,7 @@ MuseScore {
 		
 		// ** CHECK FOR OMITTED INITIAL TEMPO ** //
 		if (!initialTempoExists) addError('I couldn’t find an initial tempo marking','top');
+		
 		
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
@@ -506,6 +521,10 @@ MuseScore {
 		var eType = textObject.type;
 		var eName = textObject.name;
 		var styledText = textObject.text;
+		
+		if (eType == Element.REHEARSAL_MARK) {
+			dialog.msg += "\nFOUND REHEARSAL MARK";
+		}
 		
 		//dialog.msg += "\nstyledtext = "+styledText;
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
@@ -1581,6 +1600,26 @@ MuseScore {
 		}
 	}
 	
+	
+	function checkFluteHarmonic (noteRest) {
+		var allowedIntervals = [12,19,24,28,31,34,36];
+		var nn = noteRest.notes.length;
+		
+		if (nn == 2) {
+			var noteheadStyle1 = noteRest.notes[0].headGroup;
+			var noteheadStyle2 = noteRest.notes[1].headGroup;
+			if (noteheadStyle1 == NoteHeadGroup.HEAD_DIAMOND && noteheadStyle2 == NoteHeadGroup.HEAD_NORMAL) {
+				// we have a flute harmonic
+				var np1 = noteRest.notes[0].pitch;
+				var np2 = noteRest.notes[1].pitch;
+				var interval = np2 - np1;
+				if (np1 > 72) addError("The bottom note on this flute harmonic is too high.\nFlute harmonics should always come from fingerings in the bottom octave.",noteRest);
+				if (interval == 12) addError("Second harmonics on the flute are indistinguishable from normal notes\nit’s recommended to only use third, fourth or fifth harmonics.",noteRest);
+				if (!allowedIntervals.includes(interval)) addError("This looks like a flute harmonic, but you can’t get the\ntop note as a harmonic of the bottom note.",noteRest);		
+			}
+		}
+	}
+	
 	function getArticulation (noteRest, staffNum) {
 		// I WISH: you could just get the articulations of a note instead of having to do this hack
 		// I WISH: you could get the staffidx of a note/staff
@@ -1589,31 +1628,6 @@ MuseScore {
 		return artic;
 	}
 	
-	function checkFluteHarmonic (noteRest) {
-/*
-		if (isFlute and _checkHarmonics) {
-			if (nn = 2) {
-				nh1 = n.Lowest.NoteStyle;
-				nh2 = n.Highest.NoteStyle;
-				if (nh1 = DiamondNoteStyle and nh2 = NormalNoteStyle) {
-					// we have a flute harmonic
-					np1 = n.Lowest.WrittenPitch;
-					np2 = n.Highest.WrittenPitch;
-					interval = np2 - np1;
-					if (np1 > 72) {
-						storeError(errors,"The bottom note on this flute harmonic is too high. Flute harmonics should always be based on notes in the bottom octave.","NoteRest",n);
-					}
-					if (interval = 12) {
-						storeError(errors,"Second harmonics on the flute are indistinguishable from normal notes — it’s recommended to only use third, fourth or fifth harmonics.","NoteRest",n);
-					}
-					if (interval != 12 and interval != 19 and interval != 24 and interval != 28 and interval != 31 and interval != 34 and interval != 36) {
-						storeError(errors,"This looks like a flute harmonic, but you can’t get the top note as a harmonic of the bottom note.","NoteRest",n);		
-					}
-				}
-			}
-		}
-		*/
-	}
 	
 	function getOffsetFromMiddleLine (note) {
 		var theTPC = note.tpc2;
