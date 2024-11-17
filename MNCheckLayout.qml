@@ -100,6 +100,7 @@ MuseScore {
 	property var firstBarInScore: null
 	property var lastBarInScore: null
 	property var firstBarInSecondSystem: null
+	property var articulations: []
 	
   onRun: {
 		if (!curScore) return;
@@ -148,37 +149,57 @@ MuseScore {
 			instrumentNames.push(staves[i].part.longName);
 		}
 		
-		// ************  DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 	************ //
+		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
 		deleteAllCommentsAndHighlights();
 
-		// ************  				CHECK SCORE & PAGE SETTINGS 					************ // 
+		// ************  							CHECK SCORE & PAGE SETTINGS 					************ // 
 		checkScoreAndPageSettings();
 		
-			
-		// ************  							SELECT ENTIRE SCORE 						************ //
+		// ************  				SELECT AND PRE-PROCESS ENTIRE SCORE 				************ //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
 		curScore.endCmd();
 		
-		// ************ 								CHECK TIME SIGNATURES							************ //
+		for (var i = 0; i<numStaves; i++) articulations[i] =[];
+		
+		var elems = curScore.selection.elements;
+		for (var i = 0; i<elems.length; i++) {
+			var e = elems[i];
+			if (e.type == Element.HAIRPIN) {
+				dialog.msg += "\nFOUND HAIRPIN "+e+" spannerTick: "+e.spannerTick.ticks+" ticks: "+e.spannerTicks.ticks;
+			}
+			if (e.type == Element.OTTAVA) {
+				dialog.msg += "\nFOUND OTTAVA "+e; //+" @ ticks "+e.ticks;
+			}
+			if (e.type == Element.ARTICULATION) {
+				var staffIdx = 0;
+				var theTick = e.parent.parent.tick;
+				while (!curScore.staves[staffIdx].is(e.staff)) staffIdx++;
+				dialog.msg += "\nFOUND ARTIC "+e.symbol+" tick: "+theTick;
+				//var keyName = staffIdx+"|"+theTick;
+				articulations[staffIdx][theTick] = e;
+			}
+		}
+		
+		// ************ 								CHECK TIME SIGNATURES								************ //
 		checkTimeSignatures();
 		
-		// ************ 								CHECK SCORE TEXT							************ //
+		// ************ 										CHECK SCORE TEXT								************ //
 		checkScoreText();
 		
-		// ************  								CHECK STAFF NAMES 					************ // 
+		// ************  								CHECK STAFF NAMES 									************ // 
 		checkStaffNames();
 		
-		// ************ 					CHECK FOR STAFF ORDER ISSUES 				************ //
+		// ************ 					CHECK FOR STAFF ORDER ISSUES 							************ //
 		checkStaffOrder();
 			
-		// ************ 		PREP FOR A FULL LOOP THROUGH THE SCORE 		************ //
+		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied;
 		var firstStaffNum, firstBarNum, firstSegmentInScore;
 		var lastBarNum;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		
-		// ************ 		CALCULATE LAST BAR NUMBER								 	************ //
+		// ************ 				CALCULATE LAST BAR NUMBER									 	************ //
 		firstBarInScore = curScore.firstMeasure;
 		currentBar = firstBarInScore;
 		lastBarInScore = curScore.lastMeasure;
@@ -186,7 +207,7 @@ MuseScore {
 		cursor.rewind(Cursor.SCORE_END);
 		dialog.msg += "\n————————\n\nSTARTING LOOP\n\n";
 		
-		// ************ 		START LOOP THROUGH WHOLE SCORE 						************ //
+		// ************ 					START LOOP THROUGH WHOLE SCORE 						************ //
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			dialog.msg += "\n——— currentStaff = "+currentStaffNum;
 			
@@ -252,12 +273,13 @@ MuseScore {
 						var elem = cursor.element;
 						var eType = elem.type;
 						var eName = elem.name;
+						dialog.msg += '\neName = '+eName;
 						
 						// ************ FOUND A CLEF ************ //
-						if (eType === Element.CLEF) checkClef(elem);
+						if (eType == Element.CLEF) checkClef(elem);
 						
 						// ************ FOUND A KEY SIGNATURE ************ //
-						if (eType === Element.KEYSIG && currentStaffNum == firstStaffNum) checkKeySignature(elem,cursor.keySignature);
+						if (eType == Element.KEYSIG && currentStaffNum == firstStaffNum) checkKeySignature(elem,cursor.keySignature);
 					
 						
 						// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
@@ -269,21 +291,34 @@ MuseScore {
 									var aName = theAnnotation.name;
 									var aType = theAnnotation.type;
 									var aText = theAnnotation.text;
+									dialog.msg += "\n Anno name = "+aName;
+									
+									if (aType == Element.ARTICULATION) {
+										dialog.msg += "\n Found anno articulation "+aName+" subtype:"+theAnnotation.subtype;
+									}
 									
 									// **** FOUND A TEXT OBJECT **** //
-									if (aText) checkTextObject(theAnnotation, currentBarNum);
+									if (aText) {
+										checkTextObject(theAnnotation, currentBarNum);
+									} else {
+										
+									}
 								
 									// **** FOUND AN OTTAVA **** // — // DOESN'T WORK — TO FIX
-									if (aType == Element.OTTAVA || aType === Element.OTTAVA_SEGMENT) checkOttava(theAnnotation);
+									if (aType == Element.OTTAVA || aType == Element.OTTAVA_SEGMENT) checkOttava(theAnnotation);
 								}
 							}
 						}
 						
+						if (eType == Element.ARTICULATION) {
+							dialog.msg += "\n Found articulation "+eName+" subtype:"+elem.subtype;
+						}
+						
 						// ************ FOUND A CHORD ************ //
-						if (eType === Element.CHORD) {
+						if (eType == Element.CHORD) {
 							var noteRest = cursor.element;
 							var isHidden = !noteRest.visible;
-							var isRest = noteRest.type === Element.REST;
+							var isRest = noteRest.type == Element.REST;
 							var isNote = !isRest;
 							var displayDur = noteRest.duration.ticks;
 							var soundingDur = noteRest.actualDuration.ticks;
@@ -305,9 +340,17 @@ MuseScore {
 							if (!isRest && !isCrossStaff) {
 								
 								prevBarNum = currentBarNum;
+								
+								// ************ CHECK LEDGER LINES ************ //
 								checkLedgerLines(noteRest);
+								
+								// ************ CHECK STRING HARMONIC ************ //
+								if (isStringInstrument) checkStringHarmonic(noteRest, currentStaffNum);
+								
+								// ************ CHECK FLUTE HARMONIC ************ //
+								if (isFlute) checkFluteHarmonic(noteRest);
 							}
-						} // end if eType === Element.Chord
+						} // end if eType == Element.Chord
 
 						if (cursor.next()) {
 							processingThisBar = cursor.measure.is(currentBar);
@@ -1472,6 +1515,104 @@ MuseScore {
 			if (Math.abs(numLedgerLines) > Math.abs(maxNumLedgerLines)) maxNumLedgerLines = numLedgerLines;
 		}
 		return maxNumLedgerLines;
+	}
+	
+	function checkStringHarmonic (noteRest, staffNum) {
+
+		var harmonicCircleIntervals = [12,19,24,28,31,34,36,38,40,42,43,45,46,47,48];
+		var diamondHarmonicIntervals = [3,4,5,7,12,19,24,28,31,34,36];
+		var violinStrings = [55,62,69,76];
+		var violaStrings = [48,55,62,69];
+		var celloStrings = [36,43,50,57];
+		var bassStrings = [40,45,50,55];
+		
+		if (noteRest.notes[0].tieBack) return;
+		var nn = noteRest.notes.length;
+		dialog.msg += "\nCHECKING STRING HARMONIC — nn = "+nn;
+		if (nn == 2) {
+			//check for possible artificial harmonic
+			var noteheadStyle1 = noteRest.notes[0].headGroup;
+			var noteheadStyle2 = noteRest.notes[1].headGroup;
+			//dialog.msg += "\nns1 = "+noteheadStyle1+" vs "+NoteHeadGroup.HEAD_NORMAL+"; ns2 = "+noteheadStyle2+" vs "+NoteHeadGroup.HEAD_DIAMOND;
+			if (noteheadStyle1 == NoteHeadGroup.HEAD_NORMAL && noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND) {
+				// we have a false harmonic
+				var noteheadPitch1 = noteRest.notes[0].pitch;
+				var noteheadPitch2 = noteRest.notes[1].pitch;
+				dialog.msg += "\nFALSE HARM FOUND: np1 "+noteheadPitch1+" np2 "+noteheadPitch2;
+				var interval = noteheadPitch2 - noteheadPitch1;
+				
+				if (interval != 5) {
+					addError("This looks like an artificial harmonic, but the interval between\nthe fingered and touched pitch is not a perfect fourth.",noteRest);
+				}
+			}
+		}
+		
+		if (nn == 1) {
+			var isHarmonic = false;
+			var harmonicArray = [];
+			var stringsArray = [];
+			var noteheadStyle = noteRest.notes[0].headGroup;
+			var theArticulation = getArticulation(noteRest, staffNum);
+			//dialog.msg += "\nThe artic sym = "+theArticulation.symbol.toString();
+			if (theArticulation) {
+				if (theArticulation.symbol == 2659) {
+					isHarmonic = true;
+					harmonicArray = harmonicCircleIntervals;
+				}
+			}
+			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND) {
+				isHarmonic = true;
+				harmonicArray = diamondHarmonicIntervals;
+			}
+			if (isHarmonic) {
+				var p = noteRest.notes[0].pitch;
+				var harmonicOK = false;
+				if (currentInstrumentId.includes("violin")) stringsArray = violinStrings;
+				if (currentInstrumentId.includes("viola")) stringsArray = violaStrings;
+				if (currentInstrumentId.includes("cello")) stringsArray = celloStrings;
+				if (currentInstrumentId.includes("bass")) stringsArray = bassStrings;
+				for (var i = 0; i < stringsArray.length && !harmonicOK; i++) {
+					for (var j = 0; j < harmonicArray.length && !harmonicOK; j++) {
+						harmonicOK = (p == stringsArray[i]+harmonicArray[j]);
+					}
+				}
+				if (!harmonicOK) addError("This looks like a natural harmonic, but there is no\nnatural harmonic available at the given pitch on this instrument.",noteRest);
+			}
+		}
+	}
+	
+	function getArticulation (noteRest, staffNum) {
+		// I WISH: you could just get the articulations of a note instead of having to do this hack
+		// I WISH: you could get the staffidx of a note/staff
+		var theTick = noteRest.parent.tick;
+		var artic = articulations[staffNum][theTick];
+		return artic;
+	}
+	
+	function checkFluteHarmonic (noteRest) {
+/*
+		if (isFlute and _checkHarmonics) {
+			if (nn = 2) {
+				nh1 = n.Lowest.NoteStyle;
+				nh2 = n.Highest.NoteStyle;
+				if (nh1 = DiamondNoteStyle and nh2 = NormalNoteStyle) {
+					// we have a flute harmonic
+					np1 = n.Lowest.WrittenPitch;
+					np2 = n.Highest.WrittenPitch;
+					interval = np2 - np1;
+					if (np1 > 72) {
+						storeError(errors,"The bottom note on this flute harmonic is too high. Flute harmonics should always be based on notes in the bottom octave.","NoteRest",n);
+					}
+					if (interval = 12) {
+						storeError(errors,"Second harmonics on the flute are indistinguishable from normal notes — it’s recommended to only use third, fourth or fifth harmonics.","NoteRest",n);
+					}
+					if (interval != 12 and interval != 19 and interval != 24 and interval != 28 and interval != 31 and interval != 34 and interval != 36) {
+						storeError(errors,"This looks like a flute harmonic, but you can’t get the top note as a harmonic of the bottom note.","NoteRest",n);		
+					}
+				}
+			}
+		}
+		*/
 	}
 	
 	function getOffsetFromMiddleLine (note) {
