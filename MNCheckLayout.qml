@@ -90,6 +90,7 @@ MuseScore {
 	property var isPercussionInstrument: false
 	property var isKeyboardInstrument: false
 	property var isPedalInstrument: false
+	property var isSoloScore: false
 	property var currentMute: ""
 	property var currentPlayingTechnique: ""
 	property var currentContactPoint: ""
@@ -101,7 +102,7 @@ MuseScore {
 	property var lastBarInScore: null
 	property var firstBarInSecondSystem: null
 	property var articulations: []
-	property var scoreHasRehearsalMarks: false
+	property var numRehearsalMarks: 0
 	
   onRun: {
 		if (!curScore) return;
@@ -196,7 +197,7 @@ MuseScore {
 			
 		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
-		var firstStaffNum, firstBarNum, firstSegmentInScore, lastBarNum;
+		var firstStaffNum, firstBarNum, firstSegmentInScore, numBars;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var containsTransposingInstruments = false;
 		
@@ -204,7 +205,7 @@ MuseScore {
 		firstBarInScore = curScore.firstMeasure;
 		currentBar = firstBarInScore;
 		lastBarInScore = curScore.lastMeasure;
-		lastBarNum = curScore.nmeasures;
+		numBars = curScore.nmeasures;
 		cursor.rewind(Cursor.SCORE_END);
 		dialog.msg += "\n————————\n\nSTARTING LOOP\n\n";
 		
@@ -250,7 +251,7 @@ MuseScore {
 			prevTimeSig = currentBar.timesigNominal.str;
 			
 						
-			for (currentBarNum = 1; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
+			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
 				var barStartTick = currentBar.firstSegment.tick;
 				var barEndTick = currentBar.lastSegment.tick;
 				var barLength = barEndTick - barStartTick;
@@ -341,7 +342,8 @@ MuseScore {
 							if (!isRest && !isCrossStaff) {
 								
 								// ************ CHECK IF SCORE IS TRANSPOSED ************ //
-								
+
+								var nn = noteRest.notes.length;
 								if (isFirstNote && !containsTransposingInstruments) {
 									isFirstNote = false;
 									var note = noteRest.notes[0];
@@ -363,6 +365,9 @@ MuseScore {
 								
 								// ************ CHECK FLUTE HARMONIC ************ //
 								if (isFlute) checkFluteHarmonic(noteRest);
+								
+								// ************ CHECK FLUTE HARMONIC ************ //
+								if (isKeyboardInstrument && nn > 1) checkPianoStretch(noteRest);
 							}
 						} // end if eType == Element.Chord
 
@@ -383,6 +388,8 @@ MuseScore {
 		// ** CHECK FOR OMITTED INITIAL TEMPO ** //
 		if (!initialTempoExists) addError('I couldn’t find an initial tempo marking','top');
 		
+		// ** CHECK REHEARSAL MARKS ** //
+		if (numBars > 30 && numStaves > 3 && !isSoloScore) checkRehearsalMarks();
 		
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
@@ -391,13 +398,13 @@ MuseScore {
 		if (!debug) {
 			var numErrors = errorStrings.length;
 			if (numErrors == 0) {
-				dialog.msg = "COMPLETED! No errors found!";
+				dialog.msg = "SCORE CHECK COMPLETED!\n\nNo errors found!";
 			}
 			if (numErrors == 1) {
-				dialog.msg = "COMPLETED! One error found.";
+				dialog.msg = "SCORE CHECK COMPLETED!\n\nOne error found.";
 			}
 			if (numErrors > 1) {
-				dialog.msg = "COMPLETED! I found "+numErrors+" errors";
+				dialog.msg = "SCORE CHECK COMPLETED!\n\nI found "+numErrors+" errors";
 			}
 		}
 		dialog.show();
@@ -523,7 +530,7 @@ MuseScore {
 		var styledText = textObject.text;
 		
 		if (eType == Element.REHEARSAL_MARK) {
-			dialog.msg += "\nFOUND REHEARSAL MARK";
+			numRehearsalMarks ++;
 		}
 		
 		//dialog.msg += "\nstyledtext = "+styledText;
@@ -1292,7 +1299,7 @@ MuseScore {
 		}
 		
 		// ** CHECK FOR STAFF NAMES ** //
-		var isSoloScore = (numParts == 1);
+		isSoloScore = (numParts == 1);
 		//dialog.msg += "\nfirstStaffNameShouldBeHidden = "+firstStaffNameShouldBeHidden;
 		
 		var subsequentStaffNamesShouldBeHidden = numParts < 6;
@@ -1600,7 +1607,6 @@ MuseScore {
 		}
 	}
 	
-	
 	function checkFluteHarmonic (noteRest) {
 		var allowedIntervals = [12,19,24,28,31,34,36];
 		var nn = noteRest.notes.length;
@@ -1628,6 +1634,20 @@ MuseScore {
 		return artic;
 	}
 	
+	function checkRehearsalMarks () {
+		dialog.msg += "\nFound "+numRehearsalMarks+" rehearsal marks";
+		if (numRehearsalMarks == 0) {
+			addError("No rehearsal marks have been added.\nIf this piece will be conducted, you should add rehearsal marks every 8–16 bars.","pagetop");
+		} else {
+			if (numRehearsalMarks < curScore.nmeasures / 30) {
+				if (numRehearsalMarks == 1) {
+					addError("There is only one rehearsal mark.\nWe recommend adding rehearsal marks every 8–16 bars, approximately.","pagetop");
+				} else {
+					addError("There are only "&numRehearsalMarks&" rehearsal marks.\nWe recommend adding rehearsal marks every 8–16 bars, approximately.","pagetop");
+				}
+			}
+		}
+	}
 	
 	function getOffsetFromMiddleLine (note) {
 		var theTPC = note.tpc2;
@@ -1775,6 +1795,23 @@ MuseScore {
 				}
 			}
 		}
+	}
+	
+	function checkPianoStretch (noteRest) {
+		// CHECK PIANO STRETCH
+		var lowestPitch = noteRest.notes[0].pitch;
+		var highestPitch = lowestPitch;
+		var numNotes = noteRest.notes.length;
+		// may not need to do this — TO FIX
+		for (var i = 1; i < numNotes; i++)
+			var pitch = noteRest.notes[i].pitch;
+			if (pitch > highestPitch) highestPitch = pitch;
+			if (pitch < lowestPitch) lowestPitch = pitch;
+		}
+		var stretch = highestPitch - lowestPitch;
+		if (stretch > 14 && stretch < 16) addError("This chord may be too wide to stretch for some pianists. Consider splitting it between hands.",noteRest);
+		if (stretch > 16) addError("This chord is too wide to stretch. Consider splitting it between hands.",noteRest);
+		if (stretch < 14 && numNotes > 5) addError("It looks like there are too many notes in this chord to play in one hand.",noteRest);
 	}
 	
 	function addError (text,element) {
