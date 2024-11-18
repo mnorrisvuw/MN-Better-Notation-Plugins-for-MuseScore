@@ -102,6 +102,8 @@ MuseScore {
 	property var lastBarInScore: null
 	property var firstBarInSecondSystem: null
 	property var articulations: []
+	property var fermatas: []
+	property var fermataLocs: []
 	property var numRehearsalMarks: 0
 	
   onRun: {
@@ -173,13 +175,22 @@ MuseScore {
 			if (e.type == Element.OTTAVA) {
 				dialog.msg += "\nFOUND OTTAVA "+e; //+" @ ticks "+e.ticks;
 			}
-			if (e.type == Element.ARTICULATION) {
+			if (e.type == Element.ARTICULATION || e.type == Element.FERMATA) {
 				var staffIdx = 0;
-				var theTick = e.parent.parent.tick;
 				while (!curScore.staves[staffIdx].is(e.staff)) staffIdx++;
-				dialog.msg += "\nFOUND ARTIC "+e.symbol+" tick: "+theTick;
-				//var keyName = staffIdx+"|"+theTick;
-				articulations[staffIdx][theTick] = e;
+				var theTick;
+				if (e.type == Element.ARTICULATION) {
+					theTick = e.parent.parent.tick; // artics attached to chord
+					articulations[staffIdx][theTick] = e;
+					dialog.msg += "\nFOUND ARTIC "+e.symbol+" tick: "+theTick;
+					
+				} else {
+					theTick = e.parent.tick; // fermatas
+					fermatas.push(e);
+					var locArr = staffIdx+' '+theTick;
+					fermataLocs.push(locArr);
+					dialog.msg += "\nFOUND FERMATA "+e.symbol+" tick: "+theTick;
+				}
 			}
 		}
 		
@@ -194,7 +205,10 @@ MuseScore {
 		
 		// ************ 					CHECK FOR STAFF ORDER ISSUES 							************ //
 		checkStaffOrder();
-			
+		
+		// ************ 							CHECK FOR FERMATA ISSUES 							************ //
+		if (!isSoloScore && numStaves > 2) checkFermatas();
+		
 		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
 		var firstStaffNum, firstBarNum, firstSegmentInScore, numBars;
@@ -521,6 +535,165 @@ MuseScore {
 					checkClefs = true;
 				}
 			}
+		}
+	}
+	
+	function checkScoreAndPageSettings () {
+		var styleComments = [];
+		var pageSettingsComments = [];
+		var parts = curScore.parts;
+		var numParts = parts.length;
+		var style = curScore.style;
+		var numStaves = curScore.nstaves;
+		var staffSpacing = style.value("staffDistance");		
+		var akkoladeDistance = style.value("akkoladeDistance");
+		var minSystemDistance = style.value("minSystemDistance");
+		var maxSystemDistance = style.value("maxSystemDistance");
+		var inchesToMM = 25.4;
+		var spatiumDPI = 360.;
+		var spatium = style.value("spatium")*inchesToMM/spatiumDPI; // spatium value is given in 360 DPI
+		var staffSize = spatium*4;
+		//dialog.msg+= "\nspatium = "+spatium+"; staffSize = "+staffSize;
+		var staffLineWidth = style.value("staffLineWidth")*inchesToMM;
+		var pageEvenLeftMargin = style.value("pageEvenLeftMargin")*inchesToMM;
+		var pageOddLeftMargin = style.value("pageOddLeftMargin")*inchesToMM;
+		var pageEvenTopMargin = style.value("pageEvenTopMargin")*inchesToMM;
+		var pageOddTopMargin = style.value("pageOddTopMargin")*inchesToMM;
+		var pageEvenBottomMargin = style.value("pageEvenBottomMargin")*inchesToMM;
+		var pageOddBottomMargin = style.value("pageOddBottomMargin")*inchesToMM;
+		var tupletsFontFace = style.value("tupletFontFace");
+		var tupletsFontStyle = style.value("tupletFontStyle");
+		var barlineWidth = style.value("barWidth");
+		dialog.msg += "\nbarlineWidth = "+barlineWidth;
+		
+		// **** TEST 1A: CHECK MARGINS ****
+		var maxMargin = 15;
+		var minMargin = 5;
+		if ((pageEvenLeftMargin > maxMargin) + (pageOddLeftMargin > maxMargin) + (pageEvenTopMargin > maxMargin) + (pageOddTopMargin > maxMargin) +  (pageEvenBottomMargin > maxMargin) + (pageOddBottomMargin > maxMargin)) pageSettingsComments.push("Decrease your margins to no more than "+maxMargin+"mm");
+		if ((pageEvenLeftMargin < minMargin) + (pageOddLeftMargin < minMargin) + (pageEvenTopMargin < minMargin) + (pageOddTopMargin < minMargin) +  (pageEvenBottomMargin < minMargin) + (pageOddBottomMargin < minMargin)) pageSettingsComments.push("Increase your margins to at least "+minMargin+"mm");
+		// **** TEST 1B: CHECK STAFF SIZE ****
+		var maxSize = 6.8;
+		var minSize = 6.5;
+		if (numStaves == 2) {
+			maxSize = 6.7;
+			minSize = 6.2;
+		}
+		if (numStaves == 3) {
+			maxSize = 6.5;
+			minSize = 5.5;
+		}
+		if (numStaves > 3 && numStaves < 8) {
+			maxSize = 6.5 - ((numStaves - 3) * 0.1);
+			minSize = 5.5 - ((numStaves - 3) * 0.1);
+		}
+		if (numStaves > 7) {
+			maxSize = 5.4;
+			minSize = 4.4;
+		}
+		
+		if (staffSize > maxSize) pageSettingsComments.push("Decrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");		
+		if (staffSize < minSize) pageSettingsComments.push("Decrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
+		
+		// **** 1C: CHECK STAFF SPACING
+		
+	
+		
+		// ** CHECK FOR STAFF NAMES ** //
+		isSoloScore = (numParts == 1);
+		//dialog.msg += "\nfirstStaffNameShouldBeHidden = "+firstStaffNameShouldBeHidden;
+		
+		var subsequentStaffNamesShouldBeHidden = numParts < 6;
+		
+		// ** are the first staff names visible? ** //
+		var firstStaffNamesVisible = false;
+		var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
+		var hideInstrumentNameForSolo = isSoloScore && style.value("hideInstrumentNameIfOneInstrument");
+		if (!hideInstrumentNameForSolo && firstStaffNamesVisibleSetting < 2) {
+			for (var i = 0; i < numParts; i++) {
+				var partName = "";
+				if (firstStaffNamesVisibleSetting == 0) {
+					partName = parts[i].longName;
+				} else {
+					partName = parts[i].shortName;
+				}
+				if (partName !== "") {
+					firstStaffNamesVisible = true;
+					break;
+				}
+			}
+		}
+		
+		// **** STYLE SETTINGS — 1. SCORE TAB **** //
+		if (isSoloScore && !hideInstrumentNameForSolo) styleComments.push("(Score tab) Tick ‘Hide if there is only one instrument’");
+		if (!isSoloScore && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
+		var subsequentStaffNamesVisibleSetting = style.value("subsSystemInstNameVisibility");  //  0 = long names, 1 = short names, 2 = hidden
+		var subsequentStaffNamesVisible = false;
+		if (!hideInstrumentNameForSolo && subsequentStaffNamesVisibleSetting < 2) {
+			for (var i = 0; i < numParts; i++) {
+				var partName = "";
+				if (subsequentStaffNamesVisibleSetting == 0) {
+					partName = parts[i].longName;
+				} else {
+					partName = parts[i].shortName;
+				}
+				if (partName !== "") {
+					subsequentStaffNamesVisible = true;
+					break;
+				}
+			}
+		}
+		fullInstNamesShowing = (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 0) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 0);
+		shortInstNamesShowing =  (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 1) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 1);
+		
+		if (subsequentStaffNamesShouldBeHidden) {
+			if (subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble");
+		} else {
+			if (!subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble");
+		}
+		
+		// **** STYLE SETTINGS — 2. PAGE TAB **** //
+		// **** 1D: CHECK SYSTEM SPACING
+		if (hasMoreThanOneSystem) {
+			if (minSystemDistance < 12) styleComments.push("(Page tab) Increase the ‘Min. system distance’ to at least 12");
+			if (minSystemDistance > 16) styleComments.push("(Page tab) Decrease the ‘Min. system distance’ to no more than 16");
+			if (maxSystemDistance < 12) styleComments.push("(Page tab) Increase the ‘Max. system distance’ to at least 12");
+			if (maxSystemDistance > 16) styleComments.push("(Page tab) Decrease the ‘Max. system distance’ to no more than 16");
+		}
+		
+		// **** STYLE SETTINGS — 3. BARS TAB **** //
+		
+		// **** STYLE SETTINGS — 4. BARLINES TAB **** //
+		if (barlineWidth != 1.6) styleComments.push("(Barlines tab) Set ‘Thin Barline thickness’ to 0.16sp");
+		
+		// **** STYLE SETTINGS — 6. TEXT STYLES TAB **** //
+		
+		//dialog.msg += "tupletsFontFace = "+tupletsFontFace+" tupletsFontStyle = "+tupletsFontStyle;
+		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) We recommend using Times New Roman italic for tuplets");
+		
+		// ** OTHER STYLE ISSUES ** //
+		
+		// ** POST STYLE COMMENTS
+		if (styleComments.length>0) {
+			var styleCommentsStr = "";
+			if (styleComments.length == 1) {
+				styleCommentsStr = "I recommend making the following change to the score’s Style (Format→Style…):\n"+styleComments.join('\n');
+			} else {
+				var theList = styleComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
+				styleCommentsStr = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+theList;
+			}
+			addError(styleCommentsStr,"pagetop");
+		}
+		
+		// ** SHOW PAGE SETTINGS ERROR ** //
+		if (pageSettingsComments.length > 0) {
+			var pageSettingsCommentsStr = "";
+			if (pageSettingsComments.length == 1) {	
+				pageSettingsCommentsStr = "I recommend making the following change to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.join("\n");
+			} else {
+				var theList = pageSettingsComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
+				pageSettingsCommentsStr = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+theList;
+			}
+			addError(pageSettingsCommentsStr,"pagetop");
 		}
 	}
 	
@@ -1233,150 +1406,32 @@ MuseScore {
 		}
 	}
 	
-	function checkScoreAndPageSettings () {
-		var styleComments = [];
-		var pageSettingsComments = [];
-		var parts = curScore.parts;
-		var numParts = parts.length;
-		var style = curScore.style;
+	function checkFermatas () {
 		var numStaves = curScore.nstaves;
-		var staffSpacing = style.value("staffDistance");		
-		var akkoladeDistance = style.value("akkoladeDistance");
-		var minSystemDistance = style.value("minSystemDistance");
-		var maxSystemDistance = style.value("maxSystemDistance");
-		var inchesToMM = 25.4;
-		var spatiumDPI = 360.;
-		var spatium = style.value("spatium")*inchesToMM/spatiumDPI; // spatium value is given in 360 DPI
-		var staffSize = spatium*4;
-		//dialog.msg+= "\nspatium = "+spatium+"; staffSize = "+staffSize;
-		var staffLineWidth = style.value("staffLineWidth")*inchesToMM;
-		var pageEvenLeftMargin = style.value("pageEvenLeftMargin")*inchesToMM;
-		var pageOddLeftMargin = style.value("pageOddLeftMargin")*inchesToMM;
-		var pageEvenTopMargin = style.value("pageEvenTopMargin")*inchesToMM;
-		var pageOddTopMargin = style.value("pageOddTopMargin")*inchesToMM;
-		var pageEvenBottomMargin = style.value("pageEvenBottomMargin")*inchesToMM;
-		var pageOddBottomMargin = style.value("pageOddBottomMargin")*inchesToMM;
-		var tupletsFontFace = style.value("tupletFontFace");
-		var tupletsFontStyle = style.value("tupletFontStyle");
-		//dialog.msg += "Margins = "+pageEvenLeftMargin+" "+pageOddLeftMargin+" "+pageEvenTopMargin+" "+pageOddTopMargin+" "+pageEvenBottomMargin+" "+pageOddBottomMargin;
-		
-		// **** TEST 1A: CHECK MARGINS ****
-		var maxMargin = 15;
-		var minMargin = 5;
-		if ((pageEvenLeftMargin > maxMargin) + (pageOddLeftMargin > maxMargin) + (pageEvenTopMargin > maxMargin) + (pageOddTopMargin > maxMargin) +  (pageEvenBottomMargin > maxMargin) + (pageOddBottomMargin > maxMargin)) pageSettingsComments.push("Decrease your margins to no more than "+maxMargin+"mm");
-		if ((pageEvenLeftMargin < minMargin) + (pageOddLeftMargin < minMargin) + (pageEvenTopMargin < minMargin) + (pageOddTopMargin < minMargin) +  (pageEvenBottomMargin < minMargin) + (pageOddBottomMargin < minMargin)) pageSettingsComments.push("Increase your margins to at least "+minMargin+"mm");
-		// **** TEST 1B: CHECK STAFF SIZE ****
-		var maxSize = 6.8;
-		var minSize = 6.5;
-		if (numStaves == 2) {
-			maxSize = 6.7;
-			minSize = 6.2;
-		}
-		if (numStaves == 3) {
-			maxSize = 6.5;
-			minSize = 5.5;
-		}
-		if (numStaves > 3 && numStaves < 8) {
-			maxSize = 6.5 - ((numStaves - 3) * 0.1);
-			minSize = 5.5 - ((numStaves - 3) * 0.1);
-		}
-		if (numStaves > 7) {
-			maxSize = 5.4;
-			minSize = 4.4;
-		}
-		
-		if (staffSize > maxSize) pageSettingsComments.push("Decrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");		
-		if (staffSize < minSize) pageSettingsComments.push("Decrease your stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
-		
-		// **** 1C: CHECK STAFF SPACING
-		
-		// **** 1D: CHECK SYSTEM SPACING
-		if (hasMoreThanOneSystem) {
-			if (minSystemDistance < 12) styleComments.push("(Page tab) Increase the ‘Min. system distance’ to at least 12");
-			if (minSystemDistance > 16) styleComments.push("(Page tab) Decrease the ‘Min. system distance’ to no more than 16");
-			if (maxSystemDistance < 12) styleComments.push("(Page tab) Increase the ‘Max. system distance’ to at least 12");
-			if (maxSystemDistance > 16) styleComments.push("(Page tab) Decrease the ‘Max. system distance’ to no more than 16");
-		}
-		
-		// ** CHECK FOR STAFF NAMES ** //
-		isSoloScore = (numParts == 1);
-		//dialog.msg += "\nfirstStaffNameShouldBeHidden = "+firstStaffNameShouldBeHidden;
-		
-		var subsequentStaffNamesShouldBeHidden = numParts < 6;
-		
-		// ** are the first staff names visible? ** //
-		var firstStaffNamesVisible = false;
-		var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
-		var hideInstrumentNameForSolo = isSoloScore && style.value("hideInstrumentNameIfOneInstrument");
-		if (!hideInstrumentNameForSolo && firstStaffNamesVisibleSetting < 2) {
-			for (var i = 0; i < numParts; i++) {
-				var partName = "";
-				if (firstStaffNamesVisibleSetting == 0) {
-					partName = parts[i].longName;
-				} else {
-					partName = parts[i].shortName;
+		var ticksDone = [];
+		for (var i = 0; i < fermatas.length; i++) {
+			var fermata = fermatas[i];
+			var fermataLoc = fermataLocs[i];
+			var staffIdx = fermataLoc.split(' ')[0];
+			var theTick = fermataLoc.split(' ')[1];
+			// check if we've already done this fermata
+			if (!ticksDone.includes(theTick)) {
+				//dialog.msg+="\nChecking fermata "+fermataLoc[0]+" "+fermataLoc[1];
+				
+				var fermataInAllParts = true;
+				for (var j = 0; j<numStaves && fermataInAllParts; j++) {
+					var searchFermata = j+' '+theTick;
+					//dialog.msg+="\nLooking for "+searchFermata;
+					
+					if (j!=staffIdx) {
+						fermataInAllParts = fermataLocs.includes(searchFermata);
+						//if (!fermataInAllParts) dialog.msg+="\nCouldn't find this fermata";
+						
+					}
 				}
-				if (partName !== "") {
-					firstStaffNamesVisible = true;
-					break;
-				}
+				if (!fermataInAllParts) addError("If you have a fermata in one staff,\nall staves should also have a fermata at the same place",fermata);
+				ticksDone.push(theTick);
 			}
-		}
-		
-		if (isSoloScore && !hideInstrumentNameForSolo) styleComments.push("(Score tab) Tick ‘Hide if there is only one instrument’");
-		if (!isSoloScore && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
-		var subsequentStaffNamesVisibleSetting = style.value("subsSystemInstNameVisibility");  //  0 = long names, 1 = short names, 2 = hidden
-		var subsequentStaffNamesVisible = false;
-		if (!hideInstrumentNameForSolo && subsequentStaffNamesVisibleSetting < 2) {
-			for (var i = 0; i < numParts; i++) {
-				var partName = "";
-				if (subsequentStaffNamesVisibleSetting == 0) {
-					partName = parts[i].longName;
-				} else {
-					partName = parts[i].shortName;
-				}
-				if (partName !== "") {
-					subsequentStaffNamesVisible = true;
-					break;
-				}
-			}
-		}
-		fullInstNamesShowing = (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 0) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 0);
-		shortInstNamesShowing =  (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 1) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 1);
-		
-		if (subsequentStaffNamesShouldBeHidden) {
-			if (subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble");
-		} else {
-			if (!subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble");
-		}
-		
-		//dialog.msg += "tupletsFontFace = "+tupletsFontFace+" tupletsFontStyle = "+tupletsFontStyle;
-		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) We recommend using Times New Roman italic for tuplets");
-		
-		// ** OTHER STYLE ISSUES ** //
-		
-		// ** POST STYLE COMMENTS
-		if (styleComments.length>0) {
-			var styleCommentsStr = "";
-			if (styleComments.length == 1) {
-				styleCommentsStr = "I recommend making the following change to the score’s Style (Format→Style…):\n"+styleComments.join('\n');
-			} else {
-				var theList = styleComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
-				styleCommentsStr = "I recommend making the following changes to the score’s Style (Format→Style…):\n"+theList;
-			}
-			addError(styleCommentsStr,"pagetop");
-		}
-		
-		// ** SHOW PAGE SETTINGS ERROR ** //
-		if (pageSettingsComments.length > 0) {
-			var pageSettingsCommentsStr = "";
-			if (pageSettingsComments.length == 1) {	
-				pageSettingsCommentsStr = "I recommend making the following change to the score’s Page Settings (Format→Page settings…)\n"+pageSettingsComments.join("\n");
-			} else {
-				var theList = pageSettingsComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
-				pageSettingsCommentsStr = "I recommend making the following changes to the score’s Page Settings (Format→Page settings…)\n"+theList;
-			}
-			addError(pageSettingsCommentsStr,"pagetop");
 		}
 	}
 	
@@ -1803,7 +1858,7 @@ MuseScore {
 		var highestPitch = lowestPitch;
 		var numNotes = noteRest.notes.length;
 		// may not need to do this — TO FIX
-		for (var i = 1; i < numNotes; i++)
+		for (var i = 1; i < numNotes; i++) {
 			var pitch = noteRest.notes[i].pitch;
 			if (pitch > highestPitch) highestPitch = pitch;
 			if (pitch < lowestPitch) lowestPitch = pitch;
