@@ -435,6 +435,9 @@ MuseScore {
 						// ************ FOUND A CHORD ************ //
 						if (eType == Element.CHORD) {
 							var noteRest = cursor.element;
+							var graceNotes = noteRest.graceNotes;
+							if (graceNotes.length > 0) checkGraceNotes(graceNotes);
+								
 							var isHidden = !noteRest.visible;
 							var isRest = noteRest.type == Element.REST;
 							var isNote = !isRest;
@@ -1805,7 +1808,7 @@ MuseScore {
 		}
 		
 		// check dur >= minim
-		if (noteRest.duration >= Minim) {
+		if (noteRest.duration.ticks >= Minim) {
 			addError("It’s not recommended to have a pizzicato minim or longer (unless the tempo is very fast).\nPerhaps this is supposed to be arco?",noteRest);
 			lastPizzIssueBar = barNum;
 			lastPizzIssueStaff = staffNum;
@@ -1822,7 +1825,7 @@ MuseScore {
 		
 		// check slurred pizz
 		if (isSlurred) {
-			addError("In general, you shouldn’t slur pizzicato notes unless you specifically want the slurred notes not to be replucked", noteRest);
+			addError("In general, you shouldn’t slur pizzicato notes unless you\nspecifically want the slurred notes not to be replucked", noteRest);
 			lastPizzIssueBar = barNum;
 			lastPizzIssueStaff = staffNum;
 			return;
@@ -1915,7 +1918,23 @@ MuseScore {
 	}
 	
 	function checkStemDirection (noteRest) {
-		if (noteRest.stem.stemDirection > 0) addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’",noteRest);
+		if (noteRest.stem) {
+			if (noteRest.stem.stemDirection > 0) addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’",noteRest);
+		}
+	}
+	
+	function checkGraceNotes (graceNotes) {
+		var n = graceNotes.length;
+		var hasSlash = false;
+		for (var i = 0; i < n; i ++) {
+			var graceNote = graceNotes[i];
+			if (graceNote.stemSlash != null) hasSlash = true;
+			dialog.msg += "\nGRACE NOTE INFO: dur "+graceNote.duration.ticks+" stemSlash: "+ hasSlash;
+		}
+		if (!hasSlash) {
+			addError ("In general, you should always use grace notes with the slash through the stem.",graceNotes[0]);
+			return;
+		}
 	}
 	
 	function getArticulation (noteRest, staffNum) {
