@@ -80,6 +80,7 @@ MuseScore {
 	property var prevClef: null
 	property var prevDynamic: ""
 	property var prevDynamicBarNum: 0
+	property var tickHasDynamic: false
 	property var errorStrings: []
 	property var errorObjects: []
 	property var isWindOrBrassInstrument: false
@@ -104,7 +105,24 @@ MuseScore {
 	property var articulations: []
 	property var fermatas: []
 	property var fermataLocs: []
+	property var hairpins: []
+	property var isHairpin: false
+	property var slurs:[]
+	property var isSlurred: false
 	property var numRehearsalMarks: 0
+	property var lastPizzIssueBar: -99
+	property var lastPizzIssueStaff: -1
+	property var kHarmonicCircle: 2659
+	property var kStaccato: 624
+	property var kStaccatissimo: 617
+	property var kStaccatissimoWedge: 621
+	property var kAccentStaccato: 599
+	property var kMarcatoStaccato: 605
+	property var kAccent: 598
+	property var kAccentTenuto: 629
+	property var kMarcatoTenuto: 607
+	property var kMarcato: 603
+	property var kTenuto: 630
 	
   onRun: {
 		if (!curScore) return;
@@ -164,16 +182,30 @@ MuseScore {
 		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
 		curScore.endCmd();
 		
-		for (var i = 0; i<numStaves; i++) articulations[i] =[];
+		// **** INITIALISE ALL ARRAYS **** //
+		for (var i = 0; i<numStaves; i++) {
+			articulations[i] = [];
+			slurs[i] = [];
+			hairpins[i] = [];
+		}
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
 			if (e.type == Element.HAIRPIN) {
-				dialog.msg += "\nFOUND HAIRPIN "+e+" spannerTick: "+e.spannerTick.ticks+" ticks: "+e.spannerTicks.ticks;
+				//dialog.msg += "\nFOUND HAIRPIN "+e+" spannerTick: "+e.spannerTick.ticks+" ticks: "+e.spannerTicks.ticks;
+				var staffIdx = 0;
+				while (!curScore.staves[staffIdx].is(e.staff)) staffIdx++;
+				hairpins[staffIdx].push(e);
 			}
 			if (e.type == Element.OTTAVA) {
 				dialog.msg += "\nFOUND OTTAVA "+e; //+" @ ticks "+e.ticks;
+			}
+			if (e.type == Element.SLUR) {
+				//dialog.msg += "\nFOUND SLUR "+e+" spannerTick: "+e.spannerTick.ticks+" ticks: "+e.spannerTicks.ticks;
+				var staffIdx = 0;
+				while (!curScore.staves[staffIdx].is(e.staff)) staffIdx++;
+				slurs[staffIdx].push(e);
 			}
 			if (e.type == Element.ARTICULATION || e.type == Element.FERMATA) {
 				var staffIdx = 0;
@@ -182,14 +214,13 @@ MuseScore {
 				if (e.type == Element.ARTICULATION) {
 					theTick = e.parent.parent.tick; // artics attached to chord
 					articulations[staffIdx][theTick] = e;
-					dialog.msg += "\nFOUND ARTIC "+e.symbol+" tick: "+theTick;
-					
+					//dialog.msg += "\nFOUND ARTIC "+e.symbol+" tick: "+theTick;					
 				} else {
 					theTick = e.parent.tick; // fermatas
 					fermatas.push(e);
 					var locArr = staffIdx+' '+theTick;
 					fermataLocs.push(locArr);
-					dialog.msg += "\nFOUND FERMATA "+e.symbol+" tick: "+theTick;
+					//dialog.msg += "\nFOUND FERMATA "+e.symbol+" tick: "+theTick;
 				}
 			}
 		}
@@ -214,6 +245,8 @@ MuseScore {
 		var firstStaffNum, firstBarNum, firstSegmentInScore, numBars;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var containsTransposingInstruments = false;
+		var currentSlur, currentSlurNum, numSlurs, nextSlurStart, currentSlurEnd;
+		var currentHairpin, currentHairpinNum, numHairpins, nextHairpinStart, currentHairpinEnd;
 		
 		// ************ 				CALCULATE LAST BAR NUMBER									 	************ //
 		firstBarInScore = curScore.firstMeasure;
@@ -241,6 +274,22 @@ MuseScore {
 			flaggedLedgerLines = false;
 			isFirstNote = true;
 			
+			currentSlur = null;
+			isSlurred = false;
+			currentSlurNum = 0;
+			numSlurs = slurs[currentStaffNum].length;
+			nextSlurStart = (numSlurs == 0) ? 0 : slurs[currentStaffNum][0].spannerTick.ticks;
+			//dialog.msg += "\nNext slur starts at "+nextSlurStart;
+			
+			currentSlurEnd = 0;
+			
+			currentHairpin = null;
+			isHairpin = false;
+			currentHairpinNum = 0;
+			numHairpins = hairpins[currentStaffNum].length;
+			nextHairpinStart = (numHairpins == 0) ? 0 : hairpins[currentStaffNum][0].spannerTick.ticks;
+			currentHairpinEnd = 0;
+			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
 			cursor.filter = Segment.HeaderClef;
@@ -252,7 +301,7 @@ MuseScore {
 			var clef = cursor.element;
 			currentInstrumentName = instrumentNames[currentStaffNum];
 			currentInstrumentId = instrumentIds[currentStaffNum];
-			dialog.msg += "\nCurrent ID = "+currentInstrumentId;
+			//dialog.msg += "\nCurrent ID = "+currentInstrumentId;
 			setInstrumentVariables();
 			//dialog.msg += "\nHeader clef = "+clef.subtypeName();
 			
@@ -280,17 +329,81 @@ MuseScore {
 					var processingThisBar = cursor.element;
 					while (processingThisBar) {
 						var currSeg = cursor.segment;
-						if (currSeg.tick == barEndTick) {
-							if (!goneToNextBar) {
-								goneToNextBar = true;
-								//currentBarNum ++;
-							}
-						} 
+						var currTick = currSeg.tick;
+						tickHasDynamic = false;
 						var annotations = currSeg.annotations;
 						var elem = cursor.element;
 						var eType = elem.type;
 						var eName = elem.name;
-						dialog.msg += '\neName = '+eName;
+						//dialog.msg += '\neName = '+eName;
+						
+						// ************ UNDER A SLUR? ************ //
+						var readyToGoToNextSlur = false;
+						if (currentSlurNum < numSlurs) {
+							if (currentSlur == null) {
+								readyToGoToNextSlur = true;
+							} else {
+								if (currTick > currentSlurEnd) {
+									//dialog.msg += "\nSlur ended";
+									currentSlur = null;
+									isSlurred = false;
+									currentSlurNum ++;
+									if (currentSlurNum < numSlurs) {
+										nextSlurStart = slurs[currentStaffNum][currentSlurNum].spannerTick.ticks;
+										readyToGoToNextSlur = true;
+									}
+								}
+							}
+						}
+						if (readyToGoToNextSlur) {
+							if (currTick >= nextSlurStart) {
+								isSlurred = true;
+								currentSlur = slurs[currentStaffNum][currentSlurNum];
+								currentSlurEnd = currentSlur.spannerTick.ticks + currentSlur.spannerTicks.ticks;
+								//dialog.msg += "\nSlur started at "+currTick+" & ends at "+currentSlurEnd;
+								if (currentSlurNum < numSlurs - 1) {
+									nextSlurStart = slurs[currentStaffNum][currentSlurNum+1].spannerTick.ticks;
+									//dialog.msg += "\nNext slur starts at "+nextSlurStart;
+								} else {
+									nextSlurStart = 0;
+									//dialog.msg += "\nThis is the last slur in this staff ";
+								}
+							}
+						}
+						
+						// ************ UNDER A HAIRPIN? ************ //
+						var readyToGoToNextHairpin = false;
+						if (currentHairpinNum < numHairpins) {
+							if (currentHairpin == null) {
+								readyToGoToNextHairpin = true;
+							} else {
+								if (currTick > currentHairpinEnd) {
+									//dialog.msg += "\nHairpin ended";
+									currentHairpin = null;
+									isHairpin = false;
+									currentHairpinNum ++;
+									if (currentHairpinNum < numHairpins) {
+										nextHairpinStart = hairpins[currentStaffNum][currentHairpinNum].spannerTick.ticks;
+										readyToGoToNextHairpin = true;
+									}
+								}
+							}
+						}
+						if (readyToGoToNextHairpin) {
+							if (currTick >= nextHairpinStart) {
+								isHairpin = true;
+								currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
+								currentHairpinEnd = currentHairpin.spannerTick.ticks + currentHairpin.spannerTicks.ticks;
+								//dialog.msg += "\nHairpin started at "+currTick+" & ends at "+currentHairpinEnd;
+								if (currentHairpinNum < numHairpins - 1) {
+									nextHairpinStart = hairpins[currentStaffNum][currentHairpinNum+1].spannerTick.ticks;
+									//dialog.msg += "\nNext slur starts at "+nextHairpinStart;
+								} else {
+									nextHairpinStart = 0;
+									//dialog.msg += "\nThis is the last slur in this staff ";
+								}
+							}
+						}
 						
 						// ************ FOUND A CLEF ************ //
 						if (eType == Element.CLEF) checkClef(elem);
@@ -308,27 +421,15 @@ MuseScore {
 									var aName = theAnnotation.name;
 									var aType = theAnnotation.type;
 									var aText = theAnnotation.text;
-									dialog.msg += "\n Anno name = "+aName;
-									
-									if (aType == Element.ARTICULATION) {
-										dialog.msg += "\n Found anno articulation "+aName+" subtype:"+theAnnotation.subtype;
-									}
-									
+									//dialog.msg += "\n Anno name = "+aName;
+																		
 									// **** FOUND A TEXT OBJECT **** //
-									if (aText) {
-										checkTextObject(theAnnotation, currentBarNum);
-									} else {
-										
-									}
+									if (aText) checkTextObject(theAnnotation, currentBarNum);
 								
 									// **** FOUND AN OTTAVA **** // — // DOESN'T WORK — TO FIX
 									if (aType == Element.OTTAVA || aType == Element.OTTAVA_SEGMENT) checkOttava(theAnnotation);
 								}
 							}
-						}
-						
-						if (eType == Element.ARTICULATION) {
-							dialog.msg += "\n Found articulation "+eName+" subtype:"+elem.subtype;
 						}
 						
 						// ************ FOUND A CHORD ************ //
@@ -353,35 +454,57 @@ MuseScore {
 							// TO FIX
 							//dialog.msg += "\nFOUND NOTE";
 							
+							if (isRest) {
+								if (isSlurred && !isKeyboardInstrument) addError("It’s recommended to avoid putting slurs over rests.",currentSlur);
+							}
+							
 							if (!isRest && !isCrossStaff) {
 								
-								// ************ CHECK IF SCORE IS TRANSPOSED ************ //
 
 								var nn = noteRest.notes.length;
-								if (isFirstNote && !containsTransposingInstruments) {
+								if (isFirstNote) {
 									isFirstNote = false;
-									var note = noteRest.notes[0];
-									var containsTransposingInstruments = note.tpc1 != note.tpc2;
-									//dialog.msg += "\nThis staff is transposing = "+containsTransposingInstruments;
-									if (containsTransposingInstruments) {
-										var scoreIsInConcert = note.tpc == note.tpc1;
-										//dialog.msg += "\nscoreIsInConcert = "+scoreIsInConcert;
-										if (scoreIsInConcert) addError("This score includes a transposing instrument, but the score is currently in Concert pitch.\nIt is generally preferred to have the score transposed.\nUntick ‘Concert pitch’ in the bottom right to view the transposed score.","pagetop");
+								// ************ CHECK HAS DYNAMIC ************ //
+									if (!tickHasDynamic) addError("This note should have an initial dynamic level set.",noteRest);
+									
+								// ************ CHECK IF SCORE IS TRANSPOSED ************ //
+									
+									if (!containsTransposingInstruments) {
+										var note = noteRest.notes[0];
+										var containsTransposingInstruments = note.tpc1 != note.tpc2;
+										//dialog.msg += "\nThis staff is transposing = "+containsTransposingInstruments;
+										if (containsTransposingInstruments) {
+											var scoreIsInConcert = note.tpc == note.tpc1;
+											//dialog.msg += "\nscoreIsInConcert = "+scoreIsInConcert;
+											if (scoreIsInConcert) addError("This score includes a transposing instrument, but the score is currently in Concert pitch.\nIt is generally preferred to have the score transposed.\nUntick ‘Concert pitch’ in the bottom right to view the transposed score.","pagetop");
+										}
 									}
 								}
 								prevBarNum = currentBarNum;
+								// ************ CHECK STEM DIRECTION ************ //
+								checkStemDirection(noteRest);
 								
 								// ************ CHECK LEDGER LINES ************ //
 								checkLedgerLines(noteRest);
 								
-								// ************ CHECK STRING HARMONIC ************ //
-								if (isStringInstrument) checkStringHarmonic(noteRest, currentStaffNum);
+								if (isSlurred) checkSlurIssues (noteRest, currentStaffNum, currentSlur);
+								
+								if (isStringInstrument) {
+									
+									// ************ CHECK STRING HARMONIC ************ //
+									checkStringHarmonic(noteRest, currentStaffNum);
+									
+									// ************ CHECK PIZZ ISSUES ************ //
+									if (currentPlayingTechnique === "pizz") checkPizzIssues(noteRest, currentBarNum, currentStaffNum);
+									
+								}
 								
 								// ************ CHECK FLUTE HARMONIC ************ //
 								if (isFlute) checkFluteHarmonic(noteRest);
 								
-								// ************ CHECK FLUTE HARMONIC ************ //
+								// ************ CHECK PIANO STRETCH ************ //
 								if (isKeyboardInstrument && nn > 1) checkPianoStretch(noteRest);
+								
 							}
 						} // end if eType == Element.Chord
 
@@ -847,6 +970,7 @@ MuseScore {
 				
 				// **** CHECK REDUNDANT DYNAMIC **** //
 				if (objectIsDynamic || containsADynamic || stringIsDynamic) {
+					tickHasDynamic = true;
 					var isError = false;
 					var plainDynamicMark = lowerCaseText;
 					if (containsADynamic) plainDynamicMark = lowerCaseText
@@ -887,6 +1011,11 @@ MuseScore {
 							addError("This looks like a technique, but has been incorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
 							return;
 						}
+					}
+					var canBeAbove = plainText === "loco" || plainText.includes("ten.") || plainText.includes("tenuto") || plainText.includes("legato") || plainText.includes("flz");
+					if (textObject.placement == Placement.ABOVE && !canBeAbove) {
+						addError("Expression text should appear below the staff.\nCheck it is attached to the right staff, or it should be a technique.",textObject);
+						return;
 					}
 				}
 				
@@ -1636,7 +1765,7 @@ MuseScore {
 			var theArticulation = getArticulation(noteRest, staffNum);
 			//dialog.msg += "\nThe artic sym = "+theArticulation.symbol.toString();
 			if (theArticulation) {
-				if (theArticulation.symbol == 2659) {
+				if (theArticulation.symbol == kHarmonicCircle) {
 					isHarmonic = true;
 					harmonicArray = harmonicCircleIntervals;
 				}
@@ -1662,6 +1791,45 @@ MuseScore {
 		}
 	}
 	
+	function checkPizzIssues (noteRest, barNum, staffNum) {
+		var Minim = 2 * division;
+		
+		if (staffNum == lastPizzIssueStaff && barNum-lastPizzIssueBar < 5) return;
+		// check staccato
+		var theArtic = getArticulation (noteRest, staffNum);
+		if (theArtic == kStaccato || theArtic == kStaccatissimo || theArtic == kStaccatissimoWedge || theArtic == kAccentStaccato || theArtic == kMarcatoStaccato) {
+			addError("It’s not recommended to have a staccato articulation on a pizzicato note.",noteRest);
+			lastPizzIssueBar = barNum;
+			lastPizzIssueStaff = staffNum;
+			return;
+		}
+		
+		// check dur >= minim
+		if (noteRest.duration >= Minim) {
+			addError("It’s not recommended to have a pizzicato minim or longer (unless the tempo is very fast).\nPerhaps this is supposed to be arco?",noteRest);
+			lastPizzIssueBar = barNum;
+			lastPizzIssueStaff = staffNum;
+			return;
+		}
+		
+		// check tied pizz
+		if (noteRest.notes[0].tieForward) {
+			addError("In general, you shouldn’t need to tie pizzicato notes.\nPerhaps this is supposed to be arco?",noteRest);
+			lastPizzIssueBar = barNum;
+			lastPizzIssueStaff = staffNum;
+			return;
+		}
+		
+		// check slurred pizz
+		if (isSlurred) {
+			addError("In general, you shouldn’t slur pizzicato notes unless you specifically want the slurred notes not to be replucked", noteRest);
+			lastPizzIssueBar = barNum;
+			lastPizzIssueStaff = staffNum;
+			return;
+		}
+		
+	}
+	
 	function checkFluteHarmonic (noteRest) {
 		var allowedIntervals = [12,19,24,28,31,34,36];
 		var nn = noteRest.notes.length;
@@ -1679,6 +1847,75 @@ MuseScore {
 				if (!allowedIntervals.includes(interval)) addError("This looks like a flute harmonic, but you can’t get the\ntop note as a harmonic of the bottom note.",noteRest);		
 			}
 		}
+	}
+	
+	function checkSlurIssues (noteRest, staffNum, currentSlur) {
+		var currTick = noteRest.parent.tick;
+		var accentsArray = [kAccentStaccato,kMarcatoStaccato,kAccent,kAccentTenuto,kMarcatoTenuto,kMarcato];
+		var slurStart = currentSlur.spannerTick.ticks;
+		var isStartOfSlur = currTick == slurStart;
+		var slurEnd = slurStart + currentSlur.spannerTicks.ticks;
+		var isEndOfSlur = currTick == slurEnd;
+		var n = noteRest.notes[0];
+		var isMiddleOfTie = n.tieBack != null && n.tieForward != null;
+		var isEndOfTie = n.tieBack != null && n.tieForward == null;
+		var isStartOfTie = n.tieForward != null && n.tieBack == null;
+		//dialog.msg += "\nCHECKING SLUR";
+		
+		// Check accent
+		if (!isStartOfSlur) {
+			var theArtic = getArticulation(noteRest, staffNum);
+			if (theArtic) {
+				if (accentsArray.includes(theArtic.symbol) ) {
+					addError("Don’t put accents on notes in the middle of a slur.",noteRest);
+					return;
+				}
+			}
+		}
+		
+		// Check ties to middle of slurs
+		if (isStartOfSlur) {
+			dialog.msg += "\nSlur started — mid = "+isMiddleOfTie+"; end = "+isEndOfTie;
+			if (isMiddleOfTie) {
+				addError("Don’t begin a slur in the middle of a tied note.\nExtend the slur back to the start of the tie",currentSlur);
+				return;
+			}
+			if (isEndOfTie) {
+				addError("Don’t begin a slur at the end of a tied note.\nStart the slur at the beginning of the next note",currentSlur);
+				return;
+			}
+		}
+		
+		// Check ties to middle of slurs
+		if (isEndOfSlur) {
+			dialog.msg += "\nSlur started — mid = "+isMiddleOfTie+"; start = "+isStartOfTie;
+			if (isMiddleOfTie) {
+				addError("Don’t end a slur in the middle of a tied note.\nExtend the slur to the end of the tie",currentSlur);
+				return;
+			}
+			if (isStartOfTie) {
+				addError("Don’t end a slur at the beginning of a tied note.\nInclude the full duration of tied note in the slur",currentSlur);
+				return;
+			}
+		}
+		
+
+		var iterationArticulationArray = [kTenuto,kStaccato];
+		
+		if (!noteRest.notes[0].tieBackward) {
+			var theArtic = getArticulation(noteRest, staffNum);
+			var noteheadStyle = noteRest.notes[0].headGroup;
+		}
+		// TO FIX
+			/*if (nn = prevnn && pitch = prevPitch && noteheadStyle != NoteHeadGroup. && prevNotehead != HeadlessNoteStyle && voiceNum = prevVoiceNum && n.GetArticulation(TenutoArtic) = false && !theArtic = false && prevArtic = false) {
+				//trace ("pitch = "&pitch&" prevPitch = "&prevPitch&"; currentBarNum = "&currentBarNum&"; staffNum = "&staffNum);
+				addError("Don’t repeat a pitch under a slur.\nEither remove the slur, or add some articulation, such as a tenuto or staccato.",NoteRest);
+		}*/
+		
+	}
+	
+	function checkStemDirection (noteRest) {
+		if (noteRest.stem.stemDirection > 0) addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’",noteRest);
 	}
 	
 	function getArticulation (noteRest, staffNum) {
@@ -1880,6 +2117,7 @@ MuseScore {
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
 			var element = errorObjects[i];
+			var eType = element.type;
 			var staffNum = 0;
 			var elementHeight = 0;
 			var commentOffset = 1.0;
@@ -1932,7 +2170,11 @@ MuseScore {
 					//dialog.msg += "\nPlacing system2 at tick: "+tick;
 				}
 			} else {
-				tick = element.parent.tick;
+				if (eType == Element.HAIRPIN || eType == Element.SLUR) {
+					tick = element.spannerTick.ticks;
+				} else {
+					tick = element.parent.tick;
+				}
 			}
 		
 			// add text object to score
