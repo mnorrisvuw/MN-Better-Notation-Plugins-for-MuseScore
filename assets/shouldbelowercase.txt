@@ -13,3 +13,5 @@ bow
 bridge
 flautando
 flaut.
+flz.
+vib.
