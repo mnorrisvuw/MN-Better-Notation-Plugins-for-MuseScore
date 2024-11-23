@@ -636,9 +636,9 @@ MuseScore {
 							} else {
 															
 								// ************ CHECK GRACE NOTES ************ //
-								
 								var graceNotes = noteRest.graceNotes;
 								if (graceNotes.length > 0) {
+									errorMsg += "\nTHIS NOTE HAS "+graceNotes.length+" grace notes attached to it"
 									checkGraceNotes(graceNotes);
 									numNotesInThisSystem += graceNotes.length / 2; // grace notes only count for half
 								}
@@ -785,10 +785,22 @@ MuseScore {
 			if (bar == undefined) {
 				errorMsg += "\nBAR UNDEFINED";
 			} else {
-				if (noteCountInSys < minNoteCountPerSystem) addError("This system doesn’t have many notes in it, and may be quite spread out.\nTry including more bars in this system.",bar);
-				if (noteCountInSys > maxNoteCountPerSystem) addError("This system has a lot of notes in it, and may be quite squashed.\nTry moving some of the bars out of this system.",bar);
-				if (numBeatsInSys < minBeatsPerSystem && noteCountInSys < mmin) addError("This system doesn’t have many bars in it and may be quite spread out.\nTry including more bars in this system.",bar);
-				if (numBeatsInSys > maxBeatsPerSystem && noteCountInSys > mmax) addError("This system has quite a few bars in it, and may be quite squashed.\nTry moving some of the bars out of this system.",bar);
+				if (noteCountInSys < minNoteCountPerSystem) {
+					addError("This system doesn’t have many notes in it, and may be quite spread out.\nTry including more bars in this system.",bar);
+					continue;
+				}
+				if (noteCountInSys > maxNoteCountPerSystem) {
+					addError("This system has a lot of notes in it, and may be quite squashed.\nTry moving some of the bars out of this system.",bar);
+					continue;
+				}
+				if (numBeatsInSys < minBeatsPerSystem && noteCountInSys < mmin) {
+					addError("This system doesn’t have many bars in it and may be quite spread out.\nTry including more bars in this system.",bar);
+					continue;
+				}
+				if (numBeatsInSys > maxBeatsPerSystem && noteCountInSys > mmax) {
+					addError("This system has quite a few bars in it, and may be quite squashed.\nTry moving some of the bars out of this system.",bar);
+					continue;
+				}
 			}
 		}
 		
@@ -954,7 +966,7 @@ MuseScore {
 		var tupletsFontStyle = style.value("tupletFontStyle");
 		var barlineWidth = style.value("barWidth");
 		var minimumBarWidth = style.value("minMeasureWidth");
-		errorMsg += "\nbarlineWidth = "+barlineWidth;
+		//errorMsg += "\nbarlineWidth = "+barlineWidth;
 		
 		// **** TEST 1A: CHECK MARGINS ****
 		var maxMargin = 15;
@@ -981,12 +993,12 @@ MuseScore {
 			minSize = 4.4;
 		}
 		
-		if (staffSize > maxSize) pageSettingsComments.push("Your stave space is too large: it should be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
+		if (staffSize > maxSize) pageSettingsComments.push("Your stave space is too large:\nit should be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
 		if (staffSize < minSize) {
 			if (staffSize < 4.4) {
-				if (staffSize < minSize) pageSettingsComments.push("Your stave space is very small and will be very hard to read: try to increase it to at least 1.1mm");
+				if (staffSize < minSize) pageSettingsComments.push("Your stave space is very small and will be very hard to read:\ntry to increase it to at least 1.1mm");
 			} else {
-				pageSettingsComments.push("Your stave space is too small: it should be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
+				pageSettingsComments.push("Your stave space is too small:\nit should be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
 			}
 		}
 		
@@ -1095,6 +1107,7 @@ MuseScore {
 	
 	function checkTextObject (textObject,barNum) {
 		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a 2","a 3","a 4","a 5","a 6","a 7","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
+		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot","."];
 		var eType = textObject.type;
 		var eName = textObject.name;
 		var styledText = textObject.text;
@@ -1110,6 +1123,10 @@ MuseScore {
 			var tn = textObject.name.toLowerCase();
 			//errorMsg += "\nText style is "+textStyle+"; tn = "+tn;
 			var plainText = styledText.replace(/<[^>]+>/g, "");
+			if (typeof plainText != 'string') errorMsg += '\nTypeof plainText not string: '+(typeof plainText);
+			for (var i = 0; i < replacements.length; i += 2) {
+				plainText = plainText.replace(replacements[i],replacements[i+1]);
+			}
 			var lowerCaseText = plainText.toLowerCase();
 			//errorMsg += "\ntn = "+tn+"; plainText = "+plainText+"; lowerCaseText = "+lowerCaseText;
 			
@@ -1367,7 +1384,7 @@ MuseScore {
 						} else {
 							correctText = correctSpelling;
 						}
-						addError("‘"+plainText+"’ is misspelled; it should be ‘"+correctText+"’.",textObject);
+						addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
 						return;
 					}
 				}
@@ -1379,7 +1396,7 @@ MuseScore {
 							isSpellingError = true;
 							var correctSpelling = spellingerrorsanywhere[i*2+1];
 							var correctText = plainText.replace(spellingError,correctSpelling);
-							addError("‘"+plainText+"’ is misspelled; it should be ‘"+correctText+"’.",textObject);
+							addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
 							return;
 						}
 					}
@@ -1391,7 +1408,7 @@ MuseScore {
 						if (plainText.includes(fullText)) {
 							var abbreviatedText = canbeabbreviated[i*2+1];
 							var correctText = plainText.replace(fullText,abbreviatedText);
-							addError("‘"+plainText+"’ can be abbreviated to ‘"+correctText+"’.",textObject);
+							addError("‘"+plainText+"’ can be shortened to ‘"+correctText+"’.",textObject);
 							return;
 						}
 					}
@@ -1403,7 +1420,7 @@ MuseScore {
 				if (windAndBrassMarkings.includes(lowerCaseText) && isWindOrBrassInstrument) {
 					weKnowWhosPlaying = true;
 					flaggedWeKnowWhosPlaying = false;
-					errorMsg+="\nWW weKnowWhosPlaying is now "+weKnowWhosPlaying;
+					//errorMsg+="\nWW weKnowWhosPlaying is now "+weKnowWhosPlaying;
 				}
 			} // end lowerCaseText != ''
 		} // end check comments
@@ -1832,7 +1849,7 @@ MuseScore {
 				var theTimeSig = segment.elementAt(0);
 				if (theTimeSig.type == Element.TIMESIG) {
 					var theTimeSigStr = theTimeSig.timesig.str;
-					errorMsg += "\n found time sig "+theTimeSigStr;
+					//errorMsg += "\n found time sig "+theTimeSigStr;
 					if (theTimeSigStr === prevTimeSig) {
 						addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",theTimeSig);
 					}
@@ -1877,7 +1894,7 @@ MuseScore {
 			addError ("Don’t put staccato dots on long notes",noteRest);
 			return;
 		}		
-		if (noteRest.notes[0].dots != null && noteRest.duration.ticks >= (division * 0.5)) {
+		if (isDotted(noteRest) && noteRest.duration.ticks >= (division * 0.5)) {
 			addError ("Don’t put staccato dots on dotted notes",noteRest);
 			return;
 		}
@@ -1885,6 +1902,12 @@ MuseScore {
 			addError ("Don’t put staccato dots on tied notes",noteRest);
 			return;
 		}
+	}
+	
+	function isDotted(noteRest) {
+		var dottedDurs = [0.75,0.875,1.5,1.75,3,3.5];
+		var displayDur = noteRest.duration.ticks / parseFloat(division);
+		return dottedDurs.includes(displayDur);
 	}
 	
 	function checkStaffNames () {
@@ -2101,7 +2124,7 @@ MuseScore {
 			var stringsArray = [];
 			var noteheadStyle = noteRest.notes[0].headGroup;
 
-			if (typeof currentStaffNum !== 'number') errorMsg += "\nArtic error in checkStrigHaronic nn1";
+			if (typeof staffNum !== 'number') errorMsg += "\nArtic error in checkStrigHaronic nn1";
 			var theArticulation = getArticulation(noteRest, staffNum);
 			//errorMsg += "\nThe artic sym = "+theArticulation.symbol.toString();
 			if (theArticulation) {
@@ -2170,8 +2193,8 @@ MuseScore {
 		}
 		
 		// check dur >= minim
-		if (noteRest.duration.ticks >= Minim) {
-			addError("It’s not recommended to have a pizzicato minim or longer (unless the tempo is very fast).\nPerhaps this is supposed to be arco?",noteRest);
+		if (noteRest.duration.ticks > Minim) {
+			addError("It’s not recommended to have a pizzicato longer than a minim unless the tempo is very fast.\nPerhaps this is supposed to be arco?",noteRest);
 			lastPizzIssueBar = barNum;
 			lastPizzIssueStaff = staffNum;
 			return;
@@ -2245,7 +2268,7 @@ MuseScore {
 			var isMiddleOfTie = n.tieBack != null && n.tieForward != null;
 			var isEndOfTie = n.tieBack != null && n.tieForward == null;
 			var isStartOfTie = n.tieForward != null && n.tieBack == null;
-			if (!isStartOfSlur) {
+			if (!isStartOfSlur && !isEndOfSlur) {
 				if (typeof staffNum !== 'number') errorMsg += "\nArtic error in check slur issues";
 			
 				var theArtic = getArticulation(noteRest, staffNum);
@@ -2314,6 +2337,7 @@ MuseScore {
 	
 	function checkGraceNotes (graceNotes) {
 		var n = graceNotes.length;
+		if (n == 0) return;
 		var hasSlash = false;
 		var totalDur = 0;
 		for (var i = 0; i < n; i ++) {
@@ -2328,6 +2352,7 @@ MuseScore {
 		if (errorStr !== "In general, always use grace-notes ") addError (errorStr,graceNotes[0]);
 		
 		if (!isSlurred) {
+			errorMsg += "\nGrace note parent "+graceNotes[0].parent.name+" p p "+graceNotes[0].parent.parent.name;
 			addError("In general, grace-notes should always be slurred to the main note,\nunless you specifically add staccato articulation",graceNotes[0]);
 		}
 	}
@@ -2560,7 +2585,7 @@ MuseScore {
 		//errorMsg += "\nTREMOLO: bbox height is "+tremolo.bbox.height+" elements is "+tremolo.elements;
 		var numStrokes = parseInt((Math.round(tremolo.bbox.height * 10.)-2)/8);
 		var dur = parseFloat(noteRest.duration.ticks) / division;
-		errorMsg += "\n TREMOLO HAS "+numStrokes+" strokes; dur is "+dur;
+		//errorMsg += "\n TREMOLO HAS "+numStrokes+" strokes; dur is "+dur;
 		switch (numStrokes) {
 			case 0:
 				errorMsg += "\nCouldn't calculate number of strokes";
@@ -2681,7 +2706,12 @@ MuseScore {
 					if (eType == Element.MEASURE) {
 						tick = element.firstSegment.tick;
 					} else {
-						tick = element.parent.tick;
+						if (element.parent.type == Element.CHORD) {
+							// it's a grace note, so need to get parent of parent
+							tick = element.parent.parent.tick;
+						} else {
+							tick = element.parent.tick;
+						}
 					}
 				}
 			}

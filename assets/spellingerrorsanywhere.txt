@@ -1,5 +1,9 @@
 expressivo
 espressivo
+expressione
+espressione
+expr.
+espr.
 modere
 modéré
 cedez
@@ -12,8 +16,6 @@ trés
 très 
 pedel
 pedal
-expressione
-espressione
 cantabele
 cantabile
 non-legato
@@ -39,7 +41,7 @@ una corda
 fltzg
 flzg
 adlib
-ad lib.
+ad lib
 vib. ord.
 vib. norm.
 senza div
@@ -51,3 +53,6 @@ crescendo
 accellarando
 accelerando
 battuto.
+battuto
+lengo
+legno
