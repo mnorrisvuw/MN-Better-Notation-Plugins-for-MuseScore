@@ -14,4 +14,4 @@ bridge
 flautando
 flaut.
 flz.
-vib.
+vib
