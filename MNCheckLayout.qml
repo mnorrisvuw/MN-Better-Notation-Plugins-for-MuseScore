@@ -2579,13 +2579,15 @@ MuseScore {
 	
 	function checkOneNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) errorMsg += "\ntremolo is "+tremolo;
-		//errorMsg += "\nCHECKING 1-NOTE TREMOLO: parent is "+tremolo.parent.name+" parent parent is "+tremolo.parent.parent.name;
+		var tremDescription = tremolo.subtypeName();
+		var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
+		var strokesArray = [0,8,16,32,64];
+		var numStrokes = strokesArray.indexOf(tremSubdiv);
 		//errorMsg += "\nTREMOLO: parent parent tick is "+tremolo.parent.parent.tick;
 		//errorMsg += "\nTREMOLO: username is "+tremolo.userName()+" name is "+tremolo.name+" subtype is "+tremolo.subtype+" symbol is "+tremolo.symbol;
 		//errorMsg += "\nTREMOLO: bbox height is "+tremolo.bbox.height+" elements is "+tremolo.elements;
-		var numStrokes = parseInt((Math.round(tremolo.bbox.height * 10.)-2)/8);
 		var dur = parseFloat(noteRest.duration.ticks) / division;
-		//errorMsg += "\n TREMOLO HAS "+numStrokes+" strokes; dur is "+dur;
+		errorMsg += "\n TREMOLO HAS "+numStrokes+" strokes; dur is "+dur;
 		switch (numStrokes) {
 			case 0:
 				errorMsg += "\nCouldn't calculate number of strokes";
@@ -2608,20 +2610,38 @@ MuseScore {
 	
 	function checkTwoNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) errorMsg += "\ntremolo is "+tremolo;
-		errorMsg += "\nCHECKING 2-NOTE TREMOLO: height is "+tremolo.bbox.height;
+		var tremDescription = tremolo.subtypeName();
+		var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
+		var strokesArray = [0,8,16,32,64];
+		var numStrokes = strokesArray.indexOf(tremSubdiv);
+		var dur = 2 * parseFloat(noteRest.duration.ticks) / division;
+		errorMsg += "\n TREMOLO HAS "+numStrokes+" strokes; dur is "+dur;
 		if (isStringInstrument && !isSlurred) {
 			addError("Fingered tremolos for strings should always be slurred.",noteRest);
 			return;
 		}
-		/*if (n.DoubleTremolos > 3) {
-			storeError(errors,"You don’t need more than 3 strokes for an unmeasured tremolo.","NoteRest",n);
+		if (isPitchedPercussionInstrument) {
+			addError(errors,"It’s best to write "+currentInstrumentName.toLowerCase()+" tremolos as one-note tremolos (through stem),\nrather than two-note tremolos (between notes).",noteRest);
+			return;
 		}
-		if (n.DoubleTremolos = 1) {
-			storeError(errors,"Are you sure you want a one-stroke measured tremolo here (should be written as quavers).","NoteRest",n);
+		switch (numStrokes) {
+			case 0:
+				errorMsg += "\nCouldn't calculate number of strokes";
+				break;
+			case 1:
+				addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
+				break;
+			case 2:
+				if (dur >= 0.25 && dur < 0.5) addError("You don’t need more than 1 stroke for an unmeasured tremolo on semiquavers.",noteRest);
+					break;
+			case 3:
+				if (dur >= 0.25 && dur < 0.5) addError("You don’t need more than 1 stroke for an unmeasured tremolo on semiquavers.",noteRest);
+				if (dur >= 0.5 && dur < 1) addError("You don’t need more than 2 strokes for an unmeasured tremolo on quavers.",noteRest);
+				break;
+			default:
+				addError("You don’t need more than 3 strokes for an unmeasured tremolo.",noteRest);
+				break;
 		}
-		if (n.DoubleTremolos > 0 and isPitchedPercussion) {
-			storeError(errors,"Write "&utils.LowerCase(instrumentName)&" tremolos as single tremolos.","NoteRest",n);
-		}*/
 	}
 	
 	function checkGliss (noteRest, gliss) {
