@@ -203,7 +203,7 @@ MuseScore {
 		
 		// **** LOOP THROUGH THE SELECTED STAVES AND THE SELECTED BARS **** //
 		// ** NB — lastStaffNum IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
-		for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
+		for (currentStaffNum = firstStaffNum; currentStaffNum <= lastStaffNum; currentStaffNum ++) {
 
 			wasTied = false;
 			
@@ -486,7 +486,7 @@ MuseScore {
 	
 	
 	function checkManuallyEnteredBarRest (noteRest) {
-		//errorMsg += "\n*** CHECKING MANUALLY ENTERED BAR REST ***"; 
+		//errorg += "\n*** CHECKING MANUALLY ENTERED BAR REST ***"; 
 		isBarRest = isRest && soundingDur == barLength;
 		isManuallyEnteredBarRest = isBarRest && noteRest.durationType.type < 14;
 		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar, and press delete to revert to a correctly positioned bar rest.",noteRest);
@@ -570,7 +570,7 @@ MuseScore {
 								
 							} else {
 								if (i == numBeatsHidden - 2) {
-									errStr += " & ";
+									errStr += " and ";
 									//errorMsg += "\nerrStr="+errStr;
 									
 								} else {
@@ -601,7 +601,7 @@ MuseScore {
 								errStr += ", ";
 							} else {
 								if (i == numBeatsHidden - 2) {
-									errStr += " & ";
+									errStr += " and ";
 								} else {
 									errStr += "\nSplit it so that the beats are shown";
 								}
@@ -1256,7 +1256,7 @@ MuseScore {
 			removeElement(elementsToRemove[i]);
 		}
 		
-		curScore.selection.selectRange(0,endTick,startStaff,endStaff);
+		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
 		curScore.endCmd();
 		
 	}
@@ -1303,7 +1303,7 @@ MuseScore {
 			}
 			ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 			TextArea {
-				text: errorMsg
+				text: dialog.msg
 				wrapMode: TextEdit.Wrap         
 			}
 		}

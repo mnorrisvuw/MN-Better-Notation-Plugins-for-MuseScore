@@ -23,14 +23,22 @@ MuseScore {
 
   onRun: {
 		if (!curScore) return;
-		var numStaves = curScore.nstaves;
+		
+		// ** SAVE CURRENT SELECTION ** //
+		var s = curScore.selection;
+		var startStaff = s.startStaff;
+		var endStaff = s.endStaff;
+		var startTick = 0;
+		if (s.startSegment) startTick = s.startSegment.tick;
+		var endTick = curScore.lastSegment.tick;
+		if (s.endSegment) endTick = s.endSegment.tick + 1;
 		
 		// **** GET ALL ITEMS **** //
 		curScore.startCmd()
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
+		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
 		curScore.endCmd()
 		var elems = curScore.selection.elements;
-		dialog.msg = "Num elemns: "+elems.length;
+		//errorMsg = "Num elemns: "+elems.length;
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		for (var i = 0; i < elems.length; i++) {
@@ -57,9 +65,9 @@ MuseScore {
 		for (var i = 0; i < elementsToRemove.length; i++) {
 			removeElement(elementsToRemove[i]);
 		}
-		curScore.endCmd();
 		
-		//dialog.show();
+		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
+		curScore.endCmd();
 		
 	}
 	

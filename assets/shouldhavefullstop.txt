@@ -28,6 +28,9 @@ accel
 div
 unis
 sim
+espr
 espress
 au mouvt
 ad lib
+flz
+flzg

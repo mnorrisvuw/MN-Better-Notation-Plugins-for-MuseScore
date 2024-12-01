@@ -1,3 +1,9 @@
+detache
+détaché
+detaché
+détaché
+détache
+détaché
 expressivo
 espressivo
 expressione
@@ -45,7 +51,7 @@ ad lib
 vib. ord.
 vib. norm.
 senza div
-unis.
+unis
 pui 
 più
 crecendo
@@ -54,5 +60,7 @@ accellarando
 accelerando
 battuto.
 battuto
-lengo
-legno
+ lengo
+ legno
+pos nat
+pos. nat
