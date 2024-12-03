@@ -19,6 +19,8 @@ MuseScore {
 	requiresScore: true
 	title: "MN Check Layout"
 	id: mnchecklayout
+	thumbnailName: "MNCheckLayout.png"
+	
 	
 	// **** TEXT FILE DEFINITIONS **** //
 	FileIO { id: techniquesfile; source: Qt.resolvedUrl("./assets/techniques.txt").toString().slice(8); onError: { console.log(msg); } }
@@ -104,7 +106,6 @@ MuseScore {
 	property var currentPlayingTechnique: ""
 	property var currentContactPoint: ""
 	property var ledgerLines: []
-	property var flaggedLedgerLines: false;
 	property var fullInstNamesShowing: false
 	property var shortInstNamesShowing: false
 	property var firstBarInScore: null
@@ -143,13 +144,10 @@ MuseScore {
 	property var glisses:[]
 	property var expectedRehearsalMark: 'A'
 	property var expectedRehearsalMarkLength: 1
-	property var flaggedRehearsalMarkError: false
 	property var isDiv: false
-	property var flaggedDivError: false
 	property var isStringHarmonic: false
 	property var isSharedStaffArray: []
 	property var weKnowWhosPlaying: false
-	property var flaggedWeKnowWhosPlaying: false
 	property var numRehearsalMarks: 0
 	property var lastPizzIssueBar: -99
 	property var lastPizzIssueStaff: -1
@@ -176,11 +174,17 @@ MuseScore {
 	property var prevNote: null
 	property var selectionArray: []
 	property var isTrem: false
-	property var flaggedFlippedStem: false
 	property var prevWasGraceNote: false
 	property var firstDynamic: false
 	property var progressShowing: false
 	property var progressStartTime: 0
+	// ** FLAGS ** //
+	property var flaggedWeKnowWhosPlaying: false
+	property var flaggedDivError: false
+	property var flaggedRehearsalMarkError: false
+	property var flaggedLedgerLines: false
+	property var flaggedFlippedStem: false
+	property var flaggedPedalIssue: false
 	
   onRun: {
 		if (!curScore) return;
@@ -306,7 +310,7 @@ MuseScore {
 		// ************  							CHECK STAFF NAMES ISSUES 							************ // 
 		checkStaffNames();
 		
-		// ************ 							CHECK FOR FERMATA ISSUES 							************ //
+		// ************ 							CHECK FOR FERMATA ISSUES 							************ ///
 		if (!isSoloScore && numStaves > 2) checkFermatas();
 		
 		setProgress (3);
@@ -376,6 +380,7 @@ MuseScore {
 			flaggedSlurredRest = false;
 			flaggedFlippedStem = false;
 			flaggedOttavaIssue = false;
+			flaggedPedalIssue = false;
 			
 			// ** slurs
 			currentSlur = null;
@@ -565,7 +570,10 @@ MuseScore {
 										addError("Pedal markings should go below the bottom staff of a grand staff",currentPedal);
 									}
 								} else {
-									addError("This instrument does not have a pedal",currentPedal);
+									if (!flaggedPedalIssue) {
+										addError("This instrument does not have a sustain pedal",currentPedal);
+										flaggedPedalIssue = true;
+									}
 								}
 								if (currentPedalNum < numPedals - 1) {
 									nextPedalStart = pedals[currentStaffNum][currentPedalNum+1].spannerTick.ticks;
@@ -990,7 +998,7 @@ MuseScore {
 					progressShowing = true;
 				}
 			} else {
-				progress.progressBar.value = percentage;
+				progress.progressPercent = percentage;
 			}
 		}
 	}
@@ -1544,17 +1552,16 @@ MuseScore {
 					tickHasDynamic = true;
 					theDynamic = textObject;
 					var isError = false;
-					var plainDynamicMark = lowerCaseText;
-					if (containsADynamic) plainDynamicMark = lowerCaseText
-						.replace('<sym>dynamicforte</sym>','f')
-						.replace('<sym>dynamicmezzo</sym>','m')
-						.replace('<sym>dynamicpiano</sym>','p')
-						.replace('<sym>dynamicrinforzando</sym>','r')
-						.replace('<sym>dynamicsubito</sym>','s')
-						.replace('<sym>dynamicz</sym>','z');
+					var plainDynamicMark = lowerCaseText
+						.replace('dynamicforte','f')
+						.replace('dynamicmezzo','m')
+						.replace('dynamicpiano','p')
+						.replace('dynamicrinforzando','r')
+						.replace('dynamicsubito','s')
+						.replace('dynamicz','z');
 					//errorMsg += "\nprevDynamicBarNum = "+prevDynamicBarNum;
 					var dynamicException = plainDynamicMark.includes("fp") || plainDynamicMark.includes("sf") || plainDynamicMark.includes("fz");
-					
+					//errorMsg += "\ndynamicException = "+dynamicException+" plainDynamicMark = "+plainDynamicMark;
 					if (prevDynamicBarNum > 0) {
 						var barsSincePrevDynamic = barNum - prevDynamicBarNum;
 						if (plainDynamicMark === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
@@ -1989,6 +1996,8 @@ MuseScore {
 		//errorMsg += "\nFound OTTAVA: "+ottava.subtypeName()+" "+ottava.ottavaType;
 		if (!reads8va) {
 			addError("This instrument does not normally read "+ottavaStr+" lines.\nIt’s best to write the note(s) out at pitch.",ottava);
+			flaggedOttavaIssue = true;
+			
 		} else {
 			if (ottava.ottavaType == k8va || ottava.ottavaType == k15ma) {
 				//errorMsg += "\nChecking 8va — "+isAltoClef;
@@ -2866,9 +2875,9 @@ MuseScore {
 			if (pitch < lowestPitch) lowestPitch = pitch;
 		}
 		var stretch = highestPitch - lowestPitch;
-		if (stretch > 14 && stretch < 16) addError("This chord may be too wide to stretch for some pianists. Consider splitting it between hands.",noteRest);
-		if (stretch > 16) addError("This chord is too wide to stretch. Consider splitting it between hands.",noteRest);
-		if (stretch < 14 && numNotes > 5) addError("It looks like there are too many notes in this chord to play in one hand.",noteRest);
+		if (stretch > 14 && stretch < 16) addError("This chord may be too wide to stretch for some pianists.\nConsider splitting it between the hands.",noteRest);
+		if (stretch > 16) addError("This chord is too wide to stretch.\mConsider splitting it between the hands.",noteRest);
+		if (stretch < 14 && numNotes > 5) addError("It looks like there are too many notes in this chord to play in one hand.\nConsider splitting it between the hands.",noteRest);
 	}
 	
 	function checkOneNoteTremolo (noteRest, tremolo) {
@@ -3094,11 +3103,9 @@ MuseScore {
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		for (var i = 0; i < elems.length; i++) {
-
 			var e = elems[i];
 			var t = e.type;
-			var c = e.color;
-			
+			var c = e.color;	
 			// style the element
 			if (Qt.colorEqual(c,"hotpink")) {
 				elementsToRecolor.push(e);
@@ -3117,10 +3124,8 @@ MuseScore {
 		for (var i = 0; i < elementsToRemove.length; i++) {
 			removeElement(elementsToRemove[i]);
 		}
-		
 		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
 		curScore.endCmd();
-		
 	}
 	
 	ApplicationWindow {
@@ -3165,7 +3170,7 @@ MuseScore {
 	ApplicationWindow {
 		id: progress
 		title: "PROGRESS"
-		property var progressValue: 0
+		property var progressPercent: 0
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
 		width: 500
@@ -3178,7 +3183,7 @@ MuseScore {
 				bottom: parent.verticalCenter
 				margins: 10
 			}
-			value: 0
+			value: progressPercent
 			to: 100
 		}
 		

@@ -11,7 +11,6 @@ import QtQuick.Controls 2.15
 import Muse.UiComponents 1.0
 import FileIO 3.0
 
-
 MuseScore {
 	version:  "1.0"
 	description: "This plugin checks your score for common rhythmic notation issues"
@@ -19,6 +18,7 @@ MuseScore {
 	requiresScore: true
 	title: "MN Check Rhythmic Notation"
 	id: mncheckrhythmicnotation
+	thumbnailName: "MNCheckRhythmicNotation.png"
 	
 	// **** GLOBALS **** //
 	property var timeSigs: []
@@ -59,6 +59,7 @@ MuseScore {
 	property var nextItemIsNote: false
 	property var nextItemPos: 0
 	property var nextItemDur: 0
+	property var nextDisplayDur: 0
 	property var nextItemBeat: 0
 	property var nextNextItem: null
 	property var nextNextItemIsNote: false
@@ -77,7 +78,10 @@ MuseScore {
 	property var nextBeam: null
 	property var nextBeamMode: 0
 	property var isPickupBar: false
-	
+	property var isTied: false
+	property var beamBeat: -1
+	property var haveHadFirstNote: false
+	property var totalRestDur: 0
 	property var dottedminim
 	property var minim
 	property var dottedcrotchet
@@ -95,10 +99,13 @@ MuseScore {
 	property var possibleOffbeatSimplificationLabels: []
 	
 	property var debug: true
+	property var progressShowing: false
+	property var progressStartTime: 0
 
 
   onRun: {
 		if (!curScore) return;
+		setProgress (0);
 		
 		// **** INITIALISE VARIABLES **** //
 		var staves = curScore.staves;
@@ -119,7 +126,6 @@ MuseScore {
 		quaver = 0.5*d;
 		dottedsemiquaver = 0.375*d;
 		semiquaver = 0.25*d;
-		
 		possibleOnbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet, minim, dottedminim, semibreve];
 		possibleOnbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet", "minim", "dotted minim", "semibreve"];
 		possibleOffbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet];
@@ -127,27 +133,20 @@ MuseScore {
 		commentPosArray = Array(10000).fill(0);
 
 		// **** DELETE ALL EXISTING COMMENTS AND HIGHLIGHTS **** //
-		
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
-		if (!curScore.selection.isRange) {
-			// ** SELECT ALL IF NO SELECTION ** //
-			curScore.startCmd();
-			curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
-			curScore.endCmd();
-		}
-		
+		if (!curScore.selection.isRange) selectAll();
 		firstStaffNum = curScore.selection.startStaff;
 		lastStaffNum = curScore.selection.endStaff;
-		errorMsg+="firstStaffNum= "+firstStaffNum+"; lastStaffNum = "+lastStaffNum;
+		errorMsg+="\nfirstStaffNum= "+firstStaffNum+"; lastStaffNum = "+lastStaffNum;
+		setProgress (1);
 		
 		// **** CALCULATE FIRST BAR IN SCORE & SELECTION **** //
 		firstBarInScore = curScore.firstMeasure;
 		cursor.rewind(Cursor.SELECTION_START);
 		firstBarInSelection = cursor.measure;
 		firstTickInSelection = cursor.tick;
-		//var firstTrackInSelection = cursor.track;
 		firstBarNum = 1;
 		currentBar = firstBarInScore;
 		while (!currentBar.is(firstBarInSelection)) {
@@ -168,7 +167,7 @@ MuseScore {
 			lastBarNum ++;
 			currentBar = currentBar.nextMeasure;
 		}
-		//errorMsg += "\nlastBarNum: "+lastBarNum;
+		setProgress (2);
 		
 		// ** GET ALL TIME SIGS ** //
 		cursor.filter = Segment.All;
@@ -179,10 +178,8 @@ MuseScore {
 		while (cursor.segment) {
 			if (cursor.element) {
 				var ts = cursor.element;
-				// do something with keySig 
 				timeSigs.push(ts);
 				timeSigTicks.push(cursor.tick);
-				//errorMsg += "\nFound a time sig elem: "+ts.timesigNominal.str;
 			}
 			cursor.next();
 		}
@@ -190,20 +187,24 @@ MuseScore {
 		
 		numBars = (lastBarNum-firstBarNum)+1;
 		totalNumBars = numBars*numStaves;
+		setProgress (3);
 		
 		// **** INITIALISE VARIABLES FOR THE LOOP **** //
 		var currentBarNum, currentStaffNum, numBarsProcessed,  wasTied, currentTimeSig;
 		var prevNoteWasDoubleTremolo;
-		var tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex;
+		var tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, tieIndex;
 		var restCrossesBeat, restStartedOnBeat, isLastRest;
 		var lastNoteInBar, lastRest;
 		var totalDur, numComments;
 		
-		numBarsProcessed = 0;
+		var loop = 0;
+		var totalNumLoops = numStaves * numBars * 4;
+		setProgress (5);
 		
 		// **** LOOP THROUGH THE SELECTED STAVES AND THE SELECTED BARS **** //
 		// ** NB — lastStaffNum IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
 		for (currentStaffNum = firstStaffNum; currentStaffNum <= lastStaffNum; currentStaffNum ++) {
+			errorMsg += "\n—————————————————\nSTAFF "+currentStaffNum;
 
 			wasTied = false;
 			
@@ -227,18 +228,11 @@ MuseScore {
 				timeSigNum = currentTimeSig.numerator;
 				timeSigDenom = currentTimeSig.denominator;
 				timeSigStr = currentTimeSig.str;
-				//errorMsg += "\ntimeSigStr = "+timeSigStr;
-				
 				barStart = currentBar.firstSegment.tick;
 				barLength = currentBar.lastSegment.tick - barStart;
-				
-				//errorMsg += "\nbarStart = "+barStart+"; barLength = "+barLength;
-				
 				beatLength = crotchet;
 				isPickupBar = false;
 				var expectedDuration = timeSigNum * (semibreve/timeSigDenom);
-				//errorMsg += "\nexpectedDur = "+expectedDuration;
-				
 				if (currentBarNum == 1 && expectedDuration != barLength) isPickupBar = true;
 				var canCheckThisBar = false;
 				isCompound = false;
@@ -255,7 +249,6 @@ MuseScore {
 				if (canCheckThisBar) {
 				
 					// ** INITIALISE PARAMETERS ** //
-			
 					prevSoundingDur = 0;
 					prevDisplayDur = 0;
 					prevNoteWasDoubleTremolo = false;
@@ -273,21 +266,18 @@ MuseScore {
 					lastRest = false;
 					var startTrack = currentStaffNum * 4;
 					var endTrack = startTrack + 4;
-					for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
-						// **** GET SEGMENT **** //
-						//segment = currentBar.firstSegment;
-						cursor.voice = currentTrack;
-						cursor2.voice = currentTrack;
-						cursor.rewindToTick(barStart);
-						//cursor.next();
-						//errorMsg += "\ncursorTick = "+cursor.tick;
-						//errorMsg += "\ncurrentTrack "+currentTrack;
-						
-							// ** LOOP THROUGH EACH VOICE ** //
 					
+					for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
+						loop++;
+						setProgress(5+loop*95./totalNumLoops);
+						cursor.track = currentTrack;
+						cursor.rewindToTick(barStart);
+						cursor2.track = currentTrack;
 						totalDur = 0;
+						totalRestDur = 0;
+						beamBeat = -1;
+						haveHadFirstNote = false;
 						
-						//currentBar = cursor.measure;
 						var processingThisBar = cursor.element;
 						while (processingThisBar) {
 							
@@ -316,17 +306,26 @@ MuseScore {
 							
 							// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
 							cursor2.rewindToTick(cursor.tick);
+							var nextItemIsHidden;
 							nextItem = null;
-							var nextItemIsHidden = false;
+							nextItemIsHidden = false;
 							nextItemIsNote = false;
 							nextItemPos = 0;
 							nextItemDur = 0;
+							nextDisplayDur = 0;
+							nextItemPos = 0;
+							nextDisplayDur = -1;
+							nextItemDur = -1;
+							nextItemBeat = -1;
+							nextBeam = null;
+							nextBeamMode = Beam.NONE;
 							
 							if (cursor2.next()) {
 								if (cursor2.measure.is(currentBar)) {
 									nextItem = cursor2.element;
 									nextItemIsNote = nextItem.type != Element.REST;
 									nextItemPos = cursor2.tick - barStart;
+									nextDisplayDur = nextItem.duration.ticks;
 									nextItemDur = nextItem.actualDuration.ticks;
 									nextItemBeat = Math.trunc(nextItemPos / beatLength);
 									nextItemIsHidden = !nextItem.visible;
@@ -417,8 +416,10 @@ MuseScore {
 								restCrossesBeat = false;
 								restStartedOnBeat = false;
 								isLastRest = false;
+								totalRestDur = 0;
 							} else {
 								rests.push(noteRest);
+								totalRestDur += noteRest.actualDuration.ticks;
 								if (rests.length == 1) {
 									restStartedOnBeat = isOnTheBeat;
 									restStartBeat = noteStartBeat;
@@ -451,16 +452,8 @@ MuseScore {
 					} // end track loop
 				} // end if canCheckThisBar
 				
-				if (currentBar) {
-					//errorMsg += "\nTrying to get next measure";
-					currentBar = currentBar.nextMeasure;
-				}
-				if (!currentBar) errorMsg += "\nnextMeasure failed";
-
+				if (currentBar) currentBar = currentBar.nextMeasure;
 				numBarsProcessed ++;
-				
-				//errorMsg += "\nProcessed "+numBarsProcessed+" bars";
-				
 			} // end for currentBarNum	
 		} // end for currentStaff
 		
@@ -470,36 +463,50 @@ MuseScore {
 		// ** SHOW INFO DIALOG ** //
 		if (!debug) {
 			var numErrors = errorStrings.length;
-			if (numErrors == 0) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nNo errors found!";
-			}
-			if (numErrors == 1) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nOne error found.";
-			}
-			if (numErrors > 1) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nI found "+numErrors+" errors";
-			}
+			if (numErrors == 0) errorMsg = "SCORE CHECK COMPLETED!\n\nNo errors found!";
+			if (numErrors == 1) errorMsg = "SCORE CHECK COMPLETED!\n\nI found one error.";
+			if (numErrors > 1) errorMsg = "SCORE CHECK COMPLETED!\n\nI found "+numErrors+" errors";
 		}
+		if (progressShowing) progress.close();
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
 	
+	function setProgress (percentage) {
+		if (percentage == 0) {
+			progressStartTime = Date.now();
+		} else {
+			if (!progressShowing) {
+				var currentTime = Date.now();
+				if (currentTime - progressStartTime > 3000) {
+					progress.show();
+					progressShowing = true;
+				}
+			} else {
+				progress.progressBar.value = percentage;
+			}
+		}
+	}
+	
+	function selectAll () {
+		curScore.startCmd();
+		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
+		curScore.endCmd();
+	}
 	
 	function checkManuallyEnteredBarRest (noteRest) {
-		//errorg += "\n*** CHECKING MANUALLY ENTERED BAR REST ***"; 
 		isBarRest = isRest && soundingDur == barLength;
 		isManuallyEnteredBarRest = isBarRest && noteRest.durationType.type < 14;
-		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar, and press delete to revert to a correctly positioned bar rest.",noteRest);
+		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to create a correctly positioned bar rest.",noteRest);
 	}
 	
 	function checkHidingBeatError (noteRest){
-		//errorMsg += "\n*** CHECKING HIDING BEAT ERROR ***";
 		var hidingBeatError = noteHidesBeat && !isBarRest && !hasPause; // make a temp version
 		if (!hidingBeatError) return;
-		
-		// hidingBeatError is now true — but there are some exceptions
+		errorMsg += "\nChecking beat Hiding";
 		if (isOnTheBeat) {
-			// ON THE BEAT RESTS
+			
+			// ** ON THE BEAT RESTS ** //
 			if (isRest) {
 				if (soundingDur == minim) {
 					// ok in 4/4 on 1 & 3
@@ -508,7 +515,7 @@ MuseScore {
 				}	
 			} else {
 				
-				// ON THE BEAT NOTES
+				// ** ON THE BEAT NOTES ** //
 				if (isCompound) {
 					hidingBeatError = soundingDur % beatLength;
 				} else {
@@ -519,33 +526,58 @@ MuseScore {
 			}
 
 		} else {
-			// ** OFF THE BEAT ** //
+
+			errorMsg += "\nOff beat";
+			// ** OFF THE BEAT NOTES & RESTS ** //
 			// ** FIRST, WE ASSUME THAT THE NOTE IS HIDING THE BEAT ** //
-
 			// ** exclude dotted crotchet if on 0.5 or 2.5
-
 			// ** exclude crotchet if on 0.5 or 2.5
-			if (timeSigDenom == 4) {
-				if (timeSigNum == 4) {
-					if ((noteStart == quaver || noteStart == minim+quaver) && (soundingDur == crotchet || soundingDur == dottedcrotchet) && isNote) {
-						hidingBeatError = false; // OK to use crotchet or dotted crotchet,  rest or dotted rest here
+			
+			// EXCLUDE OFFBEAT CROTCHET IFF
+			// 1) it's on the right place
+			// 2) it's not tied
+			
+			// ** OFFBEAT CROTCHET ** //
+			if (displayDur == crotchet) {
+				if (noteRest.tuplet == null) {
+					if (isNote && !isTied) {
+						if (timeSigStr === "4/4" || timeSigStr == "2/2") {
+							if (noteStart == quaver || noteStart == minim+quaver) hidingBeatError = false;
+						} else {
+							if (noteStartFrac == quaver) hidingBeatError = false;
+						}
 					}
 				} else {
-					if ((noteStartFrac == quaver || noteStartFrac == 0) && (soundingDur == crotchet || soundingDur == dottedcrotchet) && isNote) {
-						hidingBeatError = false; // OK to use crotchet or dotted crotchet,  rest or dotted rest here
+				// check crotchet triplet
+					if (displayDur == crotchet && prevDisplayDur == crotchet && nextDisplayDur == crotchet) {
+						if (timeSigDenom <= 4) hidingBeatError = false; // default is that we allow it
+						var allowedNoteStarts32 = [division * 2 / 3, division * 8 / 3, division * 14 / 3];
+						var allowedNoteStarts34 = [division * 2 / 3, division * 5 / 3];
+						var allowedNoteStarts44 = [division * 2 / 3, division * 8 / 3];
+						var allowedNoteStarts54 = [division * 2 / 3, division * 5 / 3, division * 8 / 3, division * 11 / 3];
+						if (timeSigStr === "3/2" || timeSigStr === "6/4") hidingBeatError = !allowedNoteStarts32.includes(noteStart);
+						if (timeSigStr === "2/4" || timeSigStr === "4/4" || timeSigStr === "4/8" || timeSigStr === "8/8" || timeSigStr === "2/2") hidingBeatError = !allowedNoteStarts44.includes(noteStart);
+						if (timeSigStr === "3/4") hidingBeatError = !allowedNoteStarts34.includes(noteStart);
+						if (timeSigStr === "5/4") hidingBeatError = !allowedNoteStarts54.includes(noteStart);
 					}
 				}
 			}
+				
+			// ** OFFBEAT DOTTED CROTCHET ** //
+			if (displayDur == dottedcrotchet && noteRest.tuplet == null) {
 
-			// ** EXCLUDE LONG TUPLET
-			//if (tupletPlayedDuration > crotchet) hidingBeatError = false;
-			// TO FIX
-
-			// ** EXCLUDE DOUBLE TREMOLOS ** //
-			//if (isDoubleTremolo) hidingBeatError = false;
-			// TO FIX
-
-			//if (actualDur == prevActualDur && prevNoteWasDoubleTremolo) hidingBeatError = false;
+				errorMsg += "\nChecking dotted crotchet";
+				if (isNote) {
+					errorMsg += "\nHere1";
+					
+					if (timeSigStr === "4/4" || timeSigStr == "2/2") {
+						if ((noteStart == quaver || noteStart == minim+quaver) && prevDisplayDur == quaver) hidingBeatError = false;
+					} else {
+						errorMsg += "\nnoteStartFrac = "+noteStartFrac+" prevDisplayDur="+prevDisplayDur;
+						if (noteStartFrac == quaver && prevDisplayDur == quaver) hidingBeatError = false;
+					}
+				}
+			}
 		}
 		
 		if (hidingBeatError) {
@@ -559,28 +591,19 @@ MuseScore {
 						var errStr = "This note is hiding beats ";
 
 						for (var i = 0; i < numBeatsHidden; i++) {
-							//errorMsg += "\ni="+i+"; nbh="+numBeatsHidden;
 							var beatStr = (noteStartBeat+2+i).toString();
 							errStr += beatStr;
-							//errorMsg += "\nerrStr="+errStr;
-							
 							if (i < numBeatsHidden - 2) {
 								errStr += ", ";
-								//errorMsg += "\nerrStr="+errStr;
-								
 							} else {
 								if (i == numBeatsHidden - 2) {
-									errStr += " and ";
-									//errorMsg += "\nerrStr="+errStr;
-									
+									errStr += " and ";									
 								} else {
 									errStr += "\nSplit it with a tie, so that the beats are shown";
-									//errorMsg += "\nerrStr="+errStr;
 									
 								}
 							}
 						}
-						//errorMsg += "\nFinal errStr=‘"+errStr+"’";
 						addError(errStr,noteRest);
 					}
 				}
@@ -615,7 +638,7 @@ MuseScore {
 	}
 	
 	function condenseOverSpecifiedRest (noteRest) {
-		errorMsg += "\n*** CHECKING CONDENSING OVER-SPECIFIED REST ***"; 
+		//errorMsg += "\n*** CHECKING CONDENSING OVER-SPECIFIED REST ***"; 
 		
 		var possibleSimplification = -1;
 		var simplificationIsOnBeat = true;
@@ -627,29 +650,12 @@ MuseScore {
 		errorMsg += "\nrests: "+rests.length+" "+maxOnbeatSimplification+" "+maxOffbeatSimplification; 
 		
 		// CHECK THAT IT COULD BE SIMPLIFIED AS A BAR REST
-		var firstRest = rests[0];
-		var firstTick = firstRest.parent.tick;
-		var lastRest, lastTick, lastDur;
-		if (rests.length < 2) {
-			errorMsg += "\nNUM RESTS < 2";
-		} else {
-			lastRest = rests.slice(-1);
-			if (lastRest == null || lastRest == undefined) {
-				errorMsg += "\nLast Rest == null _ condenseOverSpecifiedRest";
-			} else {
-				var lastTickParent = lastRest.parent;
-				//errorMsg += "\nlastRestType = "+lastRest+"; lastRestParent = "+lastTickParent;
-				if (lastTickParent != undefined) {
-					lastTick = lastTickParent.tick;
-					lastDur = lastRest.duration.ticks;
-				}
-			}
-		}
-		if (firstTick == barStart && (lastTick + lastDur == barLength) && !isPickupBar) {
-			addError ('Rests can be deleted to make a bar rest.', noteRest)
+		if (totalRestDur == barLength && !isPickupBar) {
+			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘delete’', rests)
 		} else {
 			errorMsg += "\nHere 1"; 
 			var maxSimplificationFound = false;
+			
 			for (var i = 0; i < rests.length-1 && !maxSimplificationFound; i++) {
 				var startRest = rests[i];
 				var startRestTick = startRest.parent.tick;
@@ -661,6 +667,7 @@ MuseScore {
 				var startBeat = Math.trunc(startPos/beatLength);
 				var startFrac = startPos % beatLength;
 				var restIsOnBeat = !startFrac;
+				
 								
 				for (var j = i+1; j < rests.length && !maxSimplificationFound; j++) {
 					var theRest = rests[j];
@@ -676,7 +683,6 @@ MuseScore {
 					// **** ONBEAT REST CONDENSATION **** //
 	
 					if (restIsOnBeat) {
-						simplificationFound = false;
 						// ** CHECK CONDENSATION OF ACTUAL DURATIONS ** //
 						for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
 							var canBeCondensed = true;
@@ -687,8 +693,7 @@ MuseScore {
 							if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = ((timeSigDenom <= 2) || isCompound) && !(startBeat % 2);
 							if (restActualDur == dottedquaver) canBeCondensed = timeSigDenom <= 4;
 							if (restActualDur == dottedsemiquaver) canBeCondensed = timeSigDenom <= 8;
-							if (canBeCondensed && isCompound) canBeCondensed = !(restActualDur % beatLength);
-							if (canBeCondensed && isCompound && timeSigNum == 4) canBeCondensed = restActualDur <= dottedcrotchet;
+							if (canBeCondensed && isCompound) canBeCondensed = restActualDur <= beatLength || (restActualDur % beatLength == 0);
 							errorMsg += "\n(onbeat act) looking for match: "+restActualDur+" = "+p+" = "+(restActualDur==p); 
 							
 							if (restActualDur == p && canBeCondensed) {
@@ -701,6 +706,8 @@ MuseScore {
 									simplificationIsOnBeat = true;
 									simplificationFound = true;
 									maxSimplificationFound = (k == maxOnbeatSimplification);
+									errorMsg += "\nsimplificationFound = "+simplificationFound; 
+									
 								}
 							}
 						}
@@ -708,12 +715,12 @@ MuseScore {
 						if (restDisplayDur != restActualDur && !simplificationFound) {
 							for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
 								var p = possibleOnbeatSimplificationDurs[k];
-								errorMsg += "\n(onbeat disp) looking for match: "+restDisplayDur+" = "+p+" = "+(restDisplayDur==p); 
+								//errorMsg += "\n(onbeat disp) looking for match: "+restDisplayDur+" = "+p+" = "+(restDisplayDur==p); 
 								
 								if (restDisplayDur == p) {
 									if (k > possibleSimplification) {
 										
-										errorMsg += "\nfound a possibleSimplification display dur on beat = "+k; 
+										//errorMsg += "\nfound a possibleSimplification display dur on beat = "+k; 
 										
 										possibleSimplification = k;
 										possibleSimplificationLastRestIndex = j;
@@ -730,7 +737,6 @@ MuseScore {
 						// **** OFFBEAT REST CONDENSATION **** //
 
 						// CHECK ACTUAL DURS
-						simplificationFound = false;
 						for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
 							var canBeCondensed = true;
 							var p = possibleOffbeatSimplificationDurs[k];
@@ -740,12 +746,12 @@ MuseScore {
 							if (p == crotchet) canBeCondensed = false;
 							if (p < crotchet) canBeCondensed = sameBeat;
 							if (canBeCondensed && isCompound && restActualDur == beatLength * 2 / 3) canBeCondensed = false;
-							errorMsg += "\n(offbeat act) looking for match: "+restActualDur+" = "+p+" = "+(restActualDur==p); 
+							//errorMsg += "\n(offbeat act) looking for match: "+restActualDur+" = "+p+" = "+(restActualDur==p); 
 							
 							if (restActualDur == p && canBeCondensed) {
 								if (k > possibleSimplification) {
 									
-									errorMsg += "\nfound a possibleSimplification actual dur off beat = "+k; 
+									//errorMsg += "\nfound a possibleSimplification actual dur off beat = "+k; 
 									
 									possibleSimplification = k;
 									possibleSimplificationLastRestIndex = j;
@@ -761,12 +767,12 @@ MuseScore {
 						if (restDisplayDur != restActualDur && !simplificationFound) {
 							for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
 								var p = possibleOffbeatSimplificationDurs[k];
-								errorMsg += "\n(offbeat disp) looking for match: "+restDisplayDur+" = "+p+" = "+(restDisplayDur==p); 
+								//errorMsg += "\n(offbeat disp) looking for match: "+restDisplayDur+" = "+p+" = "+(restDisplayDur==p); 
 								
 								if (restDisplayDur == p) {
 									if (k > possibleSimplification) {
 										
-										errorMsg += "\nfound a possibleSimplification display dur off beat = "+k; 
+										//errorMsg += "\nfound a possibleSimplification display dur off beat = "+k; 
 										
 										possibleSimplification = k;
 										possibleSimplificationLastRestIndex = j;
@@ -781,8 +787,10 @@ MuseScore {
 					}
 				}
 			}
+			errorMsg += "\nFinal: simplificationFound = "+simplificationFound; 
+			
 			if (simplificationFound) {
-				errorMsg += "\nfinal simplificationFound = "+possibleSimplification; 
+				errorMsg += "\nfinal simplification chosen = "+possibleSimplification; 
 				
 				var exception = isPickupBar && possibleSimplification > 6;
 				if (simplificationIsOnBeat) {
@@ -792,6 +800,8 @@ MuseScore {
 						var theArray = [];
 						for (var i = possibleSimplificationFirstRestIndex; i <= possibleSimplificationLastRestIndex; i++) {
 							theArray.push(rests[i]);
+							errorMsg += "\nPushing rest "+i; 
+							
 						}
 						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 					}
@@ -817,8 +827,6 @@ MuseScore {
 	}
 	
 	function checkTieSimplifications (noteRest) {
-		
-		errorMsg += "\n*** CHECKING TIED NOTE SIMPLIFICATIONS ***";
 		
 		// ** DO TIE SIMPLIFICATION IF WE'RE ON THE LAST NOTE OF THE TIE ** //
 		// ** LOOP THROUGH THE NUMBER OF NOTES IN TIE ** //
@@ -851,10 +859,8 @@ MuseScore {
 				var tempPos = getPositionInBar(tempNote);
 				var tempBeat = Math.trunc(tempPos/beatLength);
 				var sameBeat = (tempBeat == startBeat);
-				errorMsg += "\nstartBeat = "+startBeat+" tempBeat = "+tempBeat+" sameBeat = "+sameBeat;
 				var tempNextItem = getNextNoteRest(tempNote);
 				var tempNextItemIsNote = (tempNextItem == null) ? false : tempNextItem.type == Element.CHORD;
-				
 				tiedActualDur += tempActualDur;
 				tiedDisplayDur += tempDisplayDur;
 				var checkDisplayDur = tiedDisplayDur != tiedActualDur;
@@ -862,11 +868,10 @@ MuseScore {
 				
 				if (tieIsOnBeat) {
 					
-					// CHECK ONBEAT TIE SIMPLIFICATIONS
+					// ** CHECK ONBEAT TIE SIMPLIFICATIONS ** //
 					for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
 						canBeSimplified = true;
 						simplification = possibleOnbeatSimplificationDurs[k];
-						errorMsg += "\nOnbeat actual simp: checking "+tiedActualDur+" = "+simplification+"? / "+(tiedActualDur == simplification);
 						if (tiedActualDur == simplification) {
 							if (isCompound) {
 								canBeSimplified = (tiedActualDur >= beatLength) && !(tiedActualDur % beatLength); // can be simplified if it's a multiple of the beat length
@@ -883,8 +888,6 @@ MuseScore {
 									simplificationIsOnBeat = true;
 									simplificationFound = true;
 									maxSimplificationFound = (k == maxOnbeatSimplification);
-									errorMsg += "\nSimp found: "+k;
-									
 								}
 							} // end if check
 						}
@@ -893,8 +896,6 @@ MuseScore {
 						for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
 							var canBeSimplified = true;
 							simplification = possibleOnbeatSimplificationDurs[k];
-							errorMsg += "\nOnbeat display simp: checking "+tiedDisplayDur+" = "+simplification+"? / "+(tiedDisplayDur == simplification);
-							
 							if (tiedDisplayDur == simplification && canBeSimplified) {
 								if (k > possibleSimplification) {
 									possibleSimplification = k;
@@ -903,22 +904,18 @@ MuseScore {
 									simplificationIsOnBeat = true;
 									simplificationFound = true;
 									maxSimplificationFound = (k == maxOnbeatSimplification);
-									errorMsg += "\nSimp found: "+k;
-									
 								} // end if k >
 							} // end if tied
 						} // end k
 					} // end checkDisplay
 					
 				} else {
-					// **** OFFBEAT TIE CONDENSATION **** //
-		
+					
+					// ** OFFBEAT TIE CONDENSATION ** //
 					// CHECK ACTUAL DURS
 
 					for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
 						simplification = possibleOffbeatSimplificationDurs[k];
-						errorMsg += "\nOffbeat actual simp: checking "+tiedActualDur+" = "+simplification+"? / "+(tiedActualDur == simplification);
-						
 						if (tiedActualDur == simplification) {
 							// don't simplify anything tied over a beat that is less than a crotchet
 							if (isCompound) {
@@ -927,8 +924,6 @@ MuseScore {
 								canBeSimplified = simplification < (beatLength * 2);
 							}
 							if (canBeSimplified) {
-								errorMsg += "\nCan be simplified";
-								
 								if (simplification == dottedcrotchet && !isCompound) canBeSimplified = (prevNoteRest == null) ? false : prevNoteRest.duration.ticks == quaver;
 								if (simplification == crotchet) {
 									canBeSimplified = (startFrac == quaver);
@@ -939,11 +934,7 @@ MuseScore {
 										canBeSimplified = canBeSimplified && offbeatCrotchetException;
 									} // end timeSigDenom
 								}
-								if (simplification < crotchet) {
-									//var placement = !(startFrac % (beatLength / 4)); // DO WE NEED THIS???
-									errorMsg += "\nSamebeat = "+sameBeat;
-									canBeSimplified = sameBeat; // && placementCheck;
-								} // end if simp
+								if (simplification < crotchet) canBeSimplified = sameBeat;
 							} // end if check
 							if (canBeSimplified) {
 								if (k > possibleSimplification) {
@@ -953,8 +944,6 @@ MuseScore {
 									simplificationIsOnBeat = false;
 									simplificationFound = true;
 									maxSimplificationFound = (k == maxOffbeatSimplification);
-									errorMsg += "\nOffbeat Simp found: "+k;
-									
 								}
 							} // end if check
 						} // end if tied
@@ -963,8 +952,6 @@ MuseScore {
 					if (checkDisplayDur && !maxSimplificationFound) {
 						for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
 							simplification = possibleOffbeatSimplificationDurs[k];
-							errorMsg += "\nOffbeat display simp: checking "+tiedDisplayDur+" = "+simplification+"? / "+(tiedActualDur == simplification);
-							
 							if (tiedDisplayDur == simplification && k > possibleSimplification) {
 								possibleSimplification = k;
 								possibleSimplificationFirstNoteIndex = i;
@@ -972,8 +959,6 @@ MuseScore {
 								simplificationIsOnBeat = false;
 								simplificationFound = true;
 								maxSimplificationFound = (k == maxOffbeatSimplification);
-								errorMsg += "\nOffbeat Simp found: "+k;
-								
 							}
 						}
 					} // end checkDisplayDur
@@ -989,7 +974,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError (tempText+'These tied notes can be simplified to a '+simplificationText+'.\n(Ignore if using tie to show placement of fermata/dynamic/articulation/gliss etc.)', theArray);
+				addError (tempText+'These tied notes can be simplified to a '+simplificationText+'.\n(Ignore if using tie to show placement of fermata etc.)', theArray);
 			} else {
 				var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
 				var tempText = '';
@@ -998,57 +983,158 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError(tempText+'These tied notes can be simplified to a '+simplificationText+'.\n(Ignore if using tie to show placement of fermata/dynamic/articulation/gliss etc.)', theArray);
+				addError(tempText+'These tied notes can be simplified to a '+simplificationText+'.\n(Ignore if using tie to show placement of fermata etc.)', theArray);
 			}
 		} // possSimp > -1
 	}
 	
-	function checkBeamBrokenError (noteRest) {
+	function checkBeamBrokenError (noteRest) {		
+		// is this note able to be beamed?
+		if (displayDur >= crotchet) return;
+		errorMsg += "\n\nChecking beam broken";
+		var isOnlyNoteInBeat = false;
+		
+		if (beamBeat == -1) {
+			beamBeat = noteStartBeat;
+			haveHadFirstNote = false;
+		} else {
+			if (beamBeat != noteStartBeat) haveHadFirstNote = false;
+		}
+		var isLastItemInBeat = nextItemBeat != noteStartBeat;
+		errorMsg += "\nisLastItemInBeat = "+isLastItemInBeat+"; nextItemBeat = "+nextItemBeat+" noteStartBeat "+noteStartBeat;
+		
+		var acceptableBeamSettings = [];
+		var isLastRestBeforeNote = false, isFirstNoteInBeat = false, isLastNoteInBeat = false, isMiddleNoteInBeat = false, isLastRestsInBeat = false;
 
-		errorMsg += "\n*** CHECKING BEAM BROKEN ERROR ***";
-		var thisNoteAndPrevAreLessThancrotchets = displayDur < crotchet && prevDisplayDur < crotchet && prevIsNote;
-		var restAtEndOfBeat = isRest && noteFinishesBeat;
-		var beamBroken = !isOnTheBeat && !hasBeam;
-		//errorMsg += "\nbeamBroken = "+beamBroken;
-
-		if (beamBroken && thisNoteAndPrevAreLessThancrotchets && !restAtEndOfBeat) {
-			// go through rest of beat looking for a note
-			var dontBreakBeam = true;
-			if (!noteFinishesBeat) {
+		// The following beam settings will give us the correct beaming
+		// ** FIRST RESTS IN THE BEAT BEFORE A NOTE — can be set to anything, except for ...
+		if (isRest && !haveHadFirstNote && (!nextItemIsNote || isLastItemInBeat)) {
+			errorMsg += "\nfirst rests in beat ";
+			return;
+		}
+		
+		// ** ...the REST IMMEDIATELY BEFORE FIRST NOTE — can be set to only 0 or 1 ** //
+		if (isRest && nextItemIsNote && !haveHadFirstNote && !isLastItemInBeat) {
+			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
+			acceptableBeamSettings = [Beam.AUTO, Beam.NONE];
+			isLastRestBeforeNote = true;
+			errorMsg += "\nlast rest before note";
+			
+			//errorMsg += "\nAcc beams = "+Beam.AUTO+" "+Beam.NONE+"; actual "+currentBeamMode+"; includes? "+acceptableBeamSettings.includes(currrentBeamMode);
+		}
+				
+		// ** FIRST NOTE IN A BEAT — set to anything but not 1 ** //
+		if (isNote && !haveHadFirstNote) {
+			if (isLastItemInBeat) {
+				errorMsg += "\nLast item in beat so returning";
+				return; // don't beam if it's the only note in the beat
+			}
+			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
+			haveHadFirstNote = true;
+			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
+			isFirstNoteInBeat = true;
+			isOnlyNoteInBeat = true;
+			errorMsg += "\nfirst note in beat — isOnlyNoteInBeat="+isOnlyNoteInBeat;
+		}
+		
+		if (!isLastRestBeforeNote) {
+			if (isNote && nextItemIsNote && nextItemBeat == noteStartBeat && !isFirstNoteInBeat) {
+				isMiddleNoteInBeat = true;
+			} else {
+				isLastNoteInBeat = isNote;
+				isLastRestsInBeat = isRest;
 				cursor2.rewindToTick(cursor.tick);
 				if (cursor2.next()) {
-					if (cursor2.measure.is(currentBar)) {
-						var tempBeat = noteStartBeat;
-						var tempNote = cursor2.element;
-						var dontBreakBeam = false;
-						while (tempNote && tempBeat == noteStartBeat && !dontBreakBeam ) {
-							var tempPos = cursor2.tick - barStart;
-							tempBeat = Math.trunc(tempPos / beatLength);
-							//errorMsg += "Here 3: tempPos = "+tempPos+"; tempBeat = "+tempBeat;
-							dontBreakBeam = tempNote.actualDuration.ticks < crotchet && tempBeat == noteStartBeat;
+					var withinBeat = true;
+					var tempNote = cursor2.element;
+					while (tempNote != null && cursor2.measure.is(currentBar) && withinBeat ) {
+						var tempEnd = (cursor2.tick - barStart) + tempNote.duration.ticks - 1; // end just before
+						var tempEndBeat = Math.trunc(tempEnd / beatLength);
+						withinBeat = tempEndBeat == noteStartBeat;
+						errorMsg += "\nwithinbeat = "+tempEnd+" "+tempEndBeat+" "+withinBeat;
+						
+						if (withinBeat) {
 							var tempNoteIsRest = tempNote.type == Element.REST;
-							if (tempNoteIsRest) {
-								cursor2.next();
-								if (!cursor2.measure.is(currentBar)) {
-									tempNote = null;
-									tempBeat = noteStartBeat + 1;
+							// found a rest looking forwards
+							if (!tempNoteIsRest) {
+								isLastRestsInBeat = false;
+								isLastNoteInBeat = false;
+								if (isFirstNoteInBeat) {
+									errorMsg += "\nFound another note, so not only note in beat";
+									isOnlyNoteInBeat = false;
 								} else {
-									tempNote = cursor2.element;
-									tempPos = cursor2.ticks-barStart;
-									tempBeat = Math.trunc(tempPos / beatLength);
+									isMiddleNoteInBeat = true;
 								}
+							}
+							if (cursor2.next()) {
+								tempNote = cursor2.element
 							} else {
-								tempBeat = noteStartBeat + 1;
+								tempNote = null;
 							}
 						}
 					}
 				}
 			}
-			if (dontBreakBeam) {
-				if (isNote) {
-					addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+		}
+		if (isOnlyNoteInBeat) {
+			acceptableBeamSettings = [Beam.AUTO,Beam.NONE];
+		}
+		if (isMiddleNoteInBeat) {
+			// Middle note — set to 0, 3, 4 or 5
+			errorMsg += "\nmiddle note in beat";
+			
+			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
+			if (!hasBeam) {
+				addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+				return;
+			}
+		}
+		if (isLastNoteInBeat && !isOnlyNoteInBeat) {
+			errorMsg += "\nlast note in beat";
+			
+		// Last note in a beat — anything except 1 or 2
+			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
+
+			if (!hasBeam) {
+				addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+				return;
+			}
+		}
+		if (isLastRestsInBeat) {
+			errorMsg += "\nlast rests in beat";
+			
+			// Last rests in a beat — set to 0, 1 or 2
+			acceptableBeamSettings = [Beam.AUTO,Beam.NONE,Beam.BEGIN];
+		}
+		
+		var correctlyBeamed = false;
+		var beamMode = hasBeam ? currentBeamMode : Beam.NONE;
+		correctlyBeamed = acceptableBeamSettings.includes(beamMode);
+		errorMsg += "\nbeamMode is "+beamMode;
+		if (!correctlyBeamed) {
+			errorMsg += "\nNot correctly beamed";
+			if (isNote) {
+				if (hasBeam) {
+					if (beamMode == Beam.BEGIN || beamMode == Beam.BEGIN32 || beamMode == Beam.BEGIN64) {
+						addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					} else {
+						addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					}
 				} else {
-					addError("Rest should not break beam of previous note\nSet the ‘Beam type’ property of this note to ‘Join beams’",noteRest);
+					if (isFirstNoteInBeat) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					if (isMiddleNoteInBeat) addError("This note should be beamed to the previous and next notes\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					if (isLastNoteInBeat) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					
+				}
+			} else {
+				if (hasBeam) {
+					if (beamMode == Beam.BEGIN || beamMode == Beam.BEGIN32 || beamMode == Beam.BEGIN64) {
+						addError("This rest should be under a beam\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					} else {
+						addError("Rest should not break beam of previous note\nSet the ‘Beam type’ property of this note to ‘Join beams’",noteRest);
+					}
+				} else {
+					addError("This rest should not break beam of previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
 				}
 			}
 		} // end if beamBroken
@@ -1060,13 +1146,13 @@ MuseScore {
 		var beamTriesToGoForwards = currentBeamMode == Beam.MID || currentBeamMode == Beam.BEGIN;
 		var nextBeamTriesToGoBack = nextBeamMode == Beam.MID || nextBeamMode == Beam.END;
 		
-		errorMsg += "\n*** CHECKING BEAMED TO NOTES IN NEXT BEAT ERROR ***";
-		if (lastNoteInBeat) errorMsg += "\nBEAM: "+currentBeamMode+" "+nextBeamMode;
+		//errorMsg += "\n*** CHECKING BEAMED TO NOTES IN NEXT BEAT ERROR ***";
+		//if (lastNoteInBeat) errorMsg += "\nBEAM: "+currentBeamMode+" "+nextBeamMode;
 		
 		// ADD — 
 		if (hasBeam && lastNoteInBeat && nextItem && beamTriesToGoForwards && nextBeamTriesToGoBack) {
 			
-			errorMsg += "\n beamed to notes in next beat"
+			//errorMsg += "\n beamed to notes in next beat"
 			
 			// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
 			var exception1 = isNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && nextNextItemIsNote;
@@ -1216,27 +1302,25 @@ MuseScore {
 	function deleteAllCommentsAndHighlights () {
 		// ** SAVE CURRENT SELECTION ** //
 		var s = curScore.selection;
-		var startStaff = s.startStaff;
-		var endStaff = s.endStaff;
-		var startTick = 0;
-		if (s.startSegment) startTick = s.startSegment.tick;
-		var endTick = curScore.lastSegment.tick;
-		if (s.endSegment) endTick = s.endSegment.tick + 1;
+		var isRange = s.isRange;
+		var startStaff = 0, endStaff = 0, startTick = 0, endTick = curScore.lastSegment.tick;
+		if (isRange) {
+			startStaff = s.startStaff;
+			endStaff = s.endStaff;
+			if (s.startSegment) startTick = s.startSegment.tick;
+			if (s.endSegment) endTick = s.endSegment.tick + 1;
+		}
 		
 		// **** GET ALL ITEMS **** //
-		curScore.startCmd()
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
-		curScore.endCmd()
+		selectAll();
 		var elems = curScore.selection.elements;
 		//errorMsg = "Num elemns: "+elems.length;
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		for (var i = 0; i < elems.length; i++) {
-
 			var e = elems[i];
 			var t = e.type;
-			var c = e.color;
-			
+			var c = e.color;	
 			// style the element
 			if (Qt.colorEqual(c,"hotpink")) {
 				elementsToRecolor.push(e);
@@ -1255,10 +1339,13 @@ MuseScore {
 		for (var i = 0; i < elementsToRemove.length; i++) {
 			removeElement(elementsToRemove[i]);
 		}
-		
-		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
+		// ** RESTORE SELECTION
+		if (isRange) {
+			curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff);
+		} else {
+			curScore.selection.clear();
+		}
 		curScore.endCmd();
-		
 	}
 	
 	function getPreviousNoteRest (noteRest) {
@@ -1317,6 +1404,38 @@ MuseScore {
 				margins: 10
 			}
 			onClicked: dialog.close()
+		}
+	}
+	
+	ApplicationWindow {
+		id: progress
+		title: "PROGRESS"
+		property var progressValue: 0
+		visible: false
+		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
+		width: 500
+		height: 200        
+
+		ProgressBar {
+			id: progressBar
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.verticalCenter
+				margins: 10
+			}
+			value: 0
+			to: 100
+		}
+		
+		FlatButton {            
+			accentButton: true
+			text: "Ok"
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			onClicked: progress.close()
 		}
 	}
 

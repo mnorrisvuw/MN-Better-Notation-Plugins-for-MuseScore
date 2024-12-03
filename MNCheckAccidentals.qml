@@ -18,6 +18,8 @@ MuseScore {
 	requiresScore: true
 	title: "MN Check Accidentals"
 	id: mncheckaccidentals
+	thumbnailName: "MNCheckAccidentals.png"
+	
 	
 	// ** DEBUG **
 	property var debug: true
@@ -54,9 +56,14 @@ MuseScore {
 	property var kFlatStr: 'b'
 	property var kNaturalStr: '♮'
 	property var kSharpStr: '#'
+	property var progressShowing: false
+	property var progressStartTime: 0
 
   onRun: {
 		if (!curScore) return;
+		
+		
+		setProgress (0);
 		
 		// **** GATHER VARIABLES **** //
 		var staves = curScore.staves;
@@ -102,6 +109,8 @@ MuseScore {
 			firstBarNum ++;
 			currBar = currBar.nextMeasure;
 		}
+		setProgress (1);
+		
 		// end
 		lastBarInScore = curScore.lastMeasure;
 		cursor.rewind(Cursor.SELECTION_END);
@@ -116,10 +125,15 @@ MuseScore {
 			lastBarNum ++;
 			currBar = currBar.nextMeasure;
 		}
+		setProgress (2);
+		
 //	errorMsg += "\nfirstBarNum="+firstBarNum+"; lastBarNum="+lastBarNum;
 		
 		// ** LOOP THROUGH NOTES **//
 		// ** NB — endStaff IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
+		var loop = 0;
+		var totalNumLoops = numStaves * numBars * 4;
+		setProgress (5);
 
 		for (var staffNum = startStaff; staffNum < endStaff; staffNum ++) {
 			//errorMsg += "\nStaff "+staffNum;
@@ -157,6 +171,10 @@ MuseScore {
 				//errorMsg += "\nbar num = "+barNum;
 				segment = currBar.firstSegment;
 				while (segment && segment.tick < lastTickInSelection) {
+
+					loop++;
+					setProgress(5+loop*95./totalNumLoops);
+					
 					var startTrack = staffNum * 4;
 					var endTrack = startTrack + 4;
 					for (var track = startTrack; track < endTrack; track++) {
@@ -665,6 +683,28 @@ MuseScore {
 				} // end if chromatic interval
 			} // if !note.tieBack
 		} // end var i in notes
+		
+		if (progressShowing) progress.close();
+
+		
+		dialog.msg = errorMsg;
+		dialog.show();
+	}
+	
+	function setProgress (percentage) {
+		if (percentage == 0) {
+			progressStartTime = Date.now();
+		} else {
+			if (!progressShowing) {
+				var currentTime = Date.now();
+				if (currentTime - progressStartTime > 3000) {
+					progress.show();
+					progressShowing = true;
+				}
+			} else {
+				progress.progressBar.value = percentage;
+			}
+		}
 	}
 	
 	function addError (text,element) {
@@ -805,11 +845,9 @@ MuseScore {
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		for (var i = 0; i < elems.length; i++) {
-
 			var e = elems[i];
 			var t = e.type;
-			var c = e.color;
-			
+			var c = e.color;	
 			// style the element
 			if (Qt.colorEqual(c,"hotpink")) {
 				elementsToRecolor.push(e);
@@ -828,10 +866,8 @@ MuseScore {
 		for (var i = 0; i < elementsToRemove.length; i++) {
 			removeElement(elementsToRemove[i]);
 		}
-		
 		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
 		curScore.endCmd();
-		
 	}
 	
 	ApplicationWindow {
@@ -862,6 +898,38 @@ MuseScore {
 				margins: 10
 			}
 			onClicked: dialog.close()
+		}
+	}
+	
+	ApplicationWindow {
+		id: progress
+		title: "PROGRESS"
+		property var progressValue: 0
+		visible: false
+		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
+		width: 500
+		height: 200        
+
+		ProgressBar {
+			id: progressBar
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.verticalCenter
+				margins: 10
+			}
+			value: 0
+			to: 100
+		}
+		
+		FlatButton {            
+			accentButton: true
+			text: "Ok"
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			onClicked: progress.close()
 		}
 	}
 
