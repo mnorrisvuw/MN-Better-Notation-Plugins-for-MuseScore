@@ -294,6 +294,9 @@ MuseScore {
 				var locArr = staffIdx+' '+theTick;
 				fermataLocs.push(locArr);
 			}
+			if (e.type == Element.KEYSIG) {
+				addError += "\nFOUND KEYSIG — parent = "+e.parent+" pp ="+e.parent.parent;
+			}
 		}
 		
 		setProgress (2);
@@ -317,7 +320,7 @@ MuseScore {
 		
 		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
 		var currentStaffNum, currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
-		var firstStaffNum, firstBarNum, firstSegmentInScore, numBars;
+		var firstBarNum, firstSegmentInScore, numBars;
 		var prevSoundingDur, prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var containsTransposingInstruments = false;
 		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd;
@@ -480,7 +483,6 @@ MuseScore {
 				var numTracksWithNotes = 0;
 				var chordFound = false;
 				
-				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					loop++;
 					setProgress(5+loop*95./totalNumLoops);
@@ -501,7 +503,7 @@ MuseScore {
 						var elem = cursor.element;
 						var eType = elem.type;
 						var eName = elem.name;
-						//errorMsg += '\neName = '+eName;
+						//errorMsg += "\ncurrSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName;
 						
 						// ************ HAIRPIN ? ************ //
 						if (hairpinNeedsTerminating) checkHairpinTermination (currTick);
@@ -673,8 +675,8 @@ MuseScore {
 						// ************ FOUND A CLEF ************ //
 						if (eType == Element.CLEF) checkClef(elem);
 						
-						// ************ FOUND A KEY SIGNATURE ************ //
-						if (eType == Element.KEYSIG && currentStaffNum == firstStaffNum) checkKeySignature(elem,cursor.keySignature);
+						// ************ CHECK KEY SIGNATURE ************ //
+						if (eType == Element.KEYSIG && currentStaffNum == 0) checkKeySignature(elem,cursor.keySignature);
 						
 						// **** CHECK TREM
 						isTrem = (oneNoteTremolos[currentStaffNum][currTick] != null);
@@ -2122,12 +2124,22 @@ MuseScore {
 	}
 	
 	function checkKeySignature (keySig,sharps) {
+		//errorMsg += "\nChecking key signature "+keySig+" sharps = "+sharps;
+		//errorMsg += "\nCurrentBarNum = "+currentBarNum+" prevKeySigBarNum = "+prevKeySigBarNum;
 		// *********************** KEY SIGNATURE ERRORS *********************** //
-		var keySigSegment = keySig.parent;
 		if (sharps != prevKeySigSharps) {
-			if (sharps > 6) addError("This key signature has "+sharps+" sharps,\nand would be easier to read if rescored as "+(12-sharps)+" flats.",keySig);
-			if (sharps < -6) addError("This key signature has "+Math.abs(sharps)+" flats, and would be easier to read if rescored as "+(12+sharps)+" sharps.",keySig);
-			if (currentBarNum - prevKeySigBarNum  < 16) addError("This key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps the previous one could be avoided by using accidentals instead.",keySig);
+			var errStr = "";
+			if (sharps > 6) errStr = "This key signature has "+sharps+" sharps,\nand would be easier to read if rescored as "+(12-sharps)+" flats.";
+			if (sharps < -6) errStr = "This key signature has "+Math.abs(sharps)+" flats, and would be easier to read if rescored as "+(12+sharps)+" sharps.";
+			if (currentBarNum - prevKeySigBarNum  < 16) {
+				if (errStr !== "") {
+					errStr += "\nAlso, this";
+				} else {
+					errStr = "This";
+				}
+				errStr += " key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps one of them could be avoided by using accidentals instead?";
+			}
+			if (errStr !== "") addError(errStr,keySig);
 			prevKeySigSharps = sharps;
 			prevKeySigBarNum = currentBarNum;
 		} else {
@@ -2385,15 +2397,11 @@ MuseScore {
 		var n = noteRest.notes.length;
 		var maxNumLedgerLines = 0;
 		for (var i = 0; i < n; i++ ) {
-			var numLedgerLines = 0;
-			
 			var note = noteRest.notes[i];
-			var centreLineOffset = getOffsetFromMiddleLine (note); 
-			if (centreLineOffset > 5) {
-				numLedgerLines = Math.trunc((centreLineOffset - 6) / 2) + 1; // num ledger lines above staff; e.g. A5 is centreLineOffset 6 = 1 ll
-			} else {
-				if (centreLineOffset < -5) numLedgerLines = Math.trunc((centreLineOffset + 6) / 2) - 1; // num ledger lines below staff — will be negative number — e.g. C4 = centrelineoffset -6 = -1
-			}
+			var numLedgerLines = 0;
+			var l = note.line;
+			if (l <= -2) numLedgerLines = parseInt(Math.abs(l)/2);
+			if (l >= 10) numLedgerLines = -parseInt((l-8)/2);
 			if (Math.abs(numLedgerLines) > Math.abs(maxNumLedgerLines)) maxNumLedgerLines = numLedgerLines;
 		}
 		return maxNumLedgerLines;
@@ -3183,7 +3191,7 @@ MuseScore {
 				bottom: parent.verticalCenter
 				margins: 10
 			}
-			value: progressPercent
+			value: progress.progressPercent
 			to: 100
 		}
 		

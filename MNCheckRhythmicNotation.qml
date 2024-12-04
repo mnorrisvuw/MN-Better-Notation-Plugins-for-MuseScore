@@ -483,7 +483,7 @@ MuseScore {
 					progressShowing = true;
 				}
 			} else {
-				progress.progressBar.value = percentage;
+				progress.progressPercent = percentage;
 			}
 		}
 	}
@@ -503,7 +503,7 @@ MuseScore {
 	function checkHidingBeatError (noteRest){
 		var hidingBeatError = noteHidesBeat && !isBarRest && !hasPause; // make a temp version
 		if (!hidingBeatError) return;
-		errorMsg += "\nChecking beat Hiding";
+		//errorMsg += "\nChecking beat Hiding";
 		if (isOnTheBeat) {
 			
 			// ** ON THE BEAT RESTS ** //
@@ -527,7 +527,7 @@ MuseScore {
 
 		} else {
 
-			errorMsg += "\nOff beat";
+			//errorMsg += "\nOff beat";
 			// ** OFF THE BEAT NOTES & RESTS ** //
 			// ** FIRST, WE ASSUME THAT THE NOTE IS HIDING THE BEAT ** //
 			// ** exclude dotted crotchet if on 0.5 or 2.5
@@ -541,8 +541,8 @@ MuseScore {
 			if (displayDur == crotchet) {
 				if (noteRest.tuplet == null) {
 					if (isNote && !isTied) {
-						if (timeSigStr === "4/4" || timeSigStr == "2/2") {
-							if (noteStart == quaver || noteStart == minim+quaver) hidingBeatError = false;
+						if (timeSigNum % 2 == 0) {
+							if ((noteStart - quaver) % 2 == 0) hidingBeatError = false;
 						} else {
 							if (noteStartFrac == quaver) hidingBeatError = false;
 						}
@@ -566,14 +566,14 @@ MuseScore {
 			// ** OFFBEAT DOTTED CROTCHET ** //
 			if (displayDur == dottedcrotchet && noteRest.tuplet == null) {
 
-				errorMsg += "\nChecking dotted crotchet";
+				//errorMsg += "\nChecking dotted crotchet";
 				if (isNote) {
-					errorMsg += "\nHere1";
+					//errorMsg += "\nHere1";
 					
 					if (timeSigStr === "4/4" || timeSigStr == "2/2") {
 						if ((noteStart == quaver || noteStart == minim+quaver) && prevDisplayDur == quaver) hidingBeatError = false;
 					} else {
-						errorMsg += "\nnoteStartFrac = "+noteStartFrac+" prevDisplayDur="+prevDisplayDur;
+						//errorMsg += "\nnoteStartFrac = "+noteStartFrac+" prevDisplayDur="+prevDisplayDur;
 						if (noteStartFrac == quaver && prevDisplayDur == quaver) hidingBeatError = false;
 					}
 				}
@@ -991,7 +991,7 @@ MuseScore {
 	function checkBeamBrokenError (noteRest) {		
 		// is this note able to be beamed?
 		if (displayDur >= crotchet) return;
-		errorMsg += "\n\nChecking beam broken";
+		//errorMsg += "\n\nChecking beam broken";
 		var isOnlyNoteInBeat = false;
 		
 		if (beamBeat == -1) {
@@ -1001,7 +1001,7 @@ MuseScore {
 			if (beamBeat != noteStartBeat) haveHadFirstNote = false;
 		}
 		var isLastItemInBeat = nextItemBeat != noteStartBeat;
-		errorMsg += "\nisLastItemInBeat = "+isLastItemInBeat+"; nextItemBeat = "+nextItemBeat+" noteStartBeat "+noteStartBeat;
+		//errorMsg += "\nisLastItemInBeat = "+isLastItemInBeat+"; nextItemBeat = "+nextItemBeat+" noteStartBeat "+noteStartBeat;
 		
 		var acceptableBeamSettings = [];
 		var isLastRestBeforeNote = false, isFirstNoteInBeat = false, isLastNoteInBeat = false, isMiddleNoteInBeat = false, isLastRestsInBeat = false;
@@ -1009,7 +1009,7 @@ MuseScore {
 		// The following beam settings will give us the correct beaming
 		// ** FIRST RESTS IN THE BEAT BEFORE A NOTE — can be set to anything, except for ...
 		if (isRest && !haveHadFirstNote && (!nextItemIsNote || isLastItemInBeat)) {
-			errorMsg += "\nfirst rests in beat ";
+			//errorMsg += "\nfirst rests in beat ";
 			return;
 		}
 		
@@ -1018,7 +1018,7 @@ MuseScore {
 			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
 			acceptableBeamSettings = [Beam.AUTO, Beam.NONE];
 			isLastRestBeforeNote = true;
-			errorMsg += "\nlast rest before note";
+			//errorMsg += "\nlast rest before note";
 			
 			//errorMsg += "\nAcc beams = "+Beam.AUTO+" "+Beam.NONE+"; actual "+currentBeamMode+"; includes? "+acceptableBeamSettings.includes(currrentBeamMode);
 		}
@@ -1026,7 +1026,7 @@ MuseScore {
 		// ** FIRST NOTE IN A BEAT — set to anything but not 1 ** //
 		if (isNote && !haveHadFirstNote) {
 			if (isLastItemInBeat) {
-				errorMsg += "\nLast item in beat so returning";
+				//errorMsg += "\nLast item in beat so returning";
 				return; // don't beam if it's the only note in the beat
 			}
 			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
@@ -1034,7 +1034,7 @@ MuseScore {
 			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
 			isFirstNoteInBeat = true;
 			isOnlyNoteInBeat = true;
-			errorMsg += "\nfirst note in beat — isOnlyNoteInBeat="+isOnlyNoteInBeat;
+			//errorMsg += "\nfirst note in beat — isOnlyNoteInBeat="+isOnlyNoteInBeat;
 		}
 		
 		if (!isLastRestBeforeNote) {
@@ -1051,7 +1051,7 @@ MuseScore {
 						var tempEnd = (cursor2.tick - barStart) + tempNote.duration.ticks - 1; // end just before
 						var tempEndBeat = Math.trunc(tempEnd / beatLength);
 						withinBeat = tempEndBeat == noteStartBeat;
-						errorMsg += "\nwithinbeat = "+tempEnd+" "+tempEndBeat+" "+withinBeat;
+						//errorMsg += "\nwithinbeat = "+tempEnd+" "+tempEndBeat+" "+withinBeat;
 						
 						if (withinBeat) {
 							var tempNoteIsRest = tempNote.type == Element.REST;
@@ -1060,7 +1060,7 @@ MuseScore {
 								isLastRestsInBeat = false;
 								isLastNoteInBeat = false;
 								if (isFirstNoteInBeat) {
-									errorMsg += "\nFound another note, so not only note in beat";
+									//errorMsg += "\nFound another note, so not only note in beat";
 									isOnlyNoteInBeat = false;
 								} else {
 									isMiddleNoteInBeat = true;
@@ -1081,7 +1081,7 @@ MuseScore {
 		}
 		if (isMiddleNoteInBeat) {
 			// Middle note — set to 0, 3, 4 or 5
-			errorMsg += "\nmiddle note in beat";
+			//errorMsg += "\nmiddle note in beat";
 			
 			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
 			if (!hasBeam) {
@@ -1090,7 +1090,7 @@ MuseScore {
 			}
 		}
 		if (isLastNoteInBeat && !isOnlyNoteInBeat) {
-			errorMsg += "\nlast note in beat";
+			//errorMsg += "\nlast note in beat";
 			
 		// Last note in a beat — anything except 1 or 2
 			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
@@ -1101,7 +1101,7 @@ MuseScore {
 			}
 		}
 		if (isLastRestsInBeat) {
-			errorMsg += "\nlast rests in beat";
+			//errorMsg += "\nlast rests in beat";
 			
 			// Last rests in a beat — set to 0, 1 or 2
 			acceptableBeamSettings = [Beam.AUTO,Beam.NONE,Beam.BEGIN];
@@ -1110,9 +1110,9 @@ MuseScore {
 		var correctlyBeamed = false;
 		var beamMode = hasBeam ? currentBeamMode : Beam.NONE;
 		correctlyBeamed = acceptableBeamSettings.includes(beamMode);
-		errorMsg += "\nbeamMode is "+beamMode;
+		//errorMsg += "\nbeamMode is "+beamMode;
 		if (!correctlyBeamed) {
-			errorMsg += "\nNot correctly beamed";
+		///	errorMsg += "\nNot correctly beamed";
 			if (isNote) {
 				if (hasBeam) {
 					if (beamMode == Beam.BEGIN || beamMode == Beam.BEGIN32 || beamMode == Beam.BEGIN64) {
@@ -1410,7 +1410,7 @@ MuseScore {
 	ApplicationWindow {
 		id: progress
 		title: "PROGRESS"
-		property var progressValue: 0
+		property var progressPercent: 0
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
 		width: 500
@@ -1423,7 +1423,7 @@ MuseScore {
 				bottom: parent.verticalCenter
 				margins: 10
 			}
-			value: 0
+			value: progress.progressPercent
 			to: 100
 		}
 		

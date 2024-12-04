@@ -34,7 +34,7 @@ MuseScore {
 	property var errorStrings: []
 	property var errorObjects: []
 	property var prevBarNum
-	property var prevMIDIPitch
+	property var prevMIDIPitch: -1
 	property var prevDiatonicPitch
 	property var prevPC
 	property var prevScalarInterval
@@ -132,11 +132,17 @@ MuseScore {
 		// ** LOOP THROUGH NOTES **//
 		// ** NB — endStaff IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
 		var loop = 0;
+		var numBars = lastBarNum - firstBarNum + 1;
 		var totalNumLoops = numStaves * numBars * 4;
 		setProgress (5);
 
 		for (var staffNum = startStaff; staffNum < endStaff; staffNum ++) {
-			//errorMsg += "\nStaff "+staffNum;
+			var p = curScore.staves[staffNum].part;
+			//errorMsg += "\nStaff "+staffNum+" part="+p;
+
+		//	errorMsg += "\nPartname "+p.partName+" name="+p.name;
+			var inst = p.instrumentAtTick(0);
+		//	errorMsg += "\nInst="+inst+" "+inst.name;
 			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
@@ -184,16 +190,18 @@ MuseScore {
 							//errorMsg += "\ncurrentKeySig = "+currentKeySig;
 							// ** MAYBE ONLY NEED TO DO THIS WHEN TRACK IS STARTTRACK? ** //
 						}
-						
-						if (segment.elementAt(track) && segment.elementAt(track).type == Element.CHORD) {
-							var chord = segment.elementAt(track);
-							var graceNoteChords = chord.graceNotes;
-							if (graceNoteChords != null) {
-								for (var g in graceNoteChords) {
-									checkChord (graceNoteChords[g],segment,barNum,staffNum);
-								}
-							}				
-							checkChord (chord,segment,barNum,staffNum);
+						var s = segment.elementAt(track);
+						if (s != null) {
+							if (s.type == Element.CHORD) {
+								var chord = segment.elementAt(track);
+								var graceNoteChords = chord.graceNotes;
+								if (graceNoteChords != null) {
+									for (var g in graceNoteChords) {
+										checkChord (graceNoteChords[g],segment,barNum,staffNum);
+									}
+								}				
+								checkChord (chord,segment,barNum,staffNum);
+							}
 						} // end if segment.elementAt
 					} // end of track loop
 					segment = segment.nextInMeasure;
@@ -282,12 +290,13 @@ MuseScore {
 					break;
 			}
 			var MIDIpitch = note.pitch;
-			var octave = Math.trunc(MIDIpitch/12);
+			var l = note.line;
+			var octave = Math.trunc(38-l);
+			
 			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
 			
 			var diatonicPitch = diatonicPitchClass+octave*7;
-			//errorMsg += "\nN: tpc="+tpc+" oct="+octave+" dp="+diatonicPitch+" dpc="+diatonicPitchClass+" p="+MIDIpitch;
-			//errorMsg += "\nks = "+currentKeySig;
+			//errorMsg += "\n\n MIDIpitch="+MIDIpitch+" line="+note.line+" oct="+octave+" tpc="+tpc+" tpc1="+note.tpc1+" tpc2="+note.tpc2+" sub="+note.subtypeName()+" diaPitch="+diatonicPitch+" diaPC="+diatonicPitchClass;
 
 			var accIsInKS = false;
 			if (currentKeySig == 0 && accType == Accidental.NATURAL) accIsInKS = true;
@@ -366,7 +375,7 @@ MuseScore {
 				var scalarInterval, chromaticInterval, scalarIntervalLabel = "";
 				var scalarIntervalAbs, scalarIntervalClass, chromaticIntervalAbs, chromaticIntervalClass;
 				
-				if (prevMIDIPitch != -1) {
+				if (prevMIDIPitch != -1 && prevDiatonicPitch != -1) {
 					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
 					chromaticInterval = MIDIpitch - prevMIDIPitch;
@@ -685,8 +694,6 @@ MuseScore {
 		} // end var i in notes
 		
 		if (progressShowing) progress.close();
-
-		
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
@@ -702,7 +709,7 @@ MuseScore {
 					progressShowing = true;
 				}
 			} else {
-				progress.progressBar.value = percentage;
+				progress.progressPercent = percentage;
 			}
 		}
 	}
@@ -882,7 +889,7 @@ MuseScore {
 		height: 400        
 
 		StyledTextLabel {
-			text: errorMsg            
+			text: dialog.msg            
 			anchors {
 				top: parent.top 
 				horizontalCenter: parent.horizontalCenter                
@@ -904,7 +911,7 @@ MuseScore {
 	ApplicationWindow {
 		id: progress
 		title: "PROGRESS"
-		property var progressValue: 0
+		property var progressPercent: 0
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
 		width: 500
@@ -917,7 +924,7 @@ MuseScore {
 				bottom: parent.verticalCenter
 				margins: 10
 			}
-			value: 0
+			value: progress.progressPercent
 			to: 100
 		}
 		
