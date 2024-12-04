@@ -1,9 +1,5 @@
 # 
 <div align="center">
-  <img
-    src="images/reminders-icon.png"
-    alt="Reminders MenuBar"
-  >
   <h1>
     MN Better Notation Plugins for MuseScore
   </h1>
@@ -62,15 +58,6 @@
   * **recommended courtesy accidentals**
 
 
-
-
-<div align="center">
-  <img
-    src="images/reminders-menubar-demo.gif"
-    alt="Reminders MenuBar demo"
-  >
-</div>
-
 ## Installation
 
 *MN Better Notation Plugins require MuseScore Studio 4.4 or later.*
@@ -100,9 +87,10 @@ Windows: C:\Users\[Your User Name]\Documents\MuseScore4\Plugins\
 * Each time you run a plugin, it will remove any previous comments or highlights.
 * To manually remove all comments and highlights from a score, please run the ‘MN Delete Comments and Highlights’ plugin
 
-## Warning
-Unfortunately MuseScore does not provide a mechanism of indicating who ‘created’ an object. As such, it uses the unusual styles of its comment boxes (yellow fill, black border) and highlights (hot pink) to distinguish them from normal text objects and notes created by the user.
-If you only ever use standard black notes and text, then you will have no problem. If, however, you created boxes or highlights with the exact same style/colours as those created by the plugins, then these will be also be deleted when you run the plugins. The chance that you did that, however, is vanishingly small.
+## Warnings
+* Unfortunately MuseScore does not provide a mechanism of indicating who ‘created’ an object. As such, it has to use the styles of its comment boxes (yellow fill, black border) and highlights (hot pink) to distinguish them from normal text objects and notes created by the user.
+* If you only ever use standard black notes and text, then you will have no problem. If, however, you created boxes or highlights with the exact same style/colours as those created by the plugins, then these will be also be deleted when you run the plugins.
+* Also, never choose the ‘Format→Reset Text Style Overrides’ or ‘Format→Reset Entire Score to Default Layout’ menu items while you have the comments on the score, or MuseScore will revert them all to standard black-and-white text, and the ‘MN Delete Comments and Highlights’ will not be able to delete them.
 
 ## Feedback and bug reports
 Feel free to send me any feedback or bug reports! :heart:

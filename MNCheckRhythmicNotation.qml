@@ -647,13 +647,13 @@ MuseScore {
 		var possibleSimplificationFirstRestIndex = 0;
 		var maxOnbeatSimplification = possibleOnbeatSimplificationDurs.length-1;
 		var maxOffbeatSimplification = possibleOffbeatSimplificationDurs.length-1;
-		errorMsg += "\nrests: "+rests.length+" "+maxOnbeatSimplification+" "+maxOffbeatSimplification; 
+		//errorMsg += "\nrests: "+rests.length+" "+maxOnbeatSimplification+" "+maxOffbeatSimplification; 
 		
 		// CHECK THAT IT COULD BE SIMPLIFIED AS A BAR REST
 		if (totalRestDur == barLength && !isPickupBar) {
 			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘delete’', rests)
 		} else {
-			errorMsg += "\nHere 1"; 
+			//errorMsg += "\nHere 1"; 
 			var maxSimplificationFound = false;
 			
 			for (var i = 0; i < rests.length-1 && !maxSimplificationFound; i++) {
@@ -662,12 +662,10 @@ MuseScore {
 				var restDisplayDur = startRest.duration.ticks;
 				var restActualDur = startRest.actualDuration.ticks
 				var startPos = getPositionInBar(startRest);
-				errorMsg += "\nstartPos = "+startPos; 
-				
+				//errorMsg += "\nstartPos = "+startPos; 
 				var startBeat = Math.trunc(startPos/beatLength);
 				var startFrac = startPos % beatLength;
 				var restIsOnBeat = !startFrac;
-				
 								
 				for (var j = i+1; j < rests.length && !maxSimplificationFound; j++) {
 					var theRest = rests[j];
@@ -678,7 +676,7 @@ MuseScore {
 					var sameBeat = (tempBeat == startBeat);
 					restActualDur += tempActualDur;
 					restDisplayDur += tempDisplayDur;
-					errorMsg += "\nrestActualDur = "+restActualDur; 
+					//errorMsg += "\nrestActualDur = "+restActualDur; 
 	
 					// **** ONBEAT REST CONDENSATION **** //
 	
@@ -694,20 +692,18 @@ MuseScore {
 							if (restActualDur == dottedquaver) canBeCondensed = timeSigDenom <= 4;
 							if (restActualDur == dottedsemiquaver) canBeCondensed = timeSigDenom <= 8;
 							if (canBeCondensed && isCompound) canBeCondensed = restActualDur <= beatLength || (restActualDur % beatLength == 0);
-							errorMsg += "\n(onbeat act) looking for match: "+restActualDur+" = "+p+" = "+(restActualDur==p); 
+							//errorMsg += "\n(onbeat act) looking for match: "+restActualDur+" = "+p+" = "+(restActualDur==p); 
 							
 							if (restActualDur == p && canBeCondensed) {
 								if (k > possibleSimplification) {
-									errorMsg += "\nfound a possibleSimplification actual dur on beat = "+k; 
-									
+									//errorMsg += "\nfound a possibleSimplification actual dur on beat = "+k; 
 									possibleSimplification = k;
 									possibleSimplificationLastRestIndex = j;
 									possibleSimplificationFirstRestIndex = i;
 									simplificationIsOnBeat = true;
 									simplificationFound = true;
 									maxSimplificationFound = (k == maxOnbeatSimplification);
-									errorMsg += "\nsimplificationFound = "+simplificationFound; 
-									
+									//errorMsg += "\nsimplificationFound = "+simplificationFound; 
 								}
 							}
 						}
@@ -716,12 +712,9 @@ MuseScore {
 							for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
 								var p = possibleOnbeatSimplificationDurs[k];
 								//errorMsg += "\n(onbeat disp) looking for match: "+restDisplayDur+" = "+p+" = "+(restDisplayDur==p); 
-								
 								if (restDisplayDur == p) {
 									if (k > possibleSimplification) {
-										
-										//errorMsg += "\nfound a possibleSimplification display dur on beat = "+k; 
-										
+										//errorMsg += "\nfound a possibleSimplification display dur on beat = "+k;
 										possibleSimplification = k;
 										possibleSimplificationLastRestIndex = j;
 										possibleSimplificationFirstRestIndex = i;
@@ -787,10 +780,10 @@ MuseScore {
 					}
 				}
 			}
-			errorMsg += "\nFinal: simplificationFound = "+simplificationFound; 
+			//errorMsg += "\nFinal: simplificationFound = "+simplificationFound; 
 			
 			if (simplificationFound) {
-				errorMsg += "\nfinal simplification chosen = "+possibleSimplification; 
+				//errorMsg += "\nfinal simplification chosen = "+possibleSimplification; 
 				
 				var exception = isPickupBar && possibleSimplification > 6;
 				if (simplificationIsOnBeat) {
@@ -800,8 +793,7 @@ MuseScore {
 						var theArray = [];
 						for (var i = possibleSimplificationFirstRestIndex; i <= possibleSimplificationLastRestIndex; i++) {
 							theArray.push(rests[i]);
-							errorMsg += "\nPushing rest "+i; 
-							
+							//errorMsg += "\nPushing rest "+i; 
 						}
 						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 					}

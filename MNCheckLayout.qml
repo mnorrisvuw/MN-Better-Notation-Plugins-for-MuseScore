@@ -185,6 +185,8 @@ MuseScore {
 	property var flaggedLedgerLines: false
 	property var flaggedFlippedStem: false
 	property var flaggedPedalIssue: false
+	property var firstVisibleStaff: 0
+	property var staffVisible: []
 	
   onRun: {
 		if (!curScore) return;
@@ -358,6 +360,12 @@ MuseScore {
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			errorMsg += "\n——— currentStaff = "+currentStaffNum;
 			
+			//don't process if this part is hidden
+			if (!staffVisible[currentStaffNum]) {
+				loop += numBars * 4;
+				continue;
+			}
+			
 			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
 			prevKeySigSharps = -99; // placeholder/dummy variable
 			prevKeySigBarNum = 0;
@@ -425,8 +433,12 @@ MuseScore {
 			cursor.voice = 0;
 			cursor.rewind(Cursor.SCORE_START);
 			if (cursor.element == null) cursor.next();
-			var clef = cursor.element;
-			if (clef != null) checkClef(clef);
+			
+			currentInstrumentName = instrumentNames[currentStaffNum];
+			currentInstrumentId = instrumentIds[currentStaffNum];
+			setInstrumentVariables();
+			//errorMsg += "\ncurrentStaffNum = "+currentStaffNum+" currInstName = "+currentInstrumentName+" currentInstId = "+currentInstrumentId;
+			
 			
 			currentBar = cursor.measure;
 			currentSystem = null;
@@ -434,9 +446,11 @@ MuseScore {
 			numNotesInThisSystem = 0;
 			numBeatsInThisSystem = 0;
 			
-			currentInstrumentName = instrumentNames[currentStaffNum];
-			currentInstrumentId = instrumentIds[currentStaffNum];
-			setInstrumentVariables();			
+			
+			var clef = cursor.element;
+			// call checkClef AFTER the currentInstrumentName/Id setup and AFTER set InstrumentVariables
+			if (clef != null) checkClef(clef);
+			
 			prevTimeSig = currentBar.timesigNominal.str;
 			
 			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRANT STAFF **** //
@@ -1015,14 +1029,21 @@ MuseScore {
 		var prevPrevPart = null;
 		var numStaves = curScore.nstaves;
 		var staves = curScore.staves;
-		
+		var visiblePartFound = false;
 		for (var i = 0; i < numStaves; i++) {
 			
 			// save the id and staffName
-			var id = staves[i].part.instrumentId;
+			var part = staves[i].part;
+			staffVisible[i] = part.show;
+			if (staffVisible[i] && !visiblePartFound) {
+				visiblePartFound = true;
+				firstVisibleStaff = i;
+			}
+			var id = part.instrumentId;
 			instrumentIds.push(id);
 			var staffName = staves[i].part.longName;
-			instrumentNames.push(staffName);			
+			instrumentNames.push(staffName);
+			//errorMsg += "\nstaff "+i+" ID "+id+" name "+staffName+" vis "+staves[i].visible;
 			isSharedStaffArray[i] = false;
 			
 			// check to see whether this staff name indicates that it's a shared staff
@@ -1038,7 +1059,6 @@ MuseScore {
 				}
 			}
 			
-			var part = curScore.staves[i].part;
 			if (i > 0 && part.is(prevPart)) {
 				isGrandStaff[i-1] = true;
 				isGrandStaff[i] = true;
@@ -1082,9 +1102,7 @@ MuseScore {
 			isFlute = currentInstrumentId.includes("wind.flutes");
 			isPitchedPercussionInstrument = currentInstrumentId.includes("pitched-percussion") || currentInstrumentId.includes("crotales") || currentInstrumentId.includes("almglocken");
 			isUnpitchedPercussionInstrument = false;
-			if (!isPitchedPercussionInstrument) {
-				isUnpitchedPercussionInstrument = currentInstrumentId.includes("drum.") || currentInstrumentId.includes("effect.") || currentInstrumentId.includes("metal.") || currentInstrumentId.includes("wood.");
-			}
+			if (!isPitchedPercussionInstrument) isUnpitchedPercussionInstrument = currentInstrumentId.includes("drum.") || currentInstrumentId.includes("effect.") || currentInstrumentId.includes("metal.") || currentInstrumentId.includes("wood.");
 			isPercussionInstrument = isPitchedPercussionInstrument || isUnpitchedPercussionInstrument;
 			isKeyboardInstrument = currentInstrumentId.includes("keyboard");
 			isPedalInstrument = currentInstrumentId.includes("piano") || currentInstrumentId.includes("vibraphone");
@@ -1098,6 +1116,7 @@ MuseScore {
 			readsBass = false;
 			checkClefs = false;
 
+			//errorMsg += "\nInst check id "+currentInstrumentId+" isString "+isStringInstrument;
 		// WINDS
 			if (currentInstrumentId.includes("wind.")) {
 				// Bassoon is the only wind instrument that reads bass and tenor clef
@@ -1151,6 +1170,7 @@ MuseScore {
 					reads8va = true;
 				}
 				if (currentInstrumentId.includes("viola") || currentInstrumentName.toLowerCase().includes("viola")) {
+					//errorMsg += "\nHere alto";
 					readsAlto = true;
 					checkClefs = true;
 				}
@@ -1956,7 +1976,7 @@ MuseScore {
 	
 	function checkClef (clef) {
 		var clefId = clef.subtypeName();
-		//errorMsg += "\nChecking clef — "+clefId;
+		//errorMsg += "\nChecking clef — "+clefId+" "+currentInstrumentName;
 		isTrebleClef = clefId.includes("Treble clef");
 		isAltoClef = clefId === "Alto clef";
 		isTenorClef = clefId === "Tenor clef";
@@ -2180,13 +2200,9 @@ MuseScore {
 				
 				var fermataInAllParts = true;
 				for (var j = 0; j<numStaves && fermataInAllParts; j++) {
-					var searchFermata = j+' '+theTick;
-					//errorMsg+="\nLooking for "+searchFermata;
-					
-					if (j!=staffIdx) {
-						fermataInAllParts = fermataLocs.includes(searchFermata);
-						//if (!fermataInAllParts) errorMsg+="\nCouldn't find this fermata";
-						
+					if (staffVisible[j]) {
+						var searchFermata = j+' '+theTick;
+						if (j!=staffIdx) fermataInAllParts = fermataLocs.includes(searchFermata);
 					}
 				}
 				if (!fermataInAllParts) addError("If you have a fermata in one staff,\nall staves should also have a fermata at the same place",fermata);
@@ -2979,7 +2995,7 @@ MuseScore {
 				errorMsg += "\nelement with '"+text+"' is null/undefined";
 			} else {
 				var eType = element.type;
-				var staffNum = 0;
+				var staffNum = firstVisibleStaff;
 				var elementHeight = 0;
 				var commentOffset = 1.0;
 			
