@@ -205,7 +205,17 @@ MuseScore {
 		// ** NB — lastStaffNum IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
 		for (currentStaffNum = firstStaffNum; currentStaffNum <= lastStaffNum; currentStaffNum ++) {
 			errorMsg += "\n—————————————————\nSTAFF "+currentStaffNum;
-
+			
+			// is this staff visible?
+			var theStaff = staves[currentStaffNum];
+			if (theStaff == undefined) {
+				errorMsg += "\nStaff is undefined";
+				continue;
+			}
+			var thePart = theStaff.part;
+			if (!thePart.show) {
+				continue;
+			}
 			wasTied = false;
 			
 			// ** REWIND TO START OF SELECTION ** //
@@ -597,7 +607,7 @@ MuseScore {
 								errStr += ", ";
 							} else {
 								if (i == numBeatsHidden - 2) {
-									errStr += " and ";									
+									errStr += " &amp; ";									
 								} else {
 									errStr += "\nSplit it with a tie, so that the beats are shown";
 									
@@ -624,7 +634,7 @@ MuseScore {
 								errStr += ", ";
 							} else {
 								if (i == numBeatsHidden - 2) {
-									errStr += " and ";
+									errStr += " &amp; ";
 								} else {
 									errStr += "\nSplit it so that the beats are shown";
 								}
