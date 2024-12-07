@@ -16,14 +16,14 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   <img
     max-width="400"
     width="45%"
-    src="images/CheckRhythmicNotationScreenshot.png"
-    alt="Check Rhythmic Notation screenshot"
+    src="images/CheckLayout.png"
+    alt="Check Layout screenshot"
   >
   <img
     max-width="400"
     width="45%"
-    src="images/CheckLayoutScreenshot.png"
-    alt="Check Layout screenshot"
+    src="images/CheckRhythmicNotation.png"
+    alt="Check Rhythmic Notation screenshot"
   >
 </div>
 
