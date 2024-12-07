@@ -21,6 +21,8 @@ MuseScore {
 	thumbnailName: "MNCheckRhythmicNotation.png"
 	
 	// **** GLOBALS **** //
+
+	property var selectionArray: []
 	property var timeSigs: []
 	property var timeSigTicks: []
 	property var commentPosArray: []
@@ -79,7 +81,6 @@ MuseScore {
 	property var nextBeamMode: 0
 	property var isPickupBar: false
 	property var isTied: false
-	property var beamBeat: -1
 	property var haveHadFirstNote: false
 	property var totalRestDur: 0
 	property var dottedminim
@@ -106,6 +107,7 @@ MuseScore {
   onRun: {
 		if (!curScore) return;
 		setProgress (0);
+		saveSelection();
 		
 		// **** INITIALISE VARIABLES **** //
 		var staves = curScore.staves;
@@ -169,22 +171,6 @@ MuseScore {
 		}
 		setProgress (2);
 		
-		// ** GET ALL TIME SIGS ** //
-		cursor.filter = Segment.All;
-		cursor.rewind(Cursor.SCORE_START);
-		cursor.filter = Segment.TimeSig;
-		cursor.next();
- 
-		while (cursor.segment) {
-			if (cursor.element) {
-				var ts = cursor.element;
-				timeSigs.push(ts);
-				timeSigTicks.push(cursor.tick);
-			}
-			cursor.next();
-		}
-		if (timeSigs.length == 0) errorMsg += "\nDidn't find any time sigs";
-		
 		numBars = (lastBarNum-firstBarNum)+1;
 		totalNumBars = numBars*numStaves;
 		setProgress (3);
@@ -203,7 +189,7 @@ MuseScore {
 		
 		// **** LOOP THROUGH THE SELECTED STAVES AND THE SELECTED BARS **** //
 		// ** NB — lastStaffNum IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
-		for (currentStaffNum = firstStaffNum; currentStaffNum <= lastStaffNum; currentStaffNum ++) {
+		for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
 			errorMsg += "\n—————————————————\nSTAFF "+currentStaffNum;
 			
 			// is this staff visible?
@@ -258,35 +244,37 @@ MuseScore {
 				// ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
 				if (canCheckThisBar) {
 				
-					// ** INITIALISE PARAMETERS ** //
-					prevSoundingDur = 0;
-					prevDisplayDur = 0;
-					prevNoteWasDoubleTremolo = false;
-					numComments = 0;
-					tiedSoundingDur = 0;
-					tiedDisplayDur = 0;
-					tieStartedOnBeat = false;
-					prevIsNote = false;
-					rests = [];
-					tiedNotes = [];
-					restCrossesBeat = false;
-					restStartedOnBeat = false;
-					isLastRest = false;
-					tieIndex = 0;
-					lastRest = false;
+					
 					var startTrack = currentStaffNum * 4;
 					var endTrack = startTrack + 4;
 					
 					for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
+						//errorMsg += "\ntrack "+currentTrack;
 						loop++;
 						setProgress(5+loop*95./totalNumLoops);
 						cursor.track = currentTrack;
 						cursor.rewindToTick(barStart);
 						cursor2.track = currentTrack;
+						
+						// ** INITIALISE PARAMETERS ** //
 						totalDur = 0;
 						totalRestDur = 0;
-						beamBeat = -1;
 						haveHadFirstNote = false;
+						rests = [];
+						tiedNotes = [];
+						prevSoundingDur = 0;
+						prevDisplayDur = 0;
+						prevNoteWasDoubleTremolo = false;
+						numComments = 0;
+						tiedSoundingDur = 0;
+						tiedDisplayDur = 0;
+						tieStartedOnBeat = false;
+						prevIsNote = false;
+						restCrossesBeat = false;
+						restStartedOnBeat = false;
+						isLastRest = false;
+						tieIndex = 0;
+						lastRest = false;
 						
 						var processingThisBar = cursor.element;
 						while (processingThisBar) {
@@ -388,7 +376,7 @@ MuseScore {
 							if (isTied) {
 								lastNoteInTie = noteRest.notes[0].tieForward == null || lastNoteInBar || nextItemHasPause;
 								tiedNotes.push(noteRest);
-								if (lastNoteInTie) errorMsg += "\nlastNoteInTie";
+								//if (lastNoteInTie) errorMsg += "\nlastNoteInTie";
 							} else {
 								if (wasTied) tiedNotes = [];
 							}
@@ -427,6 +415,7 @@ MuseScore {
 								restStartedOnBeat = false;
 								isLastRest = false;
 								totalRestDur = 0;
+								//errorMsg += "\nRest length now "+rests.length;
 							} else {
 								rests.push(noteRest);
 								totalRestDur += noteRest.actualDuration.ticks;
@@ -436,7 +425,8 @@ MuseScore {
 								} else {
 									if (noteStartBeat != restStartBeat) restCrossesBeat = true;
 								}
-								if (nextItemIsNote || nextItem == null || nextItemHasPause || nextItemIsHidden) isLastRest = true;
+								isLastRest = (nextItemIsNote || nextItem == null || nextItemHasPause || nextItemIsHidden);
+								//errorMsg += "\nFound a rest: rest length now "+rests.length+"; isLastRest = "+isLastRest;
 								if (isLastRest && rests.length > 1) condenseOverSpecifiedRest(noteRest);
 							}
 							
@@ -471,13 +461,14 @@ MuseScore {
 		showAllErrors();
 		
 		// ** SHOW INFO DIALOG ** //
-		if (!debug) {
-			var numErrors = errorStrings.length;
-			if (numErrors == 0) errorMsg = "SCORE CHECK COMPLETED!\n\nNo errors found!";
-			if (numErrors == 1) errorMsg = "SCORE CHECK COMPLETED!\n\nI found one error.";
-			if (numErrors > 1) errorMsg = "SCORE CHECK COMPLETED!\n\nI found "+numErrors+" errors";
-		}
+		var numErrors = errorStrings.length;
+		if (numErrors == 0) errorMsg = "SCORE CHECK COMPLETED\n\nCongratulations! No errors found!\n\nLog:" + errorMsg;
+		if (numErrors == 1) errorMsg = "SCORE CHECK COMPLETED\n\nOne error found.\n\nLog:" + errorMsg;
+		if (numErrors > 1) errorMsg = "SCORE CHECK COMPLETED\n\nI found "+numErrors+" errors.\n\nLog:" + errorMsg;
+		
 		if (progressShowing) progress.close();
+		restoreSelection();
+		
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
@@ -496,6 +487,34 @@ MuseScore {
 				progress.progressPercent = percentage;
 			}
 		}
+	}
+	
+	function saveSelection () {
+		selectionArray = [];
+		if (curScore.selection.isRange) {
+			selectionArray[0] = curScore.selection.startSegment.tick;
+			if (curScore.selection.endSegment == null) {
+				selectionArray[1] = curScore.lastSegment.tick;
+			} else {
+				selectionArray[1] = curScore.selection.endSegment.tick;
+			}
+			selectionArray[2] = curScore.selection.startStaff;
+			selectionArray[3] = curScore.selection.endStaff;
+		}
+	}
+	
+	function restoreSelection () {
+		curScore.startCmd();
+		if (selectionArray.length == 0) {
+			curScore.selection.clear();
+		} else {
+			var st = selectionArray[0];
+			var et = selectionArray[1];
+			var ss = selectionArray[2];
+			var es = selectionArray[3];
+			curScore.selection.selectRange(st,et+1,ss,es + 1);
+		}
+		curScore.endCmd();
 	}
 	
 	function selectAll () {
@@ -520,9 +539,19 @@ MuseScore {
 			if (isRest) {
 				if (soundingDur == minim) {
 					// ok in 4/4 on 1 & 3
+					if (timeSigStr === "3/4") {
+						addError ("Never write a minim rest in 3/4\n(See ‘Behind Bars’ p. 161)",noteRest);
+						return;
+					}
 					if (timeSigStr === "4/4" && noteStartBeat % 2 == 0) hidingBeatError = false;
 					if (timeSigStr === "5/4" && (noteStartBeat == 0 || noteStartBeat == 2 || noteStartBeat == 3)) hidingBeatError = false;
-				}	
+				}
+				if (soundingDur == dottedminim) {
+					if (timeSigStr === "4/4") {
+						addError ("Never write a dotted minim rest in 4/4\n(See ‘Behind Bars’ p. 162)",noteRest);
+						return;
+					}
+				}
 			} else {
 				
 				// ** ON THE BEAT NOTES ** //
@@ -550,9 +579,9 @@ MuseScore {
 			// ** OFFBEAT CROTCHET ** //
 			if (displayDur == crotchet) {
 				if (noteRest.tuplet == null) {
-					if (isNote && !isTied) {
+					if (isNote) {
 						if (timeSigNum % 2 == 0) {
-							if ((noteStart - quaver) % 2 == 0) hidingBeatError = false;
+							if ((noteStart - quaver) % 2 == 0 && prevDisplayDur >= quaver && nextDisplayDur >= quaver) hidingBeatError = false;
 						} else {
 							if (noteStartFrac == quaver) hidingBeatError = false;
 						}
@@ -575,13 +604,11 @@ MuseScore {
 				
 			// ** OFFBEAT DOTTED CROTCHET ** //
 			if (displayDur == dottedcrotchet && noteRest.tuplet == null) {
-
 				//errorMsg += "\nChecking dotted crotchet";
 				if (isNote) {
 					//errorMsg += "\nHere1";
-					
-					if (timeSigStr === "4/4" || timeSigStr == "2/2") {
-						if ((noteStart == quaver || noteStart == minim+quaver) && prevDisplayDur == quaver) hidingBeatError = false;
+					if (timeSigStr === "4/4" || timeSigStr === "2/2") {
+						if ((noteStart == quaver || noteStart == minim+quaver) && prevDisplayDur >= quaver) hidingBeatError = false;
 					} else {
 						//errorMsg += "\nnoteStartFrac = "+noteStartFrac+" prevDisplayDur="+prevDisplayDur;
 						if (noteStartFrac == quaver && prevDisplayDur == quaver) hidingBeatError = false;
@@ -621,8 +648,7 @@ MuseScore {
 				if (timeSigStr == "5/4" && soundingDur == semibreve) {
 					addError("Never use a semibreve rest in 5/4\nSplit it to show the bar division of either 2+3 or 3+2 crotchets",noteRest);
 				} else {
-					addError( "This rest is hiding beat "+(noteStartBeat + 2)+"\nSplit it into two rests, so that beat "+(noteStartBeat + 2)+" is shown.",noteRest);
-					if (numBeatsHidden = 1) {
+					if (numBeatsHidden == 1) {
 						addError( "This rest is hiding beat "+(noteStartBeat + 2)+"\nSplit it into two rests, so that beat "+(noteStartBeat + 2)+" is shown.",noteRest);
 					} else {
 						var errStr = "This rest is hiding beats ";
@@ -663,7 +689,7 @@ MuseScore {
 		if (totalRestDur == barLength && !isPickupBar) {
 			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘delete’', rests)
 		} else {
-			//errorMsg += "\nHere 1"; 
+			//errorMsg += "\nHere with "+rests.length+" rests"; 
 			var maxSimplificationFound = false;
 			
 			for (var i = 0; i < rests.length-1 && !maxSimplificationFound; i++) {
@@ -672,7 +698,7 @@ MuseScore {
 				var restDisplayDur = startRest.duration.ticks;
 				var restActualDur = startRest.actualDuration.ticks
 				var startPos = getPositionInBar(startRest);
-				//errorMsg += "\nstartPos = "+startPos; 
+				//errorMsg += "\nstartPos = "+startPos+" startDur = "+restActualDur; 
 				var startBeat = Math.trunc(startPos/beatLength);
 				var startFrac = startPos % beatLength;
 				var restIsOnBeat = !startFrac;
@@ -686,7 +712,7 @@ MuseScore {
 					var sameBeat = (tempBeat == startBeat);
 					restActualDur += tempActualDur;
 					restDisplayDur += tempDisplayDur;
-					//errorMsg += "\nrestActualDur = "+restActualDur; 
+					//errorMsg += "\nAdded "+tempActualDur+" — restActualDur is now = "+restActualDur; 
 	
 					// **** ONBEAT REST CONDENSATION **** //
 	
@@ -876,7 +902,7 @@ MuseScore {
 						simplification = possibleOnbeatSimplificationDurs[k];
 						if (tiedActualDur == simplification) {
 							if (isCompound) {
-								canBeSimplified = (tiedActualDur >= beatLength) && !(tiedActualDur % beatLength); // can be simplified if it's a multiple of the beat length
+								if (tiedActualDur >= beatLength) canBeSimplified = (tiedActualDur % beatLength) == 0; // can be simplified if it's a multiple of the beat length
 							} else {
 								if (tiedActualDur == dottedcrotchet && !(timeSigNum % 2)) canBeSimplified = !(startBeat % 2); // for 4/4, 6/4 etc — can be simplified if it's on an even numbered beat (0, 2, etc)
 								if (tiedActualDur == semibreve) canBeSimplified = timeSigDenom == 2 || (timeSigDenom == 4 && !(timeSigNum % 3)); // only use a semibreve if we're in 3/2 4/4 or 7/4 etc
@@ -976,7 +1002,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError (tempText+'These tied notes can be simplified to a '+simplificationText+'.\n(Ignore if using tie to show placement of fermata etc.)', theArray);
+				addError (tempText+'These tied notes can be simplified to a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
 			} else {
 				var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
 				var tempText = '';
@@ -985,7 +1011,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError(tempText+'These tied notes can be simplified to a '+simplificationText+'.\n(Ignore if using tie to show placement of fermata etc.)', theArray);
+				addError(tempText+'These tied notes can be simplified to a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
 			}
 		} // possSimp > -1
 	}
@@ -993,20 +1019,11 @@ MuseScore {
 	function checkBeamBrokenError (noteRest) {		
 		// is this note able to be beamed?
 		if (displayDur >= crotchet) return;
-		//errorMsg += "\n\nChecking beam broken";
+		//errorMsg += "\n\nisRest:"+isRest+"; beamMode="+currentBeamMode+" haveHadFirstNote="+haveHadFirstNote;
 		var isOnlyNoteInBeat = false;
-		
-		if (beamBeat == -1) {
-			beamBeat = noteStartBeat;
-			haveHadFirstNote = false;
-		} else {
-			if (beamBeat != noteStartBeat) haveHadFirstNote = false;
-		}
 		var isLastItemInBeat = nextItemBeat != noteStartBeat;
-		//errorMsg += "\nisLastItemInBeat = "+isLastItemInBeat+"; nextItemBeat = "+nextItemBeat+" noteStartBeat "+noteStartBeat;
-		
 		var acceptableBeamSettings = [];
-		var isLastRestBeforeNote = false, isFirstNoteInBeat = false, isLastNoteInBeat = false, isMiddleNoteInBeat = false, isLastRestsInBeat = false;
+		var isLastRestBeforeNote = false, isFirstNoteInBeat = false, isLastNoteInBeat = false, isMiddleNoteInBeat = false, isMiddleRestInBeat = false, isLastRestsInBeat = false;
 
 		// The following beam settings will give us the correct beaming
 		// ** FIRST RESTS IN THE BEAT BEFORE A NOTE — can be set to anything, except for ...
@@ -1021,86 +1038,95 @@ MuseScore {
 			acceptableBeamSettings = [Beam.AUTO, Beam.NONE];
 			isLastRestBeforeNote = true;
 			//errorMsg += "\nlast rest before note";
-			
-			//errorMsg += "\nAcc beams = "+Beam.AUTO+" "+Beam.NONE+"; actual "+currentBeamMode+"; includes? "+acceptableBeamSettings.includes(currrentBeamMode);
 		}
 				
 		// ** FIRST NOTE IN A BEAT — set to anything but not 1 ** //
 		if (isNote && !haveHadFirstNote) {
 			if (isLastItemInBeat) {
-				//errorMsg += "\nLast item in beat so returning";
+				//errorMsg += "\nOnly note in beat so returning";
 				return; // don't beam if it's the only note in the beat
 			}
 			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
 			haveHadFirstNote = true;
 			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
 			isFirstNoteInBeat = true;
-			isOnlyNoteInBeat = true;
 			//errorMsg += "\nfirst note in beat — isOnlyNoteInBeat="+isOnlyNoteInBeat;
 		}
+		//errorMsg += "\nisLastRestBeforeNote="+isLastRestBeforeNote+" isFirstNoteInBeat="+isFirstNoteInBeat+" haveHadFirstNote="+haveHadFirstNote;
 		
 		if (!isLastRestBeforeNote) {
-			if (isNote && nextItemIsNote && nextItemBeat == noteStartBeat && !isFirstNoteInBeat) {
-				isMiddleNoteInBeat = true;
-			} else {
-				isLastNoteInBeat = isNote;
-				isLastRestsInBeat = isRest;
-				cursor2.rewindToTick(cursor.tick);
-				if (cursor2.next()) {
-					var withinBeat = true;
-					var tempNote = cursor2.element;
-					while (tempNote != null && cursor2.measure.is(currentBar) && withinBeat ) {
-						var tempEnd = (cursor2.tick - barStart) + tempNote.duration.ticks - 1; // end just before
-						var tempEndBeat = Math.trunc(tempEnd / beatLength);
-						withinBeat = tempEndBeat == noteStartBeat;
-						//errorMsg += "\nwithinbeat = "+tempEnd+" "+tempEndBeat+" "+withinBeat;
-						
-						if (withinBeat) {
-							var tempNoteIsRest = tempNote.type == Element.REST;
-							// found a rest looking forwards
-							if (!tempNoteIsRest) {
-								isLastRestsInBeat = false;
-								isLastNoteInBeat = false;
-								if (isFirstNoteInBeat) {
-									//errorMsg += "\nFound another note, so not only note in beat";
-									isOnlyNoteInBeat = false;
-								} else {
-									isMiddleNoteInBeat = true;
-								}
-							}
-							if (cursor2.next()) {
-								tempNote = cursor2.element
-							} else {
-								tempNote = null;
-							}
+			//errorMsg += "\nsearching forwards";
+			var foundAnotherRest = false;
+			var foundAnotherNote = false;
+			cursor2.rewindToTick(cursor.tick);
+			if (cursor2.next()) {
+				var withinBeat = true;
+				var tempNote = cursor2.element;
+				while (tempNote != null && cursor2.measure.is(currentBar) && withinBeat ) {
+					var tempEnd = (cursor2.tick - barStart) + tempNote.actualDuration.ticks - 1; // end just before
+					var tempEndBeat = Math.trunc(tempEnd / beatLength);
+					withinBeat = tempEndBeat == noteStartBeat;
+					//errorMsg += "\nwithinbeat = "+tempEnd+" "+tempEndBeat+" "+withinBeat;
+					
+					if (withinBeat) {
+						if (tempNote.type == Element.CHORD) {
+							foundAnotherNote = true;
+						} else {
+							foundAnotherRest = true;
+						}
+						if (cursor2.next()) {
+							tempNote = cursor2.element
+						} else {
+							tempNote = null;
 						}
 					}
 				}
 			}
-		}
-		if (isOnlyNoteInBeat) {
-			acceptableBeamSettings = [Beam.AUTO,Beam.NONE];
-		}
-		if (isMiddleNoteInBeat) {
-			// Middle note — set to 0, 3, 4 or 5
-			//errorMsg += "\nmiddle note in beat";
-			
-			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
-			if (!hasBeam) {
-				addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-				return;
+			// now set the values of isOnlyNoteInBeat, lastRestsInBeat
+			if (isFirstNoteInBeat && !foundAnotherNote) isOnlyNoteInBeat = true;
+			if (isNote && !isFirstNoteInBeat && foundAnotherNote) isMiddleNoteInBeat = true;
+			if (isNote && isLastItemInBeat) isLastNoteInBeat = true;
+			if (isRest && !isLastRestBeforeNote) {
+				if (foundAnotherNote) {
+					isMiddleRestInBeat = true;
+				} else {
+					isLastRestsInBeat = true;
+				}
 			}
 		}
+		var beamMode = hasBeam ? currentBeamMode : Beam.NONE;
+		
+		/*if (isFirstNoteInBeat) errorMsg += "\nisFirstNoteInBeat";
+		if (isOnlyNoteInBeat) errorMsg += "\nisOnlyNoteInBeat";
+		if (isLastItemInBeat) errorMsg += "\nisLastItemInBeat";
+		if (isMiddleNoteInBeat) errorMsg += "\nisMiddleNoteInBeat";
+		if (isMiddleRestInBeat) errorMsg += "\nisMiddleRestInBeat";
+		if (isLastNoteInBeat) errorMsg += "\nisLastNoteInBeat";
+		if (isLastRestsInBeat) errorMsg += "\nisLastRestsInBeat";*/
+		
+		if (isLastItemInBeat) haveHadFirstNote = false; // reset for next beat
+		if (isOnlyNoteInBeat) return; // if this is incorrectly beamed, it will get caught in 'check beamed to next beat' function (note to self: these could be combined)
+		if (isMiddleNoteInBeat) {
+			//errorMsg += "\nmiddle note in beat";
+			if (!hasBeam) {
+				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
+			} else {
+				if (beamMode != Beam.AUTO && beamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
+			}
+			return;
+		}
+		
+		if (isMiddleRestInBeat) {
+			if (!hasBeam) addError("This rest should be included in a beam\nwith all other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘Join beams’",noteRest);
+			return;
+		}
+		
 		if (isLastNoteInBeat && !isOnlyNoteInBeat) {
 			//errorMsg += "\nlast note in beat";
 			
 		// Last note in a beat — anything except 1 or 2
-			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
-
-			if (!hasBeam) {
-				addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-				return;
-			}
+			if (!hasBeam) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note and intervening rests (if any) to AUTO",noteRest);
+			return;
 		}
 		if (isLastRestsInBeat) {
 			//errorMsg += "\nlast rests in beat";
@@ -1110,36 +1136,18 @@ MuseScore {
 		}
 		
 		var correctlyBeamed = false;
-		var beamMode = hasBeam ? currentBeamMode : Beam.NONE;
 		correctlyBeamed = acceptableBeamSettings.includes(beamMode);
-		//errorMsg += "\nbeamMode is "+beamMode;
+		//errorMsg += "\nbeamMode is "+beamMode+"; correctlyBeamed = "+correctlyBeamed;
 		if (!correctlyBeamed) {
 		///	errorMsg += "\nNot correctly beamed";
 			if (isNote) {
-				if (hasBeam) {
-					if (beamMode == Beam.BEGIN || beamMode == Beam.BEGIN32 || beamMode == Beam.BEGIN64) {
-						addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-					} else {
-						addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-					}
-				} else {
-					if (isFirstNoteInBeat) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-					if (isMiddleNoteInBeat) addError("This note should be beamed to the previous and next notes\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-					if (isLastNoteInBeat) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-					
-				}
+				if (isFirstNoteInBeat) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+				if (isLastNoteInBeat) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
 			} else {
-				if (hasBeam) {
-					if (beamMode == Beam.BEGIN || beamMode == Beam.BEGIN32 || beamMode == Beam.BEGIN64) {
-						addError("This rest should be under a beam\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-					} else {
-						addError("Rest should not break beam of previous note\nSet the ‘Beam type’ property of this note to ‘Join beams’",noteRest);
-					}
-				} else {
-					addError("This rest should not break beam of previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
-				}
+				if (isLastRestBeforeNote) addError("This rest should not be beamed to the next note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
+				if (isLastRestsInBeat) addError("This rest should not be beamed to the previous note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
 			}
-		} // end if beamBroken
+		} // end !correctlyBeamed
 	}
 	
 	function checkBeamedToNotesInNextBeat (noteRest) {
@@ -1176,126 +1184,132 @@ MuseScore {
 	
 	function showAllErrors () {
 		curScore.startCmd()
-		
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
-			var elementObject = errorObjects[i]; // this can be a single object, or an array of objects
-			var element = elementObject;
+			var element = errorObjects[i];
 			var isArray = Array.isArray(element);
-			var elementArray = [elementObject];
+			var objectArray;
 			if (isArray) {
-				elementArray = elementObject;
-				element = elementArray[0];
+				objectArray = element;
+			} else {
+				objectArray = [element];
 			}
-					
-			var staffNum = 0;
-			var elementHeight = 0;
-			var commentOffset = 1.0;
-		
-			// the errorObjects array contains a list of the Elements to attach the text object to
-			// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
-			// Here are the strings, and where the text object will be attached
-			// 		top 				— top of bar 1, staff 1
-			// 		pagetop			— top left of page 1
-			//		system1 n		— top of bar 1, staff n
-			//		system2 n		— first bar in second system, staff n
-		
-			var isString = typeof element === 'string';
-			var eType = isString ? null : element.type;
-			var theLocation = element;
+			for (var j in objectArray) {
+				element = objectArray[j];
+				var eType = element.type;
+				var staffNum = 0;
+				var elementHeight = 0;
+				var commentOffset = 1.0;
 			
-			if (isString) {
-				if (element.includes(' ')) {
-					staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
-					theLocation = element.split(' ')[0];
-					//if (theLocation === "system2") errorMsg += "\nsystem2";
-					if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
-				}
-			} else {
-				// calculate the staff number that this element is on
-				elementHeight = element.bbox.height;
-				if (eType != Element.MEASURE) {
-					var elemStaff = element.staff;
-					while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
-				}
-			}
-			// add a text object at the location where the element is
-			var comment = newElement(Element.STAFF_TEXT);
-			comment.text = text;
-	
-			// style the text object
-			comment.frameType = 1;
-			comment.framePadding = 0.6;
-			comment.frameWidth = 0.2;
-			comment.frameBgColor = "yellow";
-			comment.frameFgColor = "black";
-			comment.fontSize = 7.0;
-			comment.fontFace = "Helvetica";
-			comment.autoplace = false;
-			var tick = 0, desiredPosX = 0, desiredPosY = 0;
-			var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT];
-			if (isString) {
-				if (theLocation === "pagetop") {
-					desiredPosX = 2.5;
-					desiredPosY = 10.;
-				}
-				if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
-				if (theLocation === "system2") {
-					tick = firstBarInSecondSystem.firstSegment.tick;
-					//errorMsg += "\nPlacing system2 at tick: "+tick;
-				}
-			} else {
-				if (spannerArray.includes(eType)) {
-					tick = element.spannerTick.ticks;
+				// the errorObjects array contains a list of the Elements to attach the text object to
+				// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
+				// Here are the strings, and where the text object will be attached
+				// 		top 				— top of bar 1, staff 1
+				// 		pagetop			— top left of page 1
+				//		system1 n		— top of bar 1, staff n
+				//		system2 n		— first bar in second system, staff n
+			
+				var isString = typeof element === 'string';
+				var theLocation = element;
+				if (isString) {
+					if (element.includes(' ')) {
+						staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
+						theLocation = element.split(' ')[0];
+						if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
+					}
 				} else {
-					if (eType == Element.MEASURE) {
-						tick = element.firstSegment.tick;
+					// calculate the staff number that this element is on
+					if (element.bbox == undefined) {
+						errorMsg += "\nbbox undefined — elem type is "+element.name;
 					} else {
-						if (element.parent.type == Element.CHORD) {
-							// it's a grace note, so need to get parent of parent
-							tick = element.parent.parent.tick;
-						} else {
-							tick = element.parent.tick;
+						elementHeight = element.bbox.height;
+						if (eType != Element.MEASURE) {
+							var elemStaff = element.staff;
+							while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
 						}
 					}
 				}
-			}
+				// add a text object at the location where the element is
+				var comment = newElement(Element.STAFF_TEXT);
+				comment.text = text;
 		
-			// add text object to score
-			var cursor = curScore.newCursor();
-			cursor.staffIdx = staffNum;
-			cursor.rewindToTick(tick);
-			cursor.add(comment);
-			comment.z = currentZ;
-			currentZ ++;
-			var commentHeight = comment.bbox.height;
-			if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
-			if (desiredPosY != 0) {
-				comment.offsetY = desiredPosY - comment.pagePos.y;
-			} else {
-				comment.offsetY -= commentHeight;
-			}
-			var commentTopRounded = Math.round(comment.pagePos.y);
-			while (commentPosArray[commentTopRounded+1000]) {
-				commentTopRounded -= commentOffset;
-				comment.offsetY -= commentOffset;
-				comment.offsetX += commentOffset;
-			}
-			commentPosArray[commentTopRounded+1000] = true;
-			
-			for (var j in elementArray) {
-				
-				var elementToColour = elementArray[j];
-				// colour the element
-				if (elementToColour !== "pagetop" && elementToColour !== "top") {
-					if (elementToColour.type == Element.CHORD) {
-						elementToColour.color = "hotpink";
-						for (var k=0; k<elementToColour.notes.length; k++) elementToColour.notes[k].color = "hotpink";
+				// style the text object
+				comment.frameType = 1;
+				comment.framePadding = 0.6;
+				comment.frameWidth = 0.2;
+				comment.frameBgColor = "yellow";
+				comment.frameFgColor = "black";
+				comment.fontSize = 7.0;
+				comment.fontFace = "Helvetica";
+				comment.autoplace = false;
+				var tick = 0, desiredPosX = 0, desiredPosY = 0;
+				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
+				if (isString) {
+					if (theLocation === "pagetop") {
+						desiredPosX = 2.5;
+						desiredPosY = 10.;
+					}
+					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
+					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
+				} else {
+					if (spannerArray.includes(eType)) {
+						tick = element.spannerTick.ticks;
 					} else {
-						//if (elementToColour.type == Element.TIMESIG) errorMsg += "\ncoloring time sig "+element.timesigNominal.str;
-						elementToColour.color = "hotpink";
+						if (eType == Element.MEASURE) {
+							tick = element.firstSegment.tick;
+						} else {
+							if (element.parent == undefined || element.parent == null) {
+								errorMsg += "\nELEMENT PARENT IS "+element.parent+"; etype is "+element.name;
+							} else {
+								if (element.parent.type == Element.CHORD) {
+									// it's either a notehead or a gracenote
+									if (element.parent.parent.type == Element.CHORD) {
+										// it's a grace note, so need to get parent of parent
+										tick = element.parent.parent.parent.tick;
+									} else {
+										tick = element.parent.parent.tick;
+									}
+								} else {
+									tick = element.parent.tick;
+								}
+							}
+						}
 					}
 				}
+		
+				// style the element
+				if (element !== "pagetop" && element !== "top") {
+					if (element.type == Element.CHORD) {
+						element.color = "hotpink";
+						for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
+					} else {
+						element.color = "hotpink";
+					}
+				}
+				
+				// add text object to score
+				if (j == 0) {
+					var cursor = curScore.newCursor();
+					cursor.staffIdx = staffNum;
+					cursor.rewindToTick(tick);
+					cursor.add(comment);
+					comment.z = currentZ;
+					currentZ ++;
+					var commentHeight = comment.bbox.height;
+					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
+					if (desiredPosY != 0) {
+						comment.offsetY = desiredPosY - comment.pagePos.y;
+					} else {
+						comment.offsetY -= commentHeight;
+					}
+					var commentTopRounded = Math.round(comment.pagePos.y);
+					while (commentPosArray[commentTopRounded+1000]) {
+						commentTopRounded -= commentOffset;
+						comment.offsetY -= commentOffset;
+						comment.offsetX += commentOffset;
+					}
+					commentPosArray[commentTopRounded+1000] = true;
+				}		
 			}
 		}
 		curScore.endCmd();

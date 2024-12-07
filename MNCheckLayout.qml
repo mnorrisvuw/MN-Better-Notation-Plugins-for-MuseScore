@@ -294,7 +294,7 @@ MuseScore {
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
 			if (etype == Element.HAIRPIN) hairpins[staffIdx].push(e);
-			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
+			if (etype == Element.OTTAVA || etype == Element.OTTAVA_SEGMENT) ottavas[staffIdx].push(e);
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
 			if (etype == Element.SLUR) slurs[staffIdx].push(e);
 			if (etype == Element.PEDAL_SEGMENT || e.type == Element.PEDAL) pedals[staffIdx].push(e);			
@@ -952,18 +952,11 @@ MuseScore {
 		restoreSelection();
 		
 		// ** SHOW INFO DIALOG ** //
-		if (!debug) {
-			var numErrors = errorStrings.length;
-			if (numErrors == 0) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nNo errors found!";
-			}
-			if (numErrors == 1) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nOne error found.";
-			}
-			if (numErrors > 1) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nI found "+numErrors+" errors";
-			}
-		}
+		var numErrors = errorStrings.length;
+		if (numErrors == 0) errorMsg = "SCORE CHECK COMPLETED\n\nCongratulations! No errors found!\n\nLog:" + errorMsg;
+		if (numErrors == 1) errorMsg = "SCORE CHECK COMPLETED\n\nOne error found.\n\nLog:" + errorMsg;
+		if (numErrors > 1) errorMsg = "SCORE CHECK COMPLETED\n\nI found "+numErrors+" errors.\n\nLog:" + errorMsg;
+		
 		if (progressShowing) progress.close();
 		dialog.msg = errorMsg;
 		dialog.show();
@@ -979,9 +972,11 @@ MuseScore {
 		selectionArray = [];
 		if (curScore.selection.isRange) {
 			selectionArray[0] = curScore.selection.startSegment.tick;
-			//errorMsg += "\n"+curScore.selection.startSegment+" "+curScore.selection.startSegment.tick;
-			
-			selectionArray[1] = curScore.selection.endSegment.tick;
+			if (curScore.selection.endSegment == null) {
+				selectionArray[1] = curScore.lastSegment.tick;
+			} else {
+				selectionArray[1] = curScore.selection.endSegment.tick;
+			}
 			selectionArray[2] = curScore.selection.startStaff;
 			selectionArray[3] = curScore.selection.endStaff;
 		}
@@ -989,7 +984,6 @@ MuseScore {
 	
 	function restoreSelection () {
 		curScore.startCmd();
-
 		if (selectionArray.length == 0) {
 			curScore.selection.clear();
 		} else {
@@ -998,7 +992,6 @@ MuseScore {
 			var ss = selectionArray[2];
 			var es = selectionArray[3];
 			curScore.selection.selectRange(st,et+1,ss,es + 1);
-			//errorMsg += "\n"+st+" "+et+" "+ss+" "+es;
 		}
 		curScore.endCmd();
 	}
@@ -2479,13 +2472,13 @@ MuseScore {
 					//errorMsg += "\nTesting 8va Here — currentOttava.ottavaType = "+currentOttava.ottavaType+"; averageNumLedgerLines "+averageNumLedgerLines;
 					if (currentOttava.ottavaType == 0 || currentOttava.ottavaType == 2) {
 						if (averageNumLedgerLines < 2) {
-							addError("This passage is quite low for "+ottavaStr+" line;\nyou should probably write this at pitch",currentOttava);
+							addError("This passage is quite low for "+ottavaStr+" line:\nyou should be able to safely write this at pitch",currentOttava);
 							flaggedLedgerLines = true;
 							return;
 						}
 					} else {
 						if (averageNumLedgerLines > -2) {
-							addError("This passage is quite high for "+ottavaStr+" line;\nyou should probably write this at pitch",currentOttava);
+							addError("This passage is quite high for "+ottavaStr+" line:\nyou should be able to safely write this at pitch",currentOttava);
 							flaggedLedgerLines = true;
 							return;
 						}
@@ -2900,7 +2893,7 @@ MuseScore {
 		if (!isSlurred) {
 			//errorMsg += "\nGrace note parent "+graceNotes[0].parent.name+" p p "+graceNotes[0].parent.parent.name;
 			if (getArticulation(graceNotes[0],staffNum) == null) {
-				addError("In general, grace-notes should always be slurred to the main note,\nunless you specifically add staccato articulation",graceNotes[0]);
+				addError("In general, grace-notes should always be slurred to the main note,\nunless you add staccatos or accents to them",graceNotes[0]);
 			}
 		}
 	}
@@ -2982,7 +2975,7 @@ MuseScore {
 		}
 		var stretch = highestPitch - lowestPitch;
 		if (stretch > 14 && stretch < 16) addError("This chord may be too wide to stretch for some pianists.\nConsider splitting it between the hands.",noteRest);
-		if (stretch > 16) addError("This chord is too wide to stretch.\mConsider splitting it between the hands.",noteRest);
+		if (stretch > 16) addError("This chord is too wide to stretch.\nConsider splitting it between the hands.",noteRest);
 		if (stretch < 14 && numNotes > 5) addError("It looks like there are too many notes in this chord to play in one hand.\nConsider splitting it between the hands.",noteRest);
 	}
 	
@@ -3069,15 +3062,20 @@ MuseScore {
 	
 	function showAllErrors () {
 		curScore.startCmd()
-		
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
 			var element = errorObjects[i];
-			if (element == null || element == undefined) {
-				errorMsg += "\nelement with '"+text+"' is null/undefined";
+			var isArray = Array.isArray(element);
+			var objectArray;
+			if (isArray) {
+				objectArray = element;
 			} else {
+				objectArray = [element];
+			}
+			for (var j in objectArray) {
+				element = objectArray[j];
 				var eType = element.type;
-				var staffNum = firstVisibleStaff;
+				var staffNum = 0;
 				var elementHeight = 0;
 				var commentOffset = 1.0;
 			
@@ -3095,15 +3093,18 @@ MuseScore {
 					if (element.includes(' ')) {
 						staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
 						theLocation = element.split(' ')[0];
-						//if (theLocation === "system2") errorMsg += "\nsystem2";
 						if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
 					}
 				} else {
 					// calculate the staff number that this element is on
-					elementHeight = element.bbox.height;
-					if (eType != Element.MEASURE) {
-						var elemStaff = element.staff;
-						while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+					if (element.bbox == undefined) {
+						errorMsg += "\nbbox undefined — elem type is "+element.name;
+					} else {
+						elementHeight = element.bbox.height;
+						if (eType != Element.MEASURE) {
+							var elemStaff = element.staff;
+							while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+						}
 					}
 				}
 				// add a text object at the location where the element is
@@ -3127,10 +3128,7 @@ MuseScore {
 						desiredPosY = 10.;
 					}
 					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
-					if (theLocation === "system2") {
-						tick = firstBarInSecondSystem.firstSegment.tick;
-						//errorMsg += "\nPlacing system2 at tick: "+tick;
-					}
+					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
 				} else {
 					if (spannerArray.includes(eType)) {
 						tick = element.spannerTick.ticks;
@@ -3138,42 +3136,24 @@ MuseScore {
 						if (eType == Element.MEASURE) {
 							tick = element.firstSegment.tick;
 						} else {
-							if (element.parent != null) {
+							if (element.parent == undefined || element.parent == null) {
+								errorMsg += "\nELEMENT PARENT IS "+element.parent+"; etype is "+element.name;
+							} else {
 								if (element.parent.type == Element.CHORD) {
-									// it's a grace note, so need to get parent of parent
-									tick = element.parent.parent.tick;
+									// it's either a notehead or a gracenote
+									if (element.parent.parent.type == Element.CHORD) {
+										// it's a grace note, so need to get parent of parent
+										tick = element.parent.parent.parent.tick;
+									} else {
+										tick = element.parent.parent.tick;
+									}
 								} else {
 									tick = element.parent.tick;
 								}
-							} else {
-								errorMsg += "\nCouldn't find parent of "+element;
 							}
-						
 						}
 					}
 				}
-		
-				// add text object to score
-				var cursor = curScore.newCursor();
-				cursor.staffIdx = staffNum;
-				cursor.rewindToTick(tick);
-				cursor.add(comment);
-				comment.z = currentZ;
-				currentZ ++;
-				var commentHeight = comment.bbox.height;
-				if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
-				if (desiredPosY != 0) {
-					comment.offsetY = desiredPosY - comment.pagePos.y;
-				} else {
-					comment.offsetY -= commentHeight;
-				}
-				var commentTopRounded = Math.round(comment.pagePos.y);
-				while (commentPosArray[commentTopRounded+1000]) {
-					commentTopRounded -= commentOffset;
-					comment.offsetY -= commentOffset;
-					comment.offsetX += commentOffset;
-				}
-				commentPosArray[commentTopRounded+1000] = true;
 		
 				// style the element
 				if (element !== "pagetop" && element !== "top") {
@@ -3181,29 +3161,52 @@ MuseScore {
 						element.color = "hotpink";
 						for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
 					} else {
-						if (element.type == Element.TIMESIG) errorMsg += "\ncoloring time sig "+element.timesigNominal.str;
 						element.color = "hotpink";
 					}
 				}
+				
+				// add text object to score
+				if (j == 0) {
+					var cursor = curScore.newCursor();
+					cursor.staffIdx = staffNum;
+					cursor.rewindToTick(tick);
+					cursor.add(comment);
+					comment.z = currentZ;
+					currentZ ++;
+					var commentHeight = comment.bbox.height;
+					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
+					if (desiredPosY != 0) {
+						comment.offsetY = desiredPosY - comment.pagePos.y;
+					} else {
+						comment.offsetY -= commentHeight;
+					}
+					var commentTopRounded = Math.round(comment.pagePos.y);
+					while (commentPosArray[commentTopRounded+1000]) {
+						commentTopRounded -= commentOffset;
+						comment.offsetY -= commentOffset;
+						comment.offsetX += commentOffset;
+					}
+					commentPosArray[commentTopRounded+1000] = true;
+				}		
 			}
-		} // end for i
+		}
 		curScore.endCmd();
 	}
 	
 	function deleteAllCommentsAndHighlights () {
 		// ** SAVE CURRENT SELECTION ** //
 		var s = curScore.selection;
-		var startStaff = s.startStaff;
-		var endStaff = s.endStaff;
-		var startTick = 0;
-		if (s.startSegment) startTick = s.startSegment.tick;
-		var endTick = curScore.lastSegment.tick;
-		if (s.endSegment) endTick = s.endSegment.tick + 1;
+		var isRange = s.isRange;
+		var startStaff = 0, endStaff = 0, startTick = 0, endTick = curScore.lastSegment.tick;
+		if (isRange) {
+			startStaff = s.startStaff;
+			endStaff = s.endStaff;
+			if (s.startSegment) startTick = s.startSegment.tick;
+			if (s.endSegment) endTick = s.endSegment.tick + 1;
+		}
 		
 		// **** GET ALL ITEMS **** //
-		curScore.startCmd()
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
-		curScore.endCmd()
+		selectAll();
 		var elems = curScore.selection.elements;
 		//errorMsg = "Num elemns: "+elems.length;
 		var elementsToRemove = [];
@@ -3230,7 +3233,12 @@ MuseScore {
 		for (var i = 0; i < elementsToRemove.length; i++) {
 			removeElement(elementsToRemove[i]);
 		}
-		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
+		// ** RESTORE SELECTION
+		if (isRange) {
+			curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff);
+		} else {
+			curScore.selection.clear();
+		}
 		curScore.endCmd();
 	}
 	

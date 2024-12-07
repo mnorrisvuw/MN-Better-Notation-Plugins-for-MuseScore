@@ -27,59 +27,57 @@ MuseScore {
 	property var currentZ: 16384
 	
 	// **** PROPERTIES **** //
-		property var diatonicPitchAlts: []
+
+	property var selectionArray: []
+	property var diatonicPitchAlts: []
 	property var currAccs: []
 	property var currPCAccs: []
 	property var barAltered: []
 	property var errorStrings: []
 	property var errorObjects: []
-	property var prevBarNum
+	property var prevBarNum: 0
 	property var prevMIDIPitch: -1
 	property var prevDiatonicPitch
-	property var prevPC
-	property var prevScalarInterval
-	property var prevScalarIntervalClass
-	property var prevScalarIntervalAbs
-	property var prevChromaticInterval
-	property var prevChromaticIntervalClass
-	property var prevDiatonicPitchClass
-	property var prevShowError
-	property var prevAcc
-	property var prevAccVisible
-	property var prevIsAugDim
-	property var prevNote
-	property var prevPrevNote
+	property var prevPC: 0
+	property var prevScalarInterval: 0
+	property var prevScalarIntervalClass: 0
+	property var prevScalarIntervalAbs: 0
+	property var prevChromaticInterval: 0
+	property var prevChromaticIntervalClass: 0
+	property var prevDiatonicPitchClass: 0
+	property var prevShowError: false
+	property var prevAcc: 0
+	property var prevAccVisible: false
+	property var prevIsAugDim: false
+	property var prevNote: null
+	property var prevPrevNote: null
 	property var prevAlterationLabel: ""
-	property var currentKeySig
-	property var prevWhichNoteToRewrite
+	property var currentKeySig: 0
+	property var prevWhichNoteToRewrite: null
 	property var commentPosArray: []
 	property var kFlatStr: 'b'
 	property var kNaturalStr: '♮'
 	property var kSharpStr: '#'
 	property var progressShowing: false
 	property var progressStartTime: 0
+	property var currentBarNum: 0
 
   onRun: {
 		if (!curScore) return;
 		
+		saveSelection();
 		
 		setProgress (0);
 		
 		// **** GATHER VARIABLES **** //
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
-		currentKeySig = 0;
 		
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
-		if (!curScore.selection.isRange) {
-			// ** SELECT ALL ** //
-			curScore.startCmd();
-			curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
-			curScore.endCmd();
-		}
+		if (!curScore.selection.isRange) selectAll();
 		
 		// ** INITIALIZE VARIABLES ** //
 		currAccs = Array(120).fill(0);
@@ -88,26 +86,22 @@ MuseScore {
 		commentPosArray = Array(10000).fill(0);
 		
 		var startStaff = curScore.selection.startStaff;
-		var endStaff = curScore.selection.endStaff;		
-		prevNote = null;
-		prevPrevNote = null;
-
+		var endStaff = curScore.selection.endStaff;
 		var cursor = curScore.newCursor();
-		var firstBarInScore, firstBarInSelection, firstTickInSelection, firstStaffInSelection;
-		var lastBarInScore, lastBarInSelection, lastTickInSelection, lastStaffInSelection;
+		var firstBarInScore, firstBarInSelection, firstTickInSelection;
+		var lastBarInScore, lastBarInSelection, lastTickInSelection;
 		// start
 		firstBarInScore = curScore.firstMeasure;
 		cursor.rewind(Cursor.SELECTION_START);
 		firstBarInSelection = cursor.measure;
 		firstTickInSelection = cursor.tick;
-		firstStaffInSelection = cursor.track;
-//	errorMsg += "\nfirstBarInScore="+firstBarInScore+";\nfirstBarInSelection="+firstBarInSelection+";\nfirstTickInSelection="+firstTickInSelection+";\nfirstStaffInSelection="+firstStaffInSelection;
-		
+		//errorMsg += "\nstartStaff="+startStaff+"; endStaff="+endStaff;
+				
 		var firstBarNum = 1, lastBarNum = 1;
-		var currBar = firstBarInScore;
-		while (!currBar.is(firstBarInSelection)) {
+		var currentBar = firstBarInScore;
+		while (!currentBar.is(firstBarInSelection)) {
 			firstBarNum ++;
-			currBar = currBar.nextMeasure;
+			currentBar = currentBar.nextMeasure;
 		}
 		setProgress (1);
 		
@@ -119,16 +113,14 @@ MuseScore {
 		lastTickInSelection = cursor.tick;
 		if (lastTickInSelection == 0) lastTickInSelection = curScore.lastSegment.tick + 1;
 		lastBarNum = firstBarNum;
-//	errorMsg += "\nlastBarInScore="+lastBarInScore+";\nlastBarInSelection="+lastBarInSelection+";\nlastTickInSelection="+lastTickInSelection+";\nlastStaffInSelection="+lastStaffInSelection;
 		
-		while (!currBar.is(lastBarInSelection)) {
+		while (!currentBar.is(lastBarInSelection)) {
 			lastBarNum ++;
-			currBar = currBar.nextMeasure;
+			currentBar = currentBar.nextMeasure;
 		}
 		setProgress (2);
-		
-//	errorMsg += "\nfirstBarNum="+firstBarNum+"; lastBarNum="+lastBarNum;
-		
+		//errorMsg += "\nfirstBarNum="+firstBarNum+"; lastBarNum="+lastBarNum;
+				
 		// ** LOOP THROUGH NOTES **//
 		// ** NB — endStaff IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
 		var loop = 0;
@@ -136,13 +128,13 @@ MuseScore {
 		var totalNumLoops = numStaves * numBars * 4;
 		setProgress (5);
 
-		for (var staffNum = startStaff; staffNum < endStaff; staffNum ++) {
-			var p = curScore.staves[staffNum].part;
-			//errorMsg += "\nStaff "+staffNum+" part="+p;
-
-		//	errorMsg += "\nPartname "+p.partName+" name="+p.name;
-			var inst = p.instrumentAtTick(0);
-		//	errorMsg += "\nInst="+inst+" "+inst.name;
+		for (var currentStaffNum = startStaff; currentStaffNum < endStaff; currentStaffNum ++) {
+			//if (!curScore.staves[currentStaffNum].part.show) continue;
+			var theStaff = curScore.staves[currentStaffNum];
+			var part = theStaff.part;
+			var partVisible = part.show;
+			//errorMsg += "\nStaff "+currentStaffNum;
+			if (!partVisible) continue;
 			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
@@ -165,76 +157,69 @@ MuseScore {
 			currPCAccs.fill(0);
 			barAltered.fill(0);
 			
-			// go back to beginning
+			// ** REWIND TO START OF SELECTION ** //
+			cursor.filter = Segment.All;
 			cursor.rewind(Cursor.SELECTION_START);
-			var segment = cursor.segment;
+			cursor.staffIdx = currentStaffNum;
+			cursor.filter = Segment.ChordRest;
+			currentBar = cursor.measure;
 			currentKeySig = cursor.keySignature;
-			//errorMsg += "\nkeySig = "+keySig;
-			currBar = firstBarInSelection;
-			var barNum = firstBarNum;
 			
-			while (currBar) {
-				//errorMsg += "\nbar num = "+barNum;
-				segment = currBar.firstSegment;
-				while (segment && segment.tick < lastTickInSelection) {
-
-					loop++;
-					setProgress(5+loop*95./totalNumLoops);
+			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
+				//errorMsg += "\nbar num = "+currentBarNum;
+				loop++;
+				setProgress(5+loop*95./totalNumLoops);
+				var startTrack = currentStaffNum * 4;
+				var endTrack = startTrack + 4;
+				var barStart = currentBar.firstSegment.tick;
+				for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
+					//errorMsg += "\n\nTrack "+currentTrack;
 					
-					var startTrack = staffNum * 4;
-					var endTrack = startTrack + 4;
-					for (var track = startTrack; track < endTrack; track++) {
-						if (segment.elementAt(track) && segment.elementAt(track).type == Element.KEYSIG) {
-							cursor.rewindToTick(segment.tick);
-							currentKeySig = cursor.keySignature;
-							//errorMsg += "\ncurrentKeySig = "+currentKeySig;
-							// ** MAYBE ONLY NEED TO DO THIS WHEN TRACK IS STARTTRACK? ** //
-						}
-						var s = segment.elementAt(track);
-						if (s != null) {
-							if (s.type == Element.CHORD) {
-								var chord = segment.elementAt(track);
-								var graceNoteChords = chord.graceNotes;
-								if (graceNoteChords != null) {
-									for (var g in graceNoteChords) {
-										checkChord (graceNoteChords[g],segment,barNum,staffNum);
-									}
-								}				
-								checkChord (chord,segment,barNum,staffNum);
+					cursor.track = currentTrack;
+					cursor.rewindToTick(barStart);
+					var processingThisBar = cursor.element != null;
+					while (processingThisBar) {
+						
+						var noteRest = cursor.element;
+						//errorMsg += "\n\nFound "+noteRest.name+" at "+cursor.tick;
+						var isRest = noteRest.type == Element.REST;
+						var graceNoteChords = noteRest.graceNotes;
+						if (graceNoteChords != null) {
+							for (var g in graceNoteChords) {
+								checkChord (graceNoteChords[g],noteRest.parent,currentBarNum,currentStaffNum);
 							}
-						} // end if segment.elementAt
-					} // end of track loop
-					segment = segment.nextInMeasure;
-				} // end of while segment
-				if (currBar == lastBarInSelection) {
-					currBar = null;
-				} else {
-					currBar = currBar.nextMeasure;
-					barNum ++;
-				}
-			} // end of while currBar
-		}
+						}	
+						if (!isRest) {		
+							checkChord (noteRest,noteRest.parent,currentBarNum,currentStaffNum);
+						}
+						if (cursor.next()) {
+							processingThisBar = cursor.measure.is(currentBar);
+						} else {
+							processingThisBar = false;
+						}
+					} // end while Processing this bar
+				} // end track loop
+				if (currentBar) currentBar = currentBar.nextMeasure;
+				
+			} // end of currentBarNum loop
+			
+		} // staff num loop
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
 		// ** SHOW INFO DIALOG ** //
-		if (!debug) {
-			var numErrors = errorStrings.length;
-			if (numErrors == 0) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nNo errors found!";
-			}
-			if (numErrors == 1) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nOne error found.";
-			}
-			if (numErrors > 1) {
-				errorMsg = "SCORE CHECK COMPLETED!\n\nI found "+numErrors+" errors";
-			}
-		}
+
+		var numErrors = errorStrings.length;
+		if (numErrors == 0) errorMsg = "SCORE CHECK COMPLETED\n\nCongratulations! No errors found!\n\nLog:" + errorMsg;
+		if (numErrors == 1) errorMsg = "SCORE CHECK COMPLETED\n\nOne error found.\n\nLog:" + errorMsg;
+		if (numErrors > 1) errorMsg = "SCORE CHECK COMPLETED\n\nI found "+numErrors+" errors.\n\nLog:" + errorMsg;
+			
+		restoreSelection();
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
 	
-	function checkChord (chord,segment,barNum,staffNum) {
+	function checkChord (chord,theSegment,barNum,staffNum) {
 		var defaultChromaticInterval = [0,2,4,5,7,9,11];
 		var accTypes = [Accidental.FLAT2, Accidental.FLAT, Accidental.NATURAL, Accidental.SHARP, Accidental.SHARP2];
 		var pitchLabels = ["C","D","E","F","G","A","B"];
@@ -248,13 +233,16 @@ MuseScore {
 		var isBadAcc = false;
 		var isProblematic, accidentalName, currentAccidental, prevAccidental;
 		
-		
 		var notes = chord.notes;
-		for (var i in notes) {
+		var numNotes = notes.length;
+		//errorMsg += "\nChecking chord... has "+numNotes+" notes";
+		
+		for (var i = 0; i < numNotes; i ++) {
+			//errorMsg += "\ni = "+i;
 				
 			var note = notes[i];
-			var currTick = segment.tick;
-			var measure = segment.parent
+			var currTick = theSegment.tick;
+			var measure = theSegment.parent
 
 				// ** GET INFO ON THE KEY SIGNATURE AT THIS POINT ** //
 
@@ -290,13 +278,11 @@ MuseScore {
 					break;
 			}
 			var MIDIpitch = note.pitch;
-			var l = note.line;
-			var octave = Math.trunc(38-l);
-			
+			var l = note.line; // 0 is F5, 1 is E5, 2 is D5, 3 is C5
+			var octave = Math.floor((3-l)/7)+6; // lowest possible note needs to be octave 0 — i.e. C-1 (midiPitch 0) will be octave 0; therefore C4 will be octave 5
 			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
-			
-			var diatonicPitch = diatonicPitchClass+octave*7;
-			//errorMsg += "\n\n MIDIpitch="+MIDIpitch+" line="+note.line+" oct="+octave+" tpc="+tpc+" tpc1="+note.tpc1+" tpc2="+note.tpc2+" sub="+note.subtypeName()+" diaPitch="+diatonicPitch+" diaPC="+diatonicPitchClass;
+			var diatonicPitch = diatonicPitchClass+octave*7; // diatonic pitch is where 
+			//errorMsg += "\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass;
 
 			var accIsInKS = false;
 			if (currentKeySig == 0 && accType == Accidental.NATURAL) accIsInKS = true;
@@ -379,7 +365,7 @@ MuseScore {
 					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
 					chromaticInterval = MIDIpitch - prevMIDIPitch;
-					//errorMsg += "\ndp="+diatonicPitch+" pdp="+prevDiatonicPitch+" si="+scalarInterval+" ci="+chromaticInterval;
+					//errorMsg += "\nscalarInterval="+scalarInterval+" chromaticInterval="+chromaticInterval;
 					if (chromaticInterval != 0) {
 						if (scalarInterval < 0) {
 							direction = -1;
@@ -397,6 +383,8 @@ MuseScore {
 						scalarIntervalClass = scalarIntervalAbs % 7;
 						chromaticIntervalAbs = Math.abs(chromaticInterval);
 						chromaticIntervalClass = chromaticIntervalAbs % 12;
+						//errorMsg += "\nscalarIntervalAbs="+scalarIntervalAbs+"; scalarIntervalClass="+scalarIntervalClass+"\nchromaticIntervalAbs="+chromaticIntervalAbs+"; chromaticIntervalClass="+chromaticIntervalClass;
+						
 						if (scalarIntervalAbs == 7 && chromaticIntervalClass > 9) chromaticIntervalClass = chromaticIntervalClass - 12;
 						var dci = defaultChromaticInterval[scalarIntervalClass];
 						var alteration = chromaticIntervalClass - dci;
@@ -474,10 +462,12 @@ MuseScore {
 							// don't show error if we decide it"s the same note that needs to change
 							if (prevShowError && prevWhichNoteToRewrite == 2 && whichNoteToRewrite == 1) doShowError = false;
 							if (doShowError) {
+								//errorMsg += "\n***** SHOW ERROR";
+								
 								// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 								scalarIntervalLabel = intervalNames[scalarIntervalAbs];
 
-								//errorMsg += "\nscalarIntervalAbs = "+scalarIntervalAbs+"; scalarIntervalLabel="+scalarIntervalLabel;
+								// /errorMsg += "\nscalarIntervalAbs = "+scalarIntervalAbs+"; scalarIntervalLabel="+scalarIntervalLabel;
 								article = (alterationLabel === "augmented") ? "an" : "a";
 								noteToHighlight = note;
 								theAccToChange = acc;
@@ -502,12 +492,9 @@ MuseScore {
 									prevNext = "next";
 									//errorMsg += "\nChoosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
 									
-								} else {
-									//errorMsg += "\nChoosing curr note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
-									
 								}
 								
-								var j =0;
+								var j = 0;
 								switch (theAccToChange) {
 									case -2:
 										//if (!flatten) errorMsg += "Error found with "+noteLabel+" in bar "+barNum+": should be spelt enharmonically downwards";
@@ -597,7 +584,7 @@ MuseScore {
 								if (doShowError && !changeIsBad) {
 									var t = "Interval with "+prevNext+" pitch is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel;
 									// "\n"+t;
-									//errorMsg += "\n"+noteToHighlight;
+									//errorMsg += "\n******** Note to highlight = "+noteToHighlight;
 									//errorMsg += "\n"+staffNum;
 									addError(t,noteToHighlight);
 								} else {
@@ -676,7 +663,10 @@ MuseScore {
 
 				if (chromaticInterval != 0 || prevMIDIPitch == -1) {	
 					prevNote = note;
+					//errorMsg += "\nprevNote now "+prevNote;
 					prevMIDIPitch = MIDIpitch;
+					//errorMsg += "\nprevMIDIPitch now "+prevMIDIPitch;
+					
 					prevDiatonicPitch = diatonicPitch;
 					prevDiatonicPitchClass = diatonicPitchClass;
 					prevChromaticInterval = chromaticInterval;
@@ -704,7 +694,9 @@ MuseScore {
 		} else {
 			if (!progressShowing) {
 				var currentTime = Date.now();
-				if (currentTime - progressStartTime > 3000) {
+				var elapsedTime = currentTime - progressStartTime;
+				//errorMsg += "\nelapsedTime now "+elapsedTime;
+				if (elapsedTime > 3000) {
 					progress.show();
 					progressShowing = true;
 				}
@@ -714,139 +706,57 @@ MuseScore {
 		}
 	}
 	
-	function addError (text,element) {
-		errorStrings.push(text);
-		errorObjects.push(element);
+	function saveSelection () {
+		selectionArray = [];
+		if (curScore.selection.isRange) {
+			selectionArray[0] = curScore.selection.startSegment.tick;
+			if (curScore.selection.endSegment == null) {
+				selectionArray[1] = curScore.lastSegment.tick;
+			} else {
+				selectionArray[1] = curScore.selection.endSegment.tick;
+			}
+			selectionArray[2] = curScore.selection.startStaff;
+			selectionArray[3] = curScore.selection.endStaff;
+		}
 	}
 	
-	function showAllErrors () {
-		curScore.startCmd()
-		
-		for (var i in errorStrings) {
-			var text = errorStrings[i];
-			var element = errorObjects[i];
-			var eType = element.type;
-			var staffNum = 0;
-			var elementHeight = 0;
-			var commentOffset = 1.0;
-			
-			// the errorObjects array contains a list of the Elements to attach the text object to
-			// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
-			// Here are the strings, and where the text object will be attached
-			// 		top 				— top of bar 1, staff 1
-			// 		pagetop			— top left of page 1
-			//		system1 n		— top of bar 1, staff n
-			//		system2 n		— first bar in second system, staff n
-			
-			var isString = typeof element === 'string';
-			var theLocation = element;
-			if (isString) {
-				if (element.includes(' ')) {
-					staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
-					theLocation = element.split(' ')[0];
-					//if (theLocation === "system2") errorMsg += "\nsystem2";
-					if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
-				}
-			} else {
-				// calculate the staff number that this element is on
-				elementHeight = element.bbox.height;
-				if (eType != Element.MEASURE) {
-					var elemStaff = element.staff;
-					while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
-				}
-			}
-			// add a text object at the location where the element is
-			var comment = newElement(Element.STAFF_TEXT);
-			comment.text = text;
-		
-			// style the text object
-			comment.frameType = 1;
-			comment.framePadding = 0.6;
-			comment.frameWidth = 0.2;
-			comment.frameBgColor = "yellow";
-			comment.frameFgColor = "black";
-			comment.fontSize = 7.0;
-			comment.fontFace = "Helvetica";
-			comment.autoplace = false;
-			var tick = 0, desiredPosX = 0, desiredPosY = 0;
-			var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT];
-			if (isString) {
-				if (theLocation === "pagetop") {
-					desiredPosX = 2.5;
-					desiredPosY = 10.;
-				}
-				if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
-				if (theLocation === "system2") {
-					tick = firstBarInSecondSystem.firstSegment.tick;
-					//errorMsg += "\nPlacing system2 at tick: "+tick;
-				}
-			} else {
-				if (spannerArray.includes(eType)) {
-					tick = element.spannerTick.ticks;
-				} else {
-					if (eType == Element.MEASURE) {
-						tick = element.firstSegment.tick;
-					} else {
-						if (element.parent.type == Element.CHORD) {
-							// it's a grace note, so need to get parent of parent
-							tick = element.parent.parent.tick;
-						} else {
-							tick = element.parent.tick;
-						}
-					}
-				}
-			}
-		
-			// add text object to score
-			var cursor = curScore.newCursor();
-			cursor.staffIdx = staffNum;
-			cursor.rewindToTick(tick);
-			cursor.add(comment);
-			comment.z = currentZ;
-			currentZ ++;
-			var commentHeight = comment.bbox.height;
-			if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
-			if (desiredPosY != 0) {
-				comment.offsetY = desiredPosY - comment.pagePos.y;
-			} else {
-				comment.offsetY -= commentHeight;
-			}
-			var commentTopRounded = Math.round(comment.pagePos.y);
-			while (commentPosArray[commentTopRounded+1000]) {
-				commentTopRounded -= commentOffset;
-				comment.offsetY -= commentOffset;
-				comment.offsetX += commentOffset;
-			}
-			commentPosArray[commentTopRounded+1000] = true;
-		
-			// style the element
-			if (element !== "pagetop" && element !== "top") {
-				if (element.type == Element.CHORD) {
-					element.color = "hotpink";
-					for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
-				} else {
-					if (element.type == Element.TIMESIG) errorMsg += "\ncoloring time sig "+element.timesigNominal.str;
-					element.color = "hotpink";
-				}
-			}
+	function restoreSelection () {
+		curScore.startCmd();
+		if (selectionArray.length == 0) {
+			curScore.selection.clear();
+		} else {
+			var st = selectionArray[0];
+			var et = selectionArray[1];
+			var ss = selectionArray[2];
+			var es = selectionArray[3];
+			curScore.selection.selectRange(st,et+1,ss,es + 1);
 		}
 		curScore.endCmd();
+	}
+	
+	function selectAll () {
+		curScore.startCmd();
+		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
+		curScore.endCmd();
+		var startStaff = curScore.selection.startStaff;
+		var endStaff = curScore.selection.endStaff;
+		errorMsg += "\nnstves = "+curScore.nstaves+"; startStaff = "+startStaff+"; endStaff = "+endStaff;
 	}
 	
 	function deleteAllCommentsAndHighlights () {
 		// ** SAVE CURRENT SELECTION ** //
 		var s = curScore.selection;
-		var startStaff = s.startStaff;
-		var endStaff = s.endStaff;
-		var startTick = 0;
-		if (s.startSegment) startTick = s.startSegment.tick;
-		var endTick = curScore.lastSegment.tick;
-		if (s.endSegment) endTick = s.endSegment.tick + 1;
+		var isRange = s.isRange;
+		var startStaff = 0, endStaff = 0, startTick = 0, endTick = curScore.lastSegment.tick;
+		if (isRange) {
+			startStaff = s.startStaff;
+			endStaff = s.endStaff;
+			if (s.startSegment) startTick = s.startSegment.tick;
+			if (s.endSegment) endTick = s.endSegment.tick + 1;
+		}
 		
 		// **** GET ALL ITEMS **** //
-		curScore.startCmd()
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
-		curScore.endCmd()
+		selectAll();
 		var elems = curScore.selection.elements;
 		//errorMsg = "Num elemns: "+elems.length;
 		var elementsToRemove = [];
@@ -873,7 +783,150 @@ MuseScore {
 		for (var i = 0; i < elementsToRemove.length; i++) {
 			removeElement(elementsToRemove[i]);
 		}
-		curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff+1);
+		// ** RESTORE SELECTION
+		if (isRange) {
+			curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff);
+		} else {
+			curScore.selection.clear();
+		}
+		curScore.endCmd();
+	}
+	
+	function addError (text,element) {
+		errorStrings.push(text);
+		errorObjects.push(element);
+	}
+	
+	function showAllErrors () {
+		curScore.startCmd()
+		for (var i in errorStrings) {
+			var text = errorStrings[i];
+			var element = errorObjects[i];
+			var isArray = Array.isArray(element);
+			var objectArray;
+			if (isArray) {
+				objectArray = element;
+			} else {
+				objectArray = [element];
+			}
+			for (var j in objectArray) {
+				element = objectArray[j];
+				var eType = element.type;
+				var staffNum = 0;
+				var elementHeight = 0;
+				var commentOffset = 1.0;
+			
+				// the errorObjects array contains a list of the Elements to attach the text object to
+				// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
+				// Here are the strings, and where the text object will be attached
+				// 		top 				— top of bar 1, staff 1
+				// 		pagetop			— top left of page 1
+				//		system1 n		— top of bar 1, staff n
+				//		system2 n		— first bar in second system, staff n
+			
+				var isString = typeof element === 'string';
+				var theLocation = element;
+				if (isString) {
+					if (element.includes(' ')) {
+						staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
+						theLocation = element.split(' ')[0];
+						if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
+					}
+				} else {
+					// calculate the staff number that this element is on
+					if (element.bbox == undefined) {
+						errorMsg += "\nbbox undefined — elem type is "+element.name;
+					} else {
+						elementHeight = element.bbox.height;
+						if (eType != Element.MEASURE) {
+							var elemStaff = element.staff;
+							while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+						}
+					}
+				}
+				// add a text object at the location where the element is
+				var comment = newElement(Element.STAFF_TEXT);
+				comment.text = text;
+		
+				// style the text object
+				comment.frameType = 1;
+				comment.framePadding = 0.6;
+				comment.frameWidth = 0.2;
+				comment.frameBgColor = "yellow";
+				comment.frameFgColor = "black";
+				comment.fontSize = 7.0;
+				comment.fontFace = "Helvetica";
+				comment.autoplace = false;
+				var tick = 0, desiredPosX = 0, desiredPosY = 0;
+				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
+				if (isString) {
+					if (theLocation === "pagetop") {
+						desiredPosX = 2.5;
+						desiredPosY = 10.;
+					}
+					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
+					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
+				} else {
+					if (spannerArray.includes(eType)) {
+						tick = element.spannerTick.ticks;
+					} else {
+						if (eType == Element.MEASURE) {
+							tick = element.firstSegment.tick;
+						} else {
+							if (element.parent == undefined || element.parent == null) {
+								errorMsg += "\nELEMENT PARENT IS "+element.parent+"; etype is "+element.name;
+							} else {
+								if (element.parent.type == Element.CHORD) {
+									// it's either a notehead or a gracenote
+									if (element.parent.parent.type == Element.CHORD) {
+										// it's a grace note, so need to get parent of parent
+										tick = element.parent.parent.parent.tick;
+									} else {
+										tick = element.parent.parent.tick;
+									}
+								} else {
+									tick = element.parent.tick;
+								}
+							}
+						}
+					}
+				}
+		
+				// style the element
+				if (element !== "pagetop" && element !== "top") {
+					if (element.type == Element.CHORD) {
+						element.color = "hotpink";
+						for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
+					} else {
+						element.color = "hotpink";
+					}
+				}
+				
+				// add text object to score
+				if (j == 0) {
+					var cursor = curScore.newCursor();
+					cursor.staffIdx = staffNum;
+					cursor.rewindToTick(tick);
+					cursor.add(comment);
+					comment.z = currentZ;
+					currentZ ++;
+					var commentHeight = comment.bbox.height;
+					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
+					if (desiredPosY != 0) {
+						comment.offsetY = desiredPosY - comment.pagePos.y;
+					} else {
+						comment.offsetY -= commentHeight;
+					}
+					var commentTopRounded = Math.round(comment.pagePos.y);
+					while (commentPosArray[commentTopRounded+1000]) {
+						commentTopRounded -= commentOffset;
+						comment.offsetY -= commentOffset;
+						comment.offsetX += commentOffset;
+					}
+					commentPosArray[commentTopRounded+1000] = true;
+				}		
+			}
+		}
 		curScore.endCmd();
 	}
 	
@@ -883,19 +936,27 @@ MuseScore {
 		property var msg: ""
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
-	      // Qt.WindowStaysOnTopHint => dialog always on top
-	      // Qt.FramelessWindowHint  => dialog without title bar
 		width: 500
 		height: 400        
 
-		StyledTextLabel {
-			text: dialog.msg            
+		ScrollView {
+			id: view
 			anchors {
-				top: parent.top 
-				horizontalCenter: parent.horizontalCenter                
-				margins:20 
-			} 
+				fill: parent
+				horizontalCenter: parent.horizontalCenter
+				verticalCenter: parent.verticalCenter
+				margins: 2
+			}
+			background: Rectangle {
+				color: "white"
+			}
+			ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+			TextArea {
+				text: dialog.msg
+				wrapMode: TextEdit.Wrap         
+			}
 		}
+		
 		FlatButton {            
 			accentButton: true
 			text: "Ok"
