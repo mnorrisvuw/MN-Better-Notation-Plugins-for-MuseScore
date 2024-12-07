@@ -61,6 +61,9 @@ MuseScore {
 	property var progressShowing: false
 	property var progressStartTime: 0
 	property var currentBarNum: 0
+	property var currentClef: null
+	property var clefOffset: 0
+	property var isPercussionClef: false
 
   onRun: {
 		if (!curScore) return;
@@ -136,6 +139,7 @@ MuseScore {
 			//errorMsg += "\nStaff "+currentStaffNum;
 			if (!partVisible) continue;
 			
+			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
 			prevDiatonicPitch = -1;
@@ -157,11 +161,20 @@ MuseScore {
 			currPCAccs.fill(0);
 			barAltered.fill(0);
 			
+			// get start clef
+			cursor.filter = Segment.HeaderClef;
+			cursor.staffIdx = currentStaffNum;
+			cursor.voice = 0;
+			cursor.rewind(Cursor.SCORE_START);
+			if (cursor.element == null) cursor.next();
+			currentClef = cursor.element;
+			checkClef ();
+			
 			// ** REWIND TO START OF SELECTION ** //
 			cursor.filter = Segment.All;
 			cursor.rewind(Cursor.SELECTION_START);
 			cursor.staffIdx = currentStaffNum;
-			cursor.filter = Segment.ChordRest;
+			cursor.filter = Segment.ChordRest | Segment.Clef;
 			currentBar = cursor.measure;
 			currentKeySig = cursor.keySignature;
 			
@@ -179,18 +192,25 @@ MuseScore {
 					cursor.rewindToTick(barStart);
 					var processingThisBar = cursor.element != null;
 					while (processingThisBar) {
-						
-						var noteRest = cursor.element;
-						//errorMsg += "\n\nFound "+noteRest.name+" at "+cursor.tick;
-						var isRest = noteRest.type == Element.REST;
-						var graceNoteChords = noteRest.graceNotes;
-						if (graceNoteChords != null) {
-							for (var g in graceNoteChords) {
-								checkChord (graceNoteChords[g],noteRest.parent,currentBarNum,currentStaffNum);
+						var eType = cursor.element.type;
+						if (eType == Element.CLEF) {
+							currentClef = cursor.element;
+							checkClef();
+						} else {
+							if (!isPercussionClef) {
+								var noteRest = cursor.element;
+								//errorMsg += "\n\nFound "+noteRest.name+" at "+cursor.tick;
+								var isRest = noteRest.type == Element.REST;
+								var graceNoteChords = noteRest.graceNotes;
+								if (graceNoteChords != null) {
+									for (var g in graceNoteChords) {
+										checkChord (graceNoteChords[g],noteRest.parent,currentBarNum,currentStaffNum);
+									}
+								}	
+								if (!isRest) {		
+									checkChord (noteRest,noteRest.parent,currentBarNum,currentStaffNum);
+								}
 							}
-						}	
-						if (!isRest) {		
-							checkChord (noteRest,noteRest.parent,currentBarNum,currentStaffNum);
 						}
 						if (cursor.next()) {
 							processingThisBar = cursor.measure.is(currentBar);
@@ -217,6 +237,29 @@ MuseScore {
 		restoreSelection();
 		dialog.msg = errorMsg;
 		dialog.show();
+	}
+	
+	function checkClef () {
+		var clefId = currentClef.subtypeName();
+		//errorMsg += "\nChecking clef — "+clefId+" "+currentInstrumentName;
+		var isTrebleClef = clefId.includes("Treble clef");
+		var isAltoClef = clefId === "Alto clef";
+		var isTenorClef = clefId === "Tenor clef";
+		var isBassClef = clefId.includes("Bass clef");
+		var clefIs8va = clefId.includes("8va alta");
+		var clefIs15ma = clefId.includes("15ma alta");
+		var clefIs8ba = clefId.includes("8va bassa");
+		
+		// set this property so that we can ignore any notes
+		isPercussionClef = clefId === "Percussion";
+		
+		if (isTrebleClef) clefOffset = 0;
+		if (isAltoClef) clefOffset = -6; // C4 = 35
+		if (isTenorClef) clefOffset = -8; // A3 = 33
+		if (isBassClef) clefOffset = -12; // D3 = 29
+		if (clefIs8va) clefOffset += 7;
+		if (clefIs15ma) clefOffset += 14;
+		if (clefIs8ba) clefOffset -= 7;
 	}
 	
 	function checkChord (chord,theSegment,barNum,staffNum) {
@@ -279,10 +322,10 @@ MuseScore {
 			}
 			var MIDIpitch = note.pitch;
 			var l = note.line; // 0 is F5, 1 is E5, 2 is D5, 3 is C5
-			var octave = Math.floor((3-l)/7)+6; // lowest possible note needs to be octave 0 — i.e. C-1 (midiPitch 0) will be octave 0; therefore C4 will be octave 5
+			var octave = Math.floor((3-l+clefOffset)/7)+6; // lowest possible note needs to be octave 0 — i.e. C-1 (midiPitch 0) will be octave 0; therefore C4 will be octave 5
 			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
 			var diatonicPitch = diatonicPitchClass+octave*7; // diatonic pitch is where 
-			//errorMsg += "\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass;
+			//errorMsg += "\n\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass;
 
 			var accIsInKS = false;
 			if (currentKeySig == 0 && accType == Accidental.NATURAL) accIsInKS = true;
@@ -409,11 +452,7 @@ MuseScore {
 							var neverOK = false;
 							var neverOKRewriteIfPoss = false;
 							var OKRewriteIfPoss = true;
-							// = false;
 
-							//if (OKRewriteIfPoss || neverOKRewriteIfPoss) {
-							//if (OKRewriteIfPoss) {
-							
 							doShowError = prevIsAugDim;
 	
 							// EXCEPTIONS
@@ -422,10 +461,7 @@ MuseScore {
 	
 							// IGNORE TRITONE IF FOLLOWED BY ANOTHER ONE OR A SEMITONE
 							if (chromaticIntervalClass == 6 && (prevChromaticIntervalClass == 1 || prevChromaticIntervalClass == 6)) doShowError = false;
-							
-							//}
-							//if (neverOKRewriteIfPoss) doShowError = true;
-								
+															
 							if (doShowError) {
 								var foundNote = false;
 								
@@ -467,7 +503,7 @@ MuseScore {
 								// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 								scalarIntervalLabel = intervalNames[scalarIntervalAbs];
 
-								// /errorMsg += "\nscalarIntervalAbs = "+scalarIntervalAbs+"; scalarIntervalLabel="+scalarIntervalLabel;
+								//errorMsg += "\nscalarIntervalAbs = "+scalarIntervalAbs+"; scalarIntervalLabel="+scalarIntervalLabel;
 								article = (alterationLabel === "augmented") ? "an" : "a";
 								noteToHighlight = note;
 								theAccToChange = acc;
@@ -740,7 +776,6 @@ MuseScore {
 		curScore.endCmd();
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;
-		errorMsg += "\nnstves = "+curScore.nstaves+"; startStaff = "+startStaff+"; endStaff = "+endStaff;
 	}
 	
 	function deleteAllCommentsAndHighlights () {

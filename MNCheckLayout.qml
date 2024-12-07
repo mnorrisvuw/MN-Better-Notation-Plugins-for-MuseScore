@@ -439,18 +439,18 @@ MuseScore {
 			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
-			cursor.filter = Segment.HeaderClef;
-			cursor.staffIdx = currentStaffNum;
-			cursor.voice = 0;
-			cursor.rewind(Cursor.SCORE_START);
-			if (cursor.element == null) cursor.next();
+
 			
 			currentInstrumentName = instrumentNames[currentStaffNum];
 			currentInstrumentId = instrumentIds[currentStaffNum];
 			setInstrumentVariables();
 			//errorMsg += "\ncurrentStaffNum = "+currentStaffNum+" currInstName = "+currentInstrumentName+" currentInstId = "+currentInstrumentId;
 			
-			
+			cursor.filter = Segment.HeaderClef;
+			cursor.staffIdx = currentStaffNum;
+			cursor.voice = 0;
+			cursor.rewind(Cursor.SCORE_START);
+			if (cursor.element == null) cursor.next();
 			currentBar = cursor.measure;
 			currentSystem = null;
 			currentSystemNum = 0;
@@ -865,11 +865,12 @@ MuseScore {
 						}
 						if (isNote) {
 							prevNote = noteRest;
-							prevSlurNum = isSlurred ? currentSlurNum : null;
 						} else {
 							prevNote = null;
 							prevSlurNum = null;
 						}
+						prevSlurNum = isSlurred ? currentSlurNum : null;
+						
 					} // end while processingThisBar
 					if (numNotesInThisTrack > 0) numTracksWithNotes ++;
 				} // end track loop
@@ -2733,7 +2734,7 @@ MuseScore {
 			var isStartOfTie = n.tieForward != null && n.tieBack == null;
 			// *** CHECK REPEATED NOTE UNDER A SLUR — ONLY STRINGS, WINDS OR BRASS *** //
 			if (isStringInstrument || isWindOrBrassInstrument) {
-				if (prevNote != null && prevSlurNum == currentSlurNum && noteRest.notes[0].tieBack == null) {
+				if (isStartOfSlur && prevNote != null && prevSlurNum == currentSlurNum && noteRest.notes[0].tieBack == null) {
 					var iterationArticulationArray = [kTenutoAbove,kTenutoBelow,
 						kStaccatissimoAbove, kStaccatissimoAbove+1,
 						kStaccatissimoStrokeAbove, kStaccatissimoStrokeAbove+1,
@@ -2749,7 +2750,7 @@ MuseScore {
 						}
 						if (chordMatches && noteheadStyle != NoteHeadGroup.HEAD_DIAMOND && prevNoteheadStyle != NoteHeadGroup.HEAD_DIAMOND) {
 							if (getArticulation(noteRest,staffNum) == null) {
-								if (prevWasStartOfSlur) {
+								if (isEndOfSlur && prevWasStartOfSlur) {
 									addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie?",currentSlur);
 								} else {
 									addError("Don’t repeat a pitch under a slur. Either remove the slur, or\nadd some articulation (e.g. tenuto/staccato).",noteRest);

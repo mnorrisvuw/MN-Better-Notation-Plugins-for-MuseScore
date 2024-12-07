@@ -16,14 +16,14 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   <img
     max-width="400"
     width="45%"
-    src="images/reminder-menubar-light.png"
-    alt="Reminders MenuBar in light mode"
+    src="images/CheckRhythmicNotationScreenshot.png"
+    alt="Check Rhythmic Notation screenshot"
   >
   <img
     max-width="400"
     width="45%"
-    src="images/reminder-menubar-dark.png"
-    alt="Reminders MenuBar in dark mode"
+    src="images/CheckLayoutScreenshot.png"
+    alt="Check Layout screenshot"
   >
 </div>
 
