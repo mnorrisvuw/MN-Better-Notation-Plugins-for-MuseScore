@@ -29,6 +29,8 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
 
 ## Included plug-ins
 
+### <img width="200px" src="MNCheckRhythmicNotation.png" alt="Check Rhythmic Notation" style="vertical-align:top; margin-right:10px"> MN CHECK RHYTHMIC NOTATION
+
 * **MN Check Rhythmic Notation** checks for:
   * Notes incorrectly 'hiding' a beat (with standard exceptions)
   * Overspecified tied notes that can be 'condensed' into a single note
@@ -37,7 +39,11 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * Notes not beamed together correctly
   * Notes incorrectly beamed together
 
-* **MN Check Layout** checks for over 60 different layout, notation and instrumentation problems, such as:
+***
+
+### <img width="200px" src="MNCheckLayoutAndInstrumentation.png" alt="Check Layout and Instrumentation" style="vertical-align:top; margin-right:10px"> MN CHECK LAYOUT AND INSTRUMENTATION
+
+* **MN Check Layout & Instrumentation** checks for over 60 different layout, notation and instrumentation problems, such as:
   * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio
   * **Staff names and order**: non-standard staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: inappropiate tuplets font, incorrectly styled text, incorrect dynamics font
   * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest
@@ -50,8 +56,11 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * **Time signatures**: missing first time signature, redundant time signatures
   * **Clefs**: instrument doesn’t read given clef, redundant clef, clef change would improve readability
   * **Slurs**: slurs incorrectly begin/end on tied note, repeated notes under a slur without articulation, slur used instead of tie, accented notes in middle of a slur, slurs over rests
-  * **Omissions**:rehearsal marks (for longer conducted works), tempo marking, pedal indications on pedal instrument
-  * **Other**: fermatas inconsistent or missing across parts, tremolos incorrectly written, incorrect notation of grace notes, stems incorrectly flipped, note tied to different pitch, pickup bars with inconsistent rests, transposing score not switched on, unnecessarily complex key signatures, short key signature changes, redundant time signature changes, staccato on dotted notes
+  * **Omissions**: rehearsal marks (for longer conducted works), initial tempo marking, pedal indications on pedal instrument
+  * **Other**: fermatas inconsistent or missing across parts, tremolos incorrectly written, incorrect notation of grace notes, stems incorrectly flipped, note tied to different pitch, pickup bars with inconsistent rests, transposing score not switched on, unnecessarily complex key signatures, short key signature changes, redundant time signature changes, staccato on dotted notes***
+
+### <img width="200px" src="MNCheckAccidentals.png" alt="Check Accidentals" style="vertical-align:top; margin-right:10px"> MN CHECK ACCIDENTALS
+
 * **MN Check Accidentals** checks for: 
   * **augmented and diminished intervals** preceded or followed by another augmented or diminished interval (often a sign that an accidental has been misspelled)
   * **double-sharps & double-flats** which may not be necessary
@@ -83,25 +92,29 @@ Windows: C:\Users\[Your User Name]\Documents\MuseScore4\Plugins\
 * Linux: ~/Documents/MuseScore4/Plugins
 
 ## Use
-* These plugins scan the selected bars for any notation issues within their scope.
+* Select the passage you wish to check for errors, or, to check the whole score, either select all or have nothing selected. Then  select the name of the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
 
-* When it finds a problem, it will add a yellow text box comment and highlight the appropriate object in pink. **Note that the plugins do not fix the error themselves: that is up to you.**
+* Note that the *Check Layout and Instrumentation* plugin **always** checks the entire score, regardless of the current selection.
+
+* The plugin will go through the selection/score looking for relevant issues. When it finds one, it will add a **yellow text box comment** on the score (somewhere close to the error), and will highlight the relevant notation object in pink. Once it has finished, it will present a dialog box telling you how many errors it found.
+
+* **Note that the plugins do not fix the error themselves: that is up to you.**
 
 * Sometimes these comments might be more of a suggestion rather than a hard-and-fast typesetting rule: you should therefore consider each comment carefully before remedying.
 
 * It can be a good idea to delete each comment box as you fix the relevant issue to keep track of what you have done.
 
-* If there are a lot of boxes, sometimes a comment box can end up some distance away from the object it is referring to. In this instance, click and drag the box around a bit: you will see an ‘attachment line’ that shows the location of the object to which it is referring.
+* If there are a lot of comments, sometimes a comment box can end up some distance away from the object it is referring to. If you can’t work out what a comment is referring to, click and drag the box around a bit: you will see an ‘attachment line’ that shows the location of the object to which it is referring.
 
 * Each time you run a plugin, it will remove any previous comments or highlights.
 
 * To manually remove all comments and highlights from a score, please run the ‘MN Delete Comments and Highlights’ plugin
 
-* Note: MN Check Layout operates on the entire score, irrespective of the user selection, while MN Check Rhythmic Notation and MN Check Accidentals only operate on the selected bars.
+* Some comments refer to a specific page in [*Behind Bars* by Elaine Gould](https://www.amazon.com.au/dp/0571514561). This is simply to provide a level of evidence behind some of my comments, in case you think them overly pedantic or plain wrong! 😄
 
 
-## Warnings
-* This plugin has to use the styles of its comment boxes (yellow fill, black border) and highlights (hot pink) to distinguish them from normal text objects and highlights.
+## Warning about usage
+* Note that these plugins use the styles of their comment boxes (yellow fill, black border) and object highlights (hot pink) to distinguish them from normal text objects and highlights.
 * If you select ‘Format→Reset Text Style Overrides’ or ‘Format→Reset Entire Score to Default Layout’ while you still have comments on the score, or MuseScore will revert them all to standard black-and-white text, and the ‘MN Delete Comments and Highlights’ will not be able to delete them.
 
 * If you only ever use standard black notes and text, then you will have no problem. If, however, you created boxes or highlights with the exact same style/colours as those created by the plugins, then these will be also be deleted when you run the plugins.

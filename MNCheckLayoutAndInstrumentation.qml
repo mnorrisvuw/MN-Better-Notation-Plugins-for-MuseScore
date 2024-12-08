@@ -14,12 +14,12 @@ import FileIO 3.0
 
 MuseScore {
 	version:  "1.0"
-	description: "This plugin checks your score for common music layout issues"
-	menuPath: "Plugins.MNCheckLayout";
+	description: "This plugin checks your score for common music layout, notation and instrumentation issues"
+	menuPath: "Plugins.MNCheckLayoutAndInstrumentation";
 	requiresScore: true
-	title: "MN Check Layout"
-	id: mnchecklayout
-	thumbnailName: "MNCheckLayout.png"
+	title: "MN Check Layout & Instrumentation"
+	id: mnchecklayoutandinstrumentation
+	thumbnailName: "MNCheckLayoutAndInstrumentation.png"
 	
 	
 	// **** TEXT FILE DEFINITIONS **** //

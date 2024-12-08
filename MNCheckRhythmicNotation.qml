@@ -559,6 +559,10 @@ MuseScore {
 					hidingBeatError = soundingDur % beatLength;
 				} else {
 					hidingBeatError = false;
+					
+					// no dotted crotchet on beat two in 4/4 or 2/2
+					if (soundDur == dottedcrotchet && (timeSigStr == "4/4" || timeSigStr == "2/2") hidingBeatError = noteStartBeat % 2;
+					
 					// no semibreves in 5/4
 					if (timeSigStr == "5/4") hidingBeatError = (soundingDur == semibreve);
 				}
