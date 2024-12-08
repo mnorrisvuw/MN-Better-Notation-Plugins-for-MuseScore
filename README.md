@@ -71,25 +71,20 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
 ## Installation
 
 *MN Better Notation Plugins require MuseScore Studio 4.4 or later.*
-* **Download** the project as a zip file
-* **Extract it** using an archive extraction software
-* **Move the folder** to MuseScore’s plugins folder, configurable at [Preferences:General:Folders](https://musescore.org/en/handbook/4/preferences). The default directories are
-  * Windows: C:\Users\[Your User Name]\Documents\MuseScore4\Plugins\
-  * Mac OS: ~/Documents/MuseScore4/Plugins/
-  * Linux: ~/Documents/MuseScore4/Plugins
-* **Open MuseScore**
-* Click **Home: Plugins** or **Plugins: Manage plugins**...
+* **Download** the project as a zip file either from the green Code button above, or from the direct download link below.
+* **Extract it** using archive extraction software
+* **Move the entire folder** into MuseScore’s plugins folder, configurable at [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences). The default directories are:
+    * **Mac OS**: ~/Documents/MuseScore4/Plugins/
+    * **Windows**: C:\Users\YourUserName\Documents\MuseScore4\Plugins\
+    * **Linux**: ~/Documents/MuseScore4/Plugins
+* **Open MuseScore** or quit and relaunch it if it was already open
+* Click **Home→Plugins** or **Plugins→Manage plugins...**
 * For each of the four MN plugins, click on their icon and click ‘**Enable**’
-* The plugins should now be available from the **Plugins** menubar
+* The plugins should now be available from the **Plugins** menu
 
 ### Direct Download
 
-Direct downloads can be found on the [releases page](https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases).
-
-After downloading and extracting, just drag the folder to MuseScore’s plugins folder:
-Windows: C:\Users\[Your User Name]\Documents\MuseScore4\Plugins\
-* Mac OS: ~/Documents/MuseScore4/Plugins/
-* Linux: ~/Documents/MuseScore4/Plugins
+Direct downloads of the Zip file can be found on the [releases page](https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases).
 
 ## Use
 * Select the passage you wish to check for errors, or, to check the whole score, either select all or have nothing selected. Then  select the name of the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
@@ -114,10 +109,13 @@ Windows: C:\Users\[Your User Name]\Documents\MuseScore4\Plugins\
 
 
 ## Warning about usage
-* Note that these plugins use the styles of their comment boxes (yellow fill, black border) and object highlights (hot pink) to distinguish them from normal text objects and highlights.
-* If you select ‘Format→Reset Text Style Overrides’ or ‘Format→Reset Entire Score to Default Layout’ while you still have comments on the score, or MuseScore will revert them all to standard black-and-white text, and the ‘MN Delete Comments and Highlights’ will not be able to delete them.
+* Note that these plugins use the styles of their comment boxes (yellow fill, black border) to distinguish them from normal text objects and highlights.
 
-* If you only ever use standard black notes and text, then you will have no problem. If, however, you created boxes or highlights with the exact same style/colours as those created by the plugins, then these will be also be deleted when you run the plugins.
+* As such, if you select ‘Format→Reset Text Style Overrides’ or ‘Format→Reset Entire Score to Default Layout’ while you still have comments on the score, MuseScore will revert them all to standard black-and-white text
+
+* If this happens, the ‘MN Delete Comments and Highlights’ will not be able to detect them to delete them, and you will have to go through and manually delete each one.
+
+* Therefore, it is recommended that you do not use these commands while there are still comments on your 
 
 ## Wait! Nothing happened!!!
 * MuseScore does not currently have a way of providing any error messages to the user if it encounters a bug in the plugin code. Instead it just does nothing.
@@ -136,10 +134,19 @@ Windows: C:\Users\[Your User Name]\Documents\MuseScore4\Plugins\
 
 ## Known bugs and limitations
 
-**MN Check Layout**
+**MN Check Layout & Instrumentation**
 
 * Only checks the top staff of a harp part for issues
-*  
+* Cannot check the title, subtitle or composer text for various text issues; this seems to be a limitation of the plugin architecture
+
+**MN Check Rhythmic Notation**
+
+* Ignores beaming of some time signatures that could be grouped in different ways
+* Does not check for correct breaking of the 16th or 32nd beams
+
+**MN Check Accidentals**
+
+* Is not very intelligent about some of the extreme accidentals
 
 ## License
 

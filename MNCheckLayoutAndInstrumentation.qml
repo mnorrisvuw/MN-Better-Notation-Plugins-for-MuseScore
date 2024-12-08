@@ -17,7 +17,7 @@ MuseScore {
 	description: "This plugin checks your score for common music layout, notation and instrumentation issues"
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation";
 	requiresScore: true
-	title: "MN Check Layout & Instrumentation"
+	title: "MN Check Layout &amp; Instrumentation"
 	id: mnchecklayoutandinstrumentation
 	thumbnailName: "MNCheckLayoutAndInstrumentation.png"
 	
@@ -468,6 +468,7 @@ MuseScore {
 			if (currentInstrumentId.includes('vibraphone') && isTopOfGrandStaff[currentStaffNum]) addError('Vibraphones are normally notated on a single treble staff,\nrather than a grand staff.','system1 '+currentStaffNum);
 						
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
+				
 				var barStartTick = currentBar.firstSegment.tick;
 				var barEndTick = currentBar.lastSegment.tick;
 				var barLength = barEndTick - barStartTick;
@@ -511,12 +512,14 @@ MuseScore {
 				flaggedPedalChangesInThisBar = false;
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
+					
+					// **** UPDATE PROGRESS MESSAGE **** //
 					loop++;
 					setProgress(5+loop*95./totalNumLoops);
 					cursor.filter = Segment.All;
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStartTick);
-					var processingThisBar = cursor.element;
+					var processingThisBar = cursor.element && cursor.tick < barEnd;
 					var numNotesInThisTrack = 0;
 					prevNote = null;
 					prevSlurNum = null;
