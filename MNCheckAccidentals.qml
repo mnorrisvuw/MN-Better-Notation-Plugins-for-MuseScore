@@ -136,7 +136,7 @@ MuseScore {
 			var theStaff = curScore.staves[currentStaffNum];
 			var part = theStaff.part;
 			var partVisible = part.show;
-			//errorMsg += "\nStaff "+currentStaffNum;
+			errorMsg += "\n——— STAFF "+currentStaffNum+" ————";
 			if (!partVisible) continue;
 			
 			
@@ -179,18 +179,21 @@ MuseScore {
 			currentKeySig = cursor.keySignature;
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
-				//errorMsg += "\nbar num = "+currentBarNum;
+				errorMsg += "\nb. "+currentBarNum;
 				loop++;
 				setProgress(5+loop*95./totalNumLoops);
 				var startTrack = currentStaffNum * 4;
 				var endTrack = startTrack + 4;
 				var barStart = currentBar.firstSegment.tick;
+				var barEnd = currentBar.lastSegment.tick;
+				
 				for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
 					//errorMsg += "\n\nTrack "+currentTrack;
 					
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStart);
-					var processingThisBar = cursor.element != null;
+					var processingThisBar = cursor.element && cursor.tick < barEnd;
+					
 					while (processingThisBar) {
 						var eType = cursor.element.type;
 						if (eType == Element.CLEF) {
@@ -967,7 +970,7 @@ MuseScore {
 	
 	ApplicationWindow {
 		id: dialog
-		title: "WARNING!"
+		title: "COMPLETION"
 		property var msg: ""
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint

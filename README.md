@@ -3,11 +3,11 @@
 A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that check your scores for common notation and layout issues.
 
   <p>
-    <a href="#includedplugins">Included Plugins</a> •
+    <a href="#includedplugins">Included plug-ins</a> •
     <a href="#installation">Installation</a> •
-    <a href="#permission-request">Permission Request</a> •
-    <a href="#contributing">Contributing</a> •
-    <a href="#languages">Languages</a> •
+    <a href="#use">How to use</a> •
+    <a href="#feedback">Feedback, requests and bug reports</a> •
+    <a href="#knownbugs">Known bugs and limitations</a> •
     <a href="#license">License</a>
   </p>
 </div>
@@ -27,7 +27,8 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   >
 </div>
 
-## Included plug-ins
+
+## <a id="includedplugins"></a>Included plug-ins
 
 ### <img width="200px" src="MNCheckRhythmicNotation.png" alt="Check Rhythmic Notation" style="vertical-align:top; margin-right:10px"> MN CHECK RHYTHMIC NOTATION
 
@@ -44,8 +45,8 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
 ### <img width="200px" src="MNCheckLayoutAndInstrumentation.png" alt="Check Layout and Instrumentation" style="vertical-align:top; margin-right:10px"> MN CHECK LAYOUT AND INSTRUMENTATION
 
 * **MN Check Layout & Instrumentation** checks for over 60 different layout, notation and instrumentation problems, such as:
-  * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio
-  * **Staff names and order**: non-standard staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: inappropiate tuplets font, incorrectly styled text, incorrect dynamics font
+  * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio, some style settings not optimal
+  * **Staff names and order**: non-standard staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font
   * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest
   * **Text objects**: common misspellings, incorrectly capitalised text, space or non-alphanumeric character at start, text could be abbreviated, incorrect location for expressions, straight quotes instead of curly, tempo marking but not entered in Tempo text, default text in Project Properties not changed
   * **Orchestral parts issues**: single line on shared wind/brass staff lacking ‘a 2’/‘1.’ marking; string part lacking a ‘unis.’/‘div.’ marking
@@ -68,7 +69,7 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * **recommended courtesy accidentals**
 
 
-## Installation
+## <a id="installation"></a>Installation
 
 *MN Better Notation Plugins require MuseScore Studio 4.4 or later.*
 * **Download** the project as a zip file either from the green Code button above, or from the direct download link below.
@@ -86,7 +87,7 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
 
 Direct downloads of the Zip file can be found on the [releases page](https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases).
 
-## Use
+## <a id="use"></a>How to use
 * Select the passage you wish to check for errors, or, to check the whole score, either select all or have nothing selected. Then  select the name of the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
 
 * Note that the *Check Layout and Instrumentation* plugin **always** checks the entire score, regardless of the current selection.
@@ -118,26 +119,28 @@ Direct downloads of the Zip file can be found on the [releases page](https://git
 * Therefore, it is recommended that you do not use these commands while there are still comments on your 
 
 ## Wait! Nothing happened!!!
-* MuseScore does not currently have a way of providing any error messages to the user if it encounters a bug in the plugin code. Instead it just does nothing.
 
-* If you do not get a ‘COMPLETION’ dialog box after running the plugin, it may mean that MuseScore encountered a bug.
+* All of the plugins except ‘MN Delete Comments and Highlights’ show a dialog box titled ‘COMPLETION’ when they successfully complete their check of the score.
 
-* Please send the MuseScore file to Michael Norris, along with a description of which plugin you were running and (if it makes a difference) what portion of the score you had selected.
+* However, if there is a bug in the plugin code that means it fails to successfully complete its checks, MuseScore does not currently have a way of letting the user know — instead it just does nothing and the dialog box does not show.
 
-* If you are able to replicate the bug reliably, that is also very helpful
+* **Therefore, if you do not get a ‘COMPLETION’ dialog box after running the plugin, it may mean that MuseScore encountered a bug and could not complete the code. If that happens...**
 
-* That leads me to...
+## <a id="feedback"></a>Feedback, requests and bug reports
 
-## Feedback, requests and bug reports
+* Please send all feedback, feature requests and bug reports to michael.norris@vuw.ac.nz
 
-* I love feedback, feature requests and bug reports! ♥️
+* For bug reports, especially the ‘non-completion bugs’ mentioned above (i.e. the final dialog box does not show), **please send me your MuseScore file and the name of the plug-in.**
 
-## Known bugs and limitations
+## <a id="knownbugs"></a>Known bugs and limitations
 
 **MN Check Layout & Instrumentation**
 
 * Only checks the top staff of a harp part for issues
-* Cannot check the title, subtitle or composer text for various text issues; this seems to be a limitation of the plugin architecture
+* Cannot check the title, subtitle or composer text for various text issues; this seems to be a limitation of the MuseScore plugin architecture for now. Hopefully future versions will allow me to get a reference to these objects.
+* For some checks such as dynamics under rests, the plugin will not check if the instrument is on a grand staff (future versions should be able to do this, it just requires a bit more code)
+* The checks for whether 8va/8ba would be useful are a bit dumb at present, and need more nuance
+* Redundant dynamics check doesn’t yet check for *più* or *meno*
 
 **MN Check Rhythmic Notation**
 

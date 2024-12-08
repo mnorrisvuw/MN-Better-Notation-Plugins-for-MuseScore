@@ -141,7 +141,7 @@ MuseScore {
 		if (!curScore.selection.isRange) selectAll();
 		firstStaffNum = curScore.selection.startStaff;
 		lastStaffNum = curScore.selection.endStaff;
-		errorMsg+="\nfirstStaffNum= "+firstStaffNum+"; lastStaffNum = "+lastStaffNum;
+		//errorMsg+="\nfirstStaffNum= "+firstStaffNum+"; lastStaffNum = "+lastStaffNum;
 		setProgress (1);
 		
 		// **** CALCULATE FIRST BAR IN SCORE & SELECTION **** //
@@ -190,7 +190,7 @@ MuseScore {
 		// **** LOOP THROUGH THE SELECTED STAVES AND THE SELECTED BARS **** //
 		// ** NB — lastStaffNum IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
 		for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
-			errorMsg += "\n—————————————————\nSTAFF "+currentStaffNum;
+			errorMsg += "\n——— STAFF "+currentStaffNum+" ————";
 			
 			// is this staff visible?
 			var theStaff = staves[currentStaffNum];
@@ -215,7 +215,7 @@ MuseScore {
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 				
-				errorMsg += "\n—————————————————\nBAR "+currentBarNum;
+				errorMsg += "\nb. "+currentBarNum;
 				
 								
 				// **** GET TIME SIGNATURE **** //
@@ -226,7 +226,7 @@ MuseScore {
 				
 				// **** GET BAR START & END TICKS **** //
 				barStart = currentBar.firstSegment.tick;
-				var barEnd = currentBar.lastSegment.tick
+				var barEnd = currentBar.lastSegment.tick;
 				barLength = barEnd - barStart;
 				beatLength = crotchet;
 				isPickupBar = false;
@@ -561,8 +561,8 @@ MuseScore {
 						addError ("Never write a minim rest in 3/4\n(See ‘Behind Bars’ p. 161)",noteRest);
 						return;
 					}
-					if (timeSigStr === "4/4" && noteStartBeat % 2 == 0) hidingBeatError = false;
-					if (timeSigStr === "5/4" && (noteStartBeat == 0 || noteStartBeat == 2 || noteStartBeat == 3)) hidingBeatError = false;
+					hidingBeatError = false;
+					if ((timeSigStr === "4/4" || timeSigStr === "5/4" || timeSigStr === "2/2") && noteStartBeat == 1) hidingBeatError = true;
 				}
 				if (soundingDur == dottedminim) {
 					if (timeSigStr === "4/4") {
@@ -1419,7 +1419,7 @@ MuseScore {
 	
 	ApplicationWindow {
 		id: dialog
-		title: "WARNING!"
+		title: "COMPLETION"
 		property var msg: ""
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint

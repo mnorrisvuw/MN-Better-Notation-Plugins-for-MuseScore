@@ -17,7 +17,7 @@ MuseScore {
 	description: "This plugin checks your score for common music layout, notation and instrumentation issues"
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation";
 	requiresScore: true
-	title: "MN Check Layout &amp; Instrumentation"
+	title: "MN Check Layout and Instrumentation"
 	id: mnchecklayoutandinstrumentation
 	thumbnailName: "MNCheckLayoutAndInstrumentation.png"
 	
@@ -68,7 +68,7 @@ MuseScore {
 	property var isGrandStaff: []
 	property var isTopOfGrandStaff: []
 	property var numGrandStaves: []
-	property var grandStaves: []
+	property var grandStaffTops: []
 	property var numParts: 0
 	property var parts: null
 	property var scoreHasStrings: false
@@ -108,6 +108,7 @@ MuseScore {
 	property var currentPlayingTechnique: ""
 	property var currentContactPoint: ""
 	property var ledgerLines: []
+	property var maxLLSinceLastRest: 0
 	property var fullInstNamesShowing: false
 	property var shortInstNamesShowing: false
 	property var firstBarInScore: null
@@ -348,7 +349,7 @@ MuseScore {
 		lastBarInScore = curScore.lastMeasure;
 		numBars = curScore.nmeasures;
 		cursor.rewind(Cursor.SCORE_END);
-		errorMsg += "\n————————\n\nSTARTING LOOP\n\n";
+		//errorMsg += "\n————————\n\nSTARTING LOOP\n\n";
 		noteCountInSystem = [];
 		beatCountInSystem = [];
 		var inchesToMM = 25.4;
@@ -367,7 +368,7 @@ MuseScore {
 		
 		// ************ 					START LOOP THROUGH WHOLE SCORE 						************ //
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
-			errorMsg += "\n——— currentStaff = "+currentStaffNum;
+			errorMsg += "\n——— STAFF "+currentStaffNum+" ————";
 			
 			//don't process if this part is hidden
 			if (!staffVisible[currentStaffNum]) {
@@ -381,9 +382,9 @@ MuseScore {
 			prevKeySigSharps = -99; // placeholder/dummy variable
 			prevKeySigBarNum = 0;
 			prevBarNum = 0;
-			prevClef = null;
 			prevDynamic = "";
 			prevDynamicBarNum = 0;
+			prevClef = null;
 			currentMute = "senza";
 			currentPlayingTechnique = "arco";
 			currentContactPoint = "ord";
@@ -475,7 +476,7 @@ MuseScore {
 				var startTrack = currentStaffNum * 4;
 				var goneToNextBar = false;
 				var firstNoteInThisBar = null;
-				//errorMsg += "\nBAR "+currentBarNum;
+				errorMsg += "\nb. "+currentBarNum;
 				var timeSig = 	currentBar.timesigNominal;
 
 				if (currentStaffNum == 0) {
@@ -519,7 +520,7 @@ MuseScore {
 					cursor.filter = Segment.All;
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStartTick);
-					var processingThisBar = cursor.element && cursor.tick < barEnd;
+					var processingThisBar = cursor.element && cursor.tick < barEndTick;
 					var numNotesInThisTrack = 0;
 					prevNote = null;
 					prevSlurNum = null;
@@ -761,7 +762,7 @@ MuseScore {
 							//errorMsg += "\nFOUND NOTE";
 							
 							if (isRest) {
-								if (tickHasDynamic) addError ("In general, you shouldn’t put dynamic markings under rests.", theDynamic);
+								if (tickHasDynamic && !isGrandStaff[currentStaffNum]) addError ("In general, you shouldn’t put dynamic markings under rests.", theDynamic);
 								if (hairpinNeedsTerminating) {
 									//errorMsg += "\nGot rest after hairpin term: type is "+hairpinToTerminate.hairpinType;
 									if (hairpinToTerminate.hairpinType == 1) {
@@ -769,6 +770,7 @@ MuseScore {
 										hairpinToTerminate = null;
 									}
 								}
+								maxLLSinceLastRest = 0;
 							} else {
 															
 								// ************ CHECK GRACE NOTES ************ //
@@ -797,7 +799,7 @@ MuseScore {
 									isFirstNote = false;
 									
 									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
-									if (!firstDynamic) addError("This note should have an initial dynamic level set.",noteRest);
+									if (!firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.",noteRest);
 									
 									// ************ CHECK IF SCORE IS TRANSPOSED ************ //
 									if (!containsTransposingInstruments) {
@@ -1062,8 +1064,7 @@ MuseScore {
 				isGrandStaff[i] = true;
 				isTopOfGrandStaff[i-1] = !prevPart.is(prevPrevPart);
 				isTopOfGrandStaff[i] = false;
-				grandStaves.push(i-1);
-				grandStaves.push(i);
+				grandStaffTops.push(i-1);
 				numGrandStaves ++;
 				// NOTE: THIS DOESN'T WORK IF YOUR GRAND STAFF HAS MORE THAN 2 STAVES
 			} else {
@@ -1097,8 +1098,10 @@ MuseScore {
 	
 			if (checkGrandStaffOrder) {
 				for (var i = 0; i < numGrandStaves;i++) {
-					var bottomGrandStaffNum = grandStaves[i*2+1];
-					if (bottomGrandStaffNum < numStaves && !isGrandStaff[bottomGrandStaffNum+1] && staffVisible[bottomGrandStaffNum]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Instruments tab.","pagetop");
+					var bottomGrandStaffNum = grandStaffTops[i]+1;
+					if (bottomGrandStaffNum < numStaves-1) {
+						if (!isGrandStaff[bottomGrandStaffNum+1] && staffVisible[bottomGrandStaffNum]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Instruments tab.","pagetop");
+					}
 				}
 			}
 		}
@@ -1257,7 +1260,7 @@ MuseScore {
 			}
 			
 			// STRINGS, HARP, PERCUSSION
-			if (currentInstrumentId.includes("instrument.keyboard") || currentInstrumentId.includes("pluck.harp") || currentInstrumentId.includes(".marimba")) {
+			if (currentInstrumentId.includes("keyboard") || currentInstrumentId.includes("pluck.harp") || currentInstrumentId.includes(".marimba")) {
 				readsBass = true;
 				reads8va = true;
 				checkClefs = true;
@@ -1730,7 +1733,7 @@ MuseScore {
 	
 	function checkClef (clef) {
 		var clefId = clef.subtypeName();
-		//errorMsg += "\nChecking clef — "+clefId+" "+currentInstrumentName;
+		//errorMsg += "\nChecking clef — "+clefId+" prevClef is "+prevClef;
 		isTrebleClef = clefId.includes("Treble clef");
 		isAltoClef = clefId === "Alto clef";
 		isTenorClef = clefId === "Tenor clef";
@@ -1756,7 +1759,9 @@ MuseScore {
 		}
 		
 		// **** CHECK FOR REDUNDANT CLEFS **** //
-		if (clef.is(prevClef)) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
+		if (prevClef != null) {
+			if (clefId === prevClef.subtypeName()) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
+		}
 		prevClef = clef;
 	}
 	
@@ -2420,6 +2425,8 @@ MuseScore {
 	
 	function checkLedgerLines (noteRest) {
 		var numLedgerLines = getMaxNumLedgerLines(noteRest);
+		var absLL = Math.abs(numLedgerLines);
+		if (absLL > maxLLSinceLastRest) maxLLSinceLastRest = absLL;
 		//errorMsg += "maxNumLL = "+maxNumLedgerLines;
 		var numberOfLedgerLinesToCheck = 3;
 		if (ledgerLines.length >= numberOfLedgerLinesToCheck) ledgerLines = ledgerLines.slice(1);
@@ -2473,15 +2480,15 @@ MuseScore {
 				if (isOttava && currentOttava != null) {
 					var ottavaArray = ["an 8va","an 8ba","a 15ma","a 15mb"];
 					var ottavaStr = ottavaArray[currentOttava.ottavaType]; 
-					//errorMsg += "\nTesting 8va Here — currentOttava.ottavaType = "+currentOttava.ottavaType+"; averageNumLedgerLines "+averageNumLedgerLines;
+					//errorMsg += "\nTesting 8va Here — currentOttava.ottavaType = "+currentOttava.ottavaType+"; averageNumLedgerLines "+averageNumLedgerLines+" maxLLSinceLastRest="+maxLLSinceLastRest;
 					if (currentOttava.ottavaType == 0 || currentOttava.ottavaType == 2) {
-						if (averageNumLedgerLines < 2) {
+						if (averageNumLedgerLines < 2 && maxLLSinceLastRest < 2) {
 							addError("This passage is quite low for "+ottavaStr+" line:\nyou should be able to safely write this at pitch",currentOttava);
 							flaggedLedgerLines = true;
 							return;
 						}
 					} else {
-						if (averageNumLedgerLines > -2) {
+						if (averageNumLedgerLines > -2 && maxLLSinceLastRest < 2) {
 							addError("This passage is quite high for "+ottavaStr+" line:\nyou should be able to safely write this at pitch",currentOttava);
 							flaggedLedgerLines = true;
 							return;
@@ -3248,7 +3255,7 @@ MuseScore {
 	
 	ApplicationWindow {
 		id: dialog
-		title: "WARNING!"
+		title: "COMPLETION"
 		property var msg: ""
 		visible: false
 		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
