@@ -37,6 +37,7 @@ MuseScore {
 	property var errorObjects: []
 	property var prevBarNum: 0
 	property var prevMIDIPitch: -1
+	property var prevPrevMIDIPitch: -1
 	property var prevDiatonicPitch
 	property var prevPC: 0
 	property var prevScalarInterval: 0
@@ -64,6 +65,8 @@ MuseScore {
 	property var currentClef: null
 	property var clefOffset: 0
 	property var isPercussionClef: false
+	property var prevAccInKeySig: false
+	property var cmdKey: 'command'
 
   onRun: {
 		if (!curScore) return;
@@ -75,6 +78,8 @@ MuseScore {
 		// **** GATHER VARIABLES **** //
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
+		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
+		
 		
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
 		deleteAllCommentsAndHighlights();
@@ -142,6 +147,7 @@ MuseScore {
 			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
+			prevPrevMIDIPitch = -1;
 			prevDiatonicPitch = -1;
 			prevPC = -1;
 			prevScalarInterval = -1;
@@ -155,6 +161,7 @@ MuseScore {
 			prevIsAugDim = false;
 			prevNote = null;
 			prevPrevNote = null;
+			prevAccInKeySig = false;
 
 			// clear the arrays
 			currAccs.fill(0);
@@ -323,29 +330,29 @@ MuseScore {
 					isDoubleAcc = true;
 					break;
 			}
-			var MIDIpitch = note.pitch;
+			var MIDIPitch = note.pitch;
 			var l = note.line; // 0 is F5, 1 is E5, 2 is D5, 3 is C5
 			var octave = Math.floor((3-l+clefOffset)/7)+6; // lowest possible note needs to be octave 0 — i.e. C-1 (midiPitch 0) will be octave 0; therefore C4 will be octave 5
 			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
 			var diatonicPitch = diatonicPitchClass+octave*7; // diatonic pitch is where 
 			//errorMsg += "\n\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass;
 
-			var accIsInKS = false;
-			if (currentKeySig == 0 && accType == Accidental.NATURAL) accIsInKS = true;
+			var accInKeySig = false;
+			if (currentKeySig == 0 && accType == Accidental.NATURAL) accInKeySig = true;
 			if (currentKeySig > 0) {
 				accOrder = ((diatonicPitchClass + 4) * 2) % 7;
 				if (accType == Accidental.SHARP) {
 					//errorMsg += "\nhere";
-					accIsInKS = accOrder < currentKeySig;
+					accInKeySig = accOrder < currentKeySig;
 				}
-				if (accType == Accidental.NATURAL) accIsInKS = (accOrder + 1) > currentKeySig; 
+				if (accType == Accidental.NATURAL) accInKeySig = (accOrder + 1) > currentKeySig; 
 			}
 			if (currentKeySig < 0) {
 				accOrder = (2 * (13 - diatonicPitchClass)) % 7;
-				if (accType == Accidental.FLAT) accIsInKS = accOrder < Math.abs(currentKeySig);
-				if (accType == Accidental.NATURAL) accIsInKS = (accOrder + 1) > Math.abs(currentKeySig);
+				if (accType == Accidental.FLAT) accInKeySig = accOrder < Math.abs(currentKeySig);
+				if (accType == Accidental.NATURAL) accInKeySig = (accOrder + 1) > Math.abs(currentKeySig);
 			}
-			//errorMsg += "accInKeySig = "+accIsInKS+"; accType = "+accType+";";
+			//errorMsg += "accInKeySig = "+accInKeySig+"; accType = "+accType+";";
 
 			if (!note.tieBack) {
 				var noteLabel = pitchLabels[diatonicPitchClass]+accidentals[acc+2];
@@ -361,7 +368,7 @@ MuseScore {
 				// case 3: acc is same as prev and acc is in ks
 				if (currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && accVisible) {
 					prevBarNum = barAltered[diatonicPitch];
-					if (barNum == prevBarNum || accIsInKS) {
+					if (barNum == prevBarNum || accInKeySig) {
 							accidentalName = accidentalNames[acc+2];
 							addError("This was already a "+accidentalName+".",note);
 					}
@@ -381,7 +388,7 @@ MuseScore {
 							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" earlier in the bar.",note);
 						}
 						if (accVisible && currPCAccs[diatonicPitchClass] == acc) {
-							if (barNum - prevBarNum > 2 && accIsInKS) {
+							if (barNum - prevBarNum > 2 && accInKeySig) {
 								accidentalName = accidentalNames[acc+2];
 								addError("This was already a "+accidentalName+".",note);
 							}
@@ -390,7 +397,7 @@ MuseScore {
 				}
 				currAccs[diatonicPitch] = acc;
 				currPCAccs[diatonicPitchClass] = acc;
-				if (accVisible && !accIsInKS) {
+				if (accVisible && !accInKeySig) {
 					barAltered[diatonicPitch] = barNum;
 					//errorMsg += "\nAdded bar "+barNum+" to barAltered["+diatonicPitch+"]";
 				}
@@ -410,7 +417,7 @@ MuseScore {
 				if (prevMIDIPitch != -1 && prevDiatonicPitch != -1) {
 					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
-					chromaticInterval = MIDIpitch - prevMIDIPitch;
+					chromaticInterval = MIDIPitch - prevMIDIPitch;
 					//errorMsg += "\nscalarInterval="+scalarInterval+" chromaticInterval="+chromaticInterval;
 					if (chromaticInterval != 0) {
 						if (scalarInterval < 0) {
@@ -435,6 +442,25 @@ MuseScore {
 						var dci = defaultChromaticInterval[scalarIntervalClass];
 						var alteration = chromaticIntervalClass - dci;
 						//errorMsg += "\ndci="+dci+" alt="+alteration;
+						
+						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
+						if (prevPrevMIDIPitch != -1) {
+							//errorMsg += "\nprevPrevMIDIPitch = "+prevPrevMIDIPitch+"; prevMIDIPitch="+prevMIDIPitch+" MIDIPitch="+MIDIPitch;
+							if (prevMIDIPitch - prevPrevMIDIPitch == 1 && MIDIPitch - prevMIDIPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !(prevNote.parent.is(chord))){
+								//errorMsg += "\nFound Chromatic Ascent";
+								if (prevAcc < 0 && !prevAccInKeySig) {
+									// got a flat
+									addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
+								}
+							}
+							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !(prevNote.parent.is(chord))){
+								//errorMsg += "\nFound Chromatic Descent";
+								if (prevAcc > 0 && !prevAccInKeySig) {
+									// got a sharp
+									addError ("Use of a sharp during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
+								}
+							}
+						}
 
 						// **		IS THIS AUGMENTED OR DIMINISHED? 		** //
 						var isFourthFifthOrUnison = (scalarIntervalClass == 0 || scalarIntervalClass == 3 || scalarIntervalClass == 4);
@@ -511,7 +537,11 @@ MuseScore {
 								noteToHighlight = note;
 								theAccToChange = acc;
 								thePitchClassToChange = diatonicPitchClass;
-								prevNext = "previous";
+								if (prevNote.parent.is(chord)) {
+									prevNext = "note below";
+								} else {
+									prevNext = "previous note";
+								}
 								newNotePitch = "";
 								newNoteAccidental = "";
 								flatten = isAug;
@@ -528,7 +558,11 @@ MuseScore {
 									theAccToChange = prevAcc;
 									thePitchClassToChange = prevDiatonicPitchClass;
 									noteToHighlight = prevNote;
-									prevNext = "next";
+									if (prevNote.parent.is(chord)) {
+										prevNext = "note above";
+									} else {
+										prevNext = "next note";
+									}
 									//errorMsg += "\nChoosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
 									
 								}
@@ -621,7 +655,7 @@ MuseScore {
 									//if (isBad) doShowError = false;
 									//}
 								if (doShowError && !changeIsBad) {
-									var t = "Interval with "+prevNext+" pitch is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel;
+									var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press Cmd-J)";
 									// "\n"+t;
 									//errorMsg += "\n******** Note to highlight = "+noteToHighlight;
 									//errorMsg += "\n"+staffNum;
@@ -700,11 +734,13 @@ MuseScore {
 					if (doShowError) addError("Avoid writing "+noteLabel+"s.\nConsider respelling as "+newNoteLabel,noteToHighlight);
 				} // end if (!doShowError && accVisible && isProblematic && !isMicrotonal)
 
-				if (chromaticInterval != 0 || prevMIDIPitch == -1) {	
+				if (chromaticInterval != 0) {
+					prevPrevNote = prevNote;
 					prevNote = note;
 					//errorMsg += "\nprevNote now "+prevNote;
-					prevMIDIPitch = MIDIpitch;
-					//errorMsg += "\nprevMIDIPitch now "+prevMIDIPitch;
+					prevPrevMIDIPitch = prevMIDIPitch;
+					prevMIDIPitch = MIDIPitch;
+					//errorMsg += "\nprevPrevMIDIPitch now "+prevPrevMIDIPitch+"; prevMIDIPitch now "+prevMIDIPitch;
 					
 					prevDiatonicPitch = diatonicPitch;
 					prevDiatonicPitchClass = diatonicPitchClass;
@@ -712,6 +748,7 @@ MuseScore {
 					prevChromaticIntervalClass = chromaticIntervalClass;
 					prevAcc = acc;
 					prevAccVisible = accVisible;
+					prevAccInKeySig = accInKeySig;
 					prevIsAugDim = isAugDim;
 					prevScalarIntervalAbs = scalarIntervalAbs;
 					prevScalarIntervalClass = scalarIntervalClass;

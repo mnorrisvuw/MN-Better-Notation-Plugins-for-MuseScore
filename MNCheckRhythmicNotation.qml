@@ -457,6 +457,28 @@ MuseScore {
 								tiedNotes = [];
 							}
 							
+							// ** ————————————————————————————————————————————————— ** //
+							// **       CHECK 7: COULD BE STACCATO									** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
+								if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
+									flaggedWrittenStaccato = true;
+									addError ("Consider simplifying this passage by making the note\na quaver and adding a staccato dot.",noteRest);
+								}
+							}
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 8: SPLIT NON-BEAT-BREAKING RESTS				** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (isRest && !noteHidesBeat) {
+								if (isOnTheBeat) {
+									checkOnbeatRestSpelling(noteRest);
+								} else {
+									checkOffbeatRestSpelling(noteRest);
+								}
+							}
+							
+							// *** GO TO NEXT SEGMENT *** //
 							if (cursor.next()) {
 								processingThisBar = cursor.measure.is(currentBar);
 							} else {
@@ -553,26 +575,47 @@ MuseScore {
 		//errorMsg += "\nChecking beat Hiding";
 		if (isOnTheBeat) {
 			
-			// ** ON THE BEAT RESTS ** //
+			// ** ON THE BEAT — RESTS ** //
 			if (isRest) {
-				if (soundingDur == minim) {
-					// ok in 4/4 on 1 & 3
-					if (timeSigStr === "3/4") {
-						addError ("Never write a minim rest in 3/4\n(See ‘Behind Bars’ p. 161)",noteRest);
+				if (soundingDur == dottedminim) {
+					if (timeSigStr === "4/4" || timeSigStr === "9/8") {
+						addError ("Never write a dotted minim rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
 						return;
 					}
-					hidingBeatError = false;
-					if ((timeSigStr === "4/4" || timeSigStr === "5/4" || timeSigStr === "2/2") && noteStartBeat == 1) hidingBeatError = true;
 				}
-				if (soundingDur == dottedminim) {
-					if (timeSigStr === "4/4") {
-						addError ("Never write a dotted minim rest in 4/4\n(See ‘Behind Bars’ p. 162)",noteRest);
+
+				if (soundingDur == crotchet) {
+					if (timeSigStr === "3/8") {
+						addError ("Never write a crotchet rest in 3/8\n(See ‘Behind Bars’ p. 162)",noteRest);
+						return;
+					}
+				}
+				if (isCompound) {
+					hidingBeatError = soundingDur % beatLength;
+					if (soundingDur == dottedminim && timeSigStr === "12/8") {
+						addError ("Never write a dotted minim rest on beat 2 of a 12/8 bar\n(See ‘Behind Bars’ p. 163)",noteRest);
+						return;
+					}
+				} else {
+					if (soundingDur == minim) {
+						// ok in 4/4 on 1 & 3
+						if (timeSigStr === "3/4") {
+							addError ("Never write a minim rest in 3/4\n(See ‘Behind Bars’ p. 161)",noteRest);
+							return;
+						}
+						hidingBeatError = false;
+						if ((timeSigStr === "4/4" || timeSigStr === "5/4" || timeSigStr === "2/2") && noteStartBeat == 1) hidingBeatError = true;
+						if (timeSigStr === "6/4") hidingBeatError = true;
+					}
+					
+					if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
+						addError ("Never write a dotted crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
 						return;
 					}
 				}
 			} else {
 				
-				// ** ON THE BEAT NOTES ** //
+				// ** ON THE BEAT — NOTES ** //
 				if (isCompound) {
 					hidingBeatError = soundingDur % beatLength;
 				} else {
@@ -597,8 +640,31 @@ MuseScore {
 			// EXCLUDE OFFBEAT CROTCHET IFF
 			// 1) it's on the right place
 			// 2) it's not tied
+			if (isRest) {
+				if (soundingDur == dottedminim) {
+					if (timeSigStr === "4/4" || timeSigStr === "9/8") {
+						addError ("Never write a dotted minim rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
+						return;
+					}
+				}
+				if (soundingDur >= dottedquaver && soundingDur < crotchet) {
+					if (!isCompound) {
+						addError("Don’t use an offbeat dotted quaver rest in simple time\nSplit it into a semiquaver and quaver rest\n(See ‘Behind Bars’ p. 162)",noteRest);
+						return;
+					}
+				}
+				if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
+					addError ("Never write a dotted crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
+					return;
+				}
+				
+				if (soundingDur == crotchet && timeSigStr == "3/8") {
+					addError ("Never write a crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 161)",noteRest);
+					return;
+				}
+			}
 			
-			// ** OFFBEAT CROTCHET ** //
+			// ** OFF THE BEAT CROTCHET ** //
 			if (displayDur == crotchet) {
 				if (noteRest.tuplet == null) {
 					if (isNote) {
@@ -624,7 +690,7 @@ MuseScore {
 				}
 			}
 				
-			// ** OFFBEAT DOTTED CROTCHET ** //
+			// ** OFF THE BEAT BEAT DOTTED CROTCHET ** //
 			if (displayDur == dottedcrotchet && noteRest.tuplet == null) {
 				//errorMsg += "\nChecking dotted crotchet";
 				if (isNote) {
@@ -637,6 +703,7 @@ MuseScore {
 					}
 				}
 			}
+			
 		}
 		
 		if (hidingBeatError) {
@@ -695,6 +762,24 @@ MuseScore {
 		} // end if hidingBeatError
 	}
 	
+	function checkOnbeatRestSpelling (noteRest) {
+		if (timeSigStr == "3/8" && displayDur == crotchet) {
+			addError ("It is recommend to spell crotchet rests in 3/8 as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
+			return;
+		}
+	}
+	
+	function checkOffbeatRestSpelling (noteRest) {
+		if (timeSigDenom < 8 && noteStartFrac == semiquaver && displayDur == dottedquaver) {
+			addError ("It is recommend to spell offbeat dotted quaver rests as\na semiquaver rest followed by a quaver rest\n(See ‘Behind Bars’ p. 162)",noteRest);
+			return;
+		}
+		if (isCompound && noteStartFrac == quaver && displayDur == crotchet) {
+			addError ("It is recommend to spell offbeat crotchet rests in\ncompound time as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
+			return;
+		}
+	}
+	
 	function condenseOverSpecifiedRest (noteRest) {
 		//errorMsg += "\n*** CHECKING CONDENSING OVER-SPECIFIED REST ***"; 
 		
@@ -744,7 +829,11 @@ MuseScore {
 							var canBeCondensed = true;
 							var p = possibleOnbeatSimplificationDurs[k];
 							// don't simplify anything tied over a beat that is less than a crotchet
-							if (restActualDur == dottedminim) canBeCondensed = (timeSigStr == "6/4" || timeSigStr == "9/4") && !(startBeat % 3);
+							if (restActualDur == dottedminim) {
+								canBeCondensed = false;
+								if (timeSigStr == "6/4" || timeSigStr == "9/4") canBeCondensed = !(startBeat % 3);
+								if (timeSigStr == "12/8") canBeCondensed = !(startBeat % 2);
+							}
 							if (restActualDur == minim) canBeCondensed = !isCompound && !(startBeat % 2);
 							if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = ((timeSigDenom <= 2) || isCompound) && !(startBeat % 2);
 							if (restActualDur == dottedquaver) canBeCondensed = timeSigDenom <= 4;
@@ -791,26 +880,24 @@ MuseScore {
 						for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
 							var canBeCondensed = true;
 							var p = possibleOffbeatSimplificationDurs[k];
+							if (restActualDur != p) continue;
 							
 							// don't simplify anything tied over a beat that is less than a crotchet
-							if (p == dottedcrotchet) canBeCondensed = !isCompound && startFrac == quaver && timeSigDenom <= 2;
+							if (p == dottedcrotchet) canBeCondensed = startFrac == quaver && timeSigDenom == 2;
 							if (p == crotchet) canBeCondensed = false;
 							if (p < crotchet) canBeCondensed = sameBeat;
+							if (p == dottedquaver) canBeCondensed = isCompound && sameBeat;
 							if (canBeCondensed && isCompound && restActualDur == beatLength * 2 / 3) canBeCondensed = false;
-							//errorMsg += "\n(offbeat act) looking for match: "+restActualDur+" = "+p+" = "+(restActualDur==p); 
+							//errorMsg += "\np="+p+" canBeCondensed = "+canBeCondensed+" isCompound="+isCompound; 
 							
-							if (restActualDur == p && canBeCondensed) {
-								if (k > possibleSimplification) {
-									
-									//errorMsg += "\nfound a possibleSimplification actual dur off beat = "+k; 
-									
-									possibleSimplification = k;
-									possibleSimplificationLastRestIndex = j;
-									possibleSimplificationFirstRestIndex = i;
-									simplificationIsOnBeat = false;
-									simplificationFound = true;
-									maxSimplificationFound = (k == maxOffbeatSimplification);
-								}
+							if (canBeCondensed && k > possibleSimplification) {
+								//errorMsg += "\nfound a possibleSimplification actual dur off beat = "+k; 
+								possibleSimplification = k;
+								possibleSimplificationLastRestIndex = j;
+								possibleSimplificationFirstRestIndex = i;
+								simplificationIsOnBeat = false;
+								simplificationFound = true;
+								maxSimplificationFound = (k == maxOffbeatSimplification);
 							}
 						}
 		

@@ -39,6 +39,8 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * Bar rests incorrectly entered manually
   * Notes not beamed together correctly
   * Notes incorrectly beamed together
+  * Notes that might be better written as staccato
+  * Rests that might be better written to show the metre
 
 ***
 
@@ -49,8 +51,9 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * **Staff names and order**: non-standard staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font
   * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest
   * **Text objects**: common misspellings, incorrectly capitalised text, space or non-alphanumeric character at start, text could be abbreviated, incorrect location for expressions, straight quotes instead of curly, tempo marking but not entered in Tempo text, default text in Project Properties not changed
-  * **Orchestral parts issues**: single line on shared wind/brass staff lacking ‘a 2’/‘1.’ marking; string part lacking a ‘unis.’/‘div.’ marking
-  * **String-specific issues**: redundant arco/pizz./col legno/tasto/pont/ord. markings, passage that looks arco but is marked pizz., incorrect notation for string harmonics, string harmonic does not exist, artificial harmonic interval incorrect, long pizz. notes, staccato pizz. notes
+  * **Vocal music**: notes lacking lyrics, notes lacking melismatic extensions, melismata lacking slurs, multiple syllables under one slur, correct positioning of dynamics
+  * **Orchestral parts issues**: monophonic line on a shared wind/brass staff missing player indication (e.g. 1./a 2 etc.); monophonic orchestral string part lacking ‘unis.’ after ‘div.’ marking
+  * **String-specific issues**: redundant arco/pizz./col legno/tasto/pont/ord. markings, passage that looks arco but is marked pizz., incorrect notation for string harmonics, string harmonic does not exist, artificial harmonic interval incorrect, long pizz. notes, staccato pizz. notes, slurs that may be too long for one bow stroke, fingered tremolos not slurred, multiple-stops where two notes have to be played on the same string, triple- or quadruple-stops written with all strings sustained, potentially impossible double-stops
   * **Harp-specific issues**: double flats/sharps, impossible chords, too many notes in a chord, too many quick pedal changes
   * **Instrument-specific issues**: redundant mute indications, piano stretches too wide, flute harmonics incorrectly notated, fluttertongue incorrectly notated  * **Pitch**: incorrect use of clefs, clef change needed, incorrect use of 8va/8vb, 8va/8vb needed
   * **Key signatures**: extreme key signatures (6 or more sharps/flats), rapid key signature change, redundant key signature change
@@ -67,6 +70,7 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * **double-sharps & double-flats** which may not be necessary
   * **extreme accidentals** (e.g. B# Cb E# Fb), accounting for key signature
   * **recommended courtesy accidentals**
+  * **preferred chromatic ascent/descent spelling**
 
 
 ## <a id="installation"></a>Installation
@@ -116,7 +120,7 @@ Direct downloads of the Zip file can be found on the [releases page](https://git
 
 * If this happens, the ‘MN Delete Comments and Highlights’ will not be able to detect them to delete them, and you will have to go through and manually delete each one.
 
-* Therefore, it is recommended that you do not use these commands while there are still comments on your 
+* Therefore, it is recommended that you do not use these commands while there are still comments on your score.
 
 ## Wait! Nothing happened!!!
 
