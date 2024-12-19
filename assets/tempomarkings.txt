@@ -31,7 +31,7 @@ furioso
 furibondo
 lamentoso
 rubato
-l'istesso tempo
+l’istesso tempo
 lo stesso tempo
 maestoso
 più mosso
@@ -46,10 +46,14 @@ tempo 1°
 tempo 1o
 tempo semplice
 au mouvement
+au mouvt
 grave
 lent
 moins vif
 modéré
+cèdez
+retenu
+revenez
 vif
 très vif
 très vite

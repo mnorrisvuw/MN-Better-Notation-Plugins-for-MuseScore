@@ -28,10 +28,13 @@ MuseScore {
 	
 	// **** PROPERTIES **** //
 
+	property var prevCommentPage: null
+	property var commentPosOffset: []
 	property var selectionArray: []
 	property var diatonicPitchAlts: []
 	property var currAccs: []
 	property var currPCAccs: []
+	property var wasGraceNote: []
 	property var barAltered: []
 	property var errorStrings: []
 	property var errorObjects: []
@@ -55,7 +58,6 @@ MuseScore {
 	property var prevAlterationLabel: ""
 	property var currentKeySig: 0
 	property var prevWhichNoteToRewrite: null
-	property var commentPosArray: []
 	property var kFlatStr: 'b'
 	property var kNaturalStr: '♮'
 	property var kSharpStr: '#'
@@ -91,7 +93,7 @@ MuseScore {
 		currAccs = Array(120).fill(0);
 		currPCAccs = Array(120).fill(0);
 		barAltered = Array(120).fill(0);
-		commentPosArray = Array(10000).fill(0);
+		commentPosOffset = Array(10000).fill(0);
 		
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;
@@ -214,12 +216,10 @@ MuseScore {
 								var graceNoteChords = noteRest.graceNotes;
 								if (graceNoteChords != null) {
 									for (var g in graceNoteChords) {
-										checkChord (graceNoteChords[g],noteRest.parent,currentBarNum,currentStaffNum);
+										checkChord (graceNoteChords[g],noteRest.parent,currentBarNum,currentStaffNum,true);
 									}
 								}	
-								if (!isRest) {		
-									checkChord (noteRest,noteRest.parent,currentBarNum,currentStaffNum);
-								}
+								if (!isRest) checkChord (noteRest,noteRest.parent,currentBarNum,currentStaffNum,false);
 							}
 						}
 						if (cursor.next()) {
@@ -272,7 +272,7 @@ MuseScore {
 		if (clefIs8ba) clefOffset -= 7;
 	}
 	
-	function checkChord (chord,theSegment,barNum,staffNum) {
+	function checkChord (chord,theSegment,barNum,staffNum,isGraceNote) {
 		var defaultChromaticInterval = [0,2,4,5,7,9,11];
 		var accTypes = [Accidental.FLAT2, Accidental.FLAT, Accidental.NATURAL, Accidental.SHARP, Accidental.SHARP2];
 		var pitchLabels = ["C","D","E","F","G","A","B"];
@@ -369,8 +369,10 @@ MuseScore {
 				if (currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && accVisible) {
 					prevBarNum = barAltered[diatonicPitch];
 					if (barNum == prevBarNum || accInKeySig) {
+						if (!wasGraceNote[diatonicPitchClass]) {
 							accidentalName = accidentalNames[acc+2];
 							addError("This was already a "+accidentalName+".",note);
+						}
 					}
 				}
 				// check courtesy accidentals
@@ -389,14 +391,17 @@ MuseScore {
 						}
 						if (accVisible && currPCAccs[diatonicPitchClass] == acc) {
 							if (barNum - prevBarNum > 2 && accInKeySig) {
-								accidentalName = accidentalNames[acc+2];
-								addError("This was already a "+accidentalName+".",note);
+								if (!wasGraceNote[diatonicPitchClass]) {
+									accidentalName = accidentalNames[acc+2];
+									addError("This was already a "+accidentalName+".",note);
+								}
 							}
 						}
 					}
 				}
 				currAccs[diatonicPitch] = acc;
 				currPCAccs[diatonicPitchClass] = acc;
+				wasGraceNote[diatonicPitchClass] = isGraceNote;
 				if (accVisible && !accInKeySig) {
 					barAltered[diatonicPitch] = barNum;
 					//errorMsg += "\nAdded bar "+barNum+" to barAltered["+diatonicPitch+"]";
@@ -446,18 +451,21 @@ MuseScore {
 						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
 						if (prevPrevMIDIPitch != -1) {
 							//errorMsg += "\nprevPrevMIDIPitch = "+prevPrevMIDIPitch+"; prevMIDIPitch="+prevMIDIPitch+" MIDIPitch="+MIDIPitch;
-							if (prevMIDIPitch - prevPrevMIDIPitch == 1 && MIDIPitch - prevMIDIPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !(prevNote.parent.is(chord))){
-								//errorMsg += "\nFound Chromatic Ascent";
-								if (prevAcc < 0 && !prevAccInKeySig) {
-									// got a flat
-									addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
+							if (prevMIDIPitch - prevPrevMIDIPitch == 1 && MIDIPitch - prevMIDIPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
+								errorMsg += "\nFound Chromatic Ascent";
+								
+								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
+									errorMsg += "\nPrev notes";
+									
+										if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
 								}
 							}
-							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !(prevNote.parent.is(chord))){
-								//errorMsg += "\nFound Chromatic Descent";
-								if (prevAcc > 0 && !prevAccInKeySig) {
-									// got a sharp
-									addError ("Use of a sharp during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
+							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
+								errorMsg += "\nFound Chromatic Descent";
+								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
+									errorMsg += "\nPrev notes";
+									
+									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
 								}
 							}
 						}
@@ -764,6 +772,18 @@ MuseScore {
 		dialog.show();
 	}
 	
+	function previousNoteRestIsNote (noteRest) {
+		var cursor2 = curScore.newCursor();
+		cursor2.track = noteRest.track;
+		cursor2.rewindToTick(noteRest.parent.tick);
+		if (cursor2.prev()) {
+			var e = cursor2.element;
+			if (e == null) return false;
+			return e.type == Element.CHORD;
+		}
+		return false;
+	}
+	
 	function setProgress (percentage) {
 		if (percentage == 0) {
 			progressStartTime = Date.now();
@@ -851,6 +871,22 @@ MuseScore {
 				}
 			}
 		}
+		
+		var segment = curScore.firstSegment();
+		while (segment) {
+			if (segment.segmentType == Segment.TimeSig) {
+				for (var i = 0; i < curScore.nstaves; i++) {
+					var theTimeSig = segment.elementAt(i*4);
+					if (theTimeSig.type == Element.TIMESIG) {
+						var c = theTimeSig.color;
+						if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(theTimeSig);
+					}
+				}
+			}
+			segment = segment.next;
+		}
+		
+		
 		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) {
 			elementsToRecolor[i].color = "black";
@@ -873,6 +909,7 @@ MuseScore {
 	}
 	
 	function showAllErrors () {
+		var commentPage = null;
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -932,7 +969,7 @@ MuseScore {
 				comment.fontSize = 7.0;
 				comment.fontFace = "Helvetica";
 				comment.autoplace = false;
-				var tick = 0, desiredPosX = 0, desiredPosY = 0;
+				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
 				if (isString) {
 					if (theLocation === "pagetop") {
@@ -993,15 +1030,19 @@ MuseScore {
 						comment.offsetY -= commentHeight;
 					}
 					var commentTopRounded = Math.round(comment.pagePos.y);
-					while (commentPosArray[commentTopRounded+1000]) {
-						commentTopRounded -= commentOffset;
-						comment.offsetY -= commentOffset;
-						comment.offsetX += commentOffset;
+					commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
+					if (commentPage.is(prevCommentPage)) {
+						commentPosOffset[commentTopRounded+1000] += commentOffset;
+						var theOffset = commentPosOffset[commentTopRounded+1000];
+						comment.offsetY -= theOffset;
+						comment.offsetX += theOffset;
+					} else {
+						commentPosOffset[commentTopRounded+1000] = 0;
 					}
-					commentPosArray[commentTopRounded+1000] = true;
-				}		
+					prevCommentPage = commentPage;
+				}
 			}
-		}
+		} // var i
 		curScore.endCmd();
 	}
 	
