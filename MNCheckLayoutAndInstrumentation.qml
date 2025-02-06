@@ -82,6 +82,8 @@ MuseScore {
 	property var spellingerrorsatstart: ""
 	property var tempomarkings: ""
 	property var tempochangemarkings: ""
+	property var lastTempoChangeMarkingBar: -1
+	property var lastTempoChangeMarking: null
 	property var currentStaffNum: 0
 	property var currentTimeSig: null
 	property var prevTimeSig: ""
@@ -431,6 +433,7 @@ MuseScore {
 			isSharedStaff = isSharedStaffArray[currentStaffNum];
 			isDiv = false;
 			firstDynamic = false;
+			lastTempoChangeMarkingBar = -1;
 			
 			// ** clear flags ** //
 			flaggedLedgerLines = false;
@@ -558,6 +561,13 @@ MuseScore {
 			
 				// ************ CHECK HARP ISSUES ************ //
 				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues(currentBar,currentStaffNum);
+				
+				// ************ CHECK UNTERMINATED TEMPO CHANGE ************ //
+				if (lastTempoChangeMarkingBar != -1 && currentBarNum == lastTempoChangeMarkingBar + 8) {
+					//errorMsg += "\nFound unterminated tempo change in b. "+currentBarNum;
+					addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
+					lastTempoChangeMarkingBar = -1;
+				}
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					// **** UPDATE PROGRESS MESSAGE **** //
@@ -946,12 +956,12 @@ MuseScore {
 				} // end track loop
 				if (isWindOrBrassInstrument && isSharedStaff) {
 					if (numTracksWithNotes > 1 || isChord) {
-						errorMsg += "\nmultiple parts found";
+						//errorMsg += "\nmultiple parts found";
 						weKnowWhosPlaying = false;
 						flaggedWeKnowWhosPlaying = false;
 					} else {
 
-						errorMsg += "\nnumTracksWithNotes="+numTracksWithNotes+" weKnowWhosPlaying="+weKnowWhosPlaying+" flaggedWeKnowWhosPlaying="+flaggedWeKnowWhosPlaying;
+						//errorMsg += "\nnumTracksWithNotes="+numTracksWithNotes+" weKnowWhosPlaying="+weKnowWhosPlaying+" flaggedWeKnowWhosPlaying="+flaggedWeKnowWhosPlaying;
 						if (numTracksWithNotes == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
 							addError("This bar has only one melodic line on a shared staff\nThis needs to be marked with, e.g., 1./2./a 2",firstNoteInThisBar);
 							flaggedWeKnowWhosPlaying = true;
@@ -2100,9 +2110,12 @@ MuseScore {
 						}
 					}
 				}
-				
+								
 				// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
 				if (isTempoChangeMarking) {
+					lastTempoChangeMarkingBar = currentBarNum;
+					//errorMsg += "\nFound tempo change in b. "+currentBarNum;
+					lastTempoChangeMarking = textObject;
 					if (eType != Element.TEMPO_TEXT) {
 						addError( "‘"+plainText+"’ is a tempo change marking\nbut has not been entered as Tempo Text",textObject);
 						return;
@@ -2124,6 +2137,8 @@ MuseScore {
 					}
 				}
 				if (isTempoMarking) {
+					lastTempoChangeMarkingBar = -1;
+					//errorMsg += "\nCancelled tempo change marking in b. "+currentBarNum;
 					
 					// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
 					if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking\nbut has not been entered as Tempo Text",textObject);
@@ -3547,6 +3562,10 @@ MuseScore {
 					if (commentPage.is(prevCommentPage)) {
 						commentPosOffset[commentTopRounded+1000] += commentOffset;
 						var theOffset = commentPosOffset[commentTopRounded+1000];
+						if (theOffset > 4 * commentOffset) {
+							theOffset = 0;
+							commentPosOffset[commentTopRounded+1000] = 0;
+						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
 					} else {

@@ -1505,6 +1505,10 @@ MuseScore {
 					if (commentPage.is(prevCommentPage)) {
 						commentPosOffset[commentTopRounded+1000] += commentOffset;
 						var theOffset = commentPosOffset[commentTopRounded+1000];
+						if (theOffset > 4 * commentOffset) {
+							theOffset = 0;
+							commentPosOffset[commentTopRounded+1000] = 0;
+						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
 					} else {
