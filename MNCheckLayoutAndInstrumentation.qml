@@ -554,6 +554,11 @@ MuseScore {
 				pedalChangesInThisBar = 0;
 				flaggedPedalChangesInThisBar = false;
 				if (currentBarNum % 2) flaggedFastMultipleStops = false;
+				
+			
+				// ************ CHECK HARP ISSUES ************ //
+				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues(currentBar,currentStaffNum);
+				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					// **** UPDATE PROGRESS MESSAGE **** //
 					loop++;
@@ -903,8 +908,6 @@ MuseScore {
 									// ************ CHECK PIANO STRETCH ************ //
 									if (isKeyboardInstrument && isChord) checkPianoStretch(noteRest);
 								
-									// ************ CHECK HARP ISSUES ************ //
-									if (isHarp && (isTopOfGrandStaff[currentStaffNum]|| !isGrandStaff[currentStaffNum])) checkHarpIssues(noteRest,currentStaffNum,currentBar);
 						
 									// ************ CHECK TREMOLOS ************ //
 									if (oneNoteTremolos[currentStaffNum][currTick] != null) checkOneNoteTremolo(noteRest,oneNoteTremolos[currentStaffNum][currTick]);
@@ -1491,11 +1494,11 @@ MuseScore {
 		}
 		if (numStaves == 3) {
 			maxSize = 6.5;
-			minSize = 5.5;
+			minSize = 5.4;
 		}
 		if (numStaves > 3 && numStaves < 8) {
 			maxSize = 6.5 - ((numStaves - 3) * 0.1);
-			minSize = 5.5 - ((numStaves - 3) * 0.1);
+			minSize = 5.4 - ((numStaves - 3) * 0.1);
 		}
 		if (numStaves > 7) {
 			maxSize = 5.4;
@@ -1505,7 +1508,7 @@ MuseScore {
 		if (staffSize > maxSize) pageSettingsComments.push("Decrease the stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
 		if (staffSize < minSize) {
 			if (staffSize < 4.4) {
-				if (staffSize < minSize) pageSettingsComments.push("Increase the stave space to at least 1.1mm");
+				if (staffSize < minSize) pageSettingsComments.push("The staff size is very small.\nIncrease the stave space to at least 1.1mm");
 			} else {
 				pageSettingsComments.push("Increase the stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
 			}
@@ -2088,10 +2091,13 @@ MuseScore {
 		
 				// **** IS THIS A TEMPO CHANGE MARKING??? **** //
 				var isTempoChangeMarking = false;
-				for (var i = 0; i < tempochangemarkings.length; i++) {
-					if (lowerCaseText.includes(tempochangemarkings[i])) {
-						isTempoChangeMarking = true;
-						break;
+				if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+					for (var i = 0; i < tempochangemarkings.length; i++) {
+						var theText = tempochangemarkings[i];
+						if (lowerCaseText.includes(theText)) {
+							isTempoChangeMarking = true;
+							break;
+						}
 					}
 				}
 				
@@ -2109,11 +2115,12 @@ MuseScore {
 		
 				// **** IS THIS A TEMPO MARKING? **** //
 				var isTempoMarking = false;
-		
-				for (var j = 0; j < tempomarkings.length; j++) {
-					if (lowerCaseText.includes(tempomarkings[j])) {
-						isTempoMarking = true;
-						break;
+				if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+					for (var j = 0; j < tempomarkings.length; j++) {
+						if (lowerCaseText.includes(tempomarkings[j])) {
+							isTempoMarking = true;
+							break;
+						}
 					}
 				}
 				if (isTempoMarking) {
@@ -3088,63 +3095,118 @@ MuseScore {
 		
 	}
 	
-	function checkHarpIssues (noteRest, staffNum, bar) {
-		var theNotes = noteRest.notes;
-		var numNotes = theNotes.length;
-		//errorMsg += "\nHere: numNotes="+numNotes;
+	function checkHarpIssues (currentBar, staffNum) {
+		var cursor = curScore.newCursor();
+		var barStartTick = currentBar.firstSegment.tick;
+		var barEndTick = currentBar.lastSegment.tick;
 		
-		var pedalLabels = ['C','G','D','A','E','B','F'];
-		var pedalAccs = ['b','♮','#'];
-		var pedalSettingInThisChord = [-1,-1,-1,-1,-1,-1,-1];
-		for (var i = 0; i < numNotes; i++) {
-			var tpc = theNotes[i].tpc;
-			if (tpc < 6) {
-				addError ("You can’t use double flats in harp parts", nn[i]);
-				continue;
-			}
-			if (tpc > 26) {
-				addError ("You can’t use double sharps in harp parts", nn[i]);
-				continue;
-			}
-			var pedalSetting = parseInt((tpc - 6) / 7);
-			var pedalNumber = tpc % 7;
-			//errorMsg += "\ntpc "+tpc+" pedalSetting "+pedalSetting+" pedalNum "+pedalNumber+" pedalSetting "+pedalSettings[pedalNumber];
-			if (pedalSettings[pedalNumber] == -1) {
-				errorMsg += "\n"+pedalLabels[pedalNumber]+pedalAccs[pedalSetting];
-				pedalSettings[pedalNumber] = pedalSetting;
-				pedalSettingInThisChord[pedalNumber] = pedalSetting;
-			} else {
-				if (pedalSettings[pedalNumber] != pedalSetting) {
-					//change
-					errorMsg += "\n"+pedalLabels[pedalNumber]+pedalAccs[pedalSettings[pedalNumber]]+"→"+pedalLabels[pedalNumber]+pedalAccs[pedalSetting];
-					
-					pedalSettings[pedalNumber] = pedalSetting;
-					pedalChangesInThisBar ++;
-					errorMsg += "\npedalChangesInThisBar now "+pedalChangesInThisBar;
-					
-					if (pedalChangesInThisBar > 2 && !flaggedPedalChangesInThisBar) {
-						addError ("There are a number of pedal changes in this bar.\nIt might be challenging for the harpist to play.",noteRest);
-						flaggedPedalChangesInThisBar = true;
+		// collate all the notes in this bar
+		var allNotes = [];
+		
+		var endStaffNum = staffNum;
+		if (isTopOfGrandStaff[staffNum]) endStaffNum ++;
+		for (var currStaffNum = staffNum; currStaffNum <= endStaffNum; currStaffNum ++) {
+			// set cursor staff
+			for (var currentTrack = currStaffNum * 4; currentTrack < currStaffNum * 4 + 4; currentTrack ++) {
+				cursor.filter = Segment.ChordRest;
+				cursor.track = currentTrack;
+				cursor.rewindToTick(barStartTick);
+				var processingThisBar = cursor.element && cursor.tick < barEndTick;
+			
+				while (processingThisBar) {
+					var currSeg = cursor.segment;
+					var currTick = currSeg.tick;
+					var noteRest = cursor.element;
+					if (noteRest.type == Element.CHORD) {
+						var theNotes = noteRest.notes;
+						var nNotes = theNotes.length;
+						if (allNotes[currTick] == undefined) allNotes[currTick] = [];
+						for (var  i = 0; i < nNotes; i++) {
+							allNotes[currTick].push(theNotes[i]);
+						}
+						errorMsg += "\nPushed "+nNotes+" notes at "+currTick;
 					}
-					
-				}
-				// check this chord first
-				
-				if (pedalSettingInThisChord[pedalNumber] == -1) {
-					pedalSettingInThisChord[pedalNumber] = pedalSetting
-				} else {
-					if (pedalSettingInThisChord[pedalNumber] != pedalSetting) {
-						//errorMsg += "\nPedal "+pedalLabels[pedalNumber]+" in this chord was changed to "+pedalAccs[pedalSetting];
-						
-						var s = pedalLabels[pedalNumber];
-						var ped1 = s+pedalAccs[pedalSettingInThisChord[pedalNumber]];
-						var ped2 = s+pedalAccs[pedalSetting];
-						addError ("This chord is impossible to play,\nas you have both a "+ped1+" and a "+ped2+".",noteRest);
+					if (cursor.next()) {
+						processingThisBar = cursor.measure.is(currentBar);
+					} else {
+						processingThisBar = false;
 					}
 				}
 			}
 		}
-		// check other staff here TO FIX
+		
+		for (var i = 0; i < barEndTick; i++) {
+			var errorAdded = false;
+			if (allNotes[i] != undefined) {
+			
+				// getNote rest
+
+				var theNotes = allNotes[i];
+				var numNotes = theNotes.length;
+				errorMsg += "\nFound "+numNotes+" notes at "+i;
+				
+				//errorMsg += "\nHere: numNotes="+numNotes;
+
+				var pedalLabels = ['C','G','D','A','E','B','F'];
+				var pedalAccs = ['b','♮','#'];
+				var pedalSettingInThisChord = [-1,-1,-1,-1,-1,-1,-1];
+				for (var j = 0; j < numNotes; j++) {		
+					var tpc = theNotes[j].tpc;
+					if (tpc < 6) {
+						addError ("You can’t use double flats in harp parts", nn[i]);
+						continue;
+					}
+					if (tpc > 26) {
+						addError ("You can’t use double sharps in harp parts", nn[i]);
+						continue;
+					}
+					var pedalSetting = parseInt((tpc - 6) / 7);
+					var pedalNumber = tpc % 7;
+					//errorMsg += "\ntpc "+tpc+" pedalSetting "+pedalSetting+" pedalNum "+pedalNumber+" pedalSetting "+pedalSettings[pedalNumber];
+					if (pedalSettings[pedalNumber] == -1) {
+						errorMsg += "\n"+pedalLabels[pedalNumber]+pedalAccs[pedalSetting];
+						pedalSettings[pedalNumber] = pedalSetting;
+						pedalSettingInThisChord[pedalNumber] = pedalSetting;
+					} else {
+						if (pedalSettings[pedalNumber] != pedalSetting) {
+							//change
+							//errorMsg += "\n"+pedalLabels[pedalNumber]+pedalAccs[pedalSettings[pedalNumber]]+"→"+pedalLabels[pedalNumber]+pedalAccs[pedalSetting];
+		
+							pedalSettings[pedalNumber] = pedalSetting;
+							pedalChangesInThisBar ++;
+							//errorMsg += "\npedalChangesInThisBar now "+pedalChangesInThisBar;
+		
+							if (pedalChangesInThisBar > 2 && !flaggedPedalChangesInThisBar) {
+								addError ("There are a number of pedal changes in this bar.\nIt might be challenging for the harpist to play.",noteRest);
+								flaggedPedalChangesInThisBar = true;
+							}
+		
+						}
+						// check this chord first
+	
+						if (pedalSettingInThisChord[pedalNumber] == -1) {
+							pedalSettingInThisChord[pedalNumber] = pedalSetting
+						} else {
+							if (pedalSettingInThisChord[pedalNumber] != pedalSetting && !errorAdded ) {
+								//errorMsg += "\nPedal "+pedalLabels[pedalNumber]+" in this chord was changed to "+pedalAccs[pedalSetting];
+			
+								var s = pedalLabels[pedalNumber];
+								var ped1 = s+pedalAccs[pedalSettingInThisChord[pedalNumber]];
+								var ped2 = s+pedalAccs[pedalSetting];
+								var notesToHighlight = [];
+								for (var k = 0; k < numNotes; k++) {		
+									var temptpc = theNotes[k].tpc;
+									var tempPedalNumber = tpc % 7;
+									if (tempPedalNumber == pedalNumber) notesToHighlight.push(theNotes[k]);
+								}
+								addError ("This chord is impossible to play,\nas you have both a "+ped1+" and a "+ped2+".",notesToHighlight);
+								errorAdded = true;
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	function checkStemDirection (noteRest) {
@@ -3186,11 +3248,16 @@ MuseScore {
 		// I WISH: you could just get the articulations of a note instead of having to do this hack
 		// I WISH: you could get the staffidx of a note/staff
 		if (typeof staffNum !== 'number') errorMsg += "\nArtic error staffNum wrong";
-		var theTick = noteRest.parent.tick;
+		var theTick;
+		if (noteRest.parent.type == Element.CHORD) {
+			theTick = noteRest.parent.parent.tick;
+		} else {
+		 theTick = noteRest.parent.tick;
+	 }
 		//errorMsg += "\nGetting artic at tick = "+theTick;
 		
 		if (theTick == undefined || theTick == null) {
-			errorMsg += "\nERROR articulation tick = "+theTick;
+			errorMsg += "\nERROR couldn’t get articulation tick for this item = "+theTick;
 		} else {
 			if (articulations[staffNum] == null || articulations[staffNum] == undefined) {
 				errorMsg += "\nERROR articArray undefined | staffNum is "+staffNum+" = "+staffNum.length;
