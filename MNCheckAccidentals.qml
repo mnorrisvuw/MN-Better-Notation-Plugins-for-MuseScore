@@ -41,7 +41,7 @@ MuseScore {
 	property var prevBarNum: 0
 	property var prevMIDIPitch: -1
 	property var prevPrevMIDIPitch: -1
-	property var prevDiatonicPitch
+	property var prevDiatonicPitch: 0
 	property var prevPC: 0
 	property var prevScalarInterval: 0
 	property var prevScalarIntervalClass: 0
@@ -49,8 +49,10 @@ MuseScore {
 	property var prevChromaticInterval: 0
 	property var prevChromaticIntervalClass: 0
 	property var prevDiatonicPitchClass: 0
+	property var prevPrevDiatonicPitchClass: 0
 	property var prevShowError: false
 	property var prevAcc: 0
+	property var prevPrevAcc: 0
 	property var prevAccVisible: false
 	property var prevIsAugDim: false
 	property var prevNote: null
@@ -185,7 +187,6 @@ MuseScore {
 			cursor.staffIdx = currentStaffNum;
 			cursor.filter = Segment.ChordRest | Segment.Clef;
 			currentBar = cursor.measure;
-			currentKeySig = cursor.keySignature;
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 				errorMsg += "\nb. "+currentBarNum;
@@ -204,6 +205,7 @@ MuseScore {
 					var processingThisBar = cursor.element && cursor.tick < barEnd;
 					
 					while (processingThisBar) {
+						currentKeySig = cursor.keySignature;
 						var eType = cursor.element.type;
 						if (eType == Element.CLEF) {
 							currentClef = cursor.element;
@@ -291,7 +293,7 @@ MuseScore {
 		//errorMsg += "\nChecking chord... has "+numNotes+" notes";
 		
 		for (var i = 0; i < numNotes; i ++) {
-			//errorMsg += "\ni = "+i;
+			//errorMsg += "\nNote "+i;
 				
 			var note = notes[i];
 			var currTick = theSegment.tick;
@@ -368,10 +370,11 @@ MuseScore {
 				// case 3: acc is same as prev and acc is in ks
 				if (currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && accVisible) {
 					prevBarNum = barAltered[diatonicPitch];
-					if (barNum == prevBarNum || accInKeySig) {
+					if ((barNum == prevBarNum) || accInKeySig) {
 						if (!wasGraceNote[diatonicPitchClass]) {
 							accidentalName = accidentalNames[acc+2];
 							addError("This was already a "+accidentalName+".",note);
+							//errorMsg += "\nFlagged because prevBarNum is "+prevBarNum+" and barNum is "+barNum;
 						}
 					}
 				}
@@ -402,10 +405,7 @@ MuseScore {
 				currAccs[diatonicPitch] = acc;
 				currPCAccs[diatonicPitchClass] = acc;
 				wasGraceNote[diatonicPitchClass] = isGraceNote;
-				if (accVisible && !accInKeySig) {
-					barAltered[diatonicPitch] = barNum;
-					//errorMsg += "\nAdded bar "+barNum+" to barAltered["+diatonicPitch+"]";
-				}
+				if (accVisible && !accInKeySig) barAltered[diatonicPitch] = barNum;
 				var alterationLabel = "";
 				var doShowError = false;
 				var isAug = false;
@@ -452,18 +452,18 @@ MuseScore {
 						if (prevPrevMIDIPitch != -1) {
 							//errorMsg += "\nprevPrevMIDIPitch = "+prevPrevMIDIPitch+"; prevMIDIPitch="+prevMIDIPitch+" MIDIPitch="+MIDIPitch;
 							if (prevMIDIPitch - prevPrevMIDIPitch == 1 && MIDIPitch - prevMIDIPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
-								errorMsg += "\nFound Chromatic Ascent";
+								//errorMsg += "\nFound Chromatic Ascent";
 								
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
-									errorMsg += "\nPrev notes";
+									//errorMsg += "\nPrev notes";
 									
 										if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
 								}
 							}
 							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
-								errorMsg += "\nFound Chromatic Descent";
+								//errorMsg += "\nFound Chromatic Descent";
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
-									errorMsg += "\nPrev notes";
+									//errorMsg += "\nPrev notes";
 									
 									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
 								}
@@ -513,17 +513,19 @@ MuseScore {
 									foundNote = true;
 								}
 								if (!foundNote) {
-									var weighting1 = Math.abs(weightings[prevDiatonicPitchClass] + (prevAcc * 7) - currentKeySig);
-									var weighting2 = Math.abs(weightings[diatonicPitchClass] + (acc * 7) - currentKeySig);
+									var weighting1 = weightings[prevPrevDiatonicPitchClass] + (prevPrevAcc * 7) - currentKeySig
+									var weighting2 = weightings[prevDiatonicPitchClass] + (prevAcc * 7) - currentKeySig;
+									var weighting3 = weightings[diatonicPitchClass] + (acc * 7) - currentKeySig;
+									var weightingAverage = (weighting1 + weighting2 + weighting3) / 3.0;
+									var w1dist = Math.abs(weightingAverage - weighting1); 
+									var w2dist = Math.abs(weightingAverage - weighting2);
+									var w3dist = Math.abs(weightingAverage - weighting3);
 									// rewrite the one that is the most outlying
-									//errorMsg += "\nW1: prevDiatonicPitchClass="+prevDiatonicPitchClass+"; prevAcc * 7: "+prevAcc * 7+"; keySig: "+currentKeySig;
-
-									if (weighting1 > weighting2) {
-										whichNoteToRewrite = 1;
-									} else {
-										whichNoteToRewrite = 2;
-									}
-									//errorMsg += "\nWeighting1: "+weighting1+"; weighting2: "+weighting2+"; ntr = "+whichNoteToRewrite;
+									whichNoteToRewrite = 0;
+									if (w2dist > w1dist && w2dist > w3dist) whichNoteToRewrite = 1;
+									if (w3dist > w1dist && w3dist > w2dist) whichNoteToRewrite = 2;
+									
+									//errorMsg += "\nWeighting1: "+weighting1+"; weighting2: "+weighting2+"; weight3: "+weighting3+" flag noteToHighlight = "+whichNoteToRewrite;
 									
 								} // if !foundNote
 							} // if doshowerror
@@ -533,7 +535,7 @@ MuseScore {
 								//} //OKRewriteIfPoss || neverOKRewriteIfPoss*/
 							
 							// don't show error if we decide it"s the same note that needs to change
-							if (prevShowError && prevWhichNoteToRewrite == 2 && whichNoteToRewrite == 1) doShowError = false;
+							if (prevShowError && (whichNoteToRewrite == prevWhichNoteToRewrite - 1)) doShowError = false;
 							if (doShowError) {
 								//errorMsg += "\n***** SHOW ERROR";
 								
@@ -567,6 +569,18 @@ MuseScore {
 									thePitchClassToChange = prevDiatonicPitchClass;
 									noteToHighlight = prevNote;
 									if (prevNote.parent.is(chord)) {
+										prevNext = "note above";
+									} else {
+										prevNext = "next note";
+									}
+									//errorMsg += "\nChoosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
+									
+								}
+								if (whichNoteToRewrite == 0) {
+									theAccToChange = prevPrevAcc;
+									thePitchClassToChange = prevPrevDiatonicPitchClass;
+									noteToHighlight = prevPrevNote;
+									if (prevPrevNote.parent.is(chord)) {
 										prevNext = "note above";
 									} else {
 										prevNext = "next note";
@@ -655,18 +669,11 @@ MuseScore {
 								}
 								//if (newNotePitch === "") errorMsg += "\nCouldnt find new note pitch";
 								var newNoteLabel = newNotePitch+newNoteAccidental;
-
-								//if (neverOKRewriteIfPoss || OKRewriteIfPoss) {
-									var changeIsBad = false;
-									if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
-									if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
-									//if (isBad) doShowError = false;
-									//}
+								var changeIsBad = false;
+								if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
+								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
 								if (doShowError && !changeIsBad) {
 									var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press Cmd-J)";
-									// "\n"+t;
-									//errorMsg += "\n******** Note to highlight = "+noteToHighlight;
-									//errorMsg += "\n"+staffNum;
 									addError(t,noteToHighlight);
 								} else {
 									//errorMsg += "\nDid not show error cos doShowError="+doShowError+" & changeIsBad="+changeIsBad;
@@ -749,11 +756,12 @@ MuseScore {
 					prevPrevMIDIPitch = prevMIDIPitch;
 					prevMIDIPitch = MIDIPitch;
 					//errorMsg += "\nprevPrevMIDIPitch now "+prevPrevMIDIPitch+"; prevMIDIPitch now "+prevMIDIPitch;
-					
+					prevPrevDiatonicPitchClass = prevDiatonicPitchClass;
 					prevDiatonicPitch = diatonicPitch;
 					prevDiatonicPitchClass = diatonicPitchClass;
 					prevChromaticInterval = chromaticInterval;
 					prevChromaticIntervalClass = chromaticIntervalClass;
+					prevPrevAcc = prevAcc;
 					prevAcc = acc;
 					prevAccVisible = accVisible;
 					prevAccInKeySig = accInKeySig;
@@ -838,7 +846,19 @@ MuseScore {
 		var endStaff = curScore.selection.endStaff;
 	}
 	
+	function selectTitleText () {
+		curScore.startCmd();
+		cmd("title-text");
+		cmd("select-similar");
+		curScore.endCmd();
+	}
+	
 	function deleteAllCommentsAndHighlights () {
+
+		//errorMsg = "Num elemns: "+elems.length;
+		var elementsToRemove = [];
+		var elementsToRecolor = [];
+		
 		// ** SAVE CURRENT SELECTION ** //
 		var s = curScore.selection;
 		var isRange = s.isRange;
@@ -850,12 +870,23 @@ MuseScore {
 			if (s.endSegment) endTick = s.endSegment.tick + 1;
 		}
 		
-		// **** GET ALL ITEMS **** //
+		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
+		selectTitleText();
+		
+		var elems = curScore.selection.elements;
+		for (var i = 0; i<elems.length; i++) {
+			var e = elems[i];
+			var c = e.color;	
+			// style the element
+			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+		}
+		curScore.startCmd();
+		cmd("undo");
+		curScore.endCmd();
+		
+		// **** GET ALL OTHER ITEMS **** //
 		selectAll();
 		var elems = curScore.selection.elements;
-		//errorMsg = "Num elemns: "+elems.length;
-		var elementsToRemove = [];
-		var elementsToRecolor = [];
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			var t = e.type;
@@ -886,7 +917,6 @@ MuseScore {
 			segment = segment.next;
 		}
 		
-		
 		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) {
 			elementsToRecolor[i].color = "black";
@@ -902,7 +932,7 @@ MuseScore {
 		}
 		curScore.endCmd();
 	}
-	
+
 	function addError (text,element) {
 		errorStrings.push(text);
 		errorObjects.push(element);

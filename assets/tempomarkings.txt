@@ -45,8 +45,8 @@ tempo primo
 tempo 1°
 tempo 1o
 tempo semplice
-au mouvement
-au mouvt
+mouvement
+mouvt
 grave
 lent
 moins vif

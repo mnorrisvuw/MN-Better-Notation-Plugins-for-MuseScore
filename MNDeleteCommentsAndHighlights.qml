@@ -27,16 +27,31 @@ MuseScore {
   onRun: {
 		if (!curScore) return;
 		
+		var elementsToRemove = [];
+		var elementsToRecolor = [];
+		
 		// ** SAVE CURRENT SELECTION ** //
 		saveSelection();
+		
+		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
+		selectTitleText();
+		
+		var elems = curScore.selection.elements;
+		for (var i = 0; i<elems.length; i++) {
+			var e = elems[i];
+			var c = e.color;	
+			// style the element
+			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+		}
+		curScore.startCmd();
+		cmd("undo");
+		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
 		selectAll();
 		
 		// **** GET ALL ITEMS **** //
 		var elems = curScore.selection.elements;
-		var elementsToRemove = [];
-		var elementsToRecolor = [];
 		
 		// **** LOOP THROUGH ALL ITEMS AND ADD THEM TO AN ARRAY IF THEY MATCH **** //
 		
@@ -75,6 +90,13 @@ MuseScore {
 		curScore.endCmd();
 		
 		restoreSelection();
+	}
+	
+	function selectTitleText () {
+		curScore.startCmd();
+		cmd("title-text");
+		cmd("select-similar");
+		curScore.endCmd();
 	}
 	
 	function selectAll () {

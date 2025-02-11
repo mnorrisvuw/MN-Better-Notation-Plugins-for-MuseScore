@@ -1521,7 +1521,19 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
+	function selectTitleText () {
+		curScore.startCmd();
+		cmd("title-text");
+		cmd("select-similar");
+		curScore.endCmd();
+	}
+	
 	function deleteAllCommentsAndHighlights () {
+
+		//errorMsg = "Num elemns: "+elems.length;
+		var elementsToRemove = [];
+		var elementsToRecolor = [];
+		
 		// ** SAVE CURRENT SELECTION ** //
 		var s = curScore.selection;
 		var isRange = s.isRange;
@@ -1533,12 +1545,23 @@ MuseScore {
 			if (s.endSegment) endTick = s.endSegment.tick + 1;
 		}
 		
-		// **** GET ALL ITEMS **** //
+		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
+		selectTitleText();
+		
+		var elems = curScore.selection.elements;
+		for (var i = 0; i<elems.length; i++) {
+			var e = elems[i];
+			var c = e.color;	
+			// style the element
+			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+		}
+		curScore.startCmd();
+		cmd("undo");
+		curScore.endCmd();
+		
+		// **** GET ALL OTHER ITEMS **** //
 		selectAll();
 		var elems = curScore.selection.elements;
-		//errorMsg = "Num elemns: "+elems.length;
-		var elementsToRemove = [];
-		var elementsToRecolor = [];
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			var t = e.type;
