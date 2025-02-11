@@ -880,9 +880,6 @@ MuseScore {
 			// style the element
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		curScore.startCmd();
-		cmd("undo");
-		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
 		selectAll();
