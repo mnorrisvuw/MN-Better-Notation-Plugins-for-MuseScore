@@ -40,7 +40,7 @@ MuseScore {
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
 			var c = e.color;	
-			// style the element
+			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
 		
@@ -51,7 +51,6 @@ MuseScore {
 		var elems = curScore.selection.elements;
 		
 		// **** LOOP THROUGH ALL ITEMS AND ADD THEM TO AN ARRAY IF THEY MATCH **** //
-		
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			var t = e.type;

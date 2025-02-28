@@ -25,6 +25,7 @@ MuseScore {
 	property var debug: true
 	property var errorMsg: ''
 	property var currentZ: 16384
+	property var numLogs: 0
 	
 	// **** PROPERTIES **** //
 
@@ -107,7 +108,7 @@ MuseScore {
 		cursor.rewind(Cursor.SELECTION_START);
 		firstBarInSelection = cursor.measure;
 		firstTickInSelection = cursor.tick;
-		//errorMsg += "\nstartStaff="+startStaff+"; endStaff="+endStaff;
+		//logError(startStaff="+startStaff+"); endStaff="+endStaff;
 				
 		var firstBarNum = 1, lastBarNum = 1;
 		var currentBar = firstBarInScore;
@@ -131,7 +132,7 @@ MuseScore {
 			currentBar = currentBar.nextMeasure;
 		}
 		setProgress (2);
-		//errorMsg += "\nfirstBarNum="+firstBarNum+"; lastBarNum="+lastBarNum;
+		//logError(firstBarNum="+firstBarNum+"); lastBarNum="+lastBarNum;
 				
 		// ** LOOP THROUGH NOTES **//
 		// ** NB — endStaff IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
@@ -145,7 +146,7 @@ MuseScore {
 			var theStaff = curScore.staves[currentStaffNum];
 			var part = theStaff.part;
 			var partVisible = part.show;
-			errorMsg += "\n——— STAFF "+currentStaffNum+" ————";
+			//logError(——— STAFF "+currentStaffNum+" ————");
 			if (!partVisible) continue;
 			
 			
@@ -189,7 +190,7 @@ MuseScore {
 			currentBar = cursor.measure;
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
-				errorMsg += "\nb. "+currentBarNum;
+				//logError(b. "+currentBarNum);
 				loop++;
 				setProgress(5+loop*95./totalNumLoops);
 				var startTrack = currentStaffNum * 4;
@@ -198,7 +199,7 @@ MuseScore {
 				var barEnd = currentBar.lastSegment.tick;
 				
 				for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
-					//errorMsg += "\n\nTrack "+currentTrack;
+					//logError(\nTrack "+currentTrack);
 					
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStart);
@@ -213,7 +214,7 @@ MuseScore {
 						} else {
 							if (!isPercussionClef) {
 								var noteRest = cursor.element;
-								//errorMsg += "\n\nFound "+noteRest.name+" at "+cursor.tick;
+								//logError(\nFound "+noteRest.name+" at "+cursor.tick);
 								var isRest = noteRest.type == Element.REST;
 								var graceNoteChords = noteRest.graceNotes;
 								if (graceNoteChords != null) {
@@ -239,21 +240,28 @@ MuseScore {
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
-		// ** SHOW INFO DIALOG ** //
-
-		var numErrors = errorStrings.length;
-		if (numErrors == 0) errorMsg = "SCORE CHECK COMPLETED\n\nCongratulations! No errors found!\n\nLog:" + errorMsg;
-		if (numErrors == 1) errorMsg = "SCORE CHECK COMPLETED\n\nOne error found.\n\nLog:" + errorMsg;
-		if (numErrors > 1) errorMsg = "SCORE CHECK COMPLETED\n\nI found "+numErrors+" errors.\n\nLog:" + errorMsg;
-			
+		// ************  								RESTORE PREVIOUS SELECTION 							************ //
 		restoreSelection();
+		
+		// ** SHOW INFO DIALOG ** //
+		var numErrors = errorStrings.length;
+		if (errorMsg != "") errorMsg = "\n\nError log (for developer use):" + errorMsg;
+		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no errors found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
+		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one error.\nPlease check the score for the yellow comment box that describes the issue." + errorMsg;
+		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" errors.\nPlease check the score for the yellow comment boxes, which describe the issues." + errorMsg;
+		
+		if (progressShowing) progress.close();
+		
+		var h = 200+numLogs*10;
+		if (h > 500) h =500;
+		dialog.height = h;
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
 	
 	function checkClef () {
 		var clefId = currentClef.subtypeName();
-		//errorMsg += "\nChecking clef — "+clefId+" "+currentInstrumentName;
+		//logError(Checking clef — "+clefId+" "+currentInstrumentName);
 		var isTrebleClef = clefId.includes("Treble clef");
 		var isAltoClef = clefId === "Alto clef";
 		var isTenorClef = clefId === "Tenor clef";
@@ -290,10 +298,10 @@ MuseScore {
 		
 		var notes = chord.notes;
 		var numNotes = notes.length;
-		//errorMsg += "\nChecking chord... has "+numNotes+" notes";
+		//logError(Checking chord... has "+numNotes+" notes");
 		
 		for (var i = 0; i < numNotes; i ++) {
-			//errorMsg += "\nNote "+i;
+			//logError(Note "+i);
 				
 			var note = notes[i];
 			var currTick = theSegment.tick;
@@ -337,14 +345,14 @@ MuseScore {
 			var octave = Math.floor((3-l+clefOffset)/7)+6; // lowest possible note needs to be octave 0 — i.e. C-1 (midiPitch 0) will be octave 0; therefore C4 will be octave 5
 			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
 			var diatonicPitch = diatonicPitchClass+octave*7; // diatonic pitch is where 
-			//errorMsg += "\n\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass;
+			//logError(\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass);
 
 			var accInKeySig = false;
 			if (currentKeySig == 0 && accType == Accidental.NATURAL) accInKeySig = true;
 			if (currentKeySig > 0) {
 				accOrder = ((diatonicPitchClass + 4) * 2) % 7;
 				if (accType == Accidental.SHARP) {
-					//errorMsg += "\nhere";
+					//logError(here");
 					accInKeySig = accOrder < currentKeySig;
 				}
 				if (accType == Accidental.NATURAL) accInKeySig = (accOrder + 1) > currentKeySig; 
@@ -374,7 +382,7 @@ MuseScore {
 						if (!wasGraceNote[diatonicPitchClass]) {
 							accidentalName = accidentalNames[acc+2];
 							addError("This was already a "+accidentalName+".",note);
-							//errorMsg += "\nFlagged because prevBarNum is "+prevBarNum+" and barNum is "+barNum;
+							//logError(Flagged because prevBarNum is "+prevBarNum+" and barNum is "+barNum);
 						}
 					}
 				}
@@ -423,7 +431,7 @@ MuseScore {
 					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
 					chromaticInterval = MIDIPitch - prevMIDIPitch;
-					//errorMsg += "\nscalarInterval="+scalarInterval+" chromaticInterval="+chromaticInterval;
+					//logError(scalarInterval="+scalarInterval+" chromaticInterval="+chromaticInterval);
 					if (chromaticInterval != 0) {
 						if (scalarInterval < 0) {
 							direction = -1;
@@ -441,29 +449,29 @@ MuseScore {
 						scalarIntervalClass = scalarIntervalAbs % 7;
 						chromaticIntervalAbs = Math.abs(chromaticInterval);
 						chromaticIntervalClass = chromaticIntervalAbs % 12;
-						//errorMsg += "\nscalarIntervalAbs="+scalarIntervalAbs+"; scalarIntervalClass="+scalarIntervalClass+"\nchromaticIntervalAbs="+chromaticIntervalAbs+"; chromaticIntervalClass="+chromaticIntervalClass;
+						//logError(scalarIntervalAbs="+scalarIntervalAbs+"); scalarIntervalClass="+scalarIntervalClass+"\nchromaticIntervalAbs="+chromaticIntervalAbs+"; chromaticIntervalClass="+chromaticIntervalClass;
 						
 						if (scalarIntervalAbs == 7 && chromaticIntervalClass > 9) chromaticIntervalClass = chromaticIntervalClass - 12;
 						var dci = defaultChromaticInterval[scalarIntervalClass];
 						var alteration = chromaticIntervalClass - dci;
-						//errorMsg += "\ndci="+dci+" alt="+alteration;
+						//logError(dci="+dci+" alt="+alteration);
 						
 						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
 						if (prevPrevMIDIPitch != -1) {
-							//errorMsg += "\nprevPrevMIDIPitch = "+prevPrevMIDIPitch+"; prevMIDIPitch="+prevMIDIPitch+" MIDIPitch="+MIDIPitch;
+							//logError(prevPrevMIDIPitch = "+prevPrevMIDIPitch+"); prevMIDIPitch="+prevMIDIPitch+" MIDIPitch="+MIDIPitch;
 							if (prevMIDIPitch - prevPrevMIDIPitch == 1 && MIDIPitch - prevMIDIPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
-								//errorMsg += "\nFound Chromatic Ascent";
+								//logError(Found Chromatic Ascent");
 								
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
-									//errorMsg += "\nPrev notes";
+									//logError(Prev notes");
 									
 										if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
 								}
 							}
 							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
-								//errorMsg += "\nFound Chromatic Descent";
+								//logError(Found Chromatic Descent");
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
-									//errorMsg += "\nPrev notes";
+									//logError(Prev notes");
 									
 									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
 								}
@@ -484,7 +492,7 @@ MuseScore {
 						isAugDim = isAug || isDim;
 
 						if (isAugDim) {
-							//errorMsg += "\nisAug: "+isAug+"; isDim: "+isDim;
+							//logError(isAug: "+isAug+"); isDim: "+isDim;
 							
 							var neverOK = false;
 							var neverOKRewriteIfPoss = false;
@@ -503,12 +511,12 @@ MuseScore {
 								var foundNote = false;
 								
 								if (!prevAccVisible && accVisible) {
-									//errorMsg += "\nwhichNoteToRewrite = 2";
+									//logError(whichNoteToRewrite = 2");
 									whichNoteToRewrite = 2;
 									foundNote = true;
 								}
 								if (prevAccVisible && !accVisible) {
-									//errorMsg += "\nwhichNoteToRewrite = 1";
+									//logError(whichNoteToRewrite = 1");
 									whichNoteToRewrite = 1;
 									foundNote = true;
 								}
@@ -525,7 +533,7 @@ MuseScore {
 									if (w2dist > w1dist && w2dist > w3dist) whichNoteToRewrite = 1;
 									if (w3dist > w1dist && w3dist > w2dist) whichNoteToRewrite = 2;
 									
-									//errorMsg += "\nWeighting1: "+weighting1+"; weighting2: "+weighting2+"; weight3: "+weighting3+" flag noteToHighlight = "+whichNoteToRewrite;
+									//logError(Weighting1: "+weighting1+"); weighting2: "+weighting2+"; weight3: "+weighting3+" flag noteToHighlight = "+whichNoteToRewrite;
 									
 								} // if !foundNote
 							} // if doshowerror
@@ -537,12 +545,12 @@ MuseScore {
 							// don't show error if we decide it"s the same note that needs to change
 							if (prevShowError && (whichNoteToRewrite == prevWhichNoteToRewrite - 1)) doShowError = false;
 							if (doShowError) {
-								//errorMsg += "\n***** SHOW ERROR";
+								//logError(***** SHOW ERROR");
 								
 								// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 								scalarIntervalLabel = intervalNames[scalarIntervalAbs];
 
-								//errorMsg += "\nscalarIntervalAbs = "+scalarIntervalAbs+"; scalarIntervalLabel="+scalarIntervalLabel;
+								//logError(scalarIntervalAbs = "+scalarIntervalAbs+"); scalarIntervalLabel="+scalarIntervalLabel;
 								article = (alterationLabel === "augmented") ? "an" : "a";
 								noteToHighlight = note;
 								theAccToChange = acc;
@@ -573,7 +581,7 @@ MuseScore {
 									} else {
 										prevNext = "next note";
 									}
-									//errorMsg += "\nChoosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
+									//logError(Choosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange);
 									
 								}
 								if (whichNoteToRewrite == 0) {
@@ -585,7 +593,7 @@ MuseScore {
 									} else {
 										prevNext = "next note";
 									}
-									//errorMsg += "\nChoosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange;
+									//logError(Choosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange);
 									
 								}
 								
@@ -602,7 +610,7 @@ MuseScore {
 										} else {
 											newNoteAccidental = kNaturalStr;
 										}
-										//errorMsg += "\n-2 ";
+										//logError(-2 ");
 										
 										break;
 						
@@ -616,7 +624,7 @@ MuseScore {
 										} else {
 											newNoteAccidental = kSharpStr;
 										}
-										//errorMsg += "\n-1 ";
+										//logError(-1 ");
 										break;
 						
 									case 0:
@@ -640,7 +648,7 @@ MuseScore {
 												newNoteAccidental = "bb";
 											}
 										}
-										//errorMsg += "\n0 ";
+										//logError(0 ");
 										break;
 						
 									case 1:
@@ -652,11 +660,11 @@ MuseScore {
 										} else {
 											newNoteAccidental = kFlatStr;
 										}
-										//errorMsg += "\n1 ";
+										//logError(1 ");
 										break;
 						
 									case 2: 
-										//if (!sharpen) errorMsg += "\nError with "+noteLabel+" in bar "+barNum+" — should be spelt enharmonically upwards";
+										//if (!sharpen) logError(Error with "+noteLabel+" in bar "+barNum+" — should be spelt enharmonically upwards");
 										j = (thePitchClassToChange + 1) % 7;
 										newNotePitch = pitchLabels[j];
 										if (newNotePitch === "F" || newNotePitch === "C") {
@@ -664,10 +672,10 @@ MuseScore {
 										} else {
 											newNoteAccidental = kNaturalStr;
 										}
-										//errorMsg += "\n2 ";
+										//logError(2 ");
 										break;
 								}
-								//if (newNotePitch === "") errorMsg += "\nCouldnt find new note pitch";
+								//if (newNotePitch === "") logError(Couldnt find new note pitch");
 								var newNoteLabel = newNotePitch+newNoteAccidental;
 								var changeIsBad = false;
 								if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
@@ -676,7 +684,7 @@ MuseScore {
 									var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press Cmd-J)";
 									addError(t,noteToHighlight);
 								} else {
-									//errorMsg += "\nDid not show error cos doShowError="+doShowError+" & changeIsBad="+changeIsBad;
+									//logError(Did not show error cos doShowError="+doShowError+" & changeIsBad="+changeIsBad);
 								}
 											
 							} // end if doShowError
@@ -752,10 +760,10 @@ MuseScore {
 				if (chromaticInterval != 0) {
 					prevPrevNote = prevNote;
 					prevNote = note;
-					//errorMsg += "\nprevNote now "+prevNote;
+					//logError(prevNote now "+prevNote);
 					prevPrevMIDIPitch = prevMIDIPitch;
 					prevMIDIPitch = MIDIPitch;
-					//errorMsg += "\nprevPrevMIDIPitch now "+prevPrevMIDIPitch+"; prevMIDIPitch now "+prevMIDIPitch;
+					//logError(prevPrevMIDIPitch now "+prevPrevMIDIPitch+"); prevMIDIPitch now "+prevMIDIPitch;
 					prevPrevDiatonicPitchClass = prevDiatonicPitchClass;
 					prevDiatonicPitch = diatonicPitch;
 					prevDiatonicPitchClass = diatonicPitchClass;
@@ -799,7 +807,7 @@ MuseScore {
 			if (!progressShowing) {
 				var currentTime = Date.now();
 				var elapsedTime = currentTime - progressStartTime;
-				//errorMsg += "\nelapsedTime now "+elapsedTime;
+				//logError(elapsedTime now "+elapsedTime);
 				if (elapsedTime > 3000) {
 					progress.show();
 					progressShowing = true;
@@ -974,7 +982,7 @@ MuseScore {
 				} else {
 					// calculate the staff number that this element is on
 					if (element.bbox == undefined) {
-						errorMsg += "\nbbox undefined — elem type is "+element.name;
+						logError("showAllErrors() — bbox undefined — elem type is "+element.name);
 					} else {
 						elementHeight = element.bbox.height;
 						if (eType != Element.MEASURE) {
@@ -1013,7 +1021,7 @@ MuseScore {
 							tick = element.firstSegment.tick;
 						} else {
 							if (element.parent == undefined || element.parent == null) {
-								errorMsg += "\nELEMENT PARENT IS "+element.parent+"; etype is "+element.name;
+								logError("showAllErrors() — element.parent is "+element.parent+" etype is "+element.name);
 							} else {
 								if (element.parent.type == Element.CHORD) {
 									// it's either a notehead or a gracenote
@@ -1077,42 +1085,69 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
-	ApplicationWindow {
+	function logError (str) {
+		numLogs ++;
+		errorMsg += "\nStaff "+currentStaffNum+", b. "+currentBarNum+": "+str;
+	}
+	
+	StyledDialogView {
 		id: dialog
-		title: "COMPLETION"
+		title: "CHECK COMPLETED"
+		contentHeight: 232
+		contentWidth: 456
 		property var msg: ""
-		visible: false
-		flags: Qt.Dialog | Qt.WindowStaysOnTopHint
-		width: 500
-		height: 400        
+
+		Text {
+			id: theText
+			width: parent.width-40
+			x: 20
+			y: 20
+
+			text: "MN CHECK ACCIDENTALS"
+			font.bold: true
+			font.pointSize: 18
+		}
+		
+		Rectangle {
+			x:20
+			width: parent.width-40
+			y:45
+			height: 1
+			color: "black"
+		}
 
 		ScrollView {
 			id: view
-			anchors {
-				fill: parent
-				horizontalCenter: parent.horizontalCenter
-				verticalCenter: parent.verticalCenter
-				margins: 2
-			}
-			background: Rectangle {
-				color: "white"
-			}
-			ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+			x: 20
+			y: 60
+			height: parent.height-100
+			width: parent.width-40
+			leftInset: 0
+			leftPadding: 0
+			ScrollBar.vertical.policy: ScrollBar.AsNeeded
 			TextArea {
+				textFormat: Text.RichText
 				text: dialog.msg
-				wrapMode: TextEdit.Wrap         
+				wrapMode: TextEdit.Wrap
+				leftInset: 0
+				leftPadding: 0
+				readOnly: true
 			}
 		}
-		
-		FlatButton {            
-			accentButton: true
-			text: "Ok"
+
+		ButtonBox {
 			anchors {
 				horizontalCenter: parent.horizontalCenter
 				bottom: parent.bottom
 				margins: 10
 			}
-			onClicked: dialog.close()
+			buttons: [ ButtonBoxModel.Ok ]
+			navigationPanel.section: dialog.navigationSection
+			onStandardButtonClicked: function(buttonId) {
+				if (buttonId === ButtonBoxModel.Ok) {
+					dialog.close()
+				}
+			}
 		}
 	}
 	
