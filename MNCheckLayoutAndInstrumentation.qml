@@ -41,6 +41,9 @@ MuseScore {
 	property var numLogs: 0
 	
 	// **** PROPERTIES **** //
+	property var spatium: 0
+	property var pageWidth: 0
+	property var pageHeight: 0
 	property var checkClefs: false
 	property var reads8va: false
 	property var readsTreble: false
@@ -251,12 +254,19 @@ MuseScore {
 		var lastSystem = lastBarInScore.parent;
 		var firstPage = firstSystem.parent;
 		var lastPage = lastSystem.parent;
+		var firstPageNum = firstPage.pagenumber;
+		var lastPageNum = lastPage.pagenumber;
 		hasMoreThanOneSystem = !lastSystem.is(firstSystem);	
 		var cursor = curScore.newCursor();
 		var cursor2 = curScore.newCursor();
 		parts = curScore.parts;
 		numParts = parts.length;
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
+		var inchesToMM = 25.4;
+		var spatiumDPI = 360.;
+		spatium = curScore.style.value("spatium")*inchesToMM/spatiumDPI; // spatium value is given in 360 DPI
+		pageWidth = Math.round(curScore.style.value("pageWidth")*inchesToMM);
+		pageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
 		
 		//logError("1 "+curScore.selection.startSegment+" "+curScore.selection.endSegment+" "+curScore.selection.startStaff+" "+curScore.selection.endStaff);
 		
@@ -287,6 +297,11 @@ MuseScore {
 
 		// ************  							CHECK SCORE & PAGE SETTINGS 					************ // 
 		checkScoreAndPageSettings();
+		
+		// ************  							CHECK TITLE PAGE 					************ // 
+		if (lastPageNum > 1 && firstPageNum == 0) {
+			addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
+		}
 
 		// ************  				SELECT AND PRE-PROCESS ENTIRE SCORE 				************ //
 		selectAll();
@@ -312,7 +327,10 @@ MuseScore {
 			}
 		}
 		
-		commentPosOffset = Array(10000).fill(0);
+		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
+		for (var i = 0; i <= lastPageNum; i++) {
+			commentPosOffset[i] = Array(10000).fill(0);
+		}
 		
 		// **** LOOK FOR AND STORE ANY ELEMENTS THAT CAN ONLY BE ACCESSED FROM SELECTION: **** //
 		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
@@ -364,6 +382,9 @@ MuseScore {
 		// ************  							CHECK STAFF NAMES ISSUES 							************ // 
 		checkStaffNames();
 		
+		// ************  							CHECK STAFF NAMES ISSUES 							************ // 
+		checkLocationOfFinalBar();
+		
 		// ************ 							CHECK FOR FERMATA ISSUES 							************ ///
 		if (!isSoloScore && numStaves > 2) checkFermatas();
 		
@@ -384,6 +405,9 @@ MuseScore {
 		var loop = 0;
 		
 		firstBarInScore = curScore.firstMeasure;
+		
+		//logError ("Trying bracket: "+curScore.systemBracket+" "+firstBarInScore.systemBracket+" "+firstBarInScore.parent.systemBracket);
+		
 		currentBar = firstBarInScore;
 		lastBarInScore = curScore.lastMeasure;
 		numBars = curScore.nmeasures;
@@ -391,9 +415,6 @@ MuseScore {
 		//logError("————————\n\nSTARTING LOOP\n\n");
 		noteCountInSystem = [];
 		beatCountInSystem = [];
-		var inchesToMM = 25.4;
-		var spatiumDPI = 360.;
-		var spatium = curScore.style.value("spatium")*inchesToMM/spatiumDPI; // spatium value is given in 360 DPI
 		var actualStaffSize = spatium*4;
 		maxNoteCountPerSystem = (10.0 - actualStaffSize) * 10.0 + 18; // 48 notes at 7mm
 		minNoteCountPerSystem = (10.0 - actualStaffSize) * 3.0 + 4; // 13 notes at 7mm
@@ -516,6 +537,7 @@ MuseScore {
 				var startTrack = currentStaffNum * 4;
 				var goneToNextBar = false;
 				var firstNoteInThisBar = null;
+				var stretch = currentBar.userStretch;
 				//logError("\nb. "+currentBarNum);
 				currentTimeSig = currentBar.timesigNominal;
 
@@ -523,6 +545,11 @@ MuseScore {
 					var numBeats = currentTimeSig.numerator;
 					if (currentTimeSig.denominator > 8) numBeats /= 2;
 					numBeatsInThisSystem += numBeats;
+					
+					// **** CHECK FOR NON-STANDARD STRETCH FACTOR **** //
+					if (stretch != 1) {
+						addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
+					}
 				}
 				if (!currentBar.parent.is(currentSystem)) {
 					// start of system
@@ -1031,10 +1058,10 @@ MuseScore {
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
-		if (errorMsg != "") errorMsg = "\n\nError log (for developer use):" + errorMsg;
-		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no errors found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
-		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one error.\nPlease check the score for the yellow comment box that describes the issue." + errorMsg;
-		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" errors.\nPlease check the score for the yellow comment boxes, which describe the issues." + errorMsg;
+		if (errorMsg != "") errorMsg = "\n\n————————————\nERROR LOG (for developer use):" + errorMsg;
+		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no issues found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
+		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one issue.\nPlease check the score for the yellow comment box that provides more details of the issue." + errorMsg;
+		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" issues.\nPlease check the score for the yellow comment boxes that provide more details on each issue." + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
@@ -1175,11 +1202,15 @@ MuseScore {
 		var numTpt = 0;
 		var numTbn = 0;
 		var numTba = 0;
+		var numVn = 0;
+		var numVa = 0;
+		var numVc = 0;
+		var numDb = 0;
 		var flStaff, obStaff, clStaff, bsnStaff, hnStaff;
 		var tpt1Staff, tpt2Staff, tbnStaff, tbaStaff;
 	
 		// Check Quintets
-		if (numParts == 5) {
+		if (numParts > 3 && numParts < 6) {
 			for (var i = 0; i < numStaves; i ++) {
 				if (staffVisible[i]) {
 					var id = instrumentIds[i];
@@ -1216,10 +1247,17 @@ MuseScore {
 						numTba ++;
 						tbaStaff = i;
 					}
+					
+					if (id.includes ("strings.violin")) numVn ++;
+					if (id.includes ("strings.viola")) numVa ++;
+					if (id.includes ("strings.cello")) numVc ++;
+					if (id.includes ("strings.contrasbass")) numDb ++;
+					
 				}
 			}
 			// **** CHECK WIND QUINTET STAFF ORDER **** //
-			if (numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
+			if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
+				checkBarlinesConnected("wind quintet");
 				if (flStaff != 0) {
 					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.","topfunction ");
 				} else {
@@ -1240,7 +1278,8 @@ MuseScore {
 			}
 		
 			// **** CHECK BRASS QUINTET STAFF ORDER **** //
-			if (numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
+			if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
+				checkBarlinesConnected("brass quintet");
 				if (tpt1Staff != 0) {
 					addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
 				} else {
@@ -1259,6 +1298,8 @@ MuseScore {
 					}
 				}
 			}
+			if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) checkBarlinesConnected("string quartet");
+			if (numParts == 5 && numVn == 2 && numVa > 0 && numVa < 3 && numVc > 0 && numVc < 3 && numDb < 2) checkBarlinesConnected("string quintet");
 		}
 	}
 	
@@ -1277,28 +1318,28 @@ MuseScore {
 			
 			// **** CHECK FOR NON-STANDARD DEFAULT STAFF NAMES **** //
 			
-			if (full1l === 'violins 1' || full1l === 'violin 1') addError ("Change the long name to ‘Violin I’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
-			if (full1l === 'violas 1' || full1l === 'viola 1') addError ("Change the long name to ‘Viola I’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
-			if (full1l === 'cellos 1' || full1l === 'cello 1') addError ("Change the long name to ‘Cello I’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
+			if (full1l === 'violins 1' || full1l === 'violin 1') addError ("Change the long name of staff "+(i+1)+" to ‘Violin I’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
+			if (full1l === 'violas 1' || full1l === 'viola 1') addError ("Change the long name of staff "+(i+1)+" to ‘Viola I’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
+			if (full1l === 'cellos 1' || full1l === 'cello 1') addError ("Change the long name of staff "+(i+1)+" to ‘Cello I’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
 			
-			if (full1l === 'violins 2' || full1l === 'violin 2') addError ("Change the long name to ‘Violin II’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
-			if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name to ‘Viola II’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
-			if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name to ‘Cello II’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
+			if (full1l === 'violins 2' || full1l === 'violin 2') addError ("Change the long name of staff "+(i+1)+" to ‘Violin II’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
+			if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name of staff "+(i+1)+" to ‘Viola II’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
+			if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+(i+1)+" to ‘Cello II’\n(see Behind Bars, p. 509 & 515)", "system1 "+i);
 			
-			if (full1l === 'violas') addError ("Change the long name to ‘Viola’ (see Behind Bars, p. 509)", "system1 "+i);
-			if (full1l === 'violoncellos' || full1l === 'violpncello') addError ("Change the long name to ‘Cello’ (see Behind Bars, p. 509)", "system1 "+i);
-			if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name to ‘Double Bass’ or ‘D. Bass’ (see Behind Bars, p. 509)", "system1 "+i);
-			if (short1l === 'vlns. 1' || short1l === 'vln. 1' || short1l === 'vlns 1' || short1l === 'vln 1') addError ("Change the short name to ‘Vln. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vlas. 1' || short1l === 'vla. 1' || short1l === 'vlas 1' || short1l === 'vla 1') addError ("Change the short name to ‘Vla. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vcs. 1' || short1l === 'vc. 1' || short1l === 'vcs 1' || short1l === 'vc 1') addError ("Change the short name to ‘Vc. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+			if (full1l === 'violas') addError ("Change the long name of staff "+(i+1)+" to ‘Viola’ (see Behind Bars, p. 509)", "system1 "+i);
+			if (full1l === 'violoncellos' || full1l === 'violpncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see Behind Bars, p. 509)", "system1 "+i);
+			if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+(i+1)+" to ‘Double Bass’ or ‘D. Bass’ (see Behind Bars, p. 509)", "system1 "+i);
+			if (short1l === 'vlns. 1' || short1l === 'vln. 1' || short1l === 'vlns 1' || short1l === 'vln 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+			if (short1l === 'vlas. 1' || short1l === 'vla. 1' || short1l === 'vlas 1' || short1l === 'vla 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+			if (short1l === 'vcs. 1' || short1l === 'vc. 1' || short1l === 'vcs 1' || short1l === 'vc 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
 			
-			if (short1l === 'vlns. 2' || short1l === 'vln. 2' || short1l === 'vlns 2' || short1l === 'vln 2') addError ("Change the short name to ‘Vln. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2') addError ("Change the short name to ‘Vla. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vcs. 2' || short1l === 'vc. 2' || short1l === 'vcs 2' || short1l === 'vc 2') addError ("Change the short name to ‘Vc. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+			if (short1l === 'vlns. 2' || short1l === 'vln. 2' || short1l === 'vlns 2' || short1l === 'vln 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+			if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+			if (short1l === 'vcs. 2' || short1l === 'vc. 2' || short1l === 'vcs 2' || short1l === 'vc 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
 			
-			if (short1l === 'vlas.') addError ("Change the short name to ‘Vla.’ (see Behind Bars, p. 509)", "system2 "+i);
-			if (short1l === 'vcs.') addError ("Change the short name to ‘Vc.’ (see Behind Bars, p. 509)", "system2 "+i);
-			if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name to ‘D.B.’ (see Behind Bars, p. 509)", "system2 "+i);
+			if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’ (see Behind Bars, p. 509)", "system2 "+i);
+			if (short1l === 'vcs.') addError ("Change the short name of staff "+(i+1)+" to ‘Vc.’ (see Behind Bars, p. 509)", "system2 "+i);
+			if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see Behind Bars, p. 509)", "system2 "+i);
 			
 			//logError("Staff "+i+" long = "+full1+" short = "+short1);
 			var checkThisStaff = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numStaves - 1;
@@ -1454,15 +1495,17 @@ MuseScore {
 		var spatium = style.value("spatium")*inchesToMM/spatiumDPI; // spatium value is given in 360 DPI
 		var staffSize = spatium*4;
 		//errorMsg+= "\nspatium = "+spatium+"; staffSize = "+staffSize;
-		var staffLineWidth = style.value("staffLineWidth")*inchesToMM;
-		var pageEvenLeftMargin = style.value("pageEvenLeftMargin")*inchesToMM;
-		var pageOddLeftMargin = style.value("pageOddLeftMargin")*inchesToMM;
-		var pageEvenTopMargin = style.value("pageEvenTopMargin")*inchesToMM;
-		var pageOddTopMargin = style.value("pageOddTopMargin")*inchesToMM;
-		var pageEvenBottomMargin = style.value("pageEvenBottomMargin")*inchesToMM;
-		var pageOddBottomMargin = style.value("pageOddBottomMargin")*inchesToMM;
-		var pageWidth = Math.round(style.value("pageWidth")*inchesToMM);
-		var pageHeight = Math.round(style.value("pageHeight")*inchesToMM);
+		var staffLineWidth = Math.round(style.value("staffLineWidth")*inchesToMM*100)/100.;
+		var pageEvenLeftMargin = Math.round(style.value("pageEvenLeftMargin")*inchesToMM*100)/100.;
+		var pageOddLeftMargin = Math.round(style.value("pageOddLeftMargin")*inchesToMM*100)/100.;
+		var pageEvenTopMargin = Math.round(style.value("pageEvenTopMargin")*inchesToMM*100)/100.;
+		var pageOddTopMargin = Math.round(style.value("pageOddTopMargin")*inchesToMM*100)/100.;
+		var pageEvenBottomMargin = Math.round(style.value("pageEvenBottomMargin")*inchesToMM*100)/100.;
+		var pageOddBottomMargin = Math.round(style.value("pageOddBottomMargin")*inchesToMM*100)/100.;
+		var pagePrintableWidth = Math.round(style.value("pagePrintableWidth")*inchesToMM);
+		var pagePrintableHeight = Math.round(style.value("pagePrintableHeight")*inchesToMM);
+		var pageEvenRightMargin = pageWidth - pagePrintableWidth - pageEvenLeftMargin;
+		var pageOddRightMargin = pageWidth - pagePrintableWidth - pageOddLeftMargin;
 		var tupletsFontFace = style.value("tupletFontFace");
 		var tupletsFontStyle = style.value("tupletFontStyle");
 		var barlineWidth = style.value("barWidth");
@@ -1480,15 +1523,22 @@ MuseScore {
 		// ** CHECK FOR PAGE SETTING ISSUES ** //
 		
 		// **** CHECK PAPER SIZE is either A4 or A3 **** //
-		if ((pageWidth != 210 && pageHeight != 297) && (pageWidth != 297 && pageHeight != 420)) {
-			pageSettingsComments.push("The page size is non-standard: set it to A4");
+		if ((pageWidth != 210 && pageHeight != 297) && (pageWidth != 297 && pageHeight != 210) && (pageWidth != 297 && pageHeight != 420)) {
+			pageSettingsComments.push("The page size is non-standard: set it to A4, unless otherwise requested");
 		}
 		
 		// **** TEST 1A: CHECK MARGINS ****
-		var maxMargin = 15;
-		var minMargin = 10;
-		if ((pageEvenLeftMargin > maxMargin) + (pageOddLeftMargin > maxMargin) + (pageEvenTopMargin > maxMargin) + (pageOddTopMargin > maxMargin) +  (pageEvenBottomMargin > maxMargin) + (pageOddBottomMargin > maxMargin)) pageSettingsComments.push("Decrease your margins to no more than "+maxMargin+"mm");
-		if ((pageEvenLeftMargin < minMargin) + (pageOddLeftMargin < minMargin) + (pageEvenTopMargin < minMargin) + (pageOddTopMargin < minMargin) +  (pageEvenBottomMargin < minMargin) + (pageOddBottomMargin < minMargin)) pageSettingsComments.push("Increase your margins to at least "+minMargin+"mm");
+		var minLRMargin = 10;
+		var maxLRMargin = 18;
+		var minTBMargin = 10;
+		var maxTBMargin = 18;
+		
+		//logError("pageEvenTopMargin = "+pageEvenTopMargin+"; pageOddTopMargin = "+pageOddTopMargin+"; pageEvenBottomMargin = "+pageEvenBottomMargin+"; pageOddBottomMargin = "+pageOddBottomMargin);
+		if ((pageEvenLeftMargin < minLRMargin) + (pageOddLeftMargin < minLRMargin) + (pageEvenRightMargin < minLRMargin) + (pageOddRightMargin < minLRMargin)) pageSettingsComments.push("Increase your left and right margins to "+minLRMargin+"mm");
+		if ((pageEvenTopMargin < minTBMargin) + (pageOddTopMargin < minTBMargin) + (pageEvenBottomMargin < minTBMargin) + (pageOddBottomMargin < minTBMargin)) pageSettingsComments.push("Increase your top and bottom margins to "+minTBMargin+"mm");
+		if ((pageEvenLeftMargin > maxLRMargin) + (pageOddLeftMargin > maxLRMargin) + (pageEvenRightMargin > maxLRMargin) + (pageOddRightMargin > maxLRMargin)) pageSettingsComments.push("Decrease your left and right margins to "+maxLRMargin+"mm");
+		if ((pageEvenTopMargin > maxTBMargin) + (pageOddTopMargin > maxTBMargin) + (pageEvenBottomMargin > maxTBMargin) + (pageOddBottomMargin > maxTBMargin)) pageSettingsComments.push("Decrease your top and bottom margins to "+maxTBMargin+"mm");
+
 		
 		// **** TEST 1B: CHECK STAFF SIZE ****
 		var maxSize = 6.8;
@@ -1507,15 +1557,15 @@ MuseScore {
 		}
 		if (numStaves > 7) {
 			maxSize = 5.4;
-			minSize = 4.4;
+			minSize = 3.7;
 		}
 		
-		if (staffSize > maxSize) pageSettingsComments.push("Decrease the stave space to within the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
+		if (staffSize > maxSize) pageSettingsComments.push("Decrease the stave space to within the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 		if (staffSize < minSize) {
-			if (staffSize < 4.4) {
-				if (staffSize < minSize) pageSettingsComments.push("The staff size is very small.\nIncrease the stave space to at least 1.1mm");
+			if (staffSize < 3.7) {
+				if (staffSize < minSize) pageSettingsComments.push("The staff size is very small.\nIncrease the stave space to at least 0.92mm");
 			} else {
-				pageSettingsComments.push("Increase the stave space to be in the range "+(minSize/4.0)+"–"+(maxSize/4.0)+"mm");
+				pageSettingsComments.push("Increase the stave space to be in the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 			}
 		}
 				
@@ -1557,7 +1607,7 @@ MuseScore {
 				firstStaffNamesVisible = false;
 			} else {
 				for (var i = 0; i < blankStaffNames.length; i++) {
-					addError ("This staff has no staff name.","system1 "+i);
+					addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system1 "+i);
 				}
 			}
 		}
@@ -1589,7 +1639,7 @@ MuseScore {
 				subsequentStaffNamesVisible = false;
 			} else {
 				for (var i = 0; i < blankStaffNames.length; i++) {
-					addError ("This staff has no staff name.","system2 "+i);
+					addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system2 "+i);
 				}
 			}
 		}
@@ -1645,10 +1695,10 @@ MuseScore {
 		if (styleComments.length>0) {
 			var styleCommentsStr = "";
 			if (styleComments.length == 1) {
-				styleCommentsStr = "The following change to the score’s Style settings (Format→Style…) is recommended,\n(though may not be suitable for all scenarios or style guides):\n— "+styleComments[0];
+				styleCommentsStr = "The following change to the score’s Style settings (Format→Style…) is recommended\n(though may not be suitable for all scenarios or style guides):\n— "+styleComments[0];
 			} else {
 				var theList = styleComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
-				styleCommentsStr = "The following changes to the score’s Style settings (Format→Style…) are recommended,\nthough may not be suitable for all scenarios or style guides):\n"+theList;
+				styleCommentsStr = "The following changes to the score’s Style settings (Format→Style…) are recommended\n(though may not be suitable for all scenarios or style guides):\n"+theList;
 			}
 			addError(styleCommentsStr,"pagetop");
 		}
@@ -1657,12 +1707,31 @@ MuseScore {
 		if (pageSettingsComments.length > 0) {
 			var pageSettingsCommentsStr = "";
 			if (pageSettingsComments.length == 1) {	
-				pageSettingsCommentsStr = "The following change to the score’s Page Settings (Format→Page settings…) is recommended,\nthough may not be suitable for all scenarios or style guides):\n— "+pageSettingsComments[0];
+				pageSettingsCommentsStr = "The following change to the score’s Page Settings (Format→Page settings…) is recommended\n(though may not be suitable for all scenarios or style guides):\n— "+pageSettingsComments[0];
 			} else {
 				var theList = pageSettingsComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
-				pageSettingsCommentsStr = "The following changes to the score’s Page Settings (Format→Page settings…) is recommended,\n(though may not be suitable for all scenarios or style guides):\n"+theList;
+				pageSettingsCommentsStr = "The following changes to the score’s Page Settings (Format→Page settings…) is recommended\n(though may not be suitable for all scenarios or style guides):\n"+theList;
 			}
 			addError(pageSettingsCommentsStr,"pagetop");
+		}
+	}
+	
+	function checkLocationOfFinalBar () {
+		var maxDistance = 25;
+		var lastMeasure = curScore.lastMeasure;
+		var loc = lastMeasure.pagePos;
+		var rect = lastMeasure.bbox;
+		var l = Math.round(loc.x*spatium);
+		var t = Math.round(loc.y*spatium);
+		var r = Math.round((loc.x + rect.width) * spatium);
+		var b = Math.round((loc.y + rect.height) * spatium);
+		var thresholdr = pageWidth - maxDistance;
+		var thresholdb = pageHeight - maxDistance;
+		//logError ("Last measure rect is {"+l+" "+t+" "+r+" "+b+"}");
+		//logError ("Borders: "+(thresholdr)+" "+(thresholdb));
+		if (r < thresholdr || b < thresholdb ) {
+		//	logError("Adding comment");
+			addError("Try and arrange the layout so that the final bar is\nin the bottom right-hand corner of the last page.",lastMeasure);
 		}
 	}
 	
@@ -2008,9 +2077,10 @@ MuseScore {
 	function checkScoreText() {
 		curScore.startCmd();
 		cmd("title-text");
+		var titleText = curScore.selection.elements[0];
+		
 		cmd("select-similar");
 		
-		var titleText = curScore.selection.elements[0];
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
@@ -2046,12 +2116,11 @@ MuseScore {
 		var styledText = textObject.text;
 		if (eType == Element.REHEARSAL_MARK) checkRehearsalMark (textObject);
 						
-		//logError("styledtext = "+styledText);
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
 		if (!Qt.colorEqual(textObject.frameBgColor,"yellow") || !Qt.colorEqual(textObject.frameFgColor,"black")) {	
 			var textStyle = textObject.subStyle;
 			var tn = textObject.name.toLowerCase();
-			//logError("Text style is "+textStyle+"); subtype = "+eSubtype;
+			//logError(;
 			var plainText = styledText.replace(/<[^>]+>/g, "");
 			
 			if (typeof plainText != 'string') errorMsg += '\nTypeof plainText not string: '+(typeof plainText);
@@ -2059,6 +2128,7 @@ MuseScore {
 				plainText = plainText.replace(replacements[i],replacements[i+1]);
 			}
 			var lowerCaseText = plainText.toLowerCase();
+			//logError("Text style is "+textStyle+"); subtype = "+eSubtype+"; styledtext = "+styledText+"; lowerCaseText = "+lowerCaseText);
 			
 			if (lowerCaseText != '') {
 				var len = plainText.length;
@@ -2129,10 +2199,10 @@ MuseScore {
 						if (correctText.includes(spellingError)) {
 							isSpellingError = true;
 							var correctSpelling = spellingerrorsanywhere[i*2+1];
-							correctText = tempText.replace(spellingError,correctSpelling);
+							correctText = correctText.replace(spellingError,correctSpelling);
 						}
 					}
-					if (isSpellingError) addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+tempText+"’.",textObject);
+					if (isSpellingError) addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
 				}
 				
 				// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
@@ -2159,7 +2229,7 @@ MuseScore {
 						//logError("Found tempo change in b. "+currentBarNum);
 						lastTempoChangeMarking = textObject;
 						if (eType != Element.TEMPO_TEXT) {
-							addError( "‘"+plainText+"’ is a tempo change marking\nbut has not been entered as Tempo Text",textObject);
+							addError( "‘"+plainText+"’ is a tempo change marking\nbut has not been entered as Tempo Text.\nYou can change it in Properties→Show more→Text style→Tempo.",textObject);
 							return;
 						}
 						if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) {
@@ -2183,7 +2253,7 @@ MuseScore {
 						//logError("Cancelled tempo change marking in b. "+currentBarNum);
 					
 						// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
-						if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking\nbut has not been entered as Tempo Text",textObject);
+						if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking\nbut has not been entered as Tempo Text.\nYou can change it in Properties→Show more→Text style→Tempo.",textObject);
 				
 						// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
 						if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See Behind Bars, p. 182)",textObject);
@@ -2193,6 +2263,20 @@ MuseScore {
 					if (isTempoMarking || isTempoChangeMarking) {
 						if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
 						if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
+					}
+					
+					// **** CHECK METRONOME MARKINGS **** //
+					var isMetronomeMarking = false;
+					for (var j = 0; j < metronomemarkings.length; j++) {
+						if (lowerCaseText.includes(metronomemarkings[j])) {
+							isMetronomeMarking = true;
+							break;
+						}
+					}
+					
+					// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
+					if (!isTempoMarking && !isTempoChangeMarking && isMetronomeMarking) {
+						if (eType != Element.METRONOME) addError("This looks like a metronome marking, but is not in the Metronome text style.\n(Metronome markings should not be bold.)\nYou can change it in Properties→Show more→Text style→Metronome.",textObject);
 					}
 				
 					// **** CHECK DIV **** //
@@ -2478,6 +2562,18 @@ MuseScore {
 			prevKeySigBarNum = currentBarNum;
 		} else {
 			addError("This key signature is the same as the one in bar "+prevKeySigBarNum+".\nPerhaps delete it?",keySig);
+		}
+	}
+	
+	function checkBarlinesConnected (str) {
+		for (var s = 0; s < curScore.nstaves-1; s ++) {
+			var staff = curScore.staves[s];
+			//logError("Checking "+staff.systemBracket);
+			if (staff.staffBarlineSpan == 0) {
+				addError ("The barlines should go through all of the staves for a "+str,"system1 1");
+				return;
+			}
+//			logError ("s.bar "+staff.staffBarlineSpan+" "+staff.staffBarlineSpanFrom+" "+staff.staffBarlineSpanTo);
 		}
 	}
 	
@@ -2956,7 +3052,7 @@ MuseScore {
 		
 		// check dur >= minim
 		if (noteRest.duration.ticks > Minim) {
-			addError("It’s not recommended to have a pizzicato longer than a minim unless the tempo is very fast.\nPerhaps this is supposed to be arco?",noteRest);
+			addError("It’s not recommended to have a pizzicato longer\nthan a minim unless the tempo is very fast.\nPerhaps this is supposed to be arco?",noteRest);
 			lastPizzIssueBar = barNum;
 			lastPizzIssueStaff = staffNum;
 			return;
@@ -3463,7 +3559,6 @@ MuseScore {
 	}
 	
 	function showAllErrors () {
-		var commentPage = null;
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -3584,31 +3679,27 @@ MuseScore {
 					cursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
-					var commentHeight = comment.bbox.height;
-					//logError("desiredPosX = "+desiredPosX+"); desiredPosY = "+desiredPosY;
-					
+					var commentHeight = comment.bbox.height;					
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
 						comment.offsetY = desiredPosY - comment.pagePos.y;
 					} else {
 						comment.offsetY -= commentHeight;
 					}
-					//logError("offx = "+comment.offsetX+"); offy = "+comment.offsetY;
 					var commentTopRounded = Math.round(comment.pagePos.y);
-					commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
-					if (commentPage.is(prevCommentPage)) {
-						commentPosOffset[commentTopRounded+1000] += commentOffset;
-						var theOffset = commentPosOffset[commentTopRounded+1000];
+					var commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
+					if (commentPage != null && commentPage != undefined) {
+						var commentPageNum = commentPage.pagenumber;
+						var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
 						if (theOffset > 4 * commentOffset) {
 							theOffset = 0;
-							commentPosOffset[commentTopRounded+1000] = 0;
+							commentPosOffset[commentPageNum][commentTopRounded+1000] = 0;
+						} else {
+							commentPosOffset[commentPageNum][commentTopRounded+1000] += commentOffset;
 						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
-					} else {
-						commentPosOffset[commentTopRounded+1000] = 0;
 					}
-					prevCommentPage = commentPage;
 				}
 			}
 		} // var i
@@ -3757,7 +3848,6 @@ MuseScore {
 			leftPadding: 0
 			ScrollBar.vertical.policy: ScrollBar.AsNeeded
 			TextArea {
-				textFormat: Text.RichText
 				text: dialog.msg
 				wrapMode: TextEdit.Wrap
 				leftInset: 0

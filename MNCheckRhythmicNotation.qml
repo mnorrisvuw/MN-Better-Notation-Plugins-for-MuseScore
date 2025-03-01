@@ -141,7 +141,6 @@ MuseScore {
 		possibleOnbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet", "minim", "dotted minim", "semibreve"];
 		possibleOffbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet];
 		possibleOffbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet"];
-		commentPosOffset = Array(10000).fill(0);
 
 		// **** DELETE ALL EXISTING COMMENTS AND HIGHLIGHTS **** //
 		deleteAllCommentsAndHighlights();
@@ -183,6 +182,21 @@ MuseScore {
 		numBars = (lastBarNum-firstBarNum)+1;
 		totalNumBars = numBars*numStaves;
 		setProgress (3);
+		
+
+		var firstSystem = firstBarInScore.parent;
+		var lastSystem = lastBarInScore.parent;
+		var firstPage = firstSystem.parent;
+		var lastPage = lastSystem.parent;
+		var firstPageNum = firstPage.pagenumber;
+		var lastPageNum = lastPage.pagenumber;
+		
+
+		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
+		for (var i = 0; i <= lastPageNum; i++) {
+			commentPosOffset[i] = Array(10000).fill(0);
+		}
+		
 		
 		// **** INITIALISE VARIABLES FOR THE LOOP **** //
 		var currentBarNum, numBarsProcessed,  wasTied, currentTimeSig;
@@ -526,10 +540,10 @@ MuseScore {
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
-		if (errorMsg != "") errorMsg = "\n\nError log (for developer use):" + errorMsg;
-		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no errors found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
-		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one error.\nPlease check the score for the yellow comment box that describes the issue." + errorMsg;
-		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" errors.\nPlease check the score for the yellow comment boxes, which describe the issues." + errorMsg;
+		if (errorMsg != "") errorMsg = "\n\n————————————\nERROR LOG (for developer use):" + errorMsg;
+		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no issues found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
+		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one issue.\nPlease check the score for the yellow comment box that provides more details of the issue." + errorMsg;
+		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" issues.\nPlease check the score for the yellow comment boxes that provide more details on each issue." + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
@@ -1387,7 +1401,6 @@ MuseScore {
 	}
 	
 	function showAllErrors () {
-		var commentPage = null;
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -1405,6 +1418,7 @@ MuseScore {
 				var staffNum = 0;
 				var elementHeight = 0;
 				var commentOffset = 1.0;
+				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 			
 				// the errorObjects array contains a list of the Elements to attach the text object to
 				// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
@@ -1430,7 +1444,15 @@ MuseScore {
 						elementHeight = element.bbox.height;
 						if (eType != Element.MEASURE) {
 							var elemStaff = element.staff;
-							while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+							if (elemStaff == undefined) {
+								isString = true;
+								theLocation = "";
+								desiredPosX = element.bbox.x;
+								desiredPosY = element.bbox.y;
+								//logError(" x = "+desiredPosX+"); y = "+desiredPosY;
+							} else {
+								while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+							}
 						}
 					}
 				}
@@ -1447,7 +1469,6 @@ MuseScore {
 				comment.fontSize = 7.0;
 				comment.fontFace = "Helvetica";
 				comment.autoplace = false;
-				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
 				if (isString) {
 					if (theLocation === "pagetop") {
@@ -1464,7 +1485,7 @@ MuseScore {
 							tick = element.firstSegment.tick;
 						} else {
 							if (element.parent == undefined || element.parent == null) {
-								logError("showAllErrors() — element.parent is "+element.parent+"; etype is "+element.name);
+								logError("showAllErrors() — ELEMENT PARENT IS "+element.parent+"); etype is "+element.name);
 							} else {
 								if (element.parent.type == Element.CHORD) {
 									// it's either a notehead or a gracenote
@@ -1500,7 +1521,7 @@ MuseScore {
 					cursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
-					var commentHeight = comment.bbox.height;
+					var commentHeight = comment.bbox.height;					
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
 						comment.offsetY = desiredPosY - comment.pagePos.y;
@@ -1508,20 +1529,19 @@ MuseScore {
 						comment.offsetY -= commentHeight;
 					}
 					var commentTopRounded = Math.round(comment.pagePos.y);
-					commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
-					if (commentPage.is(prevCommentPage)) {
-						commentPosOffset[commentTopRounded+1000] += commentOffset;
-						var theOffset = commentPosOffset[commentTopRounded+1000];
+					var commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
+					if (commentPage != null && commentPage != undefined) {
+						var commentPageNum = commentPage.pagenumber;
+						var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
 						if (theOffset > 4 * commentOffset) {
 							theOffset = 0;
-							commentPosOffset[commentTopRounded+1000] = 0;
+							commentPosOffset[commentPageNum][commentTopRounded+1000] = 0;
+						} else {
+							commentPosOffset[commentPageNum][commentTopRounded+1000] += commentOffset;
 						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
-					} else {
-						commentPosOffset[commentTopRounded+1000] = 0;
 					}
-					prevCommentPage = commentPage;
 				}
 			}
 		} // var i
