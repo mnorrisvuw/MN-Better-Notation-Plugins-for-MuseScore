@@ -118,6 +118,14 @@ MuseScore {
   onRun: {
 		if (!curScore) return;
 		setProgress (0);
+		
+		// ** VERSION CHECK ** //
+		if (MuseScore.mscoreMajorVersion < 4 || (MuseScore.mscoreMajorVersion == 4 && MuseScore.mscoreMajorVersion < 4)) {
+			dialog.msg = "<p>This plugin requires at MuseScore v. 4.4 or later<p><p><font size=\"6\">🛑</font></p> ";
+			dialog.show();
+			return;
+		}
+		
 		saveSelection();
 		
 		// **** INITIALISE VARIABLES **** //
