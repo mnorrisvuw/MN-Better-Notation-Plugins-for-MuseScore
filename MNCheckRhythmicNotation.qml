@@ -22,7 +22,7 @@ MuseScore {
 	
 	// **** GLOBALS **** //
 	property var numLogs: 0
-
+	property var currentBarNum: 0
 	property var selectionArray: []
 	property var timeSigs: []
 	property var timeSigTicks: []
@@ -48,6 +48,7 @@ MuseScore {
 	property var prevSoundingDur: 0
 	property var noteFinishesBeat: false
 	property var hasBeam: false
+	property var nextHasBeam: false
 	property var cursor: null
 	property var cursor2: null
 	property var noteStartBeat: 0
@@ -79,6 +80,7 @@ MuseScore {
 	property var restStartBeat: 0.875
 	property var currentBeam: null
 	property var currentBeamMode: 0
+	property var currentBeamPos: 0
 	property var nextBeam: null
 	property var nextBeamMode: 0
 	property var isPickupBar: false
@@ -199,7 +201,7 @@ MuseScore {
 		
 		
 		// **** INITIALISE VARIABLES FOR THE LOOP **** //
-		var currentBarNum, numBarsProcessed,  wasTied, currentTimeSig;
+		var numBarsProcessed,  wasTied, currentTimeSig;
 		var prevNoteWasDoubleTremolo;
 		var tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, tieIndex;
 		var restCrossesBeat, restStartedOnBeat, isLastRest;
@@ -340,6 +342,7 @@ MuseScore {
 							isOnTheBeat = !noteStartFrac;
 							currentBeam = noteRest.beam;	
 							currentBeamMode = noteRest.beamMode;
+							currentBeamPos = noteRest.beamPos;
 							hasBeam = currentBeam != null;
 							
 							// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
@@ -355,6 +358,7 @@ MuseScore {
 							nextDisplayDur = -1;
 							nextItemDur = -1;
 							nextItemBeat = -1;
+							nextHasBeam = false;
 							nextBeam = null;
 							nextBeamMode = Beam.NONE;
 							
@@ -367,6 +371,7 @@ MuseScore {
 								nextItemBeat = Math.trunc(nextItemPos / beatLength);
 								nextItemIsHidden = !nextItem.visible;
 								nextBeam = nextItem.beam;
+								nextHasBeam = (nextBeam != null);
 								nextBeamMode = nextItem.beamMode;
 								if (cursor2.next()) {
 									nextNextItem = cursor2.element;
@@ -540,10 +545,10 @@ MuseScore {
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
-		if (errorMsg != "") errorMsg = "\n\n————————————\nERROR LOG (for developer use):" + errorMsg;
-		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no issues found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
-		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one issue.\nPlease check the score for the yellow comment box that provides more details of the issue." + errorMsg;
-		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" issues.\nPlease check the score for the yellow comment boxes that provide more details on each issue." + errorMsg;
+		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
+		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p>" + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
@@ -1118,7 +1123,10 @@ MuseScore {
 							if (isCompound) {
 								if (tiedActualDur >= beatLength) canBeSimplified = (tiedActualDur % beatLength) == 0; // can be simplified if it's a multiple of the beat length
 							} else {
-								if (tiedActualDur == dottedcrotchet && !(timeSigNum % 2)) canBeSimplified = !(startBeat % 2); // for 4/4, 6/4 etc — can be simplified if it's on an even numbered beat (0, 2, etc)
+								if (tiedActualDur == dottedcrotchet) {
+									if (timeSigNum % 2 == 0) canBeSimplified = startBeat % 2 == 0; // for 4/4, 6/4 etc — can be simplified if it's on an even numbered beat (0, 2, etc)
+									if (tempNextItem.actualDuration.ticks != quaver) canBeSimplified = false; 
+								}
 								if (tiedActualDur == semibreve) canBeSimplified = timeSigDenom == 2 || (timeSigDenom == 4 && !(timeSigNum % 3)); // only use a semibreve if we're in 3/2 4/4 or 7/4 etc
 							}
 			
@@ -1364,32 +1372,33 @@ MuseScore {
 	}
 	
 	function checkBeamedToNotesInNextBeat (noteRest) {
-		var beamedToNext = false;
 		var lastNoteInBeat = nextItemBeat > noteStartBeat;
-		var beamTriesToGoForwards = currentBeamMode == Beam.MID || currentBeamMode == Beam.BEGIN;
-		var nextBeamTriesToGoBack = nextBeamMode == Beam.MID || nextBeamMode == Beam.END;
 		
 		//logError(*** CHECKING BEAMED TO NOTES IN NEXT BEAT ERROR ***");
-		//logError(hasBeam="+hasBeam+" lastNoteInBeat="+lastNoteInBeat+" nextItem="+nextItem+" beamTriesToGoForwards="+beamTriesToGoForwards+" nextBeamTriesToGoBack="+nextBeamTriesToGoBack);
-		//logError(currentBeamMode="+currentBeamMode+" nextBeamMode="+nextBeamMode);
+		// Beam.AUTO = 0; Beam.NONE = 1; Beam.BEGIN = 2; Beam.BEGIN32 = 3; Beam.BEGIN64 = 4; Beam.MID = 5; Beam.END = 6; 
+		//logError("AUTO="+Beam.AUTO+"; BEGIN="+Beam.BEGIN+"; MID="+Beam.MID+"; END="+Beam.END+"; NONE="+Beam.NONE+"; BEGIN32="+Beam.BEGIN32+"; BEGIN64="+Beam.BEGIN64);
+		//logError("hasBeam="+hasBeam+" nextHasBeam="+nextHasBeam+" lastNoteInBeat="+lastNoteInBeat+" beamForwards="+beamTriesToGoForwards+" nextGoBack="+nextBeamTriesToGoBack);
+		//logError("currentBeamMode="+currentBeamMode+" nextBeamMode="+nextBeamMode+" beamPos="+currentBeamPos);
 		
 		//if (lastNoteInBeat) logError(BEAM: "+currentBeamMode+" "+nextBeamMode);
 		
 		// ADD — 
-		if (hasBeam && lastNoteInBeat && nextItem && beamTriesToGoForwards && nextBeamTriesToGoBack) {
+		if (hasBeam && nextHasBeam && lastNoteInBeat) {
 			
-			//logError( beamed to notes in next beat"
+			var beamTriesToGoForwards = currentBeamMode == Beam.AUTO || currentBeamMode > 2;
+			var nextBeamTriesToGoBack = nextBeamMode > 2;
 			
-			// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
-			var exception1 = isNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && nextNextItemIsNote;
-			//var exception2 = barLength == semibreve && noteStartBeat == 1;
-		//	logError( exception1="+exception1+"); soundingDur="+soundingDur+" prevSoundingDur="+prevSoundingDur+" nextItemDur="+nextItemDur+" nextNextItemDur="+nextNextItemDur;
-			
-			if ( !exception1 ) {
-				if (isNote) {
-					addError( "Note should not be beamed to notes in next beat\nSet the ‘Beam type’ property of this note and the following to AUTO",noteRest);
-				} else {
-					addError( "Rest should not be included in beam group of next beat\nSet the ‘Beam type’ property of this note to AUTO", noteRest);
+			if (beamTriesToGoForwards && nextBeamTriesToGoBack) {
+								
+				// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
+				var exception1 = isNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && nextNextItemIsNote;
+				
+				if (!exception1) {
+					if (isNote) {
+						addError( "Note should not be beamed to notes in next beat\nSet the ‘Beam type’ property of this note and the following to AUTO",noteRest);
+					} else {
+						addError( "Rest should not be included in beam group of next beat\nSet the ‘Beam type’ property of this note to AUTO", noteRest);
+					}
 				}
 			}
 		}
@@ -1654,7 +1663,7 @@ MuseScore {
 	
 	function logError (str) {
 		numLogs ++;
-		arrorMsg += "\nStaff "+currentStaffNum+", b. "+currentBarNum+": "+str;
+		errorMsg += "<p>Staff "+currentStaffNum+", b. "+currentBarNum+": "+str+"</p>";
 	}
 	
 	StyledDialogView {

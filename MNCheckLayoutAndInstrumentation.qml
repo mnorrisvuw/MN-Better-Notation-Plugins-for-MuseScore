@@ -24,15 +24,15 @@ MuseScore {
 	
 	
 	// **** TEXT FILE DEFINITIONS **** //
-	FileIO { id: techniquesfile; source: Qt.resolvedUrl("./assets/techniques.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: canbeabbreviatedfile; source: Qt.resolvedUrl("./assets/canbeabbreviated.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: metronomemarkingsfile; source: Qt.resolvedUrl("./assets/metronomemarkings.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: shouldbelowercasefile; source: Qt.resolvedUrl("./assets/shouldbelowercase.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: shouldhavefullstopfile; source: Qt.resolvedUrl("./assets/shouldhavefullstop.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: spellingerrorsanywherefile; source: Qt.resolvedUrl("./assets/spellingerrorsanywhere.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: spellingerrorsatstartfile; source: Qt.resolvedUrl("./assets/spellingerrorsatstart.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: tempomarkingsfile; source: Qt.resolvedUrl("./assets/tempomarkings.txt").toString().slice(8); onError: { console.logError(msg); } }
-	FileIO { id: tempochangemarkingsfile; source: Qt.resolvedUrl("./assets/tempochangemarkings.txt").toString().slice(8); onError: { console.logError(msg); } }
+	FileIO { id: techniquesfile; source: Qt.resolvedUrl("./assets/techniques.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: canbeabbreviatedfile; source: Qt.resolvedUrl("./assets/canbeabbreviated.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: metronomemarkingsfile; source: Qt.resolvedUrl("./assets/metronomemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: shouldbelowercasefile; source: Qt.resolvedUrl("./assets/shouldbelowercase.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: shouldhavefullstopfile; source: Qt.resolvedUrl("./assets/shouldhavefullstop.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: spellingerrorsanywherefile; source: Qt.resolvedUrl("./assets/spellingerrorsanywhere.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: spellingerrorsatstartfile; source: Qt.resolvedUrl("./assets/spellingerrorsatstart.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: tempomarkingsfile; source: Qt.resolvedUrl("./assets/tempomarkings.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: tempochangemarkingsfile; source: Qt.resolvedUrl("./assets/tempochangemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
 
 	// ** DEBUG **
 	property var debug: true
@@ -1058,10 +1058,10 @@ MuseScore {
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
-		if (errorMsg != "") errorMsg = "\n\n————————————\nERROR LOG (for developer use):" + errorMsg;
-		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no issues found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
-		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one issue.\nPlease check the score for the yellow comment box that provides more details of the issue." + errorMsg;
-		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" issues.\nPlease check the score for the yellow comment boxes that provide more details on each issue." + errorMsg;
+		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
+		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p>" + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
@@ -1508,6 +1508,7 @@ MuseScore {
 		var pageOddRightMargin = pageWidth - pagePrintableWidth - pageOddLeftMargin;
 		var tupletsFontFace = style.value("tupletFontFace");
 		var tupletsFontStyle = style.value("tupletFontStyle");
+		var pageNumberFontStyle = style.value("pageNumberFontStyle");
 		var barlineWidth = style.value("barWidth");
 		var minimumBarWidth = style.value("minMeasureWidth");
 		var spacingRatio = style.value("measureSpacing");
@@ -1687,7 +1688,10 @@ MuseScore {
 		
 		// **** STYLE SETTINGS — 6. TEXT STYLES TAB **** //
 		//errorMsg += "tupletsFontFace = "+tupletsFontFace+" tupletsFontStyle = "+tupletsFontStyle;
-		if (tupletsFontFace !== "Times New Roman" || tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman italic for tuplets");
+		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman italic for tuplets");
+		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle == 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman for tuplets");
+		if (tupletsFontFace === "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use an italic font for tuplets");
+		if (pageNumberFontStyle != 0) styleComments.push("(Text Styles→Page Number) Use a plain font style (not bold) for page numbers");
 		
 		// ** OTHER STYLE ISSUES ** //
 		
@@ -3848,6 +3852,7 @@ MuseScore {
 			leftPadding: 0
 			ScrollBar.vertical.policy: ScrollBar.AsNeeded
 			TextArea {
+				textFormat: Text.RichText
 				text: dialog.msg
 				wrapMode: TextEdit.Wrap
 				leftInset: 0

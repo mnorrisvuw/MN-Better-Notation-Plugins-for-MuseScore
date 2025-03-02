@@ -217,6 +217,9 @@ MuseScore {
 					while (processingThisBar) {
 						currentKeySig = cursor.keySignature;
 						var eType = cursor.element.type;
+						if (eType == Element.BRACKET_ITEM) {
+							logError ("Found bracket");
+						}
 						if (eType == Element.CLEF) {
 							currentClef = cursor.element;
 							checkClef();
@@ -254,10 +257,10 @@ MuseScore {
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
-		if (errorMsg != "") errorMsg = "\n\n————————————\nERROR LOG (for developer use):" + errorMsg;
-		if (numErrors == 0) errorMsg = "CHECK COMPLETED: Congratulations — no issues found!\n\n<font size=\"6\">🎉</font>" + errorMsg;
-		if (numErrors == 1) errorMsg = "CHECK COMPLETED: I found one issue.\nPlease check the score for the yellow comment box that provides more details of the issue." + errorMsg;
-		if (numErrors > 1) errorMsg = "CHECK COMPLETED: I found "+numErrors+" issues.\nPlease check the score for the yellow comment boxes that provide more details on each issue." + errorMsg;
+		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
+		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p>" + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
