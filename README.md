@@ -47,16 +47,16 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
 ### <img width="200px" src="MNCheckLayoutAndInstrumentation.png" alt="Check Layout and Instrumentation" style="vertical-align:top; margin-right:10px"> MN CHECK LAYOUT AND INSTRUMENTATION
 
 * **MN Check Layout & Instrumentation** checks for over 60 different layout, notation and instrumentation problems, such as:
-  * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio, some style settings not optimal, minimum note distance not optimal, bar number on first bar
-  * **Staff names and order**: non-standard staff names, missing staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font
-  * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest
-  * **Tempo markings**: tempo marking not entered in Tempo text, rit./accel. without a terminating metronome mark/tempo indication/a tempo/tempo primo, tempo marking too large
+  * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio, note spacing too wide or narrow, some style settings not optimal, bar number on first bar, staff spacing not optimal, system spacing not optimal, page size not A3 or A4, last system not finishing in bottom right-hand corner of page, barlines not going through all staves of standard small ensemble, stretch factors applied inappropriately, no title page for work longer than 2 pages, name of work missing from first page of music
+  * **Staff names and order**: non-standard staff names, missing staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font, non-optimal page number font, tempo size too small
+  * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest, ‘dim.’/‘cresc.’ used instead of hairpins
+  * **Tempo markings**: tempo marking not entered in Tempo text, rit./accel. without a terminating metronome mark/tempo indication/a tempo/tempo primo, tempo marking too large, metronome marking not in metronome style
   * **Text objects**: common misspellings, incorrectly capitalised text, space or non-alphanumeric character at start, text could be abbreviated, incorrect location for expressions, straight quotes instead of curly, default title/subtitle/composer not changed
   * **Vocal music**: notes lacking lyrics, notes lacking melismatic extensions, melismata lacking slurs, multiple syllables under one slur, correct positioning of dynamics
   * **Orchestral parts issues**: monophonic line on a shared wind/brass staff missing player indication (e.g. 1./a 2 etc.); monophonic orchestral string part lacking ‘unis.’ after ‘div.’ marking
   * **String-specific issues**: redundant arco/pizz./col legno/tasto/pont/ord. markings, passage that looks arco but is marked pizz., incorrect notation for string harmonics, string harmonic does not exist, artificial harmonic interval incorrect, overly long slurs, long pizz. notes, staccato pizz. notes, slurs that may be too long for one bow stroke, fingered tremolos not slurred, multiple-stops where two notes have to be played on the same string, triple- or quadruple-stops written with all strings sustained, potentially impossible double-stops, difficult passages of fast multiple-stops
   * **Harp-specific issues**: double flats/sharps, impossible chords, too many notes in a chord, too many quick pedal changes
-  * **Instrument-specific issues**: redundant mute indications, piano stretches too wide, flute harmonics incorrectly notated, fluttertongue incorrectly notated  * **Pitch**: incorrect use of clefs, clef change needed, incorrect use of 8va/8vb, 8va/8vb needed
+  * **Instrument-specific issues**: redundant mute indications, piano stretches too wide, flute harmonics incorrectly notated, fluttertongue incorrectly notated  * **Pitch**: incorrect use of clefs, clef change needed, incorrect use of 8va/8vb, 8va/8vb needed, horn written in bass clef unnecessarily
   * **Key signatures**: extreme key signatures (6 or more sharps/flats), rapid key signature change, redundant key signature change
   * **Time signatures**: missing first time signature, redundant time signatures
   * **Clefs**: instrument doesn’t read given clef, redundant clef, clef change would improve readability
@@ -141,8 +141,6 @@ Direct downloads of the Zip file can be found on the [releases page](https://git
 
 **MN Check Layout & Instrumentation**
 
-* Only checks the top staff of a harp part for issues
-* Cannot check the title, subtitle or composer text for various text issues; this seems to be a limitation of the MuseScore plugin architecture for now. Hopefully future versions will allow me to get a reference to these objects.
 * For some checks such as dynamics under rests, the plugin will not check if the instrument is on a grand staff (future versions should be able to do this, it just requires a bit more code)
 * Redundant dynamics check doesn’t yet check for *più* or *meno*
 
