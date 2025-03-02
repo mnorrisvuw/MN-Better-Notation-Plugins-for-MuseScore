@@ -1410,6 +1410,7 @@ MuseScore {
 	}
 	
 	function showAllErrors () {
+		var objectPageNum;
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -1422,6 +1423,7 @@ MuseScore {
 				objectArray = [element];
 			}
 			for (var j in objectArray) {
+				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
 				var staffNum = 0;
@@ -1478,6 +1480,7 @@ MuseScore {
 				comment.fontSize = 7.0;
 				comment.fontFace = "Helvetica";
 				comment.autoplace = false;
+	
 				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
 				if (isString) {
 					if (theLocation === "pagetop") {
@@ -1511,7 +1514,11 @@ MuseScore {
 						}
 					}
 				}
-		
+				if (eType == Element.TEXT) {
+					checkObjectPage = true;
+					objectPageNum = getPageNumber(element);
+				}
+	
 				// style the element
 				if (element !== "pagetop" && element !== "top") {
 					if (element.type == Element.CHORD) {
@@ -1550,11 +1557,29 @@ MuseScore {
 						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
+						if (checkObjectPage) {
+							if (commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+						}
 					}
 				}
 			}
 		} // var i
 		curScore.endCmd();
+	}
+	
+	function getPageNumber (e) {
+		var p = e.parent;
+		var ptype = null;
+		if (p != null) ptype = p.type;
+		while (p && ptype != Element.PAGE) {
+			p = p.parent;
+			if (p != null) ptype = p.type;
+		}
+		if (p != null) {
+			return p.pagenumber;
+		} else {
+			return 0;
+		}
 	}
 	
 	function selectTitleText () {

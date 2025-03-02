@@ -305,7 +305,6 @@ MuseScore {
 
 		// ************  				SELECT AND PRE-PROCESS ENTIRE SCORE 				************ //
 		selectAll();
-
 		
 		setProgress (1);
 		
@@ -342,7 +341,10 @@ MuseScore {
 			var etype = e.type;
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
-			if (etype == Element.HAIRPIN) hairpins[staffIdx].push(e);
+			if (etype == Element.HAIRPIN) {
+				hairpins[staffIdx].push(e);
+				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
+			}
 			if (etype == Element.OTTAVA || etype == Element.OTTAVA_SEGMENT) ottavas[staffIdx].push(e);
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
 			if (etype == Element.SLUR) slurs[staffIdx].push(e);
@@ -805,11 +807,7 @@ MuseScore {
 										var aText = theAnnotation.text;
 																		
 										// **** FOUND A TEXT OBJECT **** //
-										if (aText) {
-											checkTextObject(theAnnotation, currentBarNum);
-										} else {
-											//logError(" Found non-text annotion "+aName);
-										}
+										if (aText && aType != Element.TEMPO_TEXT) checkTextObject(theAnnotation);
 									}
 								}
 							}
@@ -1746,10 +1744,10 @@ MuseScore {
 			var theTick = dynamics[currentStaffNum][i];
 			if (theTick >= currentHairpinEnd && theTick <= currentHairpinEnd  + beatLength) return;
 		}
-		addError ("Hairpin should have a dynamic at the end, or\nend should be closer to the next dynamic.",currentHairpin);
+		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.",currentHairpin);
 	}
 	
-	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText, barNum) {
+	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText) {
 		var isBracketed = false; // TO FIX
 		
 		if (isWindOrBrassInstrument) {
@@ -2082,35 +2080,33 @@ MuseScore {
 		curScore.startCmd();
 		cmd("title-text");
 		var titleText = curScore.selection.elements[0];
-		
 		cmd("select-similar");
-		
 		var elems = curScore.selection.elements;
+		currentBarNum = 0;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
-			if (!e.is(titleText)) checkTextObject (e, null);
+			if (!e.is(titleText)) checkTextObject (e);
 		}
 		curScore.endCmd(true); // undo
-		
 		selectAll();
-		
 		// **** CHECK ANY STAFF-ATTACHED TEMPO TEXT **** //
 		for (var i = 0; i < tempoText.length; i++) {
 			var t = tempoText[i];
 			var m = t.parent.parent;
-			var barNum = 1;
+			currentBarNum = 1;
 			var tempm = curScore.firstMeasure;
 			while (!tempm.is(m)) {
 				tempm = tempm.nextMeasure;
-				barNum ++;
+				currentBarNum ++;
 			}
-			checkTextObject (t, barNum);
+			checkTextObject (t);
 		}
 	}
 	
-	function checkTextObject (textObject,barNum) {
+	function checkTextObject (textObject) {
 		
 		if (!textObject.visible) return;
+		
 		
 		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a 2","a 3","a 4","a 5","a 6","a 7","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
 		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z"];
@@ -2119,9 +2115,12 @@ MuseScore {
 		var eName = textObject.name;
 		var styledText = textObject.text;
 		if (eType == Element.REHEARSAL_MARK) checkRehearsalMark (textObject);
+		
+		
 						
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
 		if (!Qt.colorEqual(textObject.frameBgColor,"yellow") || !Qt.colorEqual(textObject.frameFgColor,"black")) {	
+			
 			var textStyle = textObject.subStyle;
 			var tn = textObject.name.toLowerCase();
 			//logError(;
@@ -2210,10 +2209,10 @@ MuseScore {
 				}
 				
 				// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
-				if (barNum != null) {
+				if (currentBarNum > 0) {
 					
 					// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
-					if (!initialTempoExists && eType == Element.TEMPO_TEXT && barNum == 1) initialTempoExists = true;
+					if (!initialTempoExists && eType == Element.TEMPO_TEXT && currentBarNum == 1) initialTempoExists = true;
 		
 					// **** IS THIS A TEMPO CHANGE MARKING??? **** //
 					var isTempoChangeMarking = false;
@@ -2280,6 +2279,8 @@ MuseScore {
 					
 					// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
 					if (!isTempoMarking && !isTempoChangeMarking && isMetronomeMarking) {
+						logError ("found metro Text");
+
 						if (eType != Element.METRONOME) addError("This looks like a metronome marking, but is not in the Metronome text style.\n(Metronome markings should not be bold.)\nYou can change it in Properties→Show more→Text style→Metronome.",textObject);
 					}
 				
@@ -2443,7 +2444,7 @@ MuseScore {
 						var isError = false;
 						var dynamicException = plainText.includes("fp") || plainText.includes("sf") || plainText.includes("fz");
 						if (prevDynamicBarNum > 0) {
-							var barsSincePrevDynamic = barNum - prevDynamicBarNum;
+							var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
 							if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
 								addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicBarNum+".",textObject);
 								isError = true;
@@ -2451,7 +2452,7 @@ MuseScore {
 						}
 					
 						if (!dynamicException) {
-							prevDynamicBarNum = barNum;
+							prevDynamicBarNum = currentBarNum;
 							prevDynamic = plainText;
 						}
 						if (isError) return;
@@ -2479,7 +2480,7 @@ MuseScore {
 						}
 					}
 					
-					checkInstrumentalTechniques (textObject, plainText, lowerCaseText, barNum);
+					checkInstrumentalTechniques (textObject, plainText, lowerCaseText);
 				
 					// **** CHECK IF THIS IS A WOODWIND OR BRASS MARKING **** //
 					if (windAndBrassMarkings.includes(lowerCaseText) && isWindOrBrassInstrument) {
@@ -3163,9 +3164,9 @@ MuseScore {
 								} else {
 									var errStr = "";
 									if (numNotes == 1) {
-										errStr = "Don’t repeat the same note under a slur. Either remove the slur, or\nadd some articulation (e.g. tenuto/staccato).";
+										errStr = "Don’t repeat the same note under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
 									} else {
-										errStr = "Don’t repeat the same chord under a slur. Either remove the slur, or\nadd some articulation (e.g. tenuto/staccato).";
+										errStr = "Don’t repeat the same chord under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
 									}
 									addError(errStr,noteRest);
 								}
@@ -3563,6 +3564,7 @@ MuseScore {
 	}
 	
 	function showAllErrors () {
+		var objectPageNum;
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -3575,6 +3577,7 @@ MuseScore {
 				objectArray = [element];
 			}
 			for (var j in objectArray) {
+				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
 				var staffNum = 0;
@@ -3631,6 +3634,7 @@ MuseScore {
 				comment.fontSize = 7.0;
 				comment.fontFace = "Helvetica";
 				comment.autoplace = false;
+
 				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
 				if (isString) {
 					if (theLocation === "pagetop") {
@@ -3664,7 +3668,11 @@ MuseScore {
 						}
 					}
 				}
-		
+				if (eType == Element.TEXT) {
+					checkObjectPage = true;
+					objectPageNum = getPageNumber(element);
+				}
+
 				// style the element
 				if (element !== "pagetop" && element !== "top") {
 					if (element.type == Element.CHORD) {
@@ -3703,11 +3711,29 @@ MuseScore {
 						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
+						if (checkObjectPage) {
+							if (commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+						}
 					}
 				}
 			}
 		} // var i
 		curScore.endCmd();
+	}
+	
+	function getPageNumber (e) {
+		var p = e.parent;
+		var ptype = null;
+		if (p != null) ptype = p.type;
+		while (p && ptype != Element.PAGE) {
+			p = p.parent;
+			if (p != null) ptype = p.type;
+		}
+		if (p != null) {
+			return p.pagenumber;
+		} else {
+			return 0;
+		}
 	}
 	
 	function selectTitleText () {
@@ -3719,7 +3745,7 @@ MuseScore {
 	
 	function logError (str) {
 		numLogs ++;
-		errorMsg += "\nStaff "+currentStaffNum+", b. "+currentBarNum+": "+str;
+		errorMsg += "<p>Staff "+currentStaffNum+", b. "+currentBarNum+": "+str+"</p>";
 	}
 	
 	function saveSelection () {
