@@ -970,9 +970,7 @@ MuseScore {
 							//logError(offbeat actual "); 
 							if (isCompound && restActualDur == crotchet + semiquaver && tempActualDur != quaver && startFrac == semiquaver) {
 								var theArray = [];
-								for (var m = i; m <= j; m++) {
-									theArray.push(rests[m]);
-								}
+								for (var m = i; m <= j; m++) theArray.push(rests[m]);
 								addError('Respell these rests as a dotted quaver plus a quaver',theArray);
 								return;
 							}
@@ -1044,16 +1042,15 @@ MuseScore {
 						var simplificationText = possibleOnbeatSimplificationLabels[possibleSimplification];
 						var tempText = (restDisplayDur == dottedcrotchet && !isCompound)? '[Suggestion] ' : '';
 						var theArray = [];
-						for (var i = possibleSimplificationFirstRestIndex; i <= possibleSimplificationLastRestIndex; i++) {
-							theArray.push(rests[i]);
-							//logError(Pushing rest "+i); 
-						}
+						for (var i = possibleSimplificationFirstRestIndex; i <= possibleSimplificationLastRestIndex; i++) theArray.push(rests[i]);
+						
 						if (restDisplayDur == dottedquaver) {
 							addError(tempText+'Condense rests as a '+simplificationText+'.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 							return;
-						} 
-						if (restDisplayDur == crotchet) {
-							addError('Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+						}
+						// respell as two quavers if we're in a compound time signature
+						if (restDisplayDur == crotchet && isCompound) {
+							if (theArray[0].displayDur != quaver) addError('Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 							return;
 						}
 						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
