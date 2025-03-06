@@ -234,9 +234,6 @@ MuseScore {
 					while (processingThisBar) {
 						currentKeySig = cursor.keySignature;
 						var eType = cursor.element.type;
-						if (eType == Element.BRACKET_ITEM) {
-							logError ("Found bracket");
-						}
 						if (eType == Element.CLEF) {
 							currentClef = cursor.element;
 							checkClef();
