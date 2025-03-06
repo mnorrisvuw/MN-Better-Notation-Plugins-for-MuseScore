@@ -1058,7 +1058,7 @@ MuseScore {
 			var mmax = minNoteCountPerSystem * 2;
 			//logError("CHECKING SYS "+sys+": nc="+noteCountInSys+" nb="+numBeatsInSys+" mmin="+mmin+" mmax="+mmax);
 			if (bar == undefined) {
-				logError("check spacing — BAR UNDEFINED");
+				logError("Main loop — check spacing — BAR UNDEFINED");
 			} else {
 				if (noteCountInSys < minNoteCountPerSystem) {
 					addError("This system doesn’t have many notes in it, and may be quite spread out.\nTry including more bars in this system.",bar);
@@ -3129,7 +3129,7 @@ MuseScore {
 		
 		if (staffNum == lastPizzIssueStaff && barNum-lastPizzIssueBar < 5) return;
 		// check staccato
-		if (typeof staffNum !== 'number') logError("Articulation error in check pizz");
+		if (typeof staffNum !== 'number') logError("checkPizzIssues() — Articulation error");
 		
 		var theArticulationArray = getArticulationArray (noteRest, staffNum);
 		if (theArticulationArray) {
@@ -3280,7 +3280,7 @@ MuseScore {
 			}
 			
 			if (!isStartOfSlur && !isEndOfSlur) {
-				if (typeof staffNum !== 'number') logError("Articulation error in check slur issues");
+				if (typeof staffNum !== 'number') logError("checkSlurIssues() — Articulation error");
 			
 				var theArticulationArray = getArticulationArray(noteRest, staffNum);
 				if (theArticulationArray) {
