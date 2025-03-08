@@ -291,6 +291,7 @@ MuseScore {
 		var cursor2 = curScore.newCursor();
 		parts = curScore.parts;
 		numParts = parts.length;
+		isSoloScore = (numParts == 1);
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		var inchesToMM = 25.4;
 		var spatiumDPI = 360.;
@@ -1341,7 +1342,7 @@ MuseScore {
 		var staves = curScore.staves;
 		var cursor = curScore.newCursor();
 		cursor.rewind(Cursor.SCORE_START);
-
+		
 		for (var i = 0; i < numStaves ; i++) {
 			var staff1 = staves[i];
 			var full1 = staff1.part.longName;
@@ -1351,28 +1352,34 @@ MuseScore {
 			
 			// **** CHECK FOR NON-STANDARD DEFAULT STAFF NAMES **** //
 			
-			if (full1l === 'violins 1' || full1l === 'violin 1') addError ("Change the long name of staff "+(i+1)+" to ‘Violin I’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
-			if (full1l === 'violas 1' || full1l === 'viola 1') addError ("Change the long name of staff "+(i+1)+" to ‘Viola I’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
-			if (full1l === 'cellos 1' || full1l === 'cello 1') addError ("Change the long name of staff "+(i+1)+" to ‘Cello I’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+			if (fullInstNamesShowing) {
+				if (full1l === 'violins 1' || full1l === 'violin 1') addError ("Change the long name of staff "+(i+1)+" to ‘Violin I’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+				if (full1l === 'violas 1' || full1l === 'viola 1') addError ("Change the long name of staff "+(i+1)+" to ‘Viola I’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+				if (full1l === 'cellos 1' || full1l === 'cello 1') addError ("Change the long name of staff "+(i+1)+" to ‘Cello I’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+				
+				if (full1l === 'violins 2' || full1l === 'violin 2') addError ("Change the long name of staff "+(i+1)+" to ‘Violin II’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+				if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name of staff "+(i+1)+" to ‘Viola II’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+				if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+(i+1)+" to ‘Cello II’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+				
+				if (full1l === 'violas') addError ("Change the long name of staff "+(i+1)+" to ‘Viola’ (see Behind Bars, p. 509)", "system1 "+i);
+				if (full1l === 'violoncellos' || full1l === 'violpncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see Behind Bars, p. 509)", "system1 "+i);
+				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+(i+1)+" to ‘Double Bass’ or ‘D. Bass’ (see Behind Bars, p. 509)", "system1 "+i);
+			}
 			
-			if (full1l === 'violins 2' || full1l === 'violin 2') addError ("Change the long name of staff "+(i+1)+" to ‘Violin II’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
-			if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name of staff "+(i+1)+" to ‘Viola II’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
-			if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+(i+1)+" to ‘Cello II’\n(see Behind Bars, p. 509 &amp; 515)", "system1 "+i);
+			if (shortInstNamesShowing) {
 			
-			if (full1l === 'violas') addError ("Change the long name of staff "+(i+1)+" to ‘Viola’ (see Behind Bars, p. 509)", "system1 "+i);
-			if (full1l === 'violoncellos' || full1l === 'violpncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see Behind Bars, p. 509)", "system1 "+i);
-			if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+(i+1)+" to ‘Double Bass’ or ‘D. Bass’ (see Behind Bars, p. 509)", "system1 "+i);
-			if (short1l === 'vlns. 1' || short1l === 'vln. 1' || short1l === 'vlns 1' || short1l === 'vln 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vlas. 1' || short1l === 'vla. 1' || short1l === 'vlas 1' || short1l === 'vla 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vcs. 1' || short1l === 'vc. 1' || short1l === 'vcs 1' || short1l === 'vc 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			
-			if (short1l === 'vlns. 2' || short1l === 'vln. 2' || short1l === 'vlns 2' || short1l === 'vln 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			if (short1l === 'vcs. 2' || short1l === 'vc. 2' || short1l === 'vcs 2' || short1l === 'vc 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
-			
-			if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’ (see Behind Bars, p. 509)", "system2 "+i);
-			if (short1l === 'vcs.') addError ("Change the short name of staff "+(i+1)+" to ‘Vc.’ (see Behind Bars, p. 509)", "system2 "+i);
-			if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see Behind Bars, p. 509)", "system2 "+i);
+				if (short1l === 'vlns. 1' || short1l === 'vln. 1' || short1l === 'vlns 1' || short1l === 'vln 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vlas. 1' || short1l === 'vla. 1' || short1l === 'vlas 1' || short1l === 'vla 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vcs. 1' || short1l === 'vc. 1' || short1l === 'vcs 1' || short1l === 'vc 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. I’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+				
+				if (short1l === 'vlns. 2' || short1l === 'vln. 2' || short1l === 'vlns 2' || short1l === 'vln 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vcs. 2' || short1l === 'vc. 2' || short1l === 'vcs 2' || short1l === 'vc 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. II’\n(see Behind Bars, p. 509 & 515)", "system2 "+i);
+				
+				if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’ (see Behind Bars, p. 509)", "system2 "+i);
+				if (short1l === 'vcs.') addError ("Change the short name of staff "+(i+1)+" to ‘Vc.’ (see Behind Bars, p. 509)", "system2 "+i);
+				if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see Behind Bars, p. 509)", "system2 "+i);
+			}
 			
 			//logError("Staff "+i+" long = "+full1+" short = "+short1);
 			var checkThisStaff = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numStaves - 1;
@@ -1607,84 +1614,95 @@ MuseScore {
 				pageSettingsComments.push("Increase the stave space to be in the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 			}
 		}
-				
-		// ** CHECK FOR STAFF NAMES ** //
-		isSoloScore = (numParts == 1);
-		//logError("firstStaffNameShouldBeHidden = "+firstStaffNameShouldBeHidden);
-		
-		var subsequentStaffNamesShouldBeHidden = numParts < 6;
 		
 		// **** STYLE SETTINGS — 1. SCORE TAB **** //
 		
-		// ** staff line thickness ** //
+		// **** STAFF LINE THICKNESS **** //
 		if (staffLineSize != 0.1) styleComments.push("(Score tab) Set ‘Stave line thickness’ to 0.1sp");
 		
-		// ** are the first staff names visible? ** //
-		var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
-		var firstStaffNamesVisible = firstStaffNamesVisibleSetting < 2;
-		
-		var hideInstrumentNameForSolo = isSoloScore && style.value("hideInstrumentNameIfOneInstrument");
-		var blankStaffNames = [];
-		if (!hideInstrumentNameForSolo && firstStaffNamesVisible) {
-			for (var i = 0; i < numParts; i++) {
-				var partName;
-				if (firstStaffNamesVisibleSetting == 0) {
-					partName = parts[i].longName;
-				} else {
-					partName = parts[i].shortName;
-				}
-				if (partName === "") {
-					for (var j = 0; j < numStaves; j++) {
-						if (curScore.staves[j].part.is(parts[i])) {
-							blankStaffNames.push(j);
-							break;
-						}
-					}
-				}
-			}
-			if (blankStaffNames.length == numParts) {
-				firstStaffNamesVisible = false;
-			} else {
-				for (var i = 0; i < blankStaffNames.length; i++) addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system1 "+i);
-			}
-		}
-		
-		// ** are the subsequent staff names visible? ** //
-		if (isSoloScore && !hideInstrumentNameForSolo) styleComments.push("(Score tab) Tick ‘Hide if there is only one instrument’");
-		if (!isSoloScore && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
-		var subsequentStaffNamesVisibleSetting = style.value("subsSystemInstNameVisibility");  //  0 = long names, 1 = short names, 2 = hidden
-		var subsequentStaffNamesVisible = subsequentStaffNamesVisibleSetting < 2;
-		if (!hideInstrumentNameForSolo && subsequentStaffNamesVisible) {
-			blankStaffNames = [];
-			for (var i = 0; i < numParts; i++) {
-				var partName;
-				if (subsequentStaffNamesVisibleSetting == 0) {
-					partName = parts[i].longName;
-				} else {
-					partName = parts[i].shortName;
-				}
-				if (partName === "") {
-					for (var j = 0; j < numStaves; j++) {
-						if (curScore.staves[j].part.is(parts[i])) {
-							blankStaffNames.push(j);
-							break;
-						}
-					}
-				}
-			}
-			if (blankStaffNames.length == numParts) {
-				subsequentStaffNamesVisible = false;
-			} else {
-				for (var i = 0; i < blankStaffNames.length; i++) addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system2 "+i);
-			}
-		}
-		fullInstNamesShowing = (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 0) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 0);
-		shortInstNamesShowing =  (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 1) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 1);
-		
-		if (subsequentStaffNamesShouldBeHidden) {
-			if (subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble");
+		// **** CHECK FOR STAFF NAMES SHOWING OR HIDDEN INCORRECTLY **** //
+		var staffNamesHiddenBecauseSoloScore = isSoloScore && style.value("hideInstrumentNameIfOneInstrument");
+		if (isSoloScore) {
+			if (!staffNamesHiddenBecauseSoloScore) styleComments.push("(Score tab) Tick ‘Hide if there is only one instrument’");
 		} else {
-			if (!subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble");
+			// ** FIRST STAFF NAMES SHOULD BE SHOWING — STYLE SET TO 0 **//
+			// ** ALSO CHECK THEY HAVEN'T BEEN MANUALLY DELETED ** //		
+			var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
+			var firstStaffNamesVisible = firstStaffNamesVisibleSetting < 2;
+			var blankStaffNames = [];
+			if (firstStaffNamesVisible) {
+				for (var i = 0; i < numParts; i++) {
+					var partName;
+					if (firstStaffNamesVisibleSetting == 0) {
+						partName = parts[i].longName;
+					} else {
+						partName = parts[i].shortName;
+					}
+					if (partName === "") {
+						for (var j = 0; j < numStaves; j++) {
+							if (curScore.staves[j].part.is(parts[i])) {
+								blankStaffNames.push(j);
+								break;
+							}
+						}
+					}
+				}
+				if (blankStaffNames.length == numParts) {
+					firstStaffNamesVisible = false;
+				} else {
+					for (var i = 0; i < blankStaffNames.length; i++) addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system1 "+i);
+				}
+			}
+			if (firstStaffNamesVisible && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
+			if (!firstStaffNamesVisible && firstStaffNamesVisibleSetting < 2) addError("It looks like you have manually deleted the staff names.\nThese should be showing on the first system.","pagetop");
+
+			// ** are the subsequent staff names visible? ** //
+			var subsequentStaffNamesShouldBeHidden = numParts < 6;
+			var subsequentStaffNamesVisibleSetting = style.value("subsSystemInstNameVisibility");  //  0 = long names, 1 = short names, 2 = hidden
+			var subsequentStaffNamesVisible = subsequentStaffNamesVisibleSetting < 2;
+			if (subsequentStaffNamesVisible) {
+				blankStaffNames = [];
+				for (var i = 0; i < numParts; i++) {
+					var partName;
+					if (subsequentStaffNamesVisibleSetting == 0) {
+						partName = parts[i].longName;
+					} else {
+						partName = parts[i].shortName;
+					}
+					if (partName === "") {
+						for (var j = 0; j < numStaves; j++) {
+							if (curScore.staves[j].part.is(parts[i])) {
+								blankStaffNames.push(j);
+								break;
+							}
+						}
+					}
+				}
+				if (blankStaffNames.length == numParts) {
+					subsequentStaffNamesVisible = false;
+				} else {
+					for (var i = 0; i < blankStaffNames.length; i++) addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system2 "+i);
+				}
+			}
+			fullInstNamesShowing = (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 0) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 0);
+			shortInstNamesShowing =  (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 1) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 1);
+			
+			if (subsequentStaffNamesShouldBeHidden) {
+				// are they actually showing?
+				if (subsequentStaffNamesVisible) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Hide’ for a small ensemble");
+			} else {
+				// are they actually hidden?
+				if (!subsequentStaffNamesVisible) {
+					if (subsequentStaffNamesVisibleSetting == 2) {
+						styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble");
+					} else {
+						addError("It looks like you have manually deleted the staff names on subsequent systems.\nThese should be showing.","pagetop");
+					}
+				} else {
+					// check they are short names
+					if (subsequentStaffNamesVisibleSetting == 0) styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’");
+				}
+			}
 		}
 		
 		// **** STYLE SETTINGS — 2. PAGE TAB **** //
@@ -1700,11 +1718,13 @@ MuseScore {
 		}
 		
 		// **** CHECK STAFF SPACING **** //
-		if (enableVerticalSpread) {
-			if (minStaffSpread < 5 || minStaffSpread > 6) styleComments.push("(Page tab) Set the ‘Min. stave distance’ to between 5.0–6.0sp");
-			if (maxStaffSpread < 10 || maxStaffSpread > 12) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 10.0–12.0sp");
-		} else {
-			if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Page tab) Set the ‘Stave distance’ to between 5.0–6.0sp");
+		if (!isSoloScore) {
+			if (enableVerticalSpread) {
+				if (minStaffSpread < 5 || minStaffSpread > 6) styleComments.push("(Page tab) Set the ‘Min. stave distance’ to between 5.0–6.0sp");
+				if (maxStaffSpread < 10 || maxStaffSpread > 12) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 10.0–12.0sp");
+			} else {
+				if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Page tab) Set the ‘Stave distance’ to between 5.0–6.0sp");
+			}
 		}
 		
 		// ** CHECK MUSIC BOTTOM MARGIN — TO DO** //
