@@ -51,14 +51,12 @@ grave
 lent
 moins vif
 modéré
-cèdez
-retenu
-revenez
 vif
 très vif
 très vite
 très lent
 très grave
+revenez
 vite
 rapide
 kräftig

@@ -7,3 +7,5 @@ ritardando
 ritenuto
 allargando
 allarg.
+cèdez
+retenu
