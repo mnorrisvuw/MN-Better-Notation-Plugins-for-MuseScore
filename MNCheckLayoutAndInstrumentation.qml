@@ -97,20 +97,21 @@ MuseScore {
 	property var scoreHasBrass: false
 	
 	// ** TEXT FILES ** //
-	property var techniques: ""
-	property var canbeabbreviated: ""
-	property var metronomemarkings: ""
-	property var shouldbelowercase: ""
-	property var shouldhavefullstop: ""
-	property var spellingerrorsanywhere: ""
-	property var spellingerrorsatstart: ""
-	property var tempomarkings: ""
-	property var tempochangemarkings: ""
+	property var techniques: []
+	property var canbeabbreviated: []
+	property var metronomemarkings: []
+	property var shouldbelowercase: []
+	property var shouldhavefullstop: []
+	property var spellingerrorsanywhere: []
+	property var spellingerrorsatstart: []
+	property var tempomarkings: []
+	property var tempochangemarkings: []
 	property var lastTempoChangeMarkingBar: -1
 	property var tempoChangeMarkingEnd: -1
 	property var lastTempoChangeMarking: null
 	property var lastTempoMarking: null
 	property var lastTempoMarkingBar: -1
+	property var lastMetronomeMarkingBar: -1
 	property var currentStaffNum: 0
 	property var currentTimeSig: null
 	property var prevTimeSig: ""
@@ -262,7 +263,7 @@ MuseScore {
 		
 		// **** VERSION CHECK **** //
 		if (MuseScore.mscoreMajorVersion < 4 || (MuseScore.mscoreMajorVersion == 4 && MuseScore.mscoreMajorVersion < 4)) {
-			dialog.msg = "<p>This plugin requires at MuseScore v. 4.4 or later<p><p><font size=\"6\">🛑</font></p> ";
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires at MuseScore v. 4.4 or later.</p> ";
 			dialog.show();
 			return;
 		}
@@ -273,7 +274,14 @@ MuseScore {
 		// **** READ IN TEXT FILES **** //
 		techniques = techniquesfile.read().trim().split('\n');
 		canbeabbreviated = canbeabbreviatedfile.read().trim().split('\n');
-		metronomemarkings = metronomemarkingsfile.read().trim().split('\n');
+		var tempmetronomemarkings = metronomemarkingsfile.read().trim().split('\n');
+		for (var i = 0; i < tempmetronomemarkings.length; i++) {
+			var mark = tempmetronomemarkings[i];
+			metronomemarkings.push(mark+"=");
+			metronomemarkings.push(mark+" =");
+			metronomemarkings.push(mark+".=");
+			metronomemarkings.push(mark+". =");
+		}
 		shouldbelowercase = shouldbelowercasefile.read().trim().split('\n');
 		shouldhavefullstop = shouldhavefullstopfile.read().trim().split('\n');
 		spellingerrorsanywhere = spellingerrorsanywherefile.read().trim().split('\n');
@@ -309,7 +317,9 @@ MuseScore {
 		var viewHeight = Math.round(firstPage.bbox.height*spatium);
 		
 		if (viewHeight != pageHeight) {
-			// error about viewing in Continuous View
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin works best if the score is viewed in Page View.</p><p>Change ‘Continuous View’ to ‘Page View’ from the pop-up menu in the bottom-right of the window.</p>";
+			dialog.show();
+			return;
 		}
 
 		initialTempoExists = false;
@@ -439,7 +449,7 @@ MuseScore {
 		var firstBarNum, firstSegmentInScore, numBars;
 		var prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var containsTransposingInstruments = false;
-		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd;
+		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, previousSlurEnd;
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
 		var currentHairpinNum, numHairpins, nextHairpinStart;
@@ -507,6 +517,7 @@ MuseScore {
 			prevCheckedClef = null;
 			lastTempoMarking = null;
 			lastTempoMarkingBar = -1;
+			lastMetronomeMarkingBar = -1;
 			
 			// ** clear flags ** //
 			flaggedInstrumentRange = 0;
@@ -646,7 +657,7 @@ MuseScore {
 				}
 				
 				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
-				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1) {
+				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
 					//logError("Found tempo marking without a metronome marking in "+currentBarNum);
 					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be good to indicate the specific metronome marking or range.",lastTempoMarking);
 					lastTempoChangeMarkingBar = -1;
@@ -690,9 +701,7 @@ MuseScore {
 											var nextSlur = slurs[currentStaffNum][currentSlurNum];
 											if (currentSlur != null && nextSlur != null) {
 												nextSlurStart = nextSlur.spannerTick.ticks;
-												if (nextSlurStart < currTick) {
-													addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",[currentSlur,nextSlur]);
-												}
+												if (nextSlurStart < currTick && !prevWasGraceNote) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",[currentSlur,nextSlur]);
 											}
 											readyToGoToNextSlur = true;
 										}
@@ -706,18 +715,20 @@ MuseScore {
 									isSlurred = true;
 									//logError("Slur started: isSlurred = true");
 									currentSlur = slurs[currentStaffNum][currentSlurNum];
-									currentSlurEnd = currentSlur.spannerTick.ticks + currentSlur.spannerTicks.ticks;
-									//logError("Slur started at "+currTick+" & ends at "+currentSlurEnd); // WORKS CORRECTLY
+									var currentSlurStart = nextSlurStart;
+									previousSlurEnd = currentSlurEnd;
+									currentSlurEnd = currentSlurStart + currentSlur.spannerTicks.ticks;
+									logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
 									var off1 = currentSlur.slurUoff1 == undefined ? 0 : currentSlur.slurUoff1.x;
 									var off2 = currentSlur.slurUoff2 == undefined ? 0 : currentSlur.slurUoff2.x;
 									var off3 = currentSlur.slurUoff3 == undefined ? 0 : currentSlur.slurUoff3.x;
 									var off4 = currentSlur.slurUoff4 == undefined ? 0 : currentSlur.slurUoff4.x;
-									//logError("Slur offs: "+currentSlur.posX+" "+currentSlur.offsetX+" "+off1+" "+off2+" "+off3+" "+off4); // ALWAYS RETURNS 0 0 0 0 0 0
+									//logError("Slur offs: "+currentSlur.posX+" "+currentSlur.offsetX+" "+off1+" "+off2+" "+off3+" "+off4); // ALWAYS RETURNS 0 0 0 0 0 0 :-(
+									if (currentSlurNum > 0 && currentSlurStart == previousSlurEnd && !prevWasGraceNote) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
 
 									if (currentSlurNum < numSlurs - 1) {
 										nextSlurStart = slurs[currentStaffNum][currentSlurNum+1].spannerTick.ticks;
-										//logError("Next slur starts at "+nextSlurStart);
-										if (currentSlurEnd == nextSlurStart) addError ("Don’t start a new slur on the same note\nas you end the previous slur",currentSlur);
+										logError("Next slur starts at "+nextSlurStart);
 									} else {
 										nextSlurStart = 0;
 										//logError("This is the last slur in this staff ");
@@ -969,7 +980,8 @@ MuseScore {
 								
 									// ************ CHECK GRACE NOTES ************ //
 									var graceNotes = noteRest.graceNotes;
-									if (graceNotes.length > 0) {
+									var hasGraceNotes = graceNotes.length > 0;
+									if (hasGraceNotes) {
 										checkGraceNotes(graceNotes, currentStaffNum);
 										numNotesInThisSystem += graceNotes.length / 2; // grace notes only count for half
 										prevWasGraceNote = true;
@@ -1640,14 +1652,9 @@ MuseScore {
 		var maxStaffSpread = style.value("maxStaffSpread");
 		var staffDistance = style.value("staffDistance");
 		var staffLowerBorder = style.value("staffLowerBorder");
+		var lastSystemFillLimit = style.value("lastSystemFillLimit");
 		tempoFontStyle = curScore.style.value("tempoFontStyle");
 		metronomeFontStyle = curScore.style.value("metronomeFontStyle");
-		
-		
-		//logError ("staffLowerBorder ="+staffLowerBorder);
-		
-		//logError("slurEndWidth = "+slurEndWidth+"; slurMidWidth = "+slurMidWidth);
-		//logError("pageWidth = "+pageWidth+"; pageHeight = "+pageHeight);
 		
 		// ** CHECK FOR PAGE SETTING ISSUES ** //
 		
@@ -1809,6 +1816,9 @@ MuseScore {
 				if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Page tab) Set the ‘Stave distance’ to between 5.0–6.0sp");
 			}
 		}
+		
+		// **** CHECK LAST SYSTEM FILL THRESHOLD **** //
+		if (lastSystemFillLimit > 0) styleComments.push("(Page tab) Set ‘Last system fill threshold’ to 0%");
 		
 		// ** CHECK MUSIC BOTTOM MARGIN — TO DO** //
 		//if (staffLowerBorder > 0) styleComments.push("(Page tab) Set staff 5.0–6.0sp");
@@ -2300,18 +2310,25 @@ MuseScore {
 		// ** subtypeName() returns a string such as "Title", "subtitle", "Tempo", etc.
 		var eSubtype = textObject.subtypeName();
 		var eName = textObject.name;
+	//	logError ("subtype "+eSubtype+" name "+eName);
 		var styledText;
+		
 		if (eType == Element.GRADUAL_TEMPO_CHANGE) {
 			styledText = textObject.beginText;
 		} else {
 			styledText = textObject.text;
 		}
+		
 		if (styledText == undefined) {
 			logError ("checkTextObject() — styledText is undefined");
 			styledText = "";
 		}
-		if (eType == Element.REHEARSAL_MARK) checkRehearsalMark (textObject);
-						
+		
+		if (eType == Element.REHEARSAL_MARK) {
+			checkRehearsalMark (textObject);
+			return;
+		}
+					
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
 		var isComment = false;
 		if (eType == Element.TEXT) isComment = Qt.colorEqual(textObject.frameBgColor,"yellow") && Qt.colorEqual(textObject.frameFgColor,"black");
@@ -2320,8 +2337,11 @@ MuseScore {
 			
 			var textStyle = textObject.subStyle;
 			var tn = textObject.name.toLowerCase();
-			//logError(;
-			var plainText = styledText.replace(/<[^>]+>/g, "");
+			
+			// remove all tags
+			var styledTextWithoutTags = styledText.replace(/<[^>]+>/g, "");
+			var plainText = styledTextWithoutTags;
+			
 			
 			if (typeof plainText != 'string') logError('checkTextObject() — Typeof plainText not string: '+(typeof plainText));
 			for (var i = 0; i < replacements.length; i += 2) {
@@ -2435,15 +2455,18 @@ MuseScore {
 					// **** IS THIS A TEMPO MARKING? **** //
 					var isTempoMarking = false;
 					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+						//logError ("Checking "+lowerCaseText);
 						for (var j = 0; j < tempomarkings.length; j++) {
 							if (lowerCaseText.includes(tempomarkings[j])) {
 								isTempoMarking = true;
 								//logError ("Styled text = "+styledText.replace(/</g,'{'));
 								if (styledText.includes("<b>")) {
-									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'');
+									// strip anything not between <b> tags, then strip any other tags (to ensure '=' is no longer in string)
+									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
 								} else {
-									if (eType == Element.TEMPO_TEXT && tempoFontStyle != 1) nonBoldText = styledText;
-									if (eType == Element.METRONOME && metronomeFontStyle != 1) nonBoldText = styledText;
+									//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
+									if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
+									if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
 								}
 								//logError ("Found a tempo marking: non bold text is "+nonBoldText);
 								if (nonBoldText.includes(tempomarkings[j])) addError ("It is recommended to have the tempo marking bold",textObject);
@@ -2466,8 +2489,6 @@ MuseScore {
 						// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
 						if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See Behind Bars, p. 182)",textObject);
 						
-						// **** CHECK IF IT INCLUDES A METRONOME MARKING **** //
-						if (!styledText.includes("metNote")) addError 
 					}
 				
 					// **** CHECK TEMPO POINT SIZE **** //
@@ -2479,32 +2500,33 @@ MuseScore {
 					// **** CHECK METRONOME MARKINGS **** //
 					var isMetronomeMarking = false;
 					for (var j = 0; j < metronomemarkings.length; j++) {
-						//logError (lowerCaseText+" includes "+metronomemarkings[j]+" = "+lowerCaseText.includes(metronomemarkings[j]));
-						if (lowerCaseText.includes(metronomemarkings[j])) {
+						//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
+						if (styledTextWithoutTags.includes(metronomemarkings[j])) {
 							isMetronomeMarking = true;
-							lastTempoMarking = null;
-							lastTempoMarkingBar = -1;
+							lastMetronomeMarkingBar = currentBarNum;
 							if (nonBoldText === "") {
+								//logError ("styledText is "+styledText.replace(/</g,'{'));
 								if (styledText.includes("<b>")) {
-									//var r = new RegExp("<b>[^<]*<\/b>","g");
-									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'');
+									// see comment above on the RegExp
+									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
 								} else {
-									if (eType == Element.TEMPO_TEXT && tempoFontStyle != 1) nonBoldText = styledText;
-									if (eType == Element.METRONOME && metronomeFontStyle != 1) nonBoldText = styledText;
+									//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
+									if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
+									if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
 								}
 							}
 							//logError ("Found a metronome marking: non bold text is "+nonBoldText);
-							
 							break;
 						}
 					}
 					
 					// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
-					//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; nonBoldText = "+nonBoldText);
-					if (!isTempoMarking && !isTempoChangeMarking && isMetronomeMarking && nonBoldText === '') {
+					var metroIsPlain = nonBoldText.includes('=');
+					//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
+					if (!isTempoMarking && !isTempoChangeMarking && isMetronomeMarking && !metroIsPlain) {
 						addError ("It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, Behind Bars p. 183)",textObject)
 					}
-					if (isTempoMarking && !isTempoChangeMarking && isMetronomeMarking && !nonBoldText.includes("=")) {
+					if (isTempoMarking && isMetronomeMarking && !metroIsPlain) {
 						addError ("It is recommended to have the metronome marking part of this tempo marking in a plain font style, not bold.\n(See, for instance, Behind Bars p. 183)",textObject);
 					}
 					

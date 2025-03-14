@@ -83,7 +83,7 @@ MuseScore {
 		
 		// ** VERSION CHECK ** //
 		if (MuseScore.mscoreMajorVersion < 4 || (MuseScore.mscoreMajorVersion == 4 && MuseScore.mscoreMajorVersion < 4)) {
-			dialog.msg = "<p>This plugin requires at MuseScore v. 4.4 or later<p><p><font size=\"6\">🛑</font></p> ";
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires at MuseScore v. 4.4 or later.</p> ";
 			dialog.show();
 			return;
 		}
