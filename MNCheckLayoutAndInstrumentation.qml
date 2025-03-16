@@ -354,11 +354,6 @@ MuseScore {
 		
 		// ************  					CHECK TITLE PAGE EXISTS 				************ // 
 		if (lastPageNum > 1 && firstPageNum == 0) addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
-
-		// ************  			SELECT AND PRE-PROCESS ENTIRE SCORE 			************ //
-		selectAll();
-		
-		setProgress (1);
 		
 		// **** INITIALISE ALL ARRAYS **** //
 		for (var i = 0; i<numStaves; i++) {
@@ -381,11 +376,17 @@ MuseScore {
 		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
 		for (var i = 0; i <= lastPageNum; i++) commentPosOffset[i] = Array(10000).fill(0);
 		
+		// ************  			SELECT AND PRE-PROCESS ENTIRE SCORE 			************ //
+		selectAll();
+		
+		setProgress (1);
+		
 		// **** LOOK FOR AND STORE ANY ELEMENTS THAT CAN ONLY BE ACCESSED FROM SELECTION: **** //
 		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
 		// **** THIS INCLUDES: HAIRPINS, OTTAVAS, TREMOLOS, SLURS, ARTICULATION, FERMATAS **** //
 		// **** GLISSES, PEDALS, TEMPO TEXT																								**** //
 		var elems = curScore.selection.elements;
+		//logError ("Selected "+elems.length+" elems");
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
 			var etype = e.type;
@@ -417,7 +418,7 @@ MuseScore {
 				var locArr = staffIdx+' '+theTick;
 				fermataLocs.push(locArr);
 			}
-			if (etype == Element.GRADUAL_TEMPO_CHANGE) tempoText.push(e);
+			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) tempoText.push(e);
 			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e.parent.tick);
 			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
 		}
@@ -656,7 +657,7 @@ MuseScore {
 				
 				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
-					//logError("Found tempo marking without a metronome marking in "+currentBarNum);
+					logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
 					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be good to indicate the specific metronome marking or range.",lastTempoMarking);
 					lastTempoChangeMarkingBar = -1;
 				}
@@ -884,11 +885,18 @@ MuseScore {
 						
 							// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
 							if (tempoText.length > 0) {
-								
-								if (currTick > tempoText[0].spannerTick.ticks) {
-									checkTextObject(tempoText[0]);
-									tempoChangeMarkingEnd = tempoText[0].spannerTick.ticks + tempoText[0].spannerTicks.ticks;
-									tempoText.shift();
+								var t = tempoText[0];
+								if (t.type == Element.GRADUAL_TEMPO_CHANGE) {
+									if (currTick > t.spannerTick.ticks) {
+										checkTextObject(t);
+										tempoChangeMarkingEnd = t.spannerTick.ticks + t.spannerTicks.ticks;
+										tempoText.shift();
+									}
+								} else {
+									if (currTick > t.parent.tick) {
+										checkTextObject(t);
+										tempoText.shift();
+									}
 								}
 							}
 							
@@ -927,12 +935,11 @@ MuseScore {
 								for (var aIndex in annotations) {
 									var theAnnotation = annotations[aIndex];
 									if (theAnnotation.track == currentTrack) {
-										var aName = theAnnotation.name;
 										var aType = theAnnotation.type;
-										var aText = theAnnotation.text;
-																		
+										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
+																
 										// **** FOUND A TEXT OBJECT **** //
-										if (aText) checkTextObject(theAnnotation);
+										if (theAnnotation.text) checkTextObject(theAnnotation);
 									}
 								}
 							}
@@ -2311,8 +2318,8 @@ MuseScore {
 		
 		// ** subtypeName() returns a string such as "Title", "subtitle", "Tempo", etc.
 		var eSubtype = textObject.subtypeName();
+		if (eSubtype === "Tuplet") return;
 		var eName = textObject.name;
-	//	logError ("subtype "+eSubtype+" name "+eName);
 		var styledText;
 		
 		if (eType == Element.GRADUAL_TEMPO_CHANGE) {
@@ -2320,7 +2327,8 @@ MuseScore {
 		} else {
 			styledText = textObject.text;
 		}
-		
+		//logError ("checking text: "+styledText+" subtype "+eSubtype+" name "+eName);
+
 		if (styledText == undefined) {
 			logError ("checkTextObject() — styledText is undefined");
 			styledText = "";
