@@ -166,13 +166,13 @@ MuseScore {
 		if (curScore.style.value("concertPitch") && scoreIncludesTransposingInstrument) addError ("It looks like you have at least one transposing instrument, but the score is currently displayed in concert pitch.\nBecause of this, comments about accidentals may not be accurate for the transposed/written parts.\nUntick ‘Concert Pitch’ in the bottom right, and re-run the plugin.","pagetop");
 
 		for (currentStaffNum = startStaff; currentStaffNum < endStaff; currentStaffNum ++) {
-			//if (!curScore.staves[currentStaffNum].part.show) continue;
-			var theStaff = curScore.staves[currentStaffNum];
+			
+			// ** IGNORE IF THIS STAFF IS HIDDEN ** //
 			var part = theStaff.part;
 			var partVisible = part.show;
-			//logError(——— STAFF "+currentStaffNum+" ————");
 			if (!partVisible) continue;
-			
+			var theStaff = curScore.staves[currentStaffNum];
+
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
 			prevPrevMIDIPitch = -1;

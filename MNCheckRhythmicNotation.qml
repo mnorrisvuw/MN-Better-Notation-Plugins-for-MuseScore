@@ -38,7 +38,7 @@ MuseScore {
 	property var timeSigDenom: 0
 	property var timeSigStr: ''
 	property var isOnTheBeat: false
-	property var barLength: 0
+	property var barDur: 0
 	property var isRest: false
 	property var isNote: false
 	property var prevIsNote: false
@@ -55,6 +55,7 @@ MuseScore {
 	property var noteEndBeat: 0
 	property var barStart: 0
 	property var beatLength: 0
+	property var virtualBeatLength: 0
 	property var noteHidesBeat: false
 	property var numBeatsHidden: 0
 	property var noteStart: 0
@@ -98,6 +99,7 @@ MuseScore {
 	property var dottedsemiquaver: 0
 	property var semiquaver: 0
 	property var semibreve: 0
+	property var lastCheckedTuplet: null
 	
 	property var possibleOnbeatSimplificationDurs: []
 	property var possibleOnbeatSimplificationLabels: []
@@ -266,20 +268,27 @@ MuseScore {
 			  // **** GET BAR START & END TICKS **** //
 			  barStart = currentBar.firstSegment.tick;
 			  var barEnd = currentBar.lastSegment.tick;
-			  barLength = barEnd - barStart;
+			  barDur = barEnd - barStart;
 			  
 			  beatLength = crotchet;
 			  isPickupBar = false;
 			  var expectedDuration = timeSigNum * (semibreve/timeSigDenom);
-			  isPickupBar = currentBarNum == 1 && expectedDuration != barLength;
+			  isPickupBar = currentBarNum == 1 && expectedDuration != barDur;
 			  var canCheckThisBar = false;
 			  isCompound = false;
 			  
-			  if (timeSigDenom == 8) {
+			  if (timeSigDenom == 8 || timeSigDenom == 16) {
 				  isCompound = !(timeSigNum % 3);
-				  if (isCompound) beatLength = dottedcrotchet;
+				  if (isCompound) beatLength = (division * 12) / timeSigDenom;
 			  }
+			  virtualBeatLength = beatLength;
 			  if (timeSigDenom == 4 || timeSigDenom == 2) isCompound = !(timeSigNum % 3) && (timeSigNum > 3);
+			  if (isCompound) {
+				virtualBeatLength = (division * 12) / timeSigDenom;
+			  } else {
+			  	virtualBeatLength = (division * 4) / timeSigDenom;
+			 }
+
 			  canCheckThisBar = ((isCompound && timeSigDenom > 4) || timeSigNum < 5 || !(timeSigNum % 2) || timeSigDenom == 4);
 			  if (!canCheckThisBar) logError("main loop — couldn't check this bar as time sig was too batty");
 	  
@@ -288,9 +297,12 @@ MuseScore {
 			  
 				  var startTrack = currentStaffNum * 4;
 				  var endTrack = startTrack + 4;
-				  
+				  var maxMusicDurThisBar = 0;
+				  var totalMusicDurThisTrack;
 				  for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
 					  
+					  totalMusicDurThisTrack = 0;
+					
 					  // **** UPDATE PROGRESS MESSAGE **** //
 					  loop++;
 					  setProgress(5+loop*95./totalNumLoops);
@@ -300,7 +312,6 @@ MuseScore {
 					  
 					  if (processingThisBar) {
 						  // ** INITIALISE PARAMETERS ** //
-						  totalDur = 0;
 						  totalRestDur = 0;
 						  haveHadFirstNote = false;
 						  rests = [];
@@ -332,7 +343,7 @@ MuseScore {
 						  soundingDur = noteRest.actualDuration.ticks; // what its actual length is, taking tuplets into account
 						  noteStart = cursor.tick - barStart; // offset from the start of the bar
 						  noteEnd = noteStart + soundingDur; // the tick at the end of the note
-						  lastNoteInBar = noteStart + soundingDur >= barLength; // is this the last note in the bar (in this track?)
+						  lastNoteInBar = noteStart + soundingDur >= barDur; // is this the last note in the bar (in this track?)
 						  isTied = isNote ? (noteRest.notes[0].tieBack != null || noteRest.notes[0].tieForward != null) : false; // is this note tied either forwards or backwards?
 						  noteStartFrac = noteStart % beatLength; // whereabouts this note starts within its beat
 						  noteStartBeat = Math.trunc(noteStart/beatLength); // which beat in the bar
@@ -346,6 +357,8 @@ MuseScore {
 						  currentBeamMode = noteRest.beamMode;
 						  currentBeamPos = noteRest.beamPos;
 						  hasBeam = currentBeam != null;
+						  if (!isHidden) totalMusicDurThisTrack += soundingDur;
+						  //logError ("duration =  "+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
 						  
 						  
 						  // *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
@@ -497,38 +510,29 @@ MuseScore {
 							  tiedNotes = [];
 						  }
 						  
-						  // ** ————————————————————————————————————————————————— ** //
-						  // **           CHECK 7: COULD BE STACCATO			  ** //
-						  // ** ————————————————————————————————————————————————— ** //
-						  if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
-							  if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
-								  flaggedWrittenStaccato = true;
-								  if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
-								  if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
-								  if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
-							  }
-						  }
-						  
-						  // ** ————————————————————————————————————————————————— ** //
-						  // ** 	  CHECK 8: SPLIT NON-BEAT-BREAKING RESTS	  ** //
-						  // ** ————————————————————————————————————————————————— ** //
-						  if (isRest && !noteHidesBeat) {
-							  if (isOnTheBeat) {
-								  checkOnbeatRestSpelling(noteRest);
-							  } else {
-								  checkOffbeatRestSpelling(noteRest);
-							  }
-						  }
-						  
-						 // ** ————————————————————————————————————————————————— ** //
-						 // ** 	  CHECK 9: TUPLET ISSUES	  ** //
 						// ** ————————————————————————————————————————————————— ** //
-							if (noteRest.tuplet) {
-								if (noteRest.is(noteRest.tuplet.elements[0])) {
-									if (displayDur == semiquaver && noteRest.tuplet.duration.ticks > beatLength) addError ("It’s best to split this tuplet up into multiple tuplets of only one beat",noteRest.tuplet);
-									
-								}
+						// **           CHECK 7: COULD BE STACCATO			  ** //
+						// ** ————————————————————————————————————————————————— ** //
+						if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
+							if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
+								flaggedWrittenStaccato = true;
+								if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
+								if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
+								if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
 							}
+						}
+						  
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 	  CHECK 8: SPLIT NON-BEAT-BREAKING RESTS	  ** //
+						// ** ————————————————————————————————————————————————— ** //
+						if (isRest && !noteHidesBeat) {
+							if (isOnTheBeat) {
+								checkOnbeatRestSpelling(noteRest);
+							} else {
+								checkOffbeatRestSpelling(noteRest);
+							}
+						}
+						  
 						  
 						  
 						  // *** GO TO NEXT SEGMENT *** //
@@ -543,7 +547,17 @@ MuseScore {
 						  prevNoteRest = noteRest;
 						  //prevNoteWasDoubleTremolo = isDoubleTremolo;
 					  } // end while processingThisBar
+					  if (totalMusicDurThisTrack > maxMusicDurThisBar) maxMusicDurThisBar = totalMusicDurThisTrack;
 				  } // end track loop
+				  
+				  
+				  // ** ————————————————————————————————————————————————— ** //
+				  // **   CHECK 10: CHECK TOO MUCH OR NOT ENOUGH MUSIC	  ** //
+				  // ** ————————————————————————————————————————————————— ** //
+				  //logError ("maxMusicDurThisBar = "+maxMusicDurThisBar+" barDur = "+barDur);
+				  // note I leave a 5 tick buffer here, because certain durations like septuplets are irrational, and their ints don't nicely sum to the bar duration
+				  if (maxMusicDurThisBar > 0 && maxMusicDurThisBar > barDur + 5) addError("This bar seems to have too many beats in it for "+timeSigStr, currentBar);
+				  if (maxMusicDurThisBar > 0 && maxMusicDurThisBar < barDur - 5) addError("This bar doesn’t seem to have enough beats in it for "+timeSigStr, currentBar);
 			  } // end if canCheckThisBar
 			  
 			  if (currentBar) currentBar = currentBar.nextMeasure;
@@ -639,7 +653,7 @@ MuseScore {
 	
 	function checkManuallyEnteredBarRest (noteRest) {
 		if (isPickupBar) return;
-		isBarRest = isRest && soundingDur == barLength;
+		isBarRest = isRest && soundingDur == barDur;
 		isManuallyEnteredBarRest = isBarRest && noteRest.durationType.type < 14;
 		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to create a correctly positioned bar rest.",noteRest);
 	}
@@ -657,10 +671,60 @@ MuseScore {
 		return true;
 	}
 	
-	function checkHidingBeatError (noteRest){
-		var hidingBeatError = noteHidesBeat && !isBarRest && !hasPause; // make a temp version
+	function checkHidingBeatError (noteRest) {
+		var hidingBeatError;
+
+		// ** FIRST CHECK IF THIS IS A TUPLET ** //
+		if (noteRest.tuplet == null) {
+			hidingBeatError = noteHidesBeat && !isBarRest && !hasPause; // make a temp version
+		} else {
+			var theTuplet = noteRest.tuplet;
+			// if it's already part of a tuplet then don't flag it
+			if (theTuplet.is(lastCheckedTuplet)) {
+				hidingBeatError = false;
+			} else {
+				lastCheckedTuplet = theTuplet;
+				// does this tuplet cross a beat?
+				var startTick = noteRest.parent.tick;
+				var endTick = theTuplet.actualDuration.ticks + startTick;
+				var startOffset = startTick - barStart;
+				var startBeatOffset = startTick % beatLength;
+				var endOffset = endTick - barStart - 1;
+				var startBeat = Math.floor(startOffset / beatLength);
+				var endBeat = Math.floor(endOffset / beatLength);
+				//logError("t: "+startTick+"–"+endTick+"; beat "+startBeat+"–"+endBeat);
+				// does this tuplet cross a beat?
+				hidingBeatError = false;
+				if (endBeat != startBeat) {
+					// yes it crosses a beat
+					// if it's offbeat, don't allow it
+					if (startBeatOffset != 0) {
+						addError ("Offbeat tuplets that cross beats can be difficult to read and are not recommended.\nEither split up the tuplet, or consider rewriting.",theTuplet);
+					} else {
+						// it's on-beat, but lasts longer than one beat
+						hidingBeatError = false;
+						var d = noteRest.duration.ticks;
+						var tupletDivision = theTuplet.actualDuration.ticks / theTuplet.normalNotes;
+						//logError ("d = "+d+"; tupletDiv = "+tupletDivision);
+						if (d != tupletDivision) {
+							addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet)
+						} else {
+							for (var i = 0; i < theTuplet.elements.length; i ++) {
+								var e = theTuplet.elements[i];
+								if (e.type == Element.CHORD && e.duration.ticks != d) hidingBeatError = true;
+							}
+							if (hidingBeatError) {
+								addError ("This tuplet crosses a beat and has complex rhythms.\nIt is therefore potentially difficult to read.\nConsider splitting it up into one-beat tuplets.",theTuplet);
+							}
+						}
+					}
+				}
+			}
+		}
+		
 		if (!hidingBeatError) return;
 		if (isTwoNoteTremolo(noteRest)) return;
+		
 		//logError(Checking beat Hiding");
 		if (isOnTheBeat) {
 			
@@ -754,15 +818,8 @@ MuseScore {
 			}
 			
 			// ** OFF THE BEAT — NOTES ** //
-			if (displayDur == quaver && noteRest.tuplet != null) {
-				hidingBeatError = false;
-				for (var i = 0; i < noteRest.tuplet.elements.length; i ++) {
-					var e = noteRest.tuplet.elements[i];
-					if (e.type == Element.CHORD) {
-						if (e.duration.ticks != displayDur) hidingBeatError = true;
-					}
-				}
-			}
+			
+			
 			if (displayDur == crotchet) {
 				if (noteRest.tuplet == null) {
 					if (isNote) {
@@ -894,7 +951,7 @@ MuseScore {
 		//logError(rests: "+rests.length+" "+maxOnbeatSimplification+" "+maxOffbeatSimplification); 
 		
 		// CHECK THAT IT COULD BE SIMPLIFIED AS A BAR REST
-		if (totalRestDur == barLength && !isPickupBar) {
+		if (totalRestDur == barDur && !isPickupBar) {
 			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘delete’', rests)
 		} else {
 			//logError(Here with "+rests.length+" rests"); 

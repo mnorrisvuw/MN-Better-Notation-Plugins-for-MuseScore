@@ -467,7 +467,6 @@ MuseScore {
 		lastBarInScore = curScore.lastMeasure;
 		numBars = curScore.nmeasures;
 		cursor.rewind(Cursor.SCORE_END);
-		//logError("————————\n\nSTARTING LOOP\n\n");
 		noteCountInSystem = [];
 		beatCountInSystem = [];
 		var actualStaffSize = spatium*4;
@@ -583,12 +582,11 @@ MuseScore {
 			numBeatsInThisSystem = 0;
 			var clef = cursor.element;
 			// call checkClef AFTER the currentInstrumentName/Id setup and AFTER set InstrumentVariables
-			//logError ("here");
 			if (clef != null) checkClef(clef);
 			
 			prevTimeSig = currentBar.timesigNominal.str;
 			
-			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRANT STAFF **** //
+			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRAND STAFF **** //
 			if (currentInstrumentId.includes('vibraphone') && isTopOfGrandStaff[currentStaffNum]) addError('Vibraphones are normally notated on a single treble staff,\nrather than a grand staff.','system1 '+currentStaffNum);
 						
 			for (var t = 0; t < numStaves * 4; t++) prevTick[t] = -1;
@@ -1098,6 +1096,7 @@ MuseScore {
 					} // end while processingThisBar
 					if (numNotesInThisTrack > 0) numTracksWithNotes ++;
 				} // end track loop
+				
 				if (isWindOrBrassInstrument && isSharedStaff) {
 					if (numTracksWithNotes > 1 || isChord) {
 						//logError("multiple parts found");
@@ -1653,6 +1652,7 @@ MuseScore {
 		var staffDistance = style.value("staffDistance");
 		var staffLowerBorder = style.value("staffLowerBorder");
 		var lastSystemFillLimit = style.value("lastSystemFillLimit");
+		var crossMeasureValues = style.value("crossMeasureValues");
 		tempoFontStyle = curScore.style.value("tempoFontStyle");
 		metronomeFontStyle = curScore.style.value("metronomeFontStyle");
 		
@@ -1794,6 +1794,8 @@ MuseScore {
 				}
 			}
 		}
+		
+		if (crossMeasureValues != 0) styleComments.push("(Score tab) Uncheck ‘Display note values across bar boundaries’");
 		
 		// **** STYLE SETTINGS — 2. PAGE TAB **** //
 		// **** 1D: CHECK SYSTEM SPACING
