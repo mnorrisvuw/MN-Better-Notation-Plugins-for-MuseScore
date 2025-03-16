@@ -281,6 +281,11 @@ MuseScore {
 			metronomemarkings.push(mark+" =");
 			metronomemarkings.push(mark+".=");
 			metronomemarkings.push(mark+". =");
+			metronomemarkings.push(mark+"=");
+			metronomemarkings.push(mark+" =");
+			metronomemarkings.push(mark+"metAugmentationDot=");
+			metronomemarkings.push(mark+"metAugmentationDot =");
+
 		}
 		shouldbelowercase = shouldbelowercasefile.read().trim().split('\n');
 		shouldhavefullstop = shouldhavefullstopfile.read().trim().split('\n');
