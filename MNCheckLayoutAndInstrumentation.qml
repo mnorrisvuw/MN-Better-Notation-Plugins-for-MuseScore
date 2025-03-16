@@ -657,7 +657,7 @@ MuseScore {
 				
 				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
-					logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
+					//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
 					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be good to indicate the specific metronome marking or range.",lastTempoMarking);
 					lastTempoChangeMarkingBar = -1;
 				}
@@ -677,6 +677,24 @@ MuseScore {
 					while (processingThisBar) {
 						var currSeg = cursor.segment;
 						var currTick = currSeg.tick;
+						
+						// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
+						if (tempoText.length > 0) {
+							var t = tempoText[0];
+							if (t.type == Element.GRADUAL_TEMPO_CHANGE) {
+								if (currTick > t.spannerTick.ticks) {
+									checkTextObject(t);
+									tempoChangeMarkingEnd = t.spannerTick.ticks + t.spannerTicks.ticks;
+									tempoText.shift();
+								}
+							} else {
+								if (currTick > t.parent.tick) {
+									checkTextObject(t);
+									tempoText.shift();
+								}
+							}
+						}
+						
 						if (currTick != barEndTick) {
 							tickHasDynamic = false;
 							
@@ -700,7 +718,7 @@ MuseScore {
 											var nextSlur = slurs[currentStaffNum][currentSlurNum];
 											if (currentSlur != null && nextSlur != null) {
 												nextSlurStart = nextSlur.spannerTick.ticks;
-												if (nextSlurStart < currTick && !prevWasGraceNote) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",[currentSlur,nextSlur]);
+												if (nextSlurStart < currTick && nextSlurStart != currentSlurEnd && !prevWasGraceNote) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",[currentSlur,nextSlur]);
 											}
 											readyToGoToNextSlur = true;
 										}
@@ -717,7 +735,7 @@ MuseScore {
 									var currentSlurStart = nextSlurStart;
 									previousSlurEnd = currentSlurEnd;
 									currentSlurEnd = currentSlurStart + currentSlur.spannerTicks.ticks;
-									logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
+									//logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
 									var off1 = currentSlur.slurUoff1 == undefined ? 0 : currentSlur.slurUoff1.x;
 									var off2 = currentSlur.slurUoff2 == undefined ? 0 : currentSlur.slurUoff2.x;
 									var off3 = currentSlur.slurUoff3 == undefined ? 0 : currentSlur.slurUoff3.x;
@@ -727,7 +745,7 @@ MuseScore {
 
 									if (currentSlurNum < numSlurs - 1) {
 										nextSlurStart = slurs[currentStaffNum][currentSlurNum+1].spannerTick.ticks;
-										logError("Next slur starts at "+nextSlurStart);
+										//logError("Next slur starts at "+nextSlurStart);
 									} else {
 										nextSlurStart = 0;
 										//logError("This is the last slur in this staff ");
@@ -880,25 +898,10 @@ MuseScore {
 							// ************ CHECK KEY SIGNATURE ************ //
 							if (eType == Element.KEYSIG && currentStaffNum == 0) checkKeySignature(elem,cursor.keySignature);
 						
-							// **** CHECK TREM
+							// ************ CHECK TREMOLO ************ //
 							isTrem = (oneNoteTremolos[currentStaffNum][currTick] != null);
 						
-							// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
-							if (tempoText.length > 0) {
-								var t = tempoText[0];
-								if (t.type == Element.GRADUAL_TEMPO_CHANGE) {
-									if (currTick > t.spannerTick.ticks) {
-										checkTextObject(t);
-										tempoChangeMarkingEnd = t.spannerTick.ticks + t.spannerTicks.ticks;
-										tempoText.shift();
-									}
-								} else {
-									if (currTick > t.parent.tick) {
-										checkTextObject(t);
-										tempoText.shift();
-									}
-								}
-							}
+							
 							
 							/*
 							for (var i = 0; i < tempoText.length; i++) {
@@ -1071,14 +1074,6 @@ MuseScore {
 								prevSoundingDur = soundingDur;
 							
 							} // end if eType == Element.Chord || .Rest
-						} else {
-							if (tempoText.length > 0) {
-								if (currTick > tempoText[0].spannerTick.ticks) {
-									checkTextObject(tempoText[0]);
-									tempoChangeMarkingEnd = tempoText[0].spannerTick.ticks + tempoText[0].spannerTicks.ticks;
-									tempoText.shift();
-								}
-							}
 						}
 						
 						if (tempoChangeMarkingEnd != -1 && currTick > tempoChangeMarkingEnd + division * 2) {
