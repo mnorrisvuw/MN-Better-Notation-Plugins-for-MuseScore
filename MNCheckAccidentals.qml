@@ -168,10 +168,10 @@ MuseScore {
 		for (currentStaffNum = startStaff; currentStaffNum < endStaff; currentStaffNum ++) {
 			
 			// ** IGNORE IF THIS STAFF IS HIDDEN ** //
+			var theStaff = curScore.staves[currentStaffNum];
 			var part = theStaff.part;
 			var partVisible = part.show;
 			if (!partVisible) continue;
-			var theStaff = curScore.staves[currentStaffNum];
 
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;

@@ -3185,6 +3185,13 @@ MuseScore {
 		//logError("p1 = "+p1+"); p2 = "+p2+"; interval="+interval;
 		
 		if (numNotes == 2 && interval > maxStretch) addError ("This double-stop appears to be larger than a safe stretch on the "+iName+"\nIt may not be possible: check with a player.",chord);
+		if (p2 > stringsArray[2] + 12) {
+			if (interval < 7) {
+				addError ("In general, avoid double-stops less than a fifth in a high position,\nas the bottom note is over an octave above the open string.\nThe intonation may be poor; consider increasing the interval to greater than a fifth.",chord);
+			} else {
+				addError ("This double-stop is quite high, with the bottom note over an octave above II.\nThe intonation may be poor — consider rewriting.",chord);
+			}
+		}
 		if (prevIsMultipleStop && chord.actualDuration.ticks <= division && prevSoundingDur <= division && interval > 0 && prevMultipleStopInterval > 0 && !flaggedFastMultipleStops) {
 			//logError("Checking sequence");
 			
