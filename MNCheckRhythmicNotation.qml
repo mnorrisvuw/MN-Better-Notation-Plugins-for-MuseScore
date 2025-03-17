@@ -290,7 +290,7 @@ MuseScore {
 			 }
 
 			  canCheckThisBar = ((isCompound && timeSigDenom > 4) || timeSigNum < 5 || !(timeSigNum % 2) || timeSigDenom == 4);
-			  if (!canCheckThisBar) logError("main loop — couldn't check this bar as time sig was too batty");
+			  //if (!canCheckThisBar) logError("main loop — couldn't check this bar as time sig was too batty");
 	  
 			  // ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
 			  if (canCheckThisBar) {
