@@ -19,9 +19,7 @@ MuseScore {
 	requiresScore: true
 	title: "MN Delete Comments and Highlights"
 	id: mndeletecommentsandhighlights
-	thumbnailName: "MNDeleteCommentsAndHighlights.png"
-	categoryCode: "mn-plugins"
-	
+	thumbnailName: "MNDeleteCommentsAndHighlights.png"	
 	property var selectionArray: [];
 
   onRun: {

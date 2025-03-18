@@ -262,11 +262,17 @@ MuseScore {
 		setProgress (0);
 		
 		// **** VERSION CHECK **** //
-		if (MuseScore.mscoreMajorVersion < 4 || (MuseScore.mscoreMajorVersion == 4 && MuseScore.mscoreMajorVersion < 4)) {
+		if (mscoreMajorVersion < 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion < 4)) {
 			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires at MuseScore v. 4.4 or later.</p> ";
 			dialog.show();
 			return;
 		}
+		
+		if (mscoreMajorVersion == 4 && mscoreMinorVersion == 5) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> MuseScore v. 4.5 broke the ability to check slurs and hairpins.<br />These functions will not work correctly.</p> ";
+			dialog.show();
+		}
+		
 		
 		// **** DECLARATIONS & DEFAULTS **** //
 		var scoreHasTuplets = false;
@@ -315,8 +321,7 @@ MuseScore {
 		isSoloScore = (numParts == 1);
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		var inchesToMM = 25.4;
-		var spatiumDPI = 360.;
-		spatium = curScore.style.value("spatium")*inchesToMM/spatiumDPI; // NB spatium value is given in 360 DPI
+		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI; // NB spatium value is given in MuseScore's DPI setting
 		pageWidth = Math.round(curScore.style.value("pageWidth")*inchesToMM);
 		pageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
 		var viewHeight = Math.round(firstPage.bbox.height*spatium);
@@ -326,6 +331,7 @@ MuseScore {
 			dialog.show();
 			return;
 		}
+				
 
 		initialTempoExists = false;
 		hasMoreThanOneSystem = !lastSystem.is(firstSystem);	
@@ -394,6 +400,7 @@ MuseScore {
 		//logError ("Selected "+elems.length+" elems");
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
+			//logError ("Found elem "+e.name);
 			var etype = e.type;
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
@@ -401,12 +408,13 @@ MuseScore {
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
 			}
+			//if (etype == Element.HAIRPIN_SEGMENT) logError ("Found hairpin segment: "+e+" "+e.spannerTick);
 			if (etype == Element.OTTAVA || etype == Element.OTTAVA_SEGMENT) ottavas[staffIdx].push(e);
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
-			if (etype == Element.SLUR || etype == Element.SLUR_SEGMENT) slurs[staffIdx].push(e);
-			//if (etype == Element.SLUR_SEGMENT) logError ("Found slur segment at "+e.spannerTick.ticks);
-
-			if (etype == Element.PEDAL_SEGMENT || e.type == Element.PEDAL) pedals[staffIdx].push(e);			
+			if (etype == Element.SLUR) slurs[staffIdx].push(e);
+			//if (etype == Element.SLUR) logError ("Found slur at "+e.spannerTick.ticks);
+			//if (etype == Element.SLUR_SEGMENT) logError ("Found slur segment: "+e.spannerTick+" "+e.spannerTicks);
+			if (e.type == Element.PEDAL) pedals[staffIdx].push(e);			
 			if (etype == Element.TREMOLO_SINGLECHORD) oneNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 			if (etype == Element.ARTICULATION) {
@@ -545,7 +553,16 @@ MuseScore {
 			currentSlurNum = 0;
 			currentSlurEnd = 0;	
 			numSlurs = slurs[currentStaffNum].length;
-			nextSlurStart = (numSlurs == 0) ? 0 : slurs[currentStaffNum][0].spannerTick.ticks;
+			if (numSlurs == 0) {
+				nextSlurStart = 0;
+			} else {
+				var theSlur = slurs[currentStaffNum][0];
+				if (theSlur == undefined) {
+					logError ("slur undefined!");
+				} else {
+					nextSlurStart = theSlur.spannerTick.ticks;
+				}
+			}
 			
 			// ** pedals
 			currentPedal = null;
@@ -681,6 +698,7 @@ MuseScore {
 					prevWasGraceNote = false;
 					while (processingThisBar) {
 						var currSeg = cursor.segment;
+						//logError ("Segment type: "+currSeg.segmentType);
 						var currTick = currSeg.tick;
 						
 						// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
@@ -945,7 +963,7 @@ MuseScore {
 									if (theAnnotation.track == currentTrack) {
 										var aType = theAnnotation.type;
 										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
-																
+										//logError ("Found annotation: "+theAnnotation.name);					
 										// **** FOUND A TEXT OBJECT **** //
 										if (theAnnotation.text) checkTextObject(theAnnotation);
 									}
@@ -1930,7 +1948,7 @@ MuseScore {
 	}
 	
 	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText) {
-		var isBracketed = false; // TO FIX
+		var isBracketed = lowerCaseText.substring(0,1) === "(";
 		
 		if (isWindOrBrassInstrument) {
 			if (lowerCaseText.includes("tutti")) {
@@ -1968,6 +1986,9 @@ MuseScore {
 			}
 			
 			// **** CHECK ALREADY PLAYING ORD. **** .//
+			if (lowerCaseText.substring(0,5) === "(ord." ) {
+				if (currentContactPoint != "ord") addError ("This looks like it’s an indication to change to ord.\nIf so, you don’t need the parentheses",textObject)
+			}
 			if (lowerCaseText.substring(0,4) === "ord." || lowerCaseText === "pos. nat.") {
 				if (currentContactPoint === "ord" && (currentPlayingTechnique === "arco" || currentPlayingTechnique === "pizz")) {
 					addError("Instrument is already playing ord?",textObject);
@@ -1983,6 +2004,7 @@ MuseScore {
 						addError("Instrument is already playing flautando?",textObject);
 					}
 				} else {
+					if (isBracketed) addError ("This looks like a change to flautando.\nYou don’t need the parentheses around the technique.",textObject);
 					currentContactPoint = "flaut";
 				}
 			}
@@ -2007,6 +2029,7 @@ MuseScore {
 							return;
 						}
 					} else {
+						if (isBracketed) addError ("This looks like a change to poco sul pont.\nYou don’t need the parentheses around the technique.",textObject);
 						currentContactPoint = "psp";
 					}
 				} else {
@@ -2017,6 +2040,7 @@ MuseScore {
 								return;
 							}
 						} else {
+							if (isBracketed) addError ("This looks like a change to molto sul pont.\nYou don’t need the parentheses around the technique.",textObject);
 							currentContactPoint = "msp";
 						}
 					} else {
@@ -2026,6 +2050,7 @@ MuseScore {
 								return;
 							}
 						} else {
+							if (isBracketed) addError ("This looks like a change to sul pont.\nYou don’t need the parentheses around the technique.",textObject);
 							currentContactPoint = "sp";
 						}
 					}
@@ -2040,6 +2065,7 @@ MuseScore {
 							addError("Instrument is already playing poco sul tasto?",textObject);
 						}
 					} else {
+						if (isBracketed) addError ("This looks like a change to poco sul tasto.\nYou don’t need the parentheses around the technique.",textObject);
 						currentContactPoint = "pst";
 					}
 				} else {
@@ -2049,6 +2075,7 @@ MuseScore {
 								addError("Instrument is already playing molto sul tasto?",textObject);
 							}
 						} else {
+							if (isBracketed) addError ("This looks like a change to molto sul tasto.\nYou don’t need the parentheses around the technique.",textObject);
 							currentContactPoint = "mst";
 						}
 					} else {
@@ -2057,6 +2084,7 @@ MuseScore {
 								addError("Instrument is already playing sul tasto?",textObject);
 							}
 						} else {
+							if (isBracketed) addError ("This looks like a change to sul tasto.\nYou don’t need the parentheses around the technique.",textObject);
 							currentContactPoint = "st";
 						}
 					}
@@ -2074,6 +2102,7 @@ MuseScore {
 						}
 					}
 				} else {
+					if (isBracketed) addError ("This looks like a change to arco.\nYou don’t need the parentheses around the technique.",textObject);
 					currentPlayingTechnique = "arco";
 				}
 			}
@@ -2085,6 +2114,7 @@ MuseScore {
 						addError("Instrument is already playing pizz?",textObject);
 					}
 				} else {
+					if (isBracketed) addError ("This looks like a change to pizz.\nYou don’t need the parentheses around the technique.",textObject);
 					currentPlayingTechnique = "pizz";
 					var pizzStartedInThisBar = true; // TO FIX
 					haveHadPlayingIndication = true;
@@ -2111,6 +2141,7 @@ MuseScore {
 							addError("Instrument is already playing col legno battuto?",textObject);
 						}
 					} else {
+						if (isBracketed) addError ("This looks like a change to col legno batt.\nYou don’t need the parentheses around the technique.",textObject);
 						currentPlayingTechnique = "clb";
 						haveHadPlayingIndication = true;
 					}
@@ -2121,6 +2152,7 @@ MuseScore {
 								addError("Instrument is already playing col legno tratto?",textObject);
 							}
 						} else {
+							if (isBracketed) addError ("This looks like a change to col legno tratto.\nYou don’t need the parentheses around the technique.",textObject);
 							currentPlayingTechnique = "clt";
 							haveHadPlayingIndication = true;
 						}
@@ -2164,6 +2196,7 @@ MuseScore {
 					addError("Instrument is already muted?",textObject);
 				}
 			} else {
+				if (isBracketed) addError ("This looks like a change to con sord.\nYou don’t need the parentheses around the technique.",textObject);
 				currentMute = "con";
 			}
 		}
@@ -2175,6 +2208,7 @@ MuseScore {
 					addError("Instrument is already unmuted?",textObject);
 				}
 			} else {
+				if (isBracketed) addError ("This looks like a change to senza sord.\nYou don’t need the parentheses around the technique.",textObject);
 				currentMute = "senza";
 			}
 		}
@@ -3505,6 +3539,16 @@ MuseScore {
 					return;
 				}
 			}
+		}
+		
+		// ** check dynamic
+		if (isStartOfSlur) {
+			var cursor = curScore.newCursor();
+			cursor.staffIdx = staffNum;
+			cursor.track = 0;
+			cursor.rewindToTick(currTick);
+			var currentTempo = cursor.tempo;
+			logError ("Tempo at start of slur = "+currentTempo);
 		}
 		
 	}
