@@ -407,13 +407,19 @@ MuseScore {
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
 			
-			if (etype == Element.HAIRPIN || etype == Element.HAIRPIN_SEGMENT) {
+			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
+			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
+			
+			if (etype == Element.HAIRPIN) {
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
 			}
-			
-			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
-			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
+			if (versionafter450) {
+				if (etype == Element.HAIRPIN_SEGMENT) {
+					hairpins[staffIdx].push(e);
+					if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
+				}
+			}
 			
 			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
 			if (versionafter450) if (etype == Element.OTTAVA_SEGMENT) ottavas[staffIdx].push(e);
@@ -1029,11 +1035,11 @@ MuseScore {
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
 									if (isTied) {
-										var theArticulationArray = getArticulationArray(noteRest,staffNum)
+										var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
 										if (theArticulationArray != null) {
-											for (var i = 0; i < theArticulationArray.length; i++) {
-												if (staccatoArray.includes(theArticulationArray[i].symbol)) checkStaccatoIssues (noteRest);
-											}
+											var hasStaccato = false;
+											for (var i = 0; i < theArticulationArray.length; i++) if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
+											if (!hasStaccato) addError("This note has articulation on it, but is tied.\nDid you mean that to be slurred instead?",noteRest);
 										}
 									}
 															
@@ -1238,7 +1244,7 @@ MuseScore {
 		var numErrors = errorStrings.length;
 		
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
-		if (version450) errorMsg = "<p><font size=\"6\">🛑</font>NOTE: MuseScore v. 4.5.0 breaks the ability for plugins to access slurs, hairpins, ottavas and pedal lines, so these were not checked.</p><p>This is will be fixed in v. 4.5.1.</p>" + errorMsg;
+		if (version450) errorMsg = "<p><font size=\"6\">🛑</font>NOTE: MuseScore v. 4.5.0 breaks the ability for plugins to access slurs, hairpins, ottavas, gliss lines and pedal lines, so these were not checked.</p><p>Please update to MuseScore v. 4.5.1 when this is released.</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
 		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p>" + errorMsg;
 		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p>" + errorMsg;
@@ -2506,13 +2512,7 @@ MuseScore {
 					var isTempoChangeMarking = false;
 					//logError ("Checking "+lowerCaseText);
 					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-						for (var i = 0; i < tempochangemarkings.length; i++) {
-							var theText = tempochangemarkings[i];
-							if (lowerCaseText.includes(theText)) {
-								isTempoChangeMarking = true;
-								break;
-							}
-						}
+						for (var i = 0; i < tempochangemarkings.length && !isTempoChangeMarking; i++) if (lowerCaseText.includes(tempochangemarkings[i])) isTempoChangeMarking = true;
 					}
 								
 					// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
@@ -2524,17 +2524,14 @@ MuseScore {
 							addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
 							return;
 						}
-						if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) {
-							addError("‘"+plainText+"’ looks like it is a temporary change of tempo\nif it is, it should not have a capital first letter (see Behind Bars, p. 182)",textObject);
-							return;
-						}
+						if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo\nif it is, it should not have a capital first letter (see Behind Bars, p. 182)",textObject);
 					}
 		
 					// **** IS THIS A TEMPO MARKING? **** //
 					var isTempoMarking = false;
 					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
 						//logError ("Checking "+lowerCaseText);
-						for (var j = 0; j < tempomarkings.length; j++) {
+						for (var j = 0; j < tempomarkings.length && !isTempoMarking; j++) {
 							if (lowerCaseText.includes(tempomarkings[j])) {
 								isTempoMarking = true;
 								//logError ("Styled text = "+styledText.replace(/</g,'{'));
@@ -2547,13 +2544,13 @@ MuseScore {
 									if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
 								}
 								//logError ("Found a tempo marking: non bold text is "+nonBoldText);
-								if (nonBoldText.includes(tempomarkings[j])) addError ("It is recommended to have the tempo marking bold",textObject);
+								if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
 								lastTempoMarking = textObject;
 								lastTempoMarkingBar = currentBarNum;
-								break;
 							}
 						}
 					}
+					
 					if (isTempoMarking) {
 						
 						lastTempoChangeMarkingBar = -1;
@@ -2566,6 +2563,9 @@ MuseScore {
 				
 						// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
 						if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See Behind Bars, p. 182)",textObject);
+						
+						// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
+						if (plainText.slice(-1) === '.') addError ("Tempo markings do not need a full-stop at the end.",textObject);
 						
 					}
 				
