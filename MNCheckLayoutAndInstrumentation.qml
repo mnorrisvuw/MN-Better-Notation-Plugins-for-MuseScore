@@ -64,6 +64,7 @@ MuseScore {
 	property var currentBarNum: 0
 	property var hasMoreThanOneSystem: false
 	property var scoreIncludesTransposingInstrument: false
+	property var virtualBeatLength: 0
 		
 	// ** FLAGS ** //
 	property var flaggedWeKnowWhosPlaying: false
@@ -256,6 +257,10 @@ MuseScore {
 	property var tempoFontStyle: 0
 	property var metronomeFontStyle: 0
 	
+	// ** OTHER **//
+	property var version450: false
+	property var versionafter450: false
+	
   onRun: {
 		if (!curScore) return;
 		
@@ -268,11 +273,8 @@ MuseScore {
 			return;
 		}
 		
-		if (mscoreMajorVersion == 4 && mscoreMinorVersion == 5) {
-			dialog.msg = "<p><font size=\"6\">🛑</font> MuseScore v. 4.5 broke the ability to check slurs and hairpins.<br />These functions will not work correctly.</p> ";
-			dialog.show();
-		}
-		
+		version450 = mscoreMajorVersion == 4 && mscoreMinorVersion == 5 && mscoreUpdateVersion == 0;
+		versionafter450 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5 || (mscoreMinorVersion == 5 && mscoreUpdateVersion > 0);
 		
 		// **** DECLARATIONS & DEFAULTS **** //
 		var scoreHasTuplets = false;
@@ -404,17 +406,27 @@ MuseScore {
 			var etype = e.type;
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
-			if (etype == Element.HAIRPIN) {
+			
+			if (etype == Element.HAIRPIN || etype == Element.HAIRPIN_SEGMENT) {
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
 			}
-			//if (etype == Element.HAIRPIN_SEGMENT) logError ("Found hairpin segment: "+e+" "+e.spannerTick);
-			if (etype == Element.OTTAVA || etype == Element.OTTAVA_SEGMENT) ottavas[staffIdx].push(e);
+			
+			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
+			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
+			
+			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
+			if (versionafter450) if (etype == Element.OTTAVA_SEGMENT) ottavas[staffIdx].push(e);
+			
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
+			if (versionafter450) if (etype == Element.GLISSANDO_SEGMENT) glisses[staffIdx][e.spannerTick.ticks] = e;
+			
 			if (etype == Element.SLUR) slurs[staffIdx].push(e);
-			//if (etype == Element.SLUR) logError ("Found slur at "+e.spannerTick.ticks);
-			//if (etype == Element.SLUR_SEGMENT) logError ("Found slur segment: "+e.spannerTick+" "+e.spannerTicks);
-			if (e.type == Element.PEDAL) pedals[staffIdx].push(e);			
+			if (versionafter450) if (etype == Element.SLUR_SEGMENT) slurs[staffIdx].push(e);
+			
+			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
+			if (versionafter450) if (etype == Element.PEDAL_SEGMENT) pedals[staffIdx].push(e);
+					
 			if (etype == Element.TREMOLO_SINGLECHORD) oneNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 			if (etype == Element.ARTICULATION) {
@@ -625,16 +637,26 @@ MuseScore {
 				var stretch = currentBar.userStretch;
 				//logError("\nb. "+currentBarNum);
 				currentTimeSig = currentBar.timesigNominal;
-
+				var timeSigNum = currentTimeSig.numerator;
+				var timeSigDenom = currentTimeSig.denominator;
+				var beatLength = division;
+				var isCompound = !(timeSigNum % 3);
+				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
+				if (isCompound && timeSigDenom >= 8) beatLength = (division * 12) / timeSigDenom;
+				virtualBeatLength = beatLength;
+				if (isCompound) {
+					virtualBeatLength = (division * 12) / timeSigDenom;
+				} else {
+					virtualBeatLength = (division * 4) / timeSigDenom;
+				}
+				//logError ("Time sig is "+currentTimeSig.str+"; virtual beat length = "+virtualBeatLength);
 				if (currentStaffNum == 0) {
 					var numBeats = currentTimeSig.numerator;
 					if (currentTimeSig.denominator > 8) numBeats /= 2;
 					numBeatsInThisSystem += numBeats;
 					
 					// **** CHECK FOR NON-STANDARD STRETCH FACTOR **** //
-					if (stretch != 1) {
-						addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
-					}
+					if (stretch != 1) addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
 				}
 				if (!currentBar.parent.is(currentSystem)) {
 					// start of system
@@ -1004,6 +1026,16 @@ MuseScore {
 											if (nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest",noteRest);
 										}
 									}
+									
+									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
+									if (isTied) {
+										var theArticulationArray = getArticulationArray(noteRest,staffNum)
+										if (theArticulationArray != null) {
+											for (var i = 0; i < theArticulationArray.length; i++) {
+												if (staccatoArray.includes(theArticulationArray[i].symbol)) checkStaccatoIssues (noteRest);
+											}
+										}
+									}
 															
 									// ************ CHECK LYRICS ************ //
 							
@@ -1204,7 +1236,9 @@ MuseScore {
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
+		
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
+		if (version450) errorMsg = "<p><font size=\"6\">🛑</font>NOTE: MuseScore v. 4.5.0 breaks the ability for plugins to access slurs, hairpins, ottavas and pedal lines, so these were not checked.</p><p>This is will be fixed in v. 4.5.1.</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
 		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p>" + errorMsg;
 		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p>" + errorMsg;
@@ -2547,6 +2581,24 @@ MuseScore {
 						//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
 						if (styledTextWithoutTags.includes(metronomemarkings[j])) {
 							isMetronomeMarking = true;
+							
+							// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
+							var metronomeDuration = division / 4; // crotchet
+							var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('');
+							var metroStr = "crotchet/quarter note";
+							if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('')) {
+								metronomeDuration = division / 8; // quaver
+								metroStr = "quaver/eighth note";
+							}
+							if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('')) {
+								metronomeDuration = division / 2; // minim
+								metroStr = "minim/half note";
+							}
+							if (hasAugDot) {
+								metronomeDuration *= 1.5;
+								metroStr = "dotted "+metroStr;
+							}
+							if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does not match the time signature of "+currentTimeSig.str+".",textObject);
 							lastMetronomeMarkingBar = currentBarNum;
 							if (nonBoldText === "") {
 								//logError ("styledText is "+styledText.replace(/</g,'{'));

@@ -229,46 +229,46 @@ MuseScore {
 	  
 	  // **** LOOP THROUGH THE SELECTED STAVES AND THE SELECTED BARS **** //
 	  // ** NB — lastStaffNum IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
-	  for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
-		  //logError(——— STAFF "+currentStaffNum+" ————");
+	for (currentStaffNum = firstStaffNum; currentStaffNum < lastStaffNum; currentStaffNum ++) {
+		//logError(——— STAFF "+currentStaffNum+" ————");
 		  
-		  // is this staff visible?
-		  var theStaff = staves[currentStaffNum];
-		  if (theStaff == undefined) {
-			  logError("main loop — staff is undefined");
-			  continue;
-		  }
-		  var thePart = theStaff.part;
-		  if (!thePart.show) continue;
-		  setInstrumentVariables(thePart);
-		  wasTied = false;
-		  prevNoteRest = null;
+		// is this staff visible?
+		var theStaff = staves[currentStaffNum];
+		if (theStaff == undefined) {
+			logError("main loop — staff is undefined");
+			continue;
+		}
+		var thePart = theStaff.part;
+		if (!thePart.show) continue;
+		setInstrumentVariables(thePart);
+		wasTied = false;
+		prevNoteRest = null;
 		  
-		  // ** REWIND TO START OF SELECTION ** //
-		  cursor.filter = Segment.All;
-		  cursor.rewind(Cursor.SELECTION_START);
-		  cursor.staffIdx = currentStaffNum;
-		  cursor2.staffIdx = currentStaffNum;
-		  cursor.filter = Segment.ChordRest;
-		  cursor2.filter = Segment.ChordRest;
-		  currentBar = cursor.measure;
-		  flaggedWrittenStaccato = false;
+		// ** REWIND TO START OF SELECTION ** //
+		cursor.filter = Segment.All;
+		cursor.rewind(Cursor.SELECTION_START);
+		cursor.staffIdx = currentStaffNum;
+		cursor2.staffIdx = currentStaffNum;
+		cursor.filter = Segment.ChordRest;
+		cursor2.filter = Segment.ChordRest;
+		currentBar = cursor.measure;
+		flaggedWrittenStaccato = false;
 		  
 		  
-		  for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
+		for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
 			  
-			  //logError(b. "+currentBarNum);
+			//logError(b. "+currentBarNum);
 							  
-			  // **** GET TIME SIGNATURE **** //
-			  currentTimeSig = currentBar.timesigNominal;
-			  timeSigNum = currentTimeSig.numerator;
-			  timeSigDenom = currentTimeSig.denominator;
-			  timeSigStr = currentTimeSig.str;
+			// **** GET TIME SIGNATURE **** //
+			currentTimeSig = currentBar.timesigNominal;
+			timeSigNum = currentTimeSig.numerator;
+			timeSigDenom = currentTimeSig.denominator;
+			timeSigStr = currentTimeSig.str;
 			  
-			  // **** GET BAR START & END TICKS **** //
-			  barStart = currentBar.firstSegment.tick;
-			  var barEnd = currentBar.lastSegment.tick;
-			  barDur = barEnd - barStart;
+			// **** GET BAR START & END TICKS **** //
+			barStart = currentBar.firstSegment.tick;
+			var barEnd = currentBar.lastSegment.tick;
+			barDur = barEnd - barStart;
 			  
 			  beatLength = crotchet;
 			  isPickupBar = false;
@@ -284,7 +284,7 @@ MuseScore {
 			  virtualBeatLength = beatLength;
 			  if (timeSigDenom == 4 || timeSigDenom == 2) isCompound = !(timeSigNum % 3) && (timeSigNum > 3);
 			  if (isCompound) {
-				virtualBeatLength = (division * 12) / timeSigDenom;
+				virtualBeatLength = (division * 3) / timeSigDenom;
 			  } else {
 			  	virtualBeatLength = (division * 4) / timeSigDenom;
 			 }
