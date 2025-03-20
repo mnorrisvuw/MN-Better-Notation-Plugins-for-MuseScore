@@ -708,7 +708,7 @@ MuseScore {
 				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
 					//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
-					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be good to indicate the specific metronome marking or range.",lastTempoMarking);
+					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
 					lastTempoChangeMarkingBar = -1;
 				}
 				
