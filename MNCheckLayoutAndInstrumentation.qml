@@ -80,6 +80,7 @@ MuseScore {
 	property var firstVisibleStaff: 0
 	property var staffVisible: []
 	property var haveHadPlayingIndication: false
+	property var flaggedSlurredStaccato: false
 	
 	// ** COMMMENTS ** //
 	property var prevCommentPage: null
@@ -564,6 +565,7 @@ MuseScore {
 			flaggedFastMultipleStops = false;
 			flaggedOneStrokeTrem = false;
 			haveHadPlayingIndication = false;
+			flaggedSlurredStaccato = false;
 			
 			// ** slurs
 			currentSlur = null;
@@ -2997,6 +2999,20 @@ MuseScore {
 		if (noteRest.notes[0].tieForward != null) {
 			addError ("Don’t put staccato dots on tied notes",noteRest);
 			return;
+		}
+		if (isSlurred && !flaggedSlurredStaccato && isStringInstrument) {
+			var prev = getPreviousNoteRest(noteRest);
+			var next = getNextNoteRest(noteRest);
+			if (noteRest.notes.length > 0) {
+				var pitch = noteRest.notes[0].pitch;
+				var prevPitch = (prev.notes.length > 0) ? prev.notes[0].pitch : 0;
+				var nextPitch = (next.notes.length > 0) ? next.notes[0].pitch : 0;
+				var portatoOK = (pitch == prevPitch || pitch == nextPitch);
+				if (!portatoOK) {
+					addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them?",noteRest);
+					flaggedSlurredStaccato = true;
+				}
+			}
 		}
 	}
 	
