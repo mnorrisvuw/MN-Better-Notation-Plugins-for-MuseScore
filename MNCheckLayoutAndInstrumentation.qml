@@ -2583,15 +2583,15 @@ MuseScore {
 							isMetronomeMarking = true;
 							
 							// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
-							var metronomeDuration = division / 4; // crotchet
+							var metronomeDuration = division; // crotchet
 							var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('');
 							var metroStr = "crotchet/quarter note";
 							if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('')) {
-								metronomeDuration = division / 8; // quaver
+								metronomeDuration = division / 2; // quaver
 								metroStr = "quaver/eighth note";
 							}
 							if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('')) {
-								metronomeDuration = division / 2; // minim
+								metronomeDuration = division * 2; // minim
 								metroStr = "minim/half note";
 							}
 							if (hasAugDot) {
