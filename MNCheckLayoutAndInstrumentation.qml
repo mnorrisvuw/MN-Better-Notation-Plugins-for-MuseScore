@@ -80,7 +80,7 @@ MuseScore {
 	property var firstVisibleStaff: 0
 	property var staffVisible: []
 	property var haveHadPlayingIndication: false
-	property var flaggedSlurredStaccatoBar: -1
+	property var flaggedSlurredStaccatoBar: -10
 	
 	// ** COMMMENTS ** //
 	property var prevCommentPage: null
@@ -284,17 +284,17 @@ MuseScore {
 		techniques = techniquesfile.read().trim().split('\n');
 		canbeabbreviated = canbeabbreviatedfile.read().trim().split('\n');
 		var tempmetronomemarkings = metronomemarkingsfile.read().trim().split('\n');
+		var augmentationDots = ['','.','\uECB7','metAugmentationDot']; // all the possible augmentation dots (including none)
+		var spaces = [""," ","\u00A0"]; // all the possible spaces (that last one is a non-breaking space)
 		for (var i = 0; i < tempmetronomemarkings.length; i++) {
 			var mark = tempmetronomemarkings[i];
-			metronomemarkings.push(mark+"=");
-			metronomemarkings.push(mark+" =");
-			metronomemarkings.push(mark+".=");
-			metronomemarkings.push(mark+". =");
-			metronomemarkings.push(mark+"=");
-			metronomemarkings.push(mark+" =");
-			metronomemarkings.push(mark+"metAugmentationDot=");
-			metronomemarkings.push(mark+"metAugmentationDot =");
-
+			for (var j = 0; j<augmentationDots.length; j++) {
+				var augDot = augmentationDots[j];
+				for (var k = 0; k<spaces.length; k++) {
+					var space = spaces[k];
+					metronomemarkings.push(mark+augDot+space+"=");
+				}
+			}
 		}
 		shouldbelowercase = shouldbelowercasefile.read().trim().split('\n');
 		shouldhavefullstop = shouldhavefullstopfile.read().trim().split('\n');
@@ -565,7 +565,7 @@ MuseScore {
 			flaggedFastMultipleStops = false;
 			flaggedOneStrokeTrem = false;
 			haveHadPlayingIndication = false;
-			flaggedSlurredStaccatoBar = -1;
+			flaggedSlurredStaccatoBar = -10;
 			
 			// ** slurs
 			currentSlur = null;
@@ -701,7 +701,7 @@ MuseScore {
 				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues(currentBar,currentStaffNum);
 				
 				// ************ CHECK UNTERMINATED TEMPO CHANGE ************ //
-				if (lastTempoChangeMarkingBar != -1 && currentBarNum == lastTempoChangeMarkingBar + 8) {
+				if (lastTempoChangeMarkingBar != -1 && currentBarNum >= lastTempoChangeMarkingBar + 8) {
 					//logError("Found unterminated tempo change in b. "+currentBarNum);
 					addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
 					lastTempoChangeMarkingBar = -1;
@@ -709,7 +709,7 @@ MuseScore {
 				
 				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
-					//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
+					logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
 					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
 					lastTempoChangeMarkingBar = -1;
 				}
@@ -1260,17 +1260,43 @@ MuseScore {
 		dialog.show();
 	}
 	
+		
+	function getPreviousNoteRest (noteRest) {
+		var cursor2 = curScore.newCursor();
+		cursor2.staffIdx = currentStaffNum;
+		cursor2.track = noteRest.track;
+		cursor2.rewindToTick(noteRest.parent.tick);
+		if (cursor2.prev()) return cursor2.element;
+		return null;
+	}
+	
+	function getNextNoteRest (noteRest) {
+		var cursor2 = curScore.newCursor();
+		cursor2.staffIdx = currentStaffNum;
+		cursor2.track = noteRest.track;
+		cursor2.rewindToTick(noteRest.parent.tick);
+		if (cursor2.next()) return cursor2.element;
+		return null;
+	}
+	
 	function getNextChordRest (cursor) {
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = cursor.staffIdx;
 		cursor2.filter = Segment.ChordRest;
 		cursor2.track = cursor.track;
 		cursor2.rewindToTick(cursor.tick);
-		if (cursor2.next()) {
-			return cursor2.element;
-		} else {
-			return null;
-		}
+		if (cursor2.next()) return cursor2.element;
+		return null;
+	}
+	
+	function getPrevChordRest (cursor) {
+		var cursor2 = curScore.newCursor();
+		cursor2.staffIdx = cursor.staffIdx;
+		cursor2.filter = Segment.ChordRest;
+		cursor2.track = cursor.track;
+		cursor2.rewindToTick(cursor.tick);
+		if (cursor2.next()) return cursor2.element;
+		return null;
 	}
 	
 	function chordsAreIdentical (chord1,chord2) {
@@ -2579,55 +2605,57 @@ MuseScore {
 					
 					// **** CHECK METRONOME MARKINGS **** //
 					var isMetronomeMarking = false;
-					for (var j = 0; j < metronomemarkings.length; j++) {
-						//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
-						if (styledTextWithoutTags.includes(metronomemarkings[j])) {
-							isMetronomeMarking = true;
-							
-							// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
-							var metronomeDuration = division; // crotchet
-							var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('');
-							var metroStr = "crotchet/quarter note";
-							if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('')) {
-								metronomeDuration = division / 2; // quaver
-								metroStr = "quaver/eighth note";
-							}
-							if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('')) {
-								metronomeDuration = division * 2; // minim
-								metroStr = "minim/half note";
-							}
-							if (hasAugDot) {
-								metronomeDuration *= 1.5;
-								metroStr = "dotted "+metroStr;
-							}
-							if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does not match the time signature of "+currentTimeSig.str+".",textObject);
-							lastMetronomeMarkingBar = currentBarNum;
-							if (nonBoldText === "") {
-								//logError ("styledText is "+styledText.replace(/</g,'{'));
-								if (styledText.includes("<b>")) {
-									// see comment above on the RegExp
-									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
-								} else {
-									//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-									if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
-									if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
+					if (styledTextWithoutTags.includes("=")) {
+						for (var j = 0; j < metronomemarkings.length && !isMetronomeMarking; j++) {
+							logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
+							if (styledTextWithoutTags.includes(metronomemarkings[j])) {
+								isMetronomeMarking = true;
+								
+								// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
+								var metronomeDuration = division; // crotchet
+								var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
+								var metroStr = "crotchet/quarter note";
+								if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('\uECA7')) {
+									metronomeDuration = division / 2; // quaver
+									metroStr = "quaver/eighth note";
 								}
+								if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('\uECA3')) {
+									metronomeDuration = division * 2; // minim
+									metroStr = "minim/half note";
+								}
+								if (hasAugDot) {
+									metronomeDuration *= 1.5;
+									metroStr = "dotted "+metroStr;
+								}
+								if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does not match the time signature of "+currentTimeSig.str+".",textObject);
+								lastMetronomeMarkingBar = currentBarNum;
+								if (nonBoldText === "") {
+									//logError ("styledText is "+styledText.replace(/</g,'{'));
+									if (styledText.includes('<b>')) {
+										// see comment above on the RegExp
+										nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
+									} else {
+										//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
+										if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
+										if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
+									}
+								}
+								//logError ("Found a metronome marking: non bold text is "+nonBoldText);
 							}
-							//logError ("Found a metronome marking: non bold text is "+nonBoldText);
-							break;
+						}
+						if (isMetronomeMarking) {
+							
+							// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
+							var metroIsPlain = nonBoldText.includes('=');
+							//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
+							if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
+								addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, Behind Bars p. 183)',textObject)
+							}
+							if (isTempoMarking && !metroIsPlain) {
+								addError ('It is recommended to have the metronome marking part of this tempo marking in a plain font style, not bold.\n(See, for instance, Behind Bars p. 183)',textObject);
+							}
 						}
 					}
-					
-					// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
-					var metroIsPlain = nonBoldText.includes('=');
-					//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
-					if (!isTempoMarking && !isTempoChangeMarking && isMetronomeMarking && !metroIsPlain) {
-						addError ("It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, Behind Bars p. 183)",textObject)
-					}
-					if (isTempoMarking && isMetronomeMarking && !metroIsPlain) {
-						addError ("It is recommended to have the metronome marking part of this tempo marking in a plain font style, not bold.\n(See, for instance, Behind Bars p. 183)",textObject);
-					}
-					
 				
 					// **** CHECK DIV/UNIS. **** //
 					if (lowerCaseText.includes('div.')) {
@@ -2833,7 +2861,7 @@ MuseScore {
 					if (tn === "expression") {
 						for (var i = 0; i < techniques.length; i ++) {
 							if (lowerCaseText.includes(techniques[i])) {
-								addError("This looks like a technique, but has been incorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
+								addError("This looks like a technique, but has been\nincorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
 								return;
 							}
 						}
@@ -3005,8 +3033,9 @@ MuseScore {
 			var next = getNextNoteRest(noteRest);
 			if (noteRest.notes.length > 0) {
 				var pitch = noteRest.notes[0].pitch;
-				var prevPitch = (prev.notes.length > 0) ? prev.notes[0].pitch : 0;
-				var nextPitch = (next.notes.length > 0) ? next.notes[0].pitch : 0;
+				var prevPitch = 0, nextPitch = 0;
+				if (prev != null) if (prev.notes.length > 0) prevPitch = prev.notes[0].pitch;
+				if (next != null) if (next.notes.length > 0) nextPitch = next.notes[0].pitch;
 				var portatoOK = (pitch == prevPitch || pitch == nextPitch);
 				if (!portatoOK) {
 					addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them?",noteRest);
@@ -3615,8 +3644,9 @@ MuseScore {
 			cursor.staffIdx = staffNum;
 			cursor.track = 0;
 			cursor.rewindToTick(currTick);
-			var currentTempo = cursor.tempo;
-			logError ("Tempo at start of slur = "+currentTempo);
+			var beatDurInSecs = cursor.tempo;
+			var theTime = cursor.time;
+			logError ("Time at start of slur = "+theTime+"; beatDurInSecs = "+beatDurInSecs);
 		}
 		
 	}
@@ -3944,6 +3974,7 @@ MuseScore {
 			//return;
 			//}
 	}
+
 	
 	function addError (text,element) {
 		if (element == null || element == undefined) {
