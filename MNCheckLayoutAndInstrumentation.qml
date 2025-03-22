@@ -396,142 +396,33 @@ MuseScore {
 		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
 		for (var i = 0; i <= lastPageNum; i++) commentPosOffset[i] = Array(10000).fill(0);
 		
-		// ************  			SELECT AND PRE-PROCESS ENTIRE SCORE 			************ //
+		// ************  					SELECT AND PRE-PROCESS ENTIRE SCORE 							************ //
 		selectAll();
-		
 		setProgress (1);
 		
-		// **** LOOK FOR AND STORE ANY ELEMENTS THAT CAN ONLY BE ACCESSED FROM SELECTION: **** //
-		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
-		// **** THIS INCLUDES: HAIRPINS, OTTAVAS, TREMOLOS, SLURS, ARTICULATION, FERMATAS **** //
-		// **** GLISSES, PEDALS, TEMPO TEXT																								**** //
-		var elems = curScore.selection.elements;
-		//logError ("Selected "+elems.length+" elems");
-		var prevSlurSegment = null, prevHairpinSegment = null, prevOttavaSegment = null, prevGlissSegment = null, prevPedalSegment = null;
-		
-		for (var i = 0; i<elems.length; i++) {
-			var e = elems[i];
-			//logError ("Found elem "+e.name);
-			var etype = e.type;
-			var staffIdx = 0;
-			while (!staves[staffIdx].is(e.staff)) staffIdx++;
-			
-			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
-			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
-			
-			if (etype == Element.HAIRPIN) {
-				hairpins[staffIdx].push(e);
-				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
-			}
-			if (versionafter450 && etype == Element.HAIRPIN_SEGMENT) {
-				// ONLY ADD THE HAIRPIN_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				var sameLoc = false;
-				var sameHairpin = false;
-				if (prevHairpinSegment != null) {
-					sameLoc = (e.spannerTick.ticks == prevHairpinSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevHairpinSegment.spannerTicks.ticks);
-					if (sameLoc) sameHairpin = !e.parent.is(prevHairpinSegment.parent);
-				}
-				// only add it if it's not already added
-				if (!sameHairpin) hairpins[staffIdx].push(e);
-				prevHairpinSegment = e;
-				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
-			}
-			
-			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
-			if (versionafter450 && etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				var sameLoc = false;
-				var sameOttava = false;
-				if (prevOttavaSegment != null) {
-					sameLoc = (e.spannerTick.ticks == prevOttavaSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevOttavaSegment.spannerTicks.ticks);
-					if (sameLoc) sameOttava = !e.parent.is(prevOttavaSegment.parent);
-				}
-				// only add it if it's not already added
-				if (!sameOttava) ottavas[staffIdx].push(e);
-				prevOttavaSegment = e;
-			}
-			
-			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
-			if (versionafter450 && etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				var sameLoc = false;
-				var sameGlissando = false;
-				if (prevGlissandoSegment != null) {
-					sameLoc = (e.spannerTick.ticks == prevGlissandoSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevGlissandoSegment.spannerTicks.ticks);
-					if (sameLoc) sameGlissando = !e.parent.is(prevGlissandoSegment.parent);
-				}
-				// only add it if it's not already added
-				if (!sameGlissando) glisses[staffIdx][e.spannerTick.ticks] = e;
-				prevGlissandoSegment = e;
-			}
-			
-			if (etype == Element.SLUR) slurs[staffIdx].push(e);
-			if (versionafter450 && etype == Element.SLUR_SEGMENT) {
-				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				var sameLoc = false;
-				var sameSlur = false;
-				if (prevSlurSegment != null) {
-					sameLoc = (e.spannerTick.ticks == prevSlurSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevSlurSegment.spannerTicks.ticks);
-					if (sameLoc) sameSlur = !e.parent.is(prevSlurSegment.parent);
-				}
-				// only add it if it's not already added
-				if (!sameSlur) slurs[staffIdx].push(e);
-				prevSlurSegment = e;
-			}
-			
-			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
-			if (versionafter450 && etype == Element.PEDAL_SEGMENT) {
-				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				var sameLoc = false;
-				var samePedal = false;
-				if (prevPedalSegment != null) {
-					sameLoc = (e.spannerTick.ticks == prevPedalSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevPedalSegment.spannerTicks.ticks);
-					if (sameLoc) samePedal = !e.parent.is(prevPedalSegment.parent);
-				}
-				// only add it if it's not already added
-				if (!samePedal) pedals[staffIdx].push(e);
-				prevPedalSegment = e;
-			}
-			if (etype == Element.TREMOLO_SINGLECHORD) oneNoteTremolos[staffIdx][e.parent.parent.tick] = e;
-			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
-			if (etype == Element.ARTICULATION) {
-				if (articulations[staffIdx][e.parent.parent.tick] == null || articulations[staffIdx][e.parent.parent.tick] == undefined) {
-					articulations[staffIdx][e.parent.parent.tick] = new Array();
-					//logError("New array "+articulations[staffIdx][e.parent.parent.tick].length);
-				}
-				articulations[staffIdx][e.parent.parent.tick].push(e);
-				//logError("artic slot staff "+staffIdx+" tick "+(e.parent.parent.tick)+" now has "+articulations[staffIdx][e.parent.parent.tick].length+" items");
-			}
-			if (etype == Element.FERMATA) {
-				var theTick = e.parent.tick;
-				fermatas.push(e);
-				var locArr = staffIdx+' '+theTick;
-				fermataLocs.push(locArr);
-			}
-			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) tempoText.push(e);
-			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e.parent.tick);
-			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
-		}
-		
+		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, SLURS, OTTAVAS, ETC) 	************ //
+		analyseSpanners();
 		setProgress (2);
 		
-		// ************  				CHECK TITLE TEXT AND STAFF TEXT OBJECTS FOR ERRORS 				************ //
+		// ************  				CHECK TITLE TEXT AND STAFF TEXT OBJECTS FOR ERRORS 					************ //
 		checkScoreText();
 		
 		// ************ 								CHECK TIME SIGNATURES								************ //
 		checkTimeSignatures();
 		
-		// ************ 						CHECK FOR STAFF ORDER ISSUES 						************ //
+		// ************ 							CHECK FOR STAFF ORDER ISSUES 							************ //
 		checkStaffOrder();
 		
-		// ************  							CHECK STAFF NAMES ISSUES 							************ // 
+		// ************  							CHECK STAFF NAMES ISSUES 								************ // 
 		checkStaffNames();
 		
-		// ************  							CHECK STAFF NAMES ISSUES 							************ // 
+		// ************  							CHECK LOCATION OF FINAL BAR								************ // 
 		checkLocationOfFinalBar();
 		
-		// ************  							CHECK STAFF NAMES ISSUES 							************ // 
+		// ************  					CHECK LOCATIONS OF BOTTOM SYSTEMS ON EACH PAGE 					************ // 
 		if (numPages > 1) checkLocationsOfBottomSystems();
 		
-		// ************ 							CHECK FOR FERMATA ISSUES 							************ ///
+		// ************ 								CHECK FOR FERMATA ISSUES 							************ ///
 		if (!isSoloScore && numStaves > 2) checkFermatas();
 		
 		setProgress (3);
@@ -1383,6 +1274,118 @@ MuseScore {
 			} else {
 				progress.progressPercent = percentage;
 			}
+		}
+	}
+	
+	function analyseSpanners() {
+		// **** LOOK FOR AND STORE ANY ELEMENTS THAT CAN ONLY BE ACCESSED FROM SELECTION: **** //
+		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
+		// **** THIS INCLUDES: HAIRPINS, OTTAVAS, TREMOLOS, SLURS, ARTICULATION, FERMATAS **** //
+		// **** GLISSES, PEDALS, TEMPO TEXT																								**** //
+		var elems = curScore.selection.elements;
+		//logError ("Selected "+elems.length+" elems");
+		var prevSlurSegment = null, prevHairpinSegment = null, prevOttavaSegment = null, prevGlissSegment = null, prevPedalSegment = null;
+		
+		for (var i = 0; i<elems.length; i++) {
+			var e = elems[i];
+			//logError ("Found elem "+e.name);
+			var etype = e.type;
+			var staffIdx = 0;
+			while (!staves[staffIdx].is(e.staff)) staffIdx++;
+			
+			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
+			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
+			
+			if (etype == Element.HAIRPIN) {
+				hairpins[staffIdx].push(e);
+				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
+			}
+			if (versionafter450 && etype == Element.HAIRPIN_SEGMENT) {
+				// ONLY ADD THE HAIRPIN_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+				var sameLoc = false;
+				var sameHairpin = false;
+				if (prevHairpinSegment != null) {
+					sameLoc = (e.spannerTick.ticks == prevHairpinSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevHairpinSegment.spannerTicks.ticks);
+					if (sameLoc) sameHairpin = !e.parent.is(prevHairpinSegment.parent);
+				}
+				// only add it if it's not already added
+				if (!sameHairpin) hairpins[staffIdx].push(e);
+				prevHairpinSegment = e;
+				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
+			}
+			
+			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
+			if (versionafter450 && etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+				var sameLoc = false;
+				var sameOttava = false;
+				if (prevOttavaSegment != null) {
+					sameLoc = (e.spannerTick.ticks == prevOttavaSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevOttavaSegment.spannerTicks.ticks);
+					if (sameLoc) sameOttava = !e.parent.is(prevOttavaSegment.parent);
+				}
+				// only add it if it's not already added
+				if (!sameOttava) ottavas[staffIdx].push(e);
+				prevOttavaSegment = e;
+			}
+			
+			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
+			if (versionafter450 && etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+				var sameLoc = false;
+				var sameGlissando = false;
+				if (prevGlissandoSegment != null) {
+					sameLoc = (e.spannerTick.ticks == prevGlissandoSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevGlissandoSegment.spannerTicks.ticks);
+					if (sameLoc) sameGlissando = !e.parent.is(prevGlissandoSegment.parent);
+				}
+				// only add it if it's not already added
+				if (!sameGlissando) glisses[staffIdx][e.spannerTick.ticks] = e;
+				prevGlissandoSegment = e;
+			}
+			
+			if (etype == Element.SLUR) slurs[staffIdx].push(e);
+			if (versionafter450 && etype == Element.SLUR_SEGMENT) {
+				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+				var sameLoc = false;
+				var sameSlur = false;
+				if (prevSlurSegment != null) {
+					sameLoc = (e.spannerTick.ticks == prevSlurSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevSlurSegment.spannerTicks.ticks);
+					if (sameLoc) sameSlur = !e.parent.is(prevSlurSegment.parent);
+				}
+				// only add it if it's not already added
+				if (!sameSlur) slurs[staffIdx].push(e);
+				prevSlurSegment = e;
+			}
+			
+			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
+			if (versionafter450 && etype == Element.PEDAL_SEGMENT) {
+				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+				var sameLoc = false;
+				var samePedal = false;
+				if (prevPedalSegment != null) {
+					sameLoc = (e.spannerTick.ticks == prevPedalSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevPedalSegment.spannerTicks.ticks);
+					if (sameLoc) samePedal = !e.parent.is(prevPedalSegment.parent);
+				}
+				// only add it if it's not already added
+				if (!samePedal) pedals[staffIdx].push(e);
+				prevPedalSegment = e;
+			}
+			if (etype == Element.TREMOLO_SINGLECHORD) oneNoteTremolos[staffIdx][e.parent.parent.tick] = e;
+			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
+			if (etype == Element.ARTICULATION) {
+				if (articulations[staffIdx][e.parent.parent.tick] == null || articulations[staffIdx][e.parent.parent.tick] == undefined) {
+					articulations[staffIdx][e.parent.parent.tick] = new Array();
+					//logError("New array "+articulations[staffIdx][e.parent.parent.tick].length);
+				}
+				articulations[staffIdx][e.parent.parent.tick].push(e);
+				//logError("artic slot staff "+staffIdx+" tick "+(e.parent.parent.tick)+" now has "+articulations[staffIdx][e.parent.parent.tick].length+" items");
+			}
+			if (etype == Element.FERMATA) {
+				var theTick = e.parent.tick;
+				fermatas.push(e);
+				var locArr = staffIdx+' '+theTick;
+				fermataLocs.push(locArr);
+			}
+			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) tempoText.push(e);
+			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e.parent.tick);
+			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
 		}
 	}
 	

@@ -820,18 +820,19 @@ MuseScore {
 				}
 			}
 			
-			// ** OFF THE BEAT — NOTES ** //
-			
+			// ** OFF THE BEAT — NOTES ** //	
 			
 			if (displayDur == crotchet) {
+				//logError("Found offbeat crotchet");
 				if (noteRest.tuplet == null) {
-					if (isNote) {
-						// for 2/4, 4/4, 6/8 etc, allow if offbeat
-						if (timeSigNum % 2 == 0 && beatLength % crotchet == 0) {
-							if ((noteStart - quaver) % 2 == 0 && prevDisplayDur >= quaver && nextDisplayDur >= quaver) hidingBeatError = false;
-						} else {
-							if (noteStartFrac == quaver) hidingBeatError = false;
-						}
+					if (isNote && noteStartFrac == quaver) {
+
+						// FOR COMPOUND TIME SIGNATURES (6/8 etc), allow only if on the quaver offbeat
+						if (isCompound && beatLength == dottedcrotchet) hidingBeatError = false;	
+						
+						// FOR SIMPLE TIME SIGNATURES, allow only if a) even-numbered numerator, b) previous and next notes are quavers, c) it's on the off of an odd-numbered note 
+						if (!isCompound && timeSigNum % 2 == 0 && startOffset % 2 == quaver && prevDisplayDur == quaver && nextDisplayDur == quaver) hidingBeatError = false;
+						
 					}
 				} else {
 				// check crotchet triplet
@@ -1258,7 +1259,9 @@ MuseScore {
 								canBeSimplified = simplification < (beatLength * 2);
 							}
 							if (canBeSimplified) {
-								if (simplification == dottedcrotchet && !isCompound) canBeSimplified = (prevNoteRest == null) ? false : prevNoteRest.duration.ticks == quaver;
+								
+								// Only simplify a dotted crotchet if it's in simple time with an even numerator, and it was preceded by a quaver, and it's on the offbeat of an odd-numbered beat
+								if (simplification == dottedcrotchet && !isCompound) canBeSimplified = (prevNoteRest == null) ? false : (timeSigNum % 2 == 0 && prevNoteRest.duration.ticks == quaver && tempPos % 2 == 0.5);
 								if (simplification == crotchet) {
 									canBeSimplified = (startFrac == quaver);
 									if (!isCompound) {
