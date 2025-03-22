@@ -996,6 +996,7 @@ MuseScore {
 	
 	function showAllErrors () {
 		var objectPageNum;
+		
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -1066,7 +1067,6 @@ MuseScore {
 				comment.fontFace = "Helvetica";
 				comment.autoplace = false;
 	
-				var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT];
 				if (isString) {
 					if (theLocation === "pagetop") {
 						desiredPosX = 2.5;
@@ -1075,29 +1075,7 @@ MuseScore {
 					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
 					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
 				} else {
-					if (spannerArray.includes(eType)) {
-						tick = element.spannerTick.ticks;
-					} else {
-						if (eType == Element.MEASURE) {
-							tick = element.firstSegment.tick;
-						} else {
-							if (element.parent == undefined || element.parent == null) {
-								logError("showAllErrors() — ELEMENT PARENT IS "+element.parent+"); etype is "+element.name);
-							} else {
-								if (element.parent.type == Element.CHORD) {
-									// it's either a notehead or a gracenote
-									if (element.parent.parent.type == Element.CHORD) {
-										// it's a grace note, so need to get parent of parent
-										tick = element.parent.parent.parent.tick;
-									} else {
-										tick = element.parent.parent.tick;
-									}
-								} else {
-									tick = element.parent.tick;
-								}
-							}
-						}
-					}
+					tick = getTick(element);
 				}
 				if (eType == Element.TEXT) {
 					checkObjectPage = true;
@@ -1122,7 +1100,8 @@ MuseScore {
 					cursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
-					var commentHeight = comment.bbox.height;					
+					var commentHeight = comment.bbox.height;
+					var commentWidth = comment.bbox.width;					
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
 						comment.offsetY = desiredPosY - comment.pagePos.y;
@@ -1131,6 +1110,7 @@ MuseScore {
 					}
 					var commentTopRounded = Math.round(comment.pagePos.y);
 					var commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
+					var commentPageWidth = commentPage.bbox.width; // get page width
 					if (commentPage != null && commentPage != undefined) {
 						var commentPageNum = commentPage.pagenumber;
 						var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
@@ -1142,9 +1122,9 @@ MuseScore {
 						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
-						if (checkObjectPage) {
-							if (commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
-						}
+						if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+						var rhs = comment.pagePos.x + commentWidth;
+						if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
 					}
 				}
 			}

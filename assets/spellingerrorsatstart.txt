@@ -32,6 +32,8 @@ Modere
 Modéré
 Cedez
 Cédez
+Cèdez
+Cédez
 sub 
 sub. 
 pos nat

@@ -1495,6 +1495,7 @@ MuseScore {
 	
 	function showAllErrors () {
 		var objectPageNum;
+		
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -1598,7 +1599,8 @@ MuseScore {
 					cursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
-					var commentHeight = comment.bbox.height;					
+					var commentHeight = comment.bbox.height;
+					var commentWidth = comment.bbox.width;					
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
 						comment.offsetY = desiredPosY - comment.pagePos.y;
@@ -1607,6 +1609,7 @@ MuseScore {
 					}
 					var commentTopRounded = Math.round(comment.pagePos.y);
 					var commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
+					var commentPageWidth = commentPage.bbox.width; // get page width
 					if (commentPage != null && commentPage != undefined) {
 						var commentPageNum = commentPage.pagenumber;
 						var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
@@ -1618,9 +1621,9 @@ MuseScore {
 						}
 						comment.offsetY -= theOffset;
 						comment.offsetX += theOffset;
-						if (checkObjectPage) {
-							if (commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
-						}
+						if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+						var rhs = comment.pagePos.x + commentWidth;
+						if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
 					}
 				}
 			}
