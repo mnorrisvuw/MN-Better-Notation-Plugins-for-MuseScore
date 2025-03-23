@@ -117,7 +117,10 @@ MuseScore {
 	property var lastTempoChangeMarking: null
 	property var lastTempoMarking: null
 	property var lastTempoMarkingBar: -1
+	property var lastArticulationBar: -1
+	property var lastDynamicBar: -1
 	property var lastMetronomeMarkingBar: -1
+	property var numConsecutiveMusicBars: 0
 	property var currentStaffNum: 0
 	property var currentTimeSig: null
 	property var prevTimeSig: ""
@@ -171,6 +174,7 @@ MuseScore {
 	
 	// ** DYNAMICS ** //
 	property var dynamics: []
+	property var currDynamicLevel: 0
 	
 	// ** CLEFS ** //
 	property var clefs: []
@@ -436,7 +440,7 @@ MuseScore {
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
 		var currentHairpinNum, numHairpins, nextHairpinStart;
-		var numSystems, currentSystem, currentSystemNum, numNotesInThisSystem, numBeatsInThisSystem, noteCountInSystem, beatCountInSystem;
+		var numSystems, currentSystem, currentSystemNum, numNoteRestsInThisSystem, numBeatsInThisSystem, noteCountInSystem, beatCountInSystem;
 		var maxNoteCountPerSystem, minNoteCountPerSystem, maxBeatsPerSystem, minBeatsPerSystem, actualStaffSize;
 		var isSharedStaff;
 		var loop = 0;
@@ -500,6 +504,9 @@ MuseScore {
 			lastTempoMarking = null;
 			lastTempoMarkingBar = -1;
 			lastMetronomeMarkingBar = -1;
+			lastArticulationBar = -1;
+			lastDynamicBar = -1;
+			numConsecutiveMusicBars = 0;
 			
 			// ** clear flags ** //
 			flaggedInstrumentRange = 0;
@@ -571,7 +578,7 @@ MuseScore {
 			currentBar = cursor.measure;
 			currentSystem = null;
 			currentSystemNum = 0;
-			numNotesInThisSystem = 0;
+			numNoteRestsInThisSystem = 0;
 			numBeatsInThisSystem = 0;
 			var clef = cursor.element;
 			// call checkClef AFTER the currentInstrumentName/Id setup and AFTER set InstrumentVariables
@@ -626,21 +633,21 @@ MuseScore {
 							//logError("Pushed beatCountInSystem[] = "+numBeatsInThisSystem);
 						}
 						if (noteCountInSystem.length <= currentSystemNum) {
-							noteCountInSystem.push(numNotesInThisSystem > numBeatsInThisSystem ? numNotesInThisSystem : numBeatsInThisSystem);
+							noteCountInSystem.push(numNoteRestsInThisSystem > numBeatsInThisSystem ? numNoteRestsInThisSystem : numBeatsInThisSystem);
 							//logError("Pushed noteCountInSystem["+currentSystemNum+"] = "+noteCountInSystem[currentSystemNum]);
 						} else {
-							if (numNotesInThisSystem > noteCountInSystem[currentSystemNum]) {
-								noteCountInSystem[currentSystemNum] = numNotesInThisSystem;
-								//logError("Expanded noteCountInSystem["+currentSystemNum+"] = "+numNotesInThisSystem);
+							if (numNoteRestsInThisSystem > noteCountInSystem[currentSystemNum]) {
+								noteCountInSystem[currentSystemNum] = numNoteRestsInThisSystem;
+								//logError("Expanded noteCountInSystem["+currentSystemNum+"] = "+numNoteRestsInThisSystem);
 							}
 						}
 						currentSystemNum ++;
 					}
-					numNotesInThisSystem = 0;
+					numNoteRestsInThisSystem = 0;
 					numBeatsInThisSystem = 0;
 				}
 				var numTracksWithNotes = 0;
-				var numNotesInThisTrack = 0;
+				var numTracksWithNoteRests = 0;
 				var isChord = false;
 				pedalChangesInThisBar = 0;
 				flaggedPedalChangesInThisBar = false;
@@ -666,6 +673,8 @@ MuseScore {
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					// **** UPDATE PROGRESS MESSAGE **** //
+					var numNotesInThisTrack = 0;
+					var numNoteRestsInThisTrack = 0;
 					loop++;
 					setProgress(5+loop*95./totalNumLoops);
 					cursor.filter = Segment.All;
@@ -735,6 +744,7 @@ MuseScore {
 							if (readyToGoToNextSlur) {
 								if (currTick >= nextSlurStart) {
 									isSlurred = true;
+									lastArticulationBar = currentBarNum;
 									//logError("Slur started: isSlurred = true");
 									currentSlur = slurs[currentStaffNum][currentSlurNum];
 									var currentSlurStart = nextSlurStart;
@@ -845,6 +855,8 @@ MuseScore {
 								if (currentHairpin == null) {
 									readyToGoToNextHairpin = true;
 								} else {
+									
+									lastDynamicBar = currentBarNum;
 									if (currTick >= currentHairpinEnd) {
 										//logError("Hairpin ended because currTick = "+currTick+" & currentHairpinEnd = "+currentHairpinEnd);
 										// was this hairpin long enough to require ending?
@@ -864,6 +876,7 @@ MuseScore {
 							
 								if (currTick >= nextHairpinStart) {
 									isHairpin = true;
+									lastDynamicBar = currentBarNum;
 									//logError("found hairpin, currTick = "+currTick);
 									//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
 								
@@ -955,8 +968,8 @@ MuseScore {
 							// ************ FOUND A CHORD OR REST ************ //
 							if (eType == Element.CHORD || eType == Element.REST) {
 							
-								numNotesInThisTrack ++;
-								numNotesInThisSystem ++;
+								numNoteRestsInThisTrack ++;
+								numNoteRestsInThisSystem ++;
 								var noteRest = cursor.element;
 								if (firstNoteInThisBar == null) firstNoteInThisBar = noteRest;
 								var isHidden = !noteRest.visible;
@@ -972,7 +985,16 @@ MuseScore {
 									maxLedgerLines = [];
 									flaggedInstrumentRange = 0;
 								}
+								
+								// ************ CHECK DYNAMICS ********** //
+
+								if (lastDynamicBar < currentBarNum - 8 && numConsecutiveMusicBars >= 8) {
+									lastDynamicBar = currentBarNum + 1;
+									addError("This passage has had no dynamic markings for the last 8 bars\nConsider adding more dynamic detail to this passage.",noteRest);
+								}
 							
+								// ************ CHECK DYNAMICS UNDER RESTS ********** //
+
 								if (isRest) {
 									if (tickHasDynamic && !isGrandStaff[currentStaffNum]) addError ("In general, you shouldn’t put dynamic markings under rests.", theDynamic);
 									maxLLSinceLastRest = 0;
@@ -1006,7 +1028,7 @@ MuseScore {
 									var hasGraceNotes = graceNotes.length > 0;
 									if (hasGraceNotes) {
 										checkGraceNotes(graceNotes, currentStaffNum);
-										numNotesInThisSystem += graceNotes.length / 2; // grace notes only count for half
+										numNoteRestsInThisSystem += graceNotes.length / 2; // grace notes only count for half
 										prevWasGraceNote = true;
 									}
 																
@@ -1014,8 +1036,16 @@ MuseScore {
 									var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
 								
 									if (theArticulationArray) {
+										lastArticulationBar = currentBarNum;
 										for (var i = 0; i < theArticulationArray.length; i++) {
 											if (staccatoArray.includes(theArticulationArray[i].symbol)) checkStaccatoIssues (noteRest);
+										}
+									} else {
+										if (lastArticulationBar < currentBarNum - 8 && numConsecutiveMusicBars >= 8) {
+											if (isStringInstrument || isWindOrBrassInstrument) {
+												lastArticulationBar = currentBarNum + 1;
+												addError("This passage has had no articulation for the last 8 bars\nConsider adding more detail to this passage",noteRest);
+											}
 										}
 									}
 								
@@ -1113,40 +1143,48 @@ MuseScore {
 						prevSlurNum = isSlurred ? currentSlurNum : null;
 						prevTick[currentTrack] = currTick;
 					} // end while processingThisBar
+					if (numNoteRestsInThisTrack > 0) numTracksWithNoteRests ++;
 					if (numNotesInThisTrack > 0) numTracksWithNotes ++;
 				} // end track loop
 				
 				if (isWindOrBrassInstrument && isSharedStaff) {
-					if (numTracksWithNotes > 1 || isChord) {
+					if (numTracksWithNoteRests > 1 || isChord) {
 						//logError("multiple parts found");
 						weKnowWhosPlaying = false;
 						flaggedWeKnowWhosPlaying = false;
 					} else {
 
 						//logError("numTracksWithNotes="+numTracksWithNotes+" weKnowWhosPlaying="+weKnowWhosPlaying+" flaggedWeKnowWhosPlaying="+flaggedWeKnowWhosPlaying);
-						if (numTracksWithNotes == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
+						if (numTracksWithNoteRests == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
 							addError("This bar has only one melodic line on a shared staff\nThis needs to be marked with, e.g., 1./2./a 2",firstNoteInThisBar);
 							flaggedWeKnowWhosPlaying = true;
 						}
 					}
 				}
+				
+				
 				if (currentBar) currentBar = currentBar.nextMeasure;
+				if (numTracksWithNotes > 0) {
+					numConsecutiveMusicBars ++;
+				} else {
+					numConsecutiveMusicBars = 0;
+				}
 				numBarsProcessed ++;
 			}// end currentBar num
 			
 			if (currentStaffNum == 0) beatCountInSystem.push(numBeatsInThisSystem);
 			if (noteCountInSystem[currentSystemNum] == undefined) {
-				if (numNotesInThisSystem > numBeatsInThisSystem) {
-					noteCountInSystem[currentSystemNum] = numNotesInThisSystem;
-					//logError("Pushed noteCountInSystem["+currentSystemNum+"] = "+numNotesInThisSystem);
+				if (numNoteRestsInThisSystem > numBeatsInThisSystem) {
+					noteCountInSystem[currentSystemNum] = numNoteRestsInThisSystem;
+					//logError("Pushed noteCountInSystem["+currentSystemNum+"] = "+numNoteRestsInThisSystem);
 				} else {
 					noteCountInSystem[currentSystemNum] = numBeatsInThisSystem;
 					//logError("Pushed noteCountInSystem["+currentSystemNum+"] = "+numBeatsInThisSystem);
 				}
 			} else {
-				if (numNotesInThisSystem > noteCountInSystem[currentSystemNum]) {
-					noteCountInSystem[currentSystemNum] = numNotesInThisSystem;
-					//logError("Expanded noteCountInSystem["+currentSystemNum+"] = "+numNotesInThisSystem);
+				if (numNoteRestsInThisSystem > noteCountInSystem[currentSystemNum]) {
+					noteCountInSystem[currentSystemNum] = numNoteRestsInThisSystem;
+					//logError("Expanded noteCountInSystem["+currentSystemNum+"] = "+numNoteRestsInThisSystem);
 				}
 			}
 		} // end staffnum loop
@@ -1282,6 +1320,7 @@ MuseScore {
 		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
 		// **** THIS INCLUDES: HAIRPINS, OTTAVAS, TREMOLOS, SLURS, ARTICULATION, FERMATAS **** //
 		// **** GLISSES, PEDALS, TEMPO TEXT																								**** //
+		var staves = curScore.staves;
 		var elems = curScore.selection.elements;
 		//logError ("Selected "+elems.length+" elems");
 		var prevSlurSegment = null, prevHairpinSegment = null, prevOttavaSegment = null, prevGlissSegment = null, prevPedalSegment = null;
@@ -2098,7 +2137,7 @@ MuseScore {
 						var systemBottom = prevSystem.pagePos.y + prevSystem.bbox.height;
 						if (systemBottom < thresholdb) {
 							addError ("This system should ideally be justified to the bottom of the page",prevFirstMeasure);
-							logError ("System Bottom = "+systemBottom+"; thresholdB = "+thresholdb);
+							//logError ("System Bottom = "+systemBottom+"; thresholdB = "+thresholdb);
 						}
 					}
 					prevPage = currPage;
@@ -2918,10 +2957,13 @@ MuseScore {
 					// **** CHECK REDUNDANT DYNAMIC **** //
 					if (objectIsDynamic || containsADynamic || stringIsDynamic) {
 						//logError("dynamic — plainText = "+plainText);
-						
+											
 						firstDynamic = true;
 						tickHasDynamic = true;
 						theDynamic = textObject;
+						lastDynamicBar = currentBarNum;
+						setDynamicLevel (plainText);
+						
 						var isError = false;
 						var dynamicException = plainText.includes("fp") || plainText.includes("fmp") || plainText.includes("sf") || plainText.includes("fz");
 						if (prevDynamicBarNum > 0) {
@@ -3044,6 +3086,33 @@ MuseScore {
 			}
 		}
 		return false;
+	}
+	
+	function setDynamicLevel (str) {
+		// set multiple dynamics first and return
+		// dynamicLevel — 0 = ppp–p, 1 = mp, 2 = mf, 3 = f, 4 = ff+
+		if (str === 'sf' || str === 'sfz' || str === 'sffz' || str === 'rf' || str === 'rfz') return;
+		if (str.includes('p') && !str.includes('mp')) {
+			currDynamicLevel = 0;
+			return;
+		}
+		if (str === 'mp' || str.includes('zmp') || str.includes('fmp')) {
+			currDynamicLevel = 1;
+			return;
+		}
+		if (str === 'mf') {
+			currDynamicLevel = 2;
+			return;
+		}
+		if (str.includes('f') && !str.includes('ff')) {
+			currDynamicLevel = 3;
+			return;
+		}
+		if (str.includes('ff')) {
+			currDynamicLevel = 4;
+			return;
+		}
+		logError ('Can’t find dynamic level for '+str);
 	}
 	
 	function checkKeySignature (keySig,sharps) {
@@ -3747,15 +3816,19 @@ MuseScore {
 			}
 		}
 		
-		// ** check dynamic
-		if (isStartOfSlur) {
+		// ** check bow length and dynamic
+		if (isStartOfSlur && isStringInstrument) {
+			// dynamicLevel — 0 = ppp–p, 1 = mp, 2 = mf, 3 = f, 4 = ff+
+			var maxSlurDurations = [8,6,4,3,2];
+			var maxSlurDuration = maxSlurDurations[currDynamicLevel];
 			var cursor = curScore.newCursor();
 			cursor.staffIdx = staffNum;
 			cursor.track = 0;
 			cursor.rewindToTick(currTick);
 			var beatDurInSecs = 1./cursor.tempo;
 			var tickDurInSecs = beatDurInSecs / division;
-			//logError ("BeatDurInSecs = "+beatDurInSecs+" slurDur = "+currentSlur.spannerTicks.ticks*tickDurInSecs);
+			var slurDurInSecs = currentSlur.spannerTicks.ticks*tickDurInSecs;
+			if (slurDurInSecs > maxSlurDuration) addError ("This slur/bow mark may be too long at the stated dynamic.\nCheck with a performer whether a shorter one would be more appropriate.",currentSlur);
 		}
 		
 	}
@@ -3926,8 +3999,8 @@ MuseScore {
 		if (noteRest.parent.type == Element.CHORD) {
 			theTick = noteRest.parent.parent.tick;
 		} else {
-		 theTick = noteRest.parent.tick;
-	 }
+			theTick = noteRest.parent.tick;
+		}
 		//logError("Getting artic at tick = "+theTick);
 		
 		if (theTick == undefined || theTick == null) {
@@ -3937,9 +4010,6 @@ MuseScore {
 				logError("getArticulationArray() — articulations["+staffNum+"] is undefined "+staffNum.length);
 			} else {
 				if (articulations[staffNum][theTick] == null || articulations[staffNum][theTick] == undefined) return null;
-				
-				//logError("articArray[theTick] has "+articulations[staffNum][theTick].length+" items");
-				
 				return articulations[staffNum][theTick];
 			}
 		}
