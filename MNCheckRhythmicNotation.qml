@@ -290,9 +290,14 @@ MuseScore {
 				} else {
 					virtualBeatLength = (division * 4) / timeSigDenom;
 				}
-	
-				canCheckThisBar = ((isCompound && timeSigDenom > 4) || timeSigNum < 5 || !(timeSigNum % 2) || timeSigDenom == 4);
-				//if (!canCheckThisBar) logError("main loop — couldn't check this bar as time sig was too batty");
+				
+				// WE CAN'T REALLY CHECK 5/8, 7/8 etc —
+				// SO WE CAN CHECK THIS BAR IF:
+				// 1) it's a compound time signature where the denominator is 8, 16, etc. (this allows 6/8, 9/16, 12/8, etc.)
+				// 2) the numerator is 1, 2, 3 or 4 (this allows 4/4, 3/2, etc)
+				// 3) the numerator is even (this allows 10/2, 14/8, etc)
+				// 4) the timeSigDenom is <= 4 (this allows 5/4, etc)
+				canCheckThisBar = (isCompound && timeSigDenom > 4) || timeSigNum < 5 || timeSigNum % 2 == 0 || timeSigDenom <= 4;
 		
 				// ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
 				if (canCheckThisBar) {
@@ -676,6 +681,8 @@ MuseScore {
 	
 	function checkHidingBeatError (noteRest) {
 		var hidingBeatError;
+		var startTick = noteRest.parent.tick;
+		var startOffset = startTick - barStart;
 
 		// ** FIRST CHECK IF THIS IS A TUPLET ** //
 		if (noteRest.tuplet == null) {
@@ -688,9 +695,7 @@ MuseScore {
 			} else {
 				lastCheckedTuplet = theTuplet;
 				// does this tuplet cross a beat?
-				var startTick = noteRest.parent.tick;
 				var endTick = theTuplet.actualDuration.ticks + startTick;
-				var startOffset = startTick - barStart;
 				var startBeatOffset = startTick % beatLength;
 				var endOffset = endTick - barStart - 1;
 				var startBeat = Math.floor(startOffset / beatLength);
@@ -822,6 +827,7 @@ MuseScore {
 			
 			// ** OFF THE BEAT — NOTES ** //	
 			
+			// ** CROTCHET ** //
 			if (displayDur == crotchet) {
 				//logError("Found offbeat crotchet");
 				if (noteRest.tuplet == null) {
@@ -830,9 +836,16 @@ MuseScore {
 						// FOR COMPOUND TIME SIGNATURES (6/8 etc), allow only if on the quaver offbeat
 						if (isCompound && beatLength == dottedcrotchet) hidingBeatError = false;	
 						
-						// FOR SIMPLE TIME SIGNATURES, allow only if a) even-numbered numerator, b) previous and next notes are quavers, c) it's on the off of an odd-numbered note 
-						if (!isCompound && timeSigNum % 2 == 0 && startOffset % 2 == quaver && prevDisplayDur == quaver && nextDisplayDur == quaver) hidingBeatError = false;
-						
+						// FOR SIMPLE TIME SIGNATURES, allow only if a) even-numbered numerator, b) previous and next notes are quavers, c) it's on the off of an odd-numbered note
+						//logError ("p = "+(prevDisplayDur == quaver)+" n = "+(nextDisplayDur == quaver)+" t= "+(timeSigNum % 2 == 0) +" d = "+(timeSigDenom < 4) +" h = "+(startOffset % minim != quaver));
+						//logError ("startOffset = "+startOffset+" % = "+ (startOffset % minim));
+						if (!isCompound && prevDisplayDur == quaver && nextDisplayDur == quaver) {
+							if (timeSigNum % 2 == 0 || timeSigDenom < 4) {
+								hidingBeatError = startOffset % minim != quaver;
+							} else {
+								hidingBeatError = false;
+							}
+						}						
 					}
 				} else {
 				// check crotchet triplet
@@ -855,8 +868,8 @@ MuseScore {
 				//logError(Checking dotted crotchet");
 				if (isNote) {
 					//logError(Here1");
-					if (timeSigStr === "4/4" || timeSigStr === "2/2") {
-						if ((noteStart == quaver || noteStart == minim+quaver) && prevDisplayDur >= quaver) hidingBeatError = false;
+					if (timeSigNum % 2 == 0 || timeSigDenom < 4) {
+						if (noteStart % minim == quaver && prevDisplayDur >= quaver) hidingBeatError = false;
 					} else {
 						//logError(noteStartFrac = "+noteStartFrac+" prevDisplayDur="+prevDisplayDur);
 						if (noteStartFrac == quaver && prevDisplayDur == quaver) hidingBeatError = false;
@@ -997,10 +1010,11 @@ MuseScore {
 								// don't simplify anything tied over a beat that is less than a crotchet
 								if (restActualDur == dottedminim) {
 									canBeCondensed = false;
-									if (timeSigStr == "6/4" || timeSigStr == "9/4") canBeCondensed = !(startBeat % 3);
-									if (timeSigStr == "12/8") canBeCondensed = !(startBeat % 2);
+									if (timeSigStr === "6/4" || timeSigStr === "9/4") canBeCondensed = !(startBeat % 3);
+									if (timeSigStr === "12/8") canBeCondensed = !(startBeat % 2);
 								}
-								if (restActualDur == minim) canBeCondensed = (timeSigStr == "4/4" || timeSigStr == "2/2" || timeSigStr == "3/2") && !(startBeat % 2);
+								if (restActualDur == semibreve) canBeCondensed = timeSigStr === "4/4" || timeSigStr === "2/2";
+								if (restActualDur == minim) canBeCondensed = (timeSigStr === "4/4" || timeSigStr === "2/2" || timeSigStr === "3/2") && !(startBeat % 2);
 								if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = ((timeSigDenom <= 2) || isCompound) && !(startBeat % 2);
 								if (restActualDur == dottedquaver) canBeCondensed = timeSigDenom <= 4;
 								if (restActualDur == dottedsemiquaver) canBeCondensed = timeSigDenom <= 8;
@@ -1195,7 +1209,8 @@ MuseScore {
 				var tempNextItemIsNote = (tempNextItem == null) ? false : tempNextItem.type == Element.CHORD;
 				tiedActualDur += tempActualDur;
 				tiedDisplayDur += tempDisplayDur;
-				var checkDisplayDur = (tiedDisplayDur != tiedActualDur) && (startTuplet == tempTuplet);
+				var checkDisplayDur = (tiedDisplayDur != tiedActualDur) && startTuplet.is(tempTuplet);
+				//logError ("tiedDisplayDur "+tiedDisplayDur+" tiedActualDur "+tiedActualDur+" startTuple")
 				var canBeSimplified, simplification;
 				
 				if (tieIsOnBeat) {
@@ -1253,15 +1268,25 @@ MuseScore {
 						simplification = possibleOffbeatSimplificationDurs[k];
 						if (tiedActualDur == simplification) {
 							// don't simplify anything tied over a beat that is less than a crotchet
+							//logError ("Found simplification tiedActualDur = "+tiedActualDur);
+
 							if (isCompound) {
 								canBeSimplified = simplification < beatLength;
 							} else {
 								canBeSimplified = simplification < (beatLength * 2);
 							}
 							if (canBeSimplified) {
-								
+								// DOTTED CROTCHET
 								// Only simplify a dotted crotchet if it's in simple time with an even numerator, and it was preceded by a quaver, and it's on the offbeat of an odd-numbered beat
-								if (simplification == dottedcrotchet && !isCompound) canBeSimplified = (prevNoteRest == null) ? false : (timeSigNum % 2 == 0 && prevNoteRest.duration.ticks == quaver && tempPos % 2 == 0.5);
+								if (simplification == dottedcrotchet && !isCompound) {
+									if (prevNoteRest == null) {
+										canBeSimplified = false;
+									} else {
+										canBeSimplified =  (timeSigNum % 2 == 0 || timeSigDenom < 4) && prevNoteRest.duration.ticks == quaver && startPos % minim == quaver;
+										//logError ("startPos = "+startPos);
+										//logError ("Can be simplified = "+canBeSimplified+" because "+(timeSigNum % 2 == 0 || timeSigDenom < 4)+" "+(prevNoteRest.duration.ticks == quaver)+" "+(startPos % minim == quaver));
+									}
+								}
 								if (simplification == crotchet) {
 									canBeSimplified = (startFrac == quaver);
 									if (!isCompound) {
@@ -1286,10 +1311,14 @@ MuseScore {
 						} // end if tied
 					}
 					// CHECK DISPLAY DURS
+					//logError ("checkDisplayDur = "+checkDisplayDur+" maxSimplificationFound = "+maxSimplificationFound);
+
 					if (checkDisplayDur && !maxSimplificationFound) {
 						for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
 							simplification = possibleOffbeatSimplificationDurs[k];
 							if (tiedDisplayDur == simplification && k > possibleSimplification) {
+								//logError ("Found display simplification: "+tiedDisplayDur);
+
 								possibleSimplification = k;
 								possibleSimplificationFirstNoteIndex = i;
 								possibleSimplificationLastNoteIndex = j;
@@ -1328,6 +1357,7 @@ MuseScore {
 	function checkBeamBrokenError (noteRest) {		
 		// is this note able to be beamed?
 		if (displayDur >= crotchet) return;
+		
 		//logError(\nisRest:"+isRest+"); beamMode="+currentBeamMode+" haveHadFirstNote="+haveHadFirstNote;
 		var isOnlyNoteInBeat = false;
 		var isLastItemInBeat = nextItemBeat != noteStartBeat;
@@ -1341,7 +1371,7 @@ MuseScore {
 			return;
 		}
 		
-		// ** ...the REST IMMEDIATELY BEFORE FIRST NOTE — can be set to only 0 or 1 ** //
+		// ** ...the REST IMMEDIATELY BEFORE FIRST NOTE — can be set to only AUTO or NONE ** //
 		if (isRest && nextItemIsNote && !haveHadFirstNote && !isLastItemInBeat) {
 			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
 			acceptableBeamSettings = [Beam.AUTO, Beam.NONE];
@@ -1349,13 +1379,9 @@ MuseScore {
 			//logError(last rest before note");
 		}
 				
-		// ** FIRST NOTE IN A BEAT — set to anything but not 1 ** //
+		// ** FIRST NOTE IN A BEAT WHERE THERE ARE OTHER NOTES IN THE BEAT — can be set to anything except NONE ** //
 		if (isNote && !haveHadFirstNote) {
-			if (isLastItemInBeat) {
-				//logError(Only note in beat so returning");
-				return; // don't beam if it's the only note in the beat
-			}
-			if (nextDisplayDur >= crotchet) return; // if next note doesn't have a beam, it doesn't matter
+			if (isLastItemInBeat || nextDisplayDur >= crotchet) return; // don't beam if it's the only note in the beat or next note doesn't have a beam
 			haveHadFirstNote = true;
 			acceptableBeamSettings = [Beam.AUTO,Beam.BEGIN,Beam.BEGIN32,Beam.BEGIN64,Beam.MID];
 			isFirstNoteInBeat = true;
@@ -1419,7 +1445,7 @@ MuseScore {
 			if (!hasBeam) {
 				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
 			} else {
-				if (currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
+				if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’",noteRest);
 			}
 			return;
 		}
@@ -1459,22 +1485,19 @@ MuseScore {
 	}
 	
 	function checkBeamedToNotesInNextBeat (noteRest) {
-		var lastNoteInBeat = nextItemBeat > noteStartBeat;
+		//logError ("nextItemBeat = "+nextItemBeat+" noteStartBeat "+noteStartBeat);
+		var lastNoteInBeat = nextItemBeat != noteStartBeat;
 		
-		//logError(*** CHECKING BEAMED TO NOTES IN NEXT BEAT ERROR ***");
-		// Beam.AUTO = 0; Beam.NONE = 1; Beam.BEGIN = 2; Beam.BEGIN32 = 3; Beam.BEGIN64 = 4; Beam.MID = 5; Beam.END = 6; 
-		//logError("AUTO="+Beam.AUTO+"; BEGIN="+Beam.BEGIN+"; MID="+Beam.MID+"; END="+Beam.END+"; NONE="+Beam.NONE+"; BEGIN32="+Beam.BEGIN32+"; BEGIN64="+Beam.BEGIN64);
-		//logError("hasBeam="+hasBeam+" nextHasBeam="+nextHasBeam+" lastNoteInBeat="+lastNoteInBeat+" beamForwards="+beamTriesToGoForwards+" nextGoBack="+nextBeamTriesToGoBack);
-		//logError("currentBeamMode="+currentBeamMode+" nextBeamMode="+nextBeamMode+" beamPos="+currentBeamPos);
-		
-		//if (lastNoteInBeat) logError(BEAM: "+currentBeamMode+" "+nextBeamMode);
+		//logError("*** CHECKING BEAMED TO NOTES IN NEXT BEAT ERROR ***");
+		//if (lastNoteInBeat) logError("last note — BEAM: "+currentBeamMode+" "+nextBeamMode);
 		
 		// ADD — 
 		if (hasBeam && nextHasBeam && lastNoteInBeat) {
 			
-			var beamTriesToGoForwards = currentBeamMode == Beam.AUTO || currentBeamMode > 2;
+			var beamTriesToGoForwards = currentBeamMode != Beam.NONE;
 			var nextBeamTriesToGoBack = nextBeamMode > 2;
-			
+			//logError("hasBeam="+hasBeam+" nextHasBeam="+nextHasBeam+" lastNoteInBeat="+lastNoteInBeat+" beamForwards="+beamTriesToGoForwards+" nextGoBack="+nextBeamTriesToGoBack);		
+
 			if (beamTriesToGoForwards && nextBeamTriesToGoBack) {
 								
 				// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
