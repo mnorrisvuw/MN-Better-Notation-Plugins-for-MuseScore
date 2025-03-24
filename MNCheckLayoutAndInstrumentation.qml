@@ -180,6 +180,7 @@ MuseScore {
 	property var quietRegisterThresholdPitch: 0
 	property var highLoudRegisterThresholdPitch: 0
 	property var lowLoudRegisterThresholdPitch: 0
+	property var lastDynamicFlagBar: -1
 	
 	// ** DYNAMICS ** //
 	property var dynamics: []
@@ -516,6 +517,7 @@ MuseScore {
 			lastArticulationBar = -1;
 			lastDynamicBar = -1;
 			numConsecutiveMusicBars = 0;
+			lastDynamicFlagBar = -1;
 			
 			// ** clear flags ** //
 			flaggedInstrumentRange = 0;
@@ -1256,8 +1258,8 @@ MuseScore {
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (version450) errorMsg = "<p><font size=\"6\">🛑</font>NOTE: MuseScore v. 4.5.0 breaks the ability for plugins to access slurs, hairpins, ottavas, gliss lines and pedal lines, so these were not checked.</p><p>Please update to MuseScore v. 4.5.1 when this is released.</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
-		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p>" + errorMsg;
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue. You can use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue. You can use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;	
 		
 		if (progressShowing) progress.close();
 		
@@ -2622,37 +2624,40 @@ MuseScore {
 		var highestPitch = getHighestPitch(noteRest);
 		if (lowestPitch < lowestPitchPossible) {
 			if (isBrassInstrument) {
-				addError ('This note is very low and may not be possible on this instrument.\nCheck with a player.',noteRest);
+				addError ('This note is very low and may not\nbe possible on this instrument.\nCheck with a player.',noteRest);
 				return;
 			} else {
-				addError ('This note appears to be below the lowest note possible on this instrument.',noteRest);
+				addError ('This note appears to be below the\nlowest note possible on this instrument.',noteRest);
 				return;
 			}
 		}
 		if (highestPitch > highestPitchPossible) {
 			if (isPercussionInstrument || isHarp || isKeyboardInstrument) {
-				addError ('This note appears to be above the highest note possible on this instrument.',noteRest);
+				addError ('This note appears to be above the\nhighest note possible on this instrument.',noteRest);
 				return;
 			} else {
-				addError ('This note is very high and may not be possible on this instrument.\nCheck with a player.',noteRest);
+				addError ('This note is very high and may not\nbe possible on this instrument.\nCheck with a player.',noteRest);
 				return;
 			}
 		}
 		if (quietRegisterThresholdPitch != 0) {
-			if (lowestPitch <= quietRegisterThresholdPitch && currDynamicLevel > 3) {
-				addError ('This note is quite low and may not be able to be played at the indicated dynamic.',noteRest);
+			if (lowestPitch <= quietRegisterThresholdPitch && currDynamicLevel > 3 && lastDynamicFlagBar < currentBarNum - 4) {
+				lastDynamicFlagBar = currentBarNum;
+				addError ('This note is quite low and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
 			}
 		}
 		if (highLoudRegisterThresholdPitch != 0) {
-			if (highestPitch >= highLoudRegisterThresholdPitch && currDynamicLevel < 3) {
-				addError ('This note is quite high and may not be able to be played at the indicated dynamic.',noteRest);
+			if (highestPitch >= highLoudRegisterThresholdPitch && currDynamicLevel < 3 && lastDynamicFlagBar < currentBarNum - 4) {
+				lastDynamicFlagBar = currentBarNum;
+				addError ('This note is quite high and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
 			}
 		}
 		if (lowLoudRegisterThresholdPitch != 0) {
-			if (lowestPitch <= lowLoudRegisterThresholdPitch && currDynamicLevel < 3) {
-				addError ('This note is quite low and may not be able to be played at the indicated dynamic.',noteRest);
+			if (lowestPitch <= lowLoudRegisterThresholdPitch && currDynamicLevel < 3 && lastDynamicFlagBar < currentBarNum - 4) {
+				lastDynamicFlagBar = currentBarNum;
+				addError ('This note is quite low and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
 			}
 		}
