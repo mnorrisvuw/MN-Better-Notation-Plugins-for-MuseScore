@@ -138,9 +138,13 @@ MuseScore {
 	
 	// ** INSTRUMENTS ** //
 	property var instrumentIds: []
+	property var instrumentCalcIds: []
 	property var instrumentNames: []
 	property var currentInstrumentName: ""
 	property var currentInstrumentId: ""
+	property var currentInstrumentCalcId: ""
+	property var isWindInstrument: false
+	property var isBrassInstrument: false
 	property var isWindOrBrassInstrument: false
 	property var isStringInstrument: false
 	property var isStringSection: false
@@ -171,6 +175,11 @@ MuseScore {
 	property var numPages: 0
 	property var systemStartBars: []
 	property var tempoText: []
+	property var lowestPitchPossible: 0
+	property var highestPitchPossible: 0
+	property var quietRegisterThresholdPitch: 0
+	property var highLoudRegisterThresholdPitch: 0
+	property var lowLoudRegisterThresholdPitch: 0
 	
 	// ** DYNAMICS ** //
 	property var dynamics: []
@@ -435,7 +444,7 @@ MuseScore {
 		var currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
 		var firstBarNum, firstSegmentInScore, numBars;
 		var prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
-		var containsTransposingInstruments = false;
+		var includesTransposingInstruments = false;
 		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, previousSlurEnd;
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
@@ -569,6 +578,8 @@ MuseScore {
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
 			currentInstrumentName = instrumentNames[currentStaffNum];
 			currentInstrumentId = instrumentIds[currentStaffNum];
+			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — the calcIds are figured out in the analyseInstrumentsAndStaves routine
+			currentInstrumentCalcId = instrumentCalcIds[currentStaffNum];
 			setInstrumentVariables();			
 			cursor.filter = Segment.HeaderClef;
 			cursor.staffIdx = currentStaffNum;
@@ -1051,6 +1062,9 @@ MuseScore {
 								
 									var nn = noteRest.notes.length;
 									isChord = nn > 1;
+									
+									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
+									if (isChord) checkChordNotesTied(noteRest);
 								
 									if (isFirstNote) {
 										isFirstNote = false;
@@ -1100,7 +1114,6 @@ MuseScore {
 								
 									// ************ CHECK PIANO STRETCH ************ //
 									if (isKeyboardInstrument && isChord) checkPianoStretch(noteRest);
-								
 						
 									// ************ CHECK TREMOLOS ************ //
 									if (oneNoteTremolos[currentStaffNum][currTick] != null) checkOneNoteTremolo(noteRest,oneNoteTremolos[currentStaffNum][currTick]);
@@ -1109,6 +1122,9 @@ MuseScore {
 									// ************ CHECK GLISSES ************ //
 									if (glisses[currentStaffNum][currTick] != null) checkGliss(noteRest,glisses[currentStaffNum][currTick]);
 
+									// ************ CHECK RANGE ************ //
+									checkInstrumentRange(noteRest);
+									
 									prevBarNum = currentBarNum;
 								
 								} // end is rest
@@ -1447,13 +1463,70 @@ MuseScore {
 			if (!staffVisible[i]) numParts--;
 			var id = part.instrumentId;
 			instrumentIds.push(id);
+			var calcid = id;
 			var staffName = staves[i].part.longName;
+			var lowerStaffName = staffName.toLowerCase();
 			instrumentNames.push(staffName);
+			
+			if (id.includes('.group')) {
+				if (id.includes('strings')) {
+					if (lowerStaffName.includes('violin')) calcid = 'strings.violin';
+					if (lowerStaffName.includes('viola')) calcid = 'strings.viola';
+					if (lowerStaffName.includes('cello')) calcid = 'strings.cello';
+					if (lowerStaffName.includes('bass')) calcid = 'strings.contrabass';
+				}
+				if (id.includes('wind')) {
+					if (lowerStaffName.includes('piccolo')) calcid = 'wind.flutes.flute.piccolo';
+					if (lowerStaffName.includes('flute')) {
+						if (lowerStaffName.includes('alto')) {
+							calcid = 'wind.flutes.flute.alto';
+						} else {
+							if (lowerStaffName.includes('bass')) {
+								calcid = 'wind.flutes.flute.bass';
+							} else {
+								calcid = 'wind.flutes.flute';
+							}
+						}
+					}
+					if (lowerStaffName.includes('oboe')) calcid = 'wind.reed.oboe';
+					if (lowerStaffName.includes('anglais') || lowerStaffName.includes('english')) calcid = 'wind.reed.english-horn';
+					if (lowerStaffName.includes('clarinet')) {
+						if (lowerStaffName.includes('bass')) {
+							calcid = 'wind.reed.clarinet.bass';
+						} else {
+							if (lowerStaffName.includes('a cl') || lowerStaffName.includes('in a')) {
+								calcid = 'wind.reed.clarinet.a';
+							} else {
+								if (lowerStaffName.includes('eb cl') || lowerStaffName.includes('in eb')) {
+									calcid = 'wind.reed.clarinet.eb';
+								} else {
+									calcid = 'wind.reed.clarinet.bb';
+								}
+							}
+						}
+					}
+						
+					if (staffName.includes('bassoon')) {
+						if (lowerStaffName.includes('contra')) {
+							calcid = 'wind.reed.contrabassoon';
+						} else {
+							calcid = 'wind.reed.bassoon';
+						}
+					}
+				}
+				if (id.includes('brass')) {
+					if (lowerStaffName.includes('horn')) calcid = 'brass.french-horn';
+					if (lowerStaffName.includes('trumpet')) calcid = 'brass.trumpet';
+					if (lowerStaffName.includes('trombone')) calcid = 'brass.trombone';
+					if (lowerStaffName.includes('tuba')) calcid = 'brass.tuba';
+				}
+			}
+			instrumentCalcIds.push(calcid);
 			//logError("staff "+i+" ID "+id+" name "+staffName+" vis "+staves[i].visible);
 			isSharedStaffArray[i] = false;
 			if (!scoreIncludesTransposingInstrument) {
 				for (var j = 0; j < transposingInstruments.length; j++) {
-					if (id.includes(transposingInstruments[j])) scoreIncludesTransposingInstrument = true;
+					if (calcid.includes(transposingInstruments[j])) scoreIncludesTransposingInstrument = true;
 					continue;
 				}
 			}
@@ -1463,7 +1536,7 @@ MuseScore {
 			if (firstLetterIsANumber) {
 				isSharedStaffArray[i] = true;
 			} else {
-				// check if it contains a pattern like '1.2' or 'II &amp; III'midg
+				// check if it includes a pattern like '1.2' or 'II &amp; III'midg
 				if (staffName.match(/([1-8]+|[MDCLXVI]+)(\.|,|, |&amp;| &amp; )([1-8]+|[MDCLXVI]+)/) != null) {
 					isSharedStaffArray[i] = true;
 
@@ -1719,8 +1792,10 @@ MuseScore {
 			isPercussionInstrument = isPitchedPercussionInstrument || isUnpitchedPercussionInstrument;
 			isKeyboardInstrument = currentInstrumentId.includes("keyboard");
 			isPedalInstrument = currentInstrumentId.includes("piano") || currentInstrumentId.includes("vibraphone");
-			isWindOrBrassInstrument = currentInstrumentId.includes("wind.") || currentInstrumentId.includes("brass.");
-			isHorn = currentInstrumentId === "brass.french-horn";
+			isWindInstrument = currentInstrumentId.includes("wind.");
+			isBrassInstrument = currentInstrumentId.includes("brass.");
+			isWindOrBrassInstrument = isWindInstrument || isBrassInstrument;
+			isHorn = currentInstrumentCalcId === "brass.french-horn";
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
 			isCello = currentInstrumentId.includes("cello");
@@ -1736,7 +1811,7 @@ MuseScore {
 			// WINDS
 			if (currentInstrumentId.includes("wind.")) {
 				// Bassoon is the only wind instrument that reads bass and tenor clef
-				if (currentInstrumentId.includes("bassoon")) {
+				if (currentInstrumentCalcId.includes("bassoon")) {
 					readsTreble = false;
 					readsTenor = true;
 					readsBass = true;
@@ -1747,12 +1822,12 @@ MuseScore {
 			}
 			// BRASS
 			if (currentInstrumentId.includes("brass.")) {
-				if (currentInstrumentId.includes("french-horn")) {
+				if (currentInstrumentCalcId.includes("french-horn")) {
 					readsBass = true;
 					checkClefs = true;
 				}
-				if (currentInstrumentId.includes("trumpet")) checkClefs = true;
-				if (currentInstrumentId.includes("trombone") || currentInstrumentId.includes("tuba") || currentInstrumentId.includes("sousaphone")) {
+				if (currentInstrumentCalcId.includes("trumpet")) checkClefs = true;
+				if (currentInstrumentCalcId.includes("trombone") || currentInstrumentCalcId.includes("tuba") || currentInstrumentId.includes("sousaphone")) {
 					if (currentInstrumentId.includes("alto") > 0) {
 						readsAlto = true;
 						checkClefs = true;
@@ -1781,15 +1856,15 @@ MuseScore {
 		
 			// STRINGS
 			if (currentInstrumentId.includes("strings.")) {
-				if (currentInstrumentId.includes("violin") || currentInstrumentName.toLowerCase().includes("violin")) {
+				if (currentInstrumentCalcId.includes("violin")) {
 					checkClefs = true;
 					reads8va = true;
 				}
-				if (currentInstrumentId.includes("viola") || currentInstrumentName.toLowerCase().includes("viola")) {
+				if (currentInstrumentCalcId.includes("viola")) {
 					readsAlto = true;
 					checkClefs = true;
 				}
-				if (currentInstrumentId.includes("cello") || currentInstrumentId.includes("contrabass") || currentInstrumentName.toLowerCase().includes("cello") || currentInstrumentName.toLowerCase().includes("contrabass") || currentInstrumentName.toLowerCase().includes("double bass")) {
+				if (currentInstrumentCalcId.includes("cello") || currentInstrumentCalcId.includes("contrabass")) {
 					readsTenor = true;
 					readsBass = true;
 					checkClefs = true;
@@ -1801,6 +1876,21 @@ MuseScore {
 				if (currentInstrumentId.includes("bass") || currentInstrumentId.includes("baritone") || currentInstrumentId.includes(".male")) {
 					readsBass = true;
 					checkClefs = true;
+				}
+			}
+			
+			// lowest pitch possible etc.
+			lowestPitchPossible = highestPitchPossible = quietRegisterThresholdPitch = highLoudRegisterThresholdPitch = lowLoudRegisterThresholdPitch = 0;
+			for (var i = 0; i < instrumentranges.length; i++) {
+				var instrumentData = instrumentranges[i];
+				if (currentInstrumentCalcId === instrumentData[0]) {
+					/// *** BACK HERE
+					lowestPitchPossible = instrumentData[1];
+					if (instrumentData[2] != '') quietRegisterThresholdPitch = instrumentData[2];
+					highestPitchPossible = instrumentData[3];
+					if (instrumentData[4] != '') highLoudRegisterThresholdPitch = instrumentData[4];
+					if (instrumentData[5] != '') lowLoudRegisterThresholdPitch = instrumentData[5];
+					//logError ('Data for '+currentInstrumentCalcId+': '+lowestPitchPossible+' '+highestPitchPossible+' '+quietRegisterThresholdPitch+' '+highLoudRegisterThresholdPitch+' '+lowLoudRegisterThresholdPitch);
 				}
 			}
 		}
@@ -2525,6 +2615,63 @@ MuseScore {
 		}
 	}
 	
+	function checkInstrumentRange(noteRest) {
+		// the currentInstrumentRange array is formatted thus:
+		//[instrumentId,lowestSoundingPitchPossible,quietRegisterThresholdPitch,highestSoundPitchPossible,highLoudRegisterThreshold,lowLoudRegisterThreshold] 
+		var lowestPitch = getLowestPitch(noteRest);
+		var highestPitch = getHighestPitch(noteRest);
+		if (lowestPitch < lowestPitchPossible) {
+			if (isBrassInstrument) {
+				addError ('This note is very low and may not be possible on this instrument.\nCheck with a player.',noteRest);
+				return;
+			} else {
+				addError ('This note appears to be below the lowest note possible on this instrument.',noteRest);
+				return;
+			}
+		}
+		if (highestPitch > highestPitchPossible) {
+			if (isPercussionInstrument || isHarp || isKeyboardInstrument) {
+				addError ('This note appears to be above the highest note possible on this instrument.',noteRest);
+				return;
+			} else {
+				addError ('This note is very high and may not be possible on this instrument.\nCheck with a player.',noteRest);
+				return;
+			}
+		}
+		if (quietRegisterThresholdPitch != 0) {
+			if (lowestPitch <= quietRegisterThresholdPitch && currDynamicLevel > 3) {
+				addError ('This note is quite low and may not be able to be played at the indicated dynamic.',noteRest);
+				return;
+			}
+		}
+		if (highLoudRegisterThresholdPitch != 0) {
+			if (highestPitch >= highLoudRegisterThresholdPitch && currDynamicLevel < 3) {
+				addError ('This note is quite high and may not be able to be played at the indicated dynamic.',noteRest);
+				return;
+			}
+		}
+		if (lowLoudRegisterThresholdPitch != 0) {
+			if (lowestPitch <= lowLoudRegisterThresholdPitch && currDynamicLevel < 3) {
+				addError ('This note is quite low and may not be able to be played at the indicated dynamic.',noteRest);
+				return;
+			}
+		}
+	}
+	
+	function getLowestPitch(chord) {
+		var numNotes = chord.notes.length;
+		var lowestPitch = chord.notes[0].pitch;
+		if (numNotes > 1) for (var i = 1; i < numNotes; i++) if (chord.notes[i].pitch < lowestPitch) lowestPitch = chord.notes[i].pitch;
+		return lowestPitch;
+	}
+	
+	function getHighestPitch(chord) {
+		var numNotes = chord.notes.length;
+		var highestPitch = chord.notes[0].pitch;
+		if (numNotes > 1) for (var i = 1; i < numNotes; i++) if (chord.notes[i].pitch > highestPitch) highestPitch = chord.notes[i].pitch;
+		return highestPitch;
+	}
+	
 	function checkScoreText() {
 		curScore.startCmd();
 		cmd("title-text");
@@ -2951,11 +3098,11 @@ MuseScore {
 					}
 					
 					var objectIsDynamic = tn === "dynamic";
-					var containsADynamic = styledText.includes('<sym>dynamics');
+					var includesADynamic = styledText.includes('<sym>dynamics');
 					var stringIsDynamic = isDynamic(lowerCaseText);
 				
 					// **** CHECK REDUNDANT DYNAMIC **** //
-					if (objectIsDynamic || containsADynamic || stringIsDynamic) {
+					if (objectIsDynamic || includesADynamic || stringIsDynamic) {
 						//logError("dynamic — plainText = "+plainText);
 											
 						firstDynamic = true;
@@ -3000,7 +3147,7 @@ MuseScore {
 					//logError(""+lowerCaseText+" isDyn = "+isDyn);
 				
 					// **** CHECK FOR DYNAMIC ENTERED AS EXPRESSION (OR OTHER) TEXT **** //
-					if (!objectIsDynamic && (containsADynamic || stringIsDynamic)) {
+					if (!objectIsDynamic && (includesADynamic || stringIsDynamic)) {
 						addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette",textObject);
 						return;
 					}
@@ -3031,6 +3178,20 @@ MuseScore {
 				}
 			} // end lowerCaseText != ''
 		} // end check comments
+	}
+	
+	function checkChordNotesTied (noteRest) {
+		var numNotes = noteRest.notes.length;
+		var nextChord = getNextNoteRest(noteRest);
+		if (nextChord == null) return;
+		if (nextChord.notes == null) return;
+		if (numNotes != nextChord.notes.length) return;
+		var numTies = 0;
+		for (var i = 0; i < numNotes; i++) {
+			if (noteRest.notes[i].pitch != nextChord.notes[i].pitch) return;
+			if (noteRest.notes[i].tieForward) numTies ++;
+		}
+		if (numTies > 0 && numTies < numNotes) addError ("This chord only has some notes tied to the next chord.\nShould they ALL be tied?",noteRest);
 	}
 	
 	function checkLyrics (noteRest) {
@@ -3410,7 +3571,7 @@ MuseScore {
 		var stringsArray = [];
 		var stringNames = [];
 		var iName = "";
-		var maxStretch = 11;
+		var maxStretch = 13; // 6 + 7
 		var numNotes = chord.notes.length;
 		
 		if (numNotes > 4) {
@@ -3433,7 +3594,7 @@ MuseScore {
 			iName = "viola";
 			stringsArray = violaStrings;
 			stringNames = violaStringNames;
-			maxStretch = 10;
+			maxStretch = 12;
 		}
 		if (currentInstrumentId.includes("cello") || currentInstrumentName.toLowerCase().includes("cello")) {
 			iName = "cello";
@@ -3444,7 +3605,7 @@ MuseScore {
 			iName = "double bass";
 			stringsArray = bassStrings;
 			stringNames = bassStringNames;
-			maxStretch = 8;
+			maxStretch = 9;
 		}
 		if (iName === "") return; // unknown string instrument
 		var tempPitchArray = [];
@@ -3487,11 +3648,12 @@ MuseScore {
 		var interval = 0;
 		var p1 = chord.notes[0].pitch;
 		var p2 = chord.notes[1].pitch;
+		var bottomNote = p1 < p2 ? p1: p2;
 		if (!stringsArray.includes(p1) && !stringsArray.includes(p2)) interval = Math.abs(p2-p1);
 		//logError("p1 = "+p1+"); p2 = "+p2+"; interval="+interval;
 		
 		if (numNotes == 2 && interval > maxStretch) addError ("This double-stop appears to be larger than a safe stretch on the "+iName+"\nIt may not be possible: check with a player.",chord);
-		if (p2 > stringsArray[2] + 12) {
+		if (bottomNote > stringsArray[2] + 12) {
 			if (interval < 7) {
 				addError ("In general, avoid double-stops less than a fifth in a high position,\nas the bottom note is over an octave above the open string.\nThe intonation may be poor; consider increasing the interval to greater than a fifth.",chord);
 			} else {
@@ -4186,7 +4348,7 @@ MuseScore {
 				var commentOffset = 1.0;
 				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 			
-				// the errorObjects array contains a list of the Elements to attach the text object to
+				// the errorObjects array includes a list of the Elements to attach the text object to
 				// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
 				// Here are the strings, and where the text object will be attached
 				// 		top 				— top of bar 1, staff 1

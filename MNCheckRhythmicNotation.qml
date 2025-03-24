@@ -753,7 +753,7 @@ MuseScore {
 				}
 				if (isCompound) {
 					hidingBeatError = soundingDur % beatLength;
-					if (soundingDur == dottedminim && timeSigStr === "12/8") {
+					if (soundingDur == dottedminim && timeSigStr === "12/8" && startOffset == dottedcrotchet) {
 						addError ("Never write a dotted minim rest on beat 2 of a 12/8 bar\n(See ‘Behind Bars’ p. 163)",noteRest);
 						return;
 					}
