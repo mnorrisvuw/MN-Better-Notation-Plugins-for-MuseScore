@@ -255,6 +255,7 @@ MuseScore {
 	property var kAccentTenutoAbove: 628
 	property var kTenutoBelow: 630
 	property var prevNote: null
+	property var prevNotes: []
 	property var selectionArray: []
 	property var isTrem: false
 	property var prevWasGraceNote: false
@@ -695,8 +696,7 @@ MuseScore {
 					cursor.rewindToTick(barStartTick);
 					var processingThisBar = cursor.element && cursor.tick < barEndTick;
 					
-					prevNote = null;
-					prevSlurNum = null;
+					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
 					while (processingThisBar) {
 						var currSeg = cursor.segment;
@@ -739,6 +739,7 @@ MuseScore {
 								} else {
 									if (currTick > currentSlurEnd) {
 										currentSlurNum ++;
+										logError ("Now at slur "+currentSlurNum);
 										if (currentSlurNum < numSlurs) {
 											var nextSlur = slurs[currentStaffNum][currentSlurNum];
 											if (currentSlur != null && nextSlur != null) {
@@ -764,10 +765,10 @@ MuseScore {
 									previousSlurEnd = currentSlurEnd;
 									currentSlurEnd = currentSlurStart + currentSlur.spannerTicks.ticks;
 									//logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
-									var off1 = currentSlur.slurUoff1 == undefined ? 0 : currentSlur.slurUoff1.x;
-									var off2 = currentSlur.slurUoff2 == undefined ? 0 : currentSlur.slurUoff2.x;
-									var off3 = currentSlur.slurUoff3 == undefined ? 0 : currentSlur.slurUoff3.x;
-									var off4 = currentSlur.slurUoff4 == undefined ? 0 : currentSlur.slurUoff4.x;
+									//var off1 = currentSlur.slurUoff1 == undefined ? 0 : currentSlur.slurUoff1.x;
+									//var off2 = currentSlur.slurUoff2 == undefined ? 0 : currentSlur.slurUoff2.x;
+									///var off3 = currentSlur.slurUoff3 == undefined ? 0 : currentSlur.slurUoff3.x;
+									//var off4 = currentSlur.slurUoff4 == undefined ? 0 : currentSlur.slurUoff4.x;
 									//logError("Slur offs: "+currentSlur.posX+" "+currentSlur.offsetX+" "+off1+" "+off2+" "+off3+" "+off4); // ALWAYS RETURNS 0 0 0 0 0 0 :-(
 									if (currentSlurNum > 0 && currentSlurStart == previousSlurEnd && !prevWasGraceNote) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
 
@@ -1154,11 +1155,12 @@ MuseScore {
 						}
 						if (isNote) {
 							prevNote = noteRest;
+							prevNotes[currentTrack] = prevNote;
 						} else {
 							prevNote = null;
-							prevSlurNum = null;
+							prevNotes[currentTrack] = null;
 						}
-						prevSlurNum = isSlurred ? currentSlurNum : null;
+						prevSlurNum = currentSlurNum;
 						prevTick[currentTrack] = currTick;
 					} // end while processingThisBar
 					if (numNoteRestsInThisTrack > 0) numTracksWithNoteRests ++;
@@ -1258,8 +1260,8 @@ MuseScore {
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (version450) errorMsg = "<p><font size=\"6\">🛑</font>NOTE: MuseScore v. 4.5.0 breaks the ability for plugins to access slurs, hairpins, ottavas, gliss lines and pedal lines, so these were not checked.</p><p>Please update to MuseScore v. 4.5.1 when this is released.</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
-		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue. You can use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue. You can use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;	
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
@@ -1345,6 +1347,9 @@ MuseScore {
 		
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
+			
+			// check if elem is hidden
+			if (e.parent == null) continue;
 			//logError ("Found elem "+e.name);
 			var etype = e.type;
 			var staffIdx = 0;
@@ -3907,6 +3912,7 @@ MuseScore {
 			var isStartOfTie = n.tieForward != null && n.tieBack == null;
 			// *** CHECK REPEATED NOTE UNDER A SLUR — ONLY STRINGS, WINDS OR BRASS *** //
 			if (isStringInstrument || isWindOrBrassInstrument) {
+				logError ("isStartOfSlur "+isStartOfSlur+" prevNote "+(prevNote != null) + " prevSlurNum "+prevSlurNum+" currentSlurNum:"+currentSlurNum+" tieBack"+(noteRest.notes[0].tieBack == null));
 				if (!isStartOfSlur && prevNote != null && prevSlurNum == currentSlurNum && noteRest.notes[0].tieBack == null) {
 					var iterationArticulationArray = [kTenutoAbove,kTenutoBelow,
 						kStaccatissimoAbove, kStaccatissimoAbove+1,
@@ -3921,8 +3927,11 @@ MuseScore {
 						for (var i = 0; i < numNotes && chordMatches; i++) {
 							if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
 						}
+						logError ("chordMatches "+chordMatches);
 						if (chordMatches && noteheadStyle != NoteHeadGroup.HEAD_DIAMOND && prevNoteheadStyle != NoteHeadGroup.HEAD_DIAMOND) {
+							logError ("here1");
 							if (getArticulationArray(noteRest,staffNum) == null) {
+								logError ("here2");
 								if (isEndOfSlur && prevWasStartOfSlur) {
 									addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie, or do you need to add articulation?",currentSlur);
 								} else {
