@@ -899,14 +899,8 @@ MuseScore {
 									var hairpinDur = currentHairpin.spannerTicks.ticks;
 								
 									currentHairpinEnd = hairpinStartTick + hairpinDur;
-									if (hairpinDur > barLength * 0.8) {
-										var doCheck = true;
-										if (currentHairpin.hairpinType == 2) {
-											var nextItem = getNextChordRest(cursor);
-											doCheck = nextItem.type == Element.CHORD;
-										}
-										if (doCheck) checkHairpinTermination();
-									}
+									if (hairpinDur > barLength * 0.8) checkHairpinTermination(cursor);
+									
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
 										nextHairpinStart = hairpins[currentStaffNum][currentHairpinNum+1].spannerTick.ticks;
@@ -2245,13 +2239,25 @@ MuseScore {
 		}
 	}
 	
-	function checkHairpinTermination () {
+	function checkHairpinTermination (cursor) {
+		var cursor2 = curScore.newCursor();
+		cursor2.staffIdx = cursor.staffIdx;
+		cursor2.track = cursor.track;
+		cursor2.rewindToTick(cursor.tick);
+		cursor2.filter = Segment.ChordRest;
+		
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
 		for (var i=0;i<dynamics[currentStaffNum].length;i++) {
 			var theTick = dynamics[currentStaffNum][i];
 			if (theTick >= currentHairpinEnd && theTick <= currentHairpinEnd  + beatLength) return;
 		}
+		// check not rests
+		while (cursor2 != null && cursor2.tick < theTick) cursor2.next();
+		if (cursor2 == null) return;
+		if (cursor2.element == null) return;
+		if (cursor2.element.notes == null) return;
+		if (cursor2.element.notes.length == 0) return;
 		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.",currentHairpin);
 	}
 	
