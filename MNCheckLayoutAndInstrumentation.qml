@@ -993,7 +993,7 @@ MuseScore {
 								
 								// ************ CHECK DYNAMICS ********** //
 
-								if (lastDynamicBar < currentBarNum - 8 && numConsecutiveMusicBars >= 8) {
+								if (lastDynamicBar < currentBarNum - 8 && numConsecutiveMusicBars >= 8 && isNote) {
 									lastDynamicBar = currentBarNum + 1;
 									addError("This passage has had no dynamic markings for the last 8 bars\nConsider adding more dynamic detail to this passage.",noteRest);
 								}
