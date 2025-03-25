@@ -587,9 +587,10 @@ MuseScore {
 		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		if (progressShowing) progress.close();
 		
-		var h = 200+numLogs*10;
+		var h = 250+numLogs*10;
 		if (h > 500) h =500;
 		dialog.height = h;
+		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
 		dialog.show();
 	

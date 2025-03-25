@@ -1258,9 +1258,10 @@ MuseScore {
 		
 		if (progressShowing) progress.close();
 		
-		var h = 200+numLogs*10;
+		var h = 250+numLogs*10;
 		if (h > 500) h =500;
 		dialog.height = h;
+		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
 		dialog.show();
 	}

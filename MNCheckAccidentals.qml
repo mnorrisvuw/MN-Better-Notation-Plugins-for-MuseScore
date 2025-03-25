@@ -277,9 +277,10 @@ MuseScore {
 		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;		
 		if (progressShowing) progress.close();
 		
-		var h = 200+numLogs*10;
+		var h = 250+numLogs*10;
 		if (h > 500) h =500;
 		dialog.height = h;
+		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
@@ -993,6 +994,33 @@ MuseScore {
 		errorObjects.push(element);
 	}
 	
+	function getTick (e) {
+		var tick = 0;
+		var eType = e.type;
+		var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
+		if (spannerArray.includes(eType)) {
+			tick = e.spannerTick.ticks;
+		} else {
+			if (eType == Element.MEASURE) {
+				tick = e.firstSegment.tick;
+			} else {
+				if (e.parent == undefined || e.parent == null) {
+					logError("showAllErrors() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
+				} else {
+					var p;
+					if (eType == Element.TUPLET) {
+						p = e.elements[0].parent;
+					} else {
+						p = e.parent;
+					}
+					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) p = p.parent;
+					if (p.type == Element.SEGMENT) tick = p.tick;
+				}
+			}
+		}
+		return tick;
+	}
+	
 	function showAllErrors () {
 		var objectPageNum;
 		
@@ -1154,8 +1182,9 @@ MuseScore {
 	StyledDialogView {
 		id: dialog
 		title: "CHECK COMPLETED"
-		contentHeight: 232
+		contentHeight: 252
 		contentWidth: 456
+		margins: 10
 		property var msg: ""
 
 		Text {
