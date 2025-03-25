@@ -277,24 +277,21 @@ MuseScore {
 	property var tempoFontStyle: 0
 	property var metronomeFontStyle: 0
 	
-	// ** OTHER **//
-	property var version450: false
-	property var versionafter450: false
-	
   onRun: {
 		if (!curScore) return;
 		
 		setProgress (0);
 		
 		// **** VERSION CHECK **** //
-		if (mscoreMajorVersion < 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion < 4)) {
-			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires at MuseScore v. 4.4 or later.</p> ";
+		var versionafter450 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5 || (mscoreMinorVersion == 5 && mscoreUpdateVersion > 0);
+
+		if (!versionafter450) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.5.1 or later.</p> ";
 			dialog.show();
 			return;
 		}
 		
-		version450 = mscoreMajorVersion == 4 && mscoreMinorVersion == 5 && mscoreUpdateVersion == 0;
-		versionafter450 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5 || (mscoreMinorVersion == 5 && mscoreUpdateVersion > 0);
+		//version450 = mscoreMajorVersion == 4 && mscoreMinorVersion == 5 && mscoreUpdateVersion == 0;
 		
 		// **** DECLARATIONS & DEFAULTS **** //
 		var scoreHasTuplets = false;
@@ -739,7 +736,7 @@ MuseScore {
 								} else {
 									if (currTick > currentSlurEnd) {
 										currentSlurNum ++;
-										logError ("Now at slur "+currentSlurNum);
+										//logError ("Now at slur "+currentSlurNum);
 										if (currentSlurNum < numSlurs) {
 											var nextSlur = slurs[currentStaffNum][currentSlurNum];
 											if (currentSlur != null && nextSlur != null) {
@@ -1021,9 +1018,12 @@ MuseScore {
 									if (isTied) {
 										var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
 										if (theArticulationArray != null) {
-											var hasStaccato = false;
-											for (var i = 0; i < theArticulationArray.length; i++) if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
-											if (!hasStaccato) addError("This note has articulation on it, but is tied.\nDid you mean that to be slurred instead?",noteRest);
+											var hasStaccato = false, hasHarmonic = false;
+											for (var i = 0; i < theArticulationArray.length; i++) {
+												if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
+												if (theArticulationArray[i].symbol == kHarmonicCircle) hasHarmonic = true;
+											}
+											if (!hasStaccato && !hasHarmonic) addError("This note has articulation on it, but is tied.\nDid you mean that to be slurred instead?",noteRest);
 										}
 									}
 															
@@ -1252,7 +1252,6 @@ MuseScore {
 		var numErrors = errorStrings.length;
 		
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
-		if (version450) errorMsg = "<p><font size=\"6\">🛑</font>NOTE: MuseScore v. 4.5.0 breaks the ability for plugins to access slurs, hairpins, ottavas, gliss lines and pedal lines, so these were not checked.</p><p>Please update to MuseScore v. 4.5.1 when this is released.</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
 		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
 		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
@@ -1356,7 +1355,7 @@ MuseScore {
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
 			}
-			if (versionafter450 && etype == Element.HAIRPIN_SEGMENT) {
+			if (etype == Element.HAIRPIN_SEGMENT) {
 				// ONLY ADD THE HAIRPIN_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameHairpin = false;
@@ -1371,7 +1370,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
-			if (versionafter450 && etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameOttava = false;
 				if (prevOttavaSegment != null) {
@@ -1384,7 +1383,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
-			if (versionafter450 && etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameGlissando = false;
 				if (prevGlissandoSegment != null) {
@@ -1397,7 +1396,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.SLUR) slurs[staffIdx].push(e);
-			if (versionafter450 && etype == Element.SLUR_SEGMENT) {
+			if (etype == Element.SLUR_SEGMENT) {
 				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameSlur = false;
@@ -1411,7 +1410,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
-			if (versionafter450 && etype == Element.PEDAL_SEGMENT) {
+			if (etype == Element.PEDAL_SEGMENT) {
 				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var samePedal = false;
@@ -3918,7 +3917,7 @@ MuseScore {
 			var isStartOfTie = n.tieForward != null && n.tieBack == null;
 			// *** CHECK REPEATED NOTE UNDER A SLUR — ONLY STRINGS, WINDS OR BRASS *** //
 			if (isStringInstrument || isWindOrBrassInstrument) {
-				logError ("isStartOfSlur "+isStartOfSlur+" prevNote "+(prevNote != null) + " prevSlurNum "+prevSlurNum+" currentSlurNum:"+currentSlurNum+" tieBack"+(noteRest.notes[0].tieBack == null));
+				//logError ("isStartOfSlur "+isStartOfSlur+" prevNote "+(prevNote != null) + " prevSlurNum "+prevSlurNum+" currentSlurNum:"+currentSlurNum+" tieBack"+(noteRest.notes[0].tieBack == null));
 				if (!isStartOfSlur && prevNote != null && prevSlurNum == currentSlurNum && noteRest.notes[0].tieBack == null) {
 					var iterationArticulationArray = [kTenutoAbove,kTenutoBelow,
 						kStaccatissimoAbove, kStaccatissimoAbove+1,
@@ -3933,11 +3932,11 @@ MuseScore {
 						for (var i = 0; i < numNotes && chordMatches; i++) {
 							if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
 						}
-						logError ("chordMatches "+chordMatches);
+						//logError ("chordMatches "+chordMatches);
 						if (chordMatches && noteheadStyle != NoteHeadGroup.HEAD_DIAMOND && prevNoteheadStyle != NoteHeadGroup.HEAD_DIAMOND) {
-							logError ("here1");
+						//	logError ("here1");
 							if (getArticulationArray(noteRest,staffNum) == null) {
-								logError ("here2");
+								//logError ("here2");
 								if (isEndOfSlur && prevWasStartOfSlur) {
 									addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie, or do you need to add articulation?",currentSlur);
 								} else {
@@ -4201,7 +4200,11 @@ MuseScore {
 	function checkRehearsalMark (textObject) {
 		//logError("Found reh mark "+textObject.text);
 		if (getTick(textObject) != barStartTick) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
-				
+		logError ("Checking rehearsal mark");
+		if (currentBarNum < 2) {
+			addError ("Don’t put rehearsal marks at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
+			return;
+		}
 		if (textObject.text !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
 			flaggedRehearsalMarkError = true;
 			addError ("This is not the rehearsal mark I would expect.\nDid you miss rehearsal mark ‘"+expectedRehearsalMark+"’?", textObject);
