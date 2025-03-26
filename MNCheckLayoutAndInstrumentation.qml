@@ -696,6 +696,8 @@ MuseScore {
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
 					while (processingThisBar) {
+						var isNote = false;
+						var isRest = true;
 						var currSeg = cursor.segment;
 						//logError ("Segment type: "+currSeg.segmentType);
 						var currTick = currSeg.tick;
@@ -890,13 +892,20 @@ MuseScore {
 									lastDynamicBar = currentBarNum;
 									//logError("found hairpin, currTick = "+currTick);
 									//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
+									
 								
 									currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
 									var hairpinStartTick = currentHairpin.spannerTick.ticks;
 									var hairpinDur = currentHairpin.spannerTicks.ticks;
-								
 									currentHairpinEnd = hairpinStartTick + hairpinDur;
 									if (hairpinDur > barLength * 0.8) checkHairpinTermination(cursor);
+									
+									// **** Hairpin starting underneath a rest? **** //
+									//logError ("Checking hairpin: currTick = "+currTick+" hairpinStartTick = "+hairpinStartTick+" prevTick = "+prevTick[currentTrack]+" prevNote = "+prevNote);
+									var hairpinStartsOnRest = (currTick == hairpinStartTick && eType == Element.REST);
+									var hairpinStartsAfterRest = currTick >= hairpinStartTick && eType != Element.CHORD && prevTick[currentTrack] <= hairpinStartTick && prevNote == null;
+									//logError ("hairpinStartsOnRest = "+hairpinStartsOnRest+" hairpinStartsAfterRest = "+hairpinStartsAfterRest);
+									if (hairpinStartsOnRest || hairpinStartsAfterRest) addError ("This hairpin appears to start underneath a rest.\nAlways start hairpins under notes.",currentHairpin);
 									
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
@@ -978,8 +987,8 @@ MuseScore {
 								var noteRest = cursor.element;
 								if (firstNoteInThisBar == null) firstNoteInThisBar = noteRest;
 								var isHidden = !noteRest.visible;
-								var isRest = noteRest.type == Element.REST;
-								var isNote = !isRest;
+								isRest = noteRest.type == Element.REST;
+								isNote = !isRest;
 								var displayDur = noteRest.duration.ticks;
 								var soundingDur = noteRest.actualDuration.ticks;
 								var tuplet = noteRest.tuplet;
@@ -1157,7 +1166,12 @@ MuseScore {
 						prevSlurNum = currentSlurNum;
 						prevTick[currentTrack] = currTick;
 					} // end while processingThisBar
-					if (numNoteRestsInThisTrack > 0) numTracksWithNoteRests ++;
+					if (numNoteRestsInThisTrack > 0) {
+						numTracksWithNoteRests ++;
+					} else {
+						prevNote = null;
+						prevNotes[currentTrack] = null;
+					}
 					if (numNotesInThisTrack > 0) numTracksWithNotes ++;
 				} // end track loop
 				
@@ -3269,19 +3283,20 @@ MuseScore {
 		// set multiple dynamics first and return
 		// dynamicLevel — 0 = ppp–p, 1 = mp, 2 = mf, 3 = f, 4 = ff+
 		if (str === 'sf' || str === 'sfz' || str === 'sffz' || str === 'rf' || str === 'rfz') return;
-		if (str.includes('p') && !str.includes('mp')) {
+		var strWords = str.split(' ');
+		if (strWords.includes ('p') || strWords.includes ('pp') || str.includes('ppp') || str.includes('fp') || str.includes('fzp')) {
 			currDynamicLevel = 0;
 			return;
 		}
-		if (str === 'mp' || str.includes('zmp') || str.includes('fmp')) {
+		if (strWords.includes('mp') || str.includes('zmp') || str.includes('fmp')) {
 			currDynamicLevel = 1;
 			return;
 		}
-		if (str === 'mf') {
+		if (strWords.includes('mf')) {
 			currDynamicLevel = 2;
 			return;
 		}
-		if (str.includes('f') && !str.includes('ff')) {
+		if (strWords.includes('f') && !str.includes('ff')) {
 			currDynamicLevel = 3;
 			return;
 		}
