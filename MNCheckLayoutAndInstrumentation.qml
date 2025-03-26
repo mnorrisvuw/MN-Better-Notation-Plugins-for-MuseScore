@@ -84,6 +84,8 @@ MuseScore {
 	property var staffVisible: []
 	property var haveHadPlayingIndication: false
 	property var flaggedSlurredStaccatoBar: -10
+	property var isNote: false
+	property var isRest: false
 	
 	// ** COMMMENTS ** //
 	property var prevCommentPage: null
@@ -696,8 +698,8 @@ MuseScore {
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
 					while (processingThisBar) {
-						var isNote = false;
-						var isRest = true;
+						isNote = false;
+						isRest = false;
 						var currSeg = cursor.segment;
 						//logError ("Segment type: "+currSeg.segmentType);
 						var currTick = currSeg.tick;
@@ -965,20 +967,7 @@ MuseScore {
 								checkTextObject (t);
 							} */
 							
-							// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
-							if (annotations && annotations.length) {
-								for (var aIndex in annotations) {
-									var theAnnotation = annotations[aIndex];
-									if (theAnnotation.track == currentTrack) {
-										var aType = theAnnotation.type;
-										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
-										//logError ("Found annotation: "+theAnnotation.name);					
-										// **** FOUND A TEXT OBJECT **** //
-										if (theAnnotation.text) checkTextObject(theAnnotation);
-									}
-								}
-							}
-						
+											
 							// ************ FOUND A CHORD OR REST ************ //
 							if (eType == Element.CHORD || eType == Element.REST) {
 							
@@ -1143,6 +1132,20 @@ MuseScore {
 								prevSoundingDur = soundingDur;
 							
 							} // end if eType == Element.Chord || .Rest
+							
+							// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
+							if (annotations && annotations.length) {
+								for (var aIndex in annotations) {
+									var theAnnotation = annotations[aIndex];
+									if (theAnnotation.track == currentTrack) {
+										var aType = theAnnotation.type;
+										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
+										//logError ("Found annotation: "+theAnnotation.name);					
+										// **** FOUND A TEXT OBJECT **** //
+										if (theAnnotation.text) checkTextObject(theAnnotation);
+									}
+								}
+							}
 						}
 						
 						if (tempoChangeMarkingEnd != -1 && currTick > tempoChangeMarkingEnd + division * 2) {
@@ -1368,7 +1371,7 @@ MuseScore {
 			
 			if (etype == Element.HAIRPIN) {
 				hairpins[staffIdx].push(e);
-				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
+				if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 			}
 			if (etype == Element.HAIRPIN_SEGMENT) {
 				// ONLY ADD THE HAIRPIN_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
@@ -1379,9 +1382,11 @@ MuseScore {
 					if (sameLoc) sameHairpin = !e.parent.is(prevHairpinSegment.parent);
 				}
 				// only add it if it's not already added
-				if (!sameHairpin) hairpins[staffIdx].push(e);
+				if (!sameHairpin) {
+					hairpins[staffIdx].push(e);
+					if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
+				}
 				prevHairpinSegment = e;
-				if (e.subtypeName().includes(" line")) addError ("It’s recommended to use hairpins\ninstead of ‘cresc.’, ‘dim.’ etc.",e);
 			}
 			
 			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
@@ -2277,6 +2282,15 @@ MuseScore {
 	
 	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText) {
 		var isBracketed = lowerCaseText.substring(0,1) === "(";
+		
+		if (isRest) {
+			for (var i = 0; i < techniques.length; i ++) {
+				if (lowerCaseText.includes(techniques[i])) {
+					addError("Avoid putting techniques over rests if possible.\(See ‘Behind Bars’, p. 492).",textObject);
+					continue;
+				}
+			}
+		}
 		
 		if (isWindOrBrassInstrument) {
 			if (lowerCaseText.includes("tutti")) {
@@ -3895,7 +3909,6 @@ MuseScore {
 	function checkSlurIssues (noteRest, staffNum, currentSlur) {
 		//logError("Slur off1 "+currentSlur.slurUoff1+" off2 "+currentSlur.slurUoff2+" off3 "+currentSlur.slurUoff3+" off4 "+currentSlur.slurUoff4);
 		var currTick = noteRest.parent.tick;
-		var isRest = noteRest.type == Element.REST;
 		var accentsArray = [ kAccentAbove,	kAccentAbove+1,
 			kAccentStaccatoAbove,	kAccentStaccatoAbove+1,
 			kMarcatoAbove,	kMarcatoAbove+1,
