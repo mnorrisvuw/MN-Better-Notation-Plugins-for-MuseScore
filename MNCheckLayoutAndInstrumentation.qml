@@ -155,6 +155,7 @@ MuseScore {
 	property var isStringSection: false
 	property var isFlute: false
 	property var isHorn: false
+	property var isTrombone: false
 	property var isHarp: false
 	property var isCello: false
 	property var isPitchedPercussionInstrument: false
@@ -1861,6 +1862,7 @@ MuseScore {
 			isBrassInstrument = currentInstrumentId.includes("brass.");
 			isWindOrBrassInstrument = isWindInstrument || isBrassInstrument;
 			isHorn = currentInstrumentCalcId === "brass.french-horn";
+			isTrombone = currentInstrumentCalcId === "brass.trombone.tenor";
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
 			isCello = currentInstrumentId.includes("cello");
@@ -2313,14 +2315,16 @@ MuseScore {
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
 		//logError (currentHairpin.hairpinType+" "+currentBarNum+ " "+numBars);
-		if (currentHairpin.hairpinType %2 == 1) {
-			// allow a terminating decrescendo to a rest or on the last bar
-			if (currentBarNum == numBars) return;
-			for (var i=0;i<dynamics[currentStaffNum].length;i++) {
-				var theTick = dynamics[currentStaffNum][i];
-				if (theTick >= currentHairpinEnd && theTick <= currentHairpinEnd  + beatLength) return;
-			}
+		
+		// allow a terminating decrescendo to a rest or on the last bar
+		if (currentHairpin.hairpinType %2 == 1 && currentBarNum == numBars) return;
+
+		for (var i=0;i<dynamics[currentStaffNum].length;i++) {
+			var theTick = dynamics[currentStaffNum][i];
+		//	if (theTick > (currentHairpinEnd - division * 4) && theTick < (currentHairpinEnd + division * 4)) logError ("Found a dynamic at "+theTick+"; needs to be between "+currentHairpinEnd+" and "+hairpinZoneEndTick);
+			if (theTick >= currentHairpinEnd && theTick <= hairpinZoneEndTick) return;
 		}
+		
 		// check not rests
 		while (cursor2 != null && cursor2.tick < theTick) cursor2.next();
 		if (cursor2 == null) return;
@@ -4407,8 +4411,9 @@ MuseScore {
 		var numStrokes = strokesArray.indexOf(tremSubdiv);
 		var dur = 2 * parseFloat(noteRest.duration.ticks) / division;
 		//logError(" TREMOLO HAS "+numStrokes+" strokes); dur is "+dur;
-		if (isStringInstrument && !isSlurred) {
-			addError("Fingered tremolos for strings should always be slurred.",noteRest);
+		if (!isSlurred) {
+			if (isStringInstrument) addError("Fingered tremolos for strings should always be slurred.",noteRest);
+			if (isWindOrBrassInstrument) addError("Two-note tremolos for winds or brass should always be slurred.",noteRest);
 			return;
 		}
 		if (isPitchedPercussionInstrument) {
@@ -4437,7 +4442,31 @@ MuseScore {
 	
 	function checkGliss (noteRest, gliss) {
 		if (gliss == null || gliss == undefined) logError("checkGliss() — gliss is "+gliss);
-		if (gliss.glissType == Glissando.WAVY && isStringInstrument) addError ("Strings generally don’t read wavy glissando lines.\nIn Properties→Glissando, change to ‘Straight’.",gliss);
+		if (gliss.glissType == Glissando.WAVY) {
+			if (isStringInstrument) addError ("Strings generally don’t read wavy glissando lines.\nIn Properties→Glissando, change to ‘Straight’.",gliss);
+			if (isTrombone) addError ("Trombones can’t perform wavy glissandi.\nIn Properties→Glissando, change to ‘Straight’.",gliss);
+		}
+		if (gliss.glissType == Glissando.STRAIGHT) {
+			var nextNoteRest = getNextNoteRest(noteRest);
+			if (nextNoteRest != null) {
+				if (nextNoteRest.type == Element.CHORD) {
+					var p1 = noteRest.notes[0].pitch;
+					var p2 = nextNoteRest.notes[0].pitch;
+					var interval = Math.abs (p2 - p1);
+					if (isWindInstrument) {
+						if (interval > 4) addError ("This gliss. may be too wide to perform smoothly\nand may be better notated as a wavy gliss.\nCheck with a performer", gliss);
+					}
+					if (isTrombone) {
+						if (interval > 6 && interval < 12) addError ("This gliss. is too wide to be a slide gliss\nand too narrow to be a rip.\nPerhaps reconsider or check with a performer.", gliss);
+						if (p1 < 54 && p2 < 54) {
+							var h1 = Math.floor((p1 - 40) / 6);
+							var h2 = Math.floor((p2 - 40) / 6);
+							if (h1 != h2) addError ("This gliss. is not possible on the tenor trombone.\nYou might want to reconsider");
+						}
+					}
+				}
+			}
+		}
 		//logError("CHECKING GLISS — "+gliss.glissShowText+" | "+gliss.glissText+" | "+gliss.glissType+" | "+gliss.glissandoStyle);
 		//if (gliss.glissShowText) {
 			//addError("Including the word ‘gliss.’ in glissandi is  — switch it off in Properties",gliss);

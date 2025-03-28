@@ -213,6 +213,8 @@ MuseScore {
 		var restCrossesBeat, restStartedOnBeat, isLastRest;
 		var lastNoteInBar, lastRest, prevNoteRest;
 		var totalDur, numComments;
+		var firstNoteInTuplet, prevTuplet;
+		
 		for (var i = 0; i<numStaves; i++) twoNoteTremolos[i] = [];
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -243,6 +245,8 @@ MuseScore {
 			setInstrumentVariables(thePart);
 			wasTied = false;
 			prevNoteRest = null;
+			firstNoteInTuplet = false;
+			prevTuplet = null;
 			
 			// ** REWIND TO START OF SELECTION ** //
 			cursor.filter = Segment.All;
@@ -541,7 +545,18 @@ MuseScore {
 								}
 							}
 							
-							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 9: CHECK TUPLET SETTINGS				** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (noteRest.tuplet == null) {
+								firstNoteInTuplet = null;
+							} else {
+								if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
+									firstNoteInTuplet = true;
+									checkTupletSettings (noteRest.tuplet);
+									prevTuplet = noteRest.tuplet;
+								}
+							}
 							
 							// *** GO TO NEXT SEGMENT *** //
 							if (cursor.next()) {
@@ -954,6 +969,26 @@ MuseScore {
 		if (isCompound && noteStartFrac == quaver && displayDur == crotchet) {
 			addError ("It is recommend to spell offbeat crotchet rests in\ncompound time as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
 			return;
+		}
+	}
+	
+	function checkTupletSettings (tuplet) {
+		var normalSettings = [0,0,3,2,6,4,4,4,12,8,8,8,8,8,8,8,8];
+		var a = tuplet.actualNotes;
+		// check ratio is on
+		if (tuplet.numberType == 0 && a < normalSettings.length) {
+			var normalRatio = normalSettings[tuplet.actualNotes];
+			if (tuplet.normalNotes != normalRatio) addError ("This tuplet is non-standard, and should therefore show the ratio.\nIn Properties, switch Number to ‘Ratio’", tuplet);
+		}
+		var l = tuplet.elements.length;
+		var nn = 0;
+		for (var i = 0; i < l; i++) nn += tuplet.elements[i].type == Element.CHORD || tuplet.elements[i].type == Element.REST;
+		if (nn >= a * 2) {
+			if (nn == 6 && a == 3) {
+				addError ("This triplet should be a sextuplet", tuplet);
+			} else {
+				addError ("This tuplet is meant to have "+a+" notes/rests,\nbut instead contains "+nn+".\nConsider rewriting the tuplet",tuplet);
+			}
 		}
 	}
 	
