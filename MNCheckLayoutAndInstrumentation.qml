@@ -69,6 +69,7 @@ MuseScore {
 	property var barStartTick: 0
 	property var barEndTick: 0
 	property var currTick: 0
+	property var numBars: 0
 		
 	// ** FLAGS ** //
 	property var flaggedWeKnowWhosPlaying: false
@@ -129,6 +130,7 @@ MuseScore {
 	property var prevTimeSig: ""
 	property var prevClefId: null
 	property var prevDynamic: ""
+	property var prevDynamicObject: null
 	property var prevDynamicBarNum: 0
 	property var prevIsMultipleStop: false
 	property var prevSoundingDur: 0
@@ -444,7 +446,7 @@ MuseScore {
 		
 		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
 		var currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
-		var firstBarNum, firstSegmentInScore, numBars;
+		var firstBarNum, firstSegmentInScore;
 		var prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var includesTransposingInstruments = false;
 		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, previousSlurEnd;
@@ -494,6 +496,7 @@ MuseScore {
 			prevKeySigBarNum = 0;
 			prevBarNum = 0;
 			prevDynamic = "";
+			prevDynamicObject = null;
 			prevDynamicBarNum = 0;
 			prevClefId = null;
 			prevMultipleStop = null;
@@ -888,7 +891,7 @@ MuseScore {
 											nextHairpin = hairpins[currentStaffNum][currentHairpinNum];
 											nextHairpinStart = nextHairpin.spannerTick.ticks;
 											readyToGoToNextHairpin = true;
-											logError("nextHairpin num = "+currentHairpinNum+" "+nextHairpin.hairpinType);
+											//logError("nextHairpin num = "+currentHairpinNum+" "+nextHairpin.hairpinType);
 										}
 									}
 								}
@@ -2309,9 +2312,14 @@ MuseScore {
 		
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
-		for (var i=0;i<dynamics[currentStaffNum].length;i++) {
-			var theTick = dynamics[currentStaffNum][i];
-			if (theTick >= currentHairpinEnd && theTick <= currentHairpinEnd  + beatLength) return;
+		//logError (currentHairpin.hairpinType+" "+currentBarNum+ " "+numBars);
+		if (currentHairpin.hairpinType %2 == 1) {
+			// allow a terminating decrescendo to a rest or on the last bar
+			if (currentBarNum == numBars) return;
+			for (var i=0;i<dynamics[currentStaffNum].length;i++) {
+				var theTick = dynamics[currentStaffNum][i];
+				if (theTick >= currentHairpinEnd && theTick <= currentHairpinEnd  + beatLength) return;
+			}
 		}
 		// check not rests
 		while (cursor2 != null && cursor2.tick < theTick) cursor2.next();
@@ -2955,8 +2963,13 @@ MuseScore {
 								}
 								//logError ("Found a tempo marking: non bold text is "+nonBoldText);
 								if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
-								lastTempoMarking = textObject;
-								lastTempoMarkingBar = currentBarNum;
+								
+								// does this require a metronome mark?
+								var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo 1o","tempo 1°","mouvt","au mouvt","au mouvement"];
+								if (!tempoMarkingToIgnoreArray.includes(lowerCaseText)) {
+									lastTempoMarking = textObject;
+									lastTempoMarkingBar = currentBarNum;
+								}
 							}
 						}
 					}
@@ -3206,7 +3219,12 @@ MuseScore {
 						if (prevDynamicBarNum > 0) {
 							var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
 							if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
-								addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicBarNum+".",textObject);
+								// check if visual overlapping
+								if (textObject.bbox == prevDynamicObject.bbox) {
+									addError ("There appear to be two dynamic markings overlapped here.\nYou can safely delete one of them.",textObject);
+								} else {
+									addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicBarNum+".",textObject);
+								}
 								isError = true;
 							}
 						}
@@ -3214,6 +3232,7 @@ MuseScore {
 						if (!dynamicException) {
 							prevDynamicBarNum = currentBarNum;
 							prevDynamic = plainText;
+							prevDynamicObject = textObject;
 						} else {
 							if (plainText === "fmp" || plainText === "sfmp" || plainText === "sfzmp" || plainText === "sffzmp" || plainText === "sfffzmp") {
 								prevDynamicBarNum = currentBarNum;
@@ -3984,7 +4003,9 @@ MuseScore {
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur) {
-			var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
+			if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged vertically away from its correct position.",currentSlur);
+			if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged horizontally away from its correct position.",currentSlur);
+		//	var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.posX,currentSlur.posY,currentSlur.pagePos.x,currentSlur.pagePos.y,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
 			//logError (t);
 			if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
 		}
@@ -4288,10 +4309,7 @@ MuseScore {
 		//logError("Found reh mark "+textObject.text);
 		if (getTick(textObject) != barStartTick) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
 		//logError ("Checking rehearsal mark");
-		if (currentBarNum < 2) {
-			addError ("Don’t put a rehearsal mark at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
-			return;
-		}
+		if (currentBarNum < 2) addError ("Don’t put a rehearsal mark at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
 		if (textObject.text !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
 			flaggedRehearsalMarkError = true;
 			addError ("This is not the rehearsal mark I would expect.\nDid you miss rehearsal mark ‘"+expectedRehearsalMark+"’?", textObject);
@@ -4343,6 +4361,7 @@ MuseScore {
 	
 	function checkOneNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) logError("checkOneNoteTremolo() — tremolo is "+tremolo);
+		lastArticulationTick = currTick;
 		var tremDescription = tremolo.subtypeName();
 		var tremSubdiv;
 		if (tremDescription.includes("eighth")) {
@@ -4381,6 +4400,7 @@ MuseScore {
 	
 	function checkTwoNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) logError("checkTwoNoteTremolo() — tremolo is "+tremolo);
+		lastArticulationTick = currTick;
 		var tremDescription = tremolo.subtypeName();
 		var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
 		var strokesArray = [0,8,16,32,64];
