@@ -690,7 +690,9 @@ MuseScore {
 		} else {
 			var theTuplet = noteRest.tuplet;
 			// if it's already part of a tuplet then don't flag it
-			if (theTuplet.is(lastCheckedTuplet)) {
+			var isInTuplet = false;
+			if (theTuplet != null) isInTuplet = theTuplet.is(lastCheckedTuplet);
+			if (isInTuplet) {
 				hidingBeatError = false;
 			} else {
 				lastCheckedTuplet = theTuplet;
@@ -1209,7 +1211,8 @@ MuseScore {
 				var tempNextItemIsNote = (tempNextItem == null) ? false : tempNextItem.type == Element.CHORD;
 				tiedActualDur += tempActualDur;
 				tiedDisplayDur += tempDisplayDur;
-				var checkDisplayDur = (tiedDisplayDur != tiedActualDur) && startTuplet.is(tempTuplet);
+				var checkDisplayDur = false;
+				if (startTuplet != null) checkDisplayDur = (tiedDisplayDur != tiedActualDur) && startTuplet.is(tempTuplet);
 				//logError ("tiedDisplayDur "+tiedDisplayDur+" tiedActualDur "+tiedActualDur+" startTuple")
 				var canBeSimplified, simplification;
 				
