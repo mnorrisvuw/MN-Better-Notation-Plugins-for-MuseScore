@@ -68,6 +68,7 @@ MuseScore {
 	property var virtualBeatLength: 0
 	property var barStartTick: 0
 	property var barEndTick: 0
+	property var currTick: 0
 		
 	// ** FLAGS ** //
 	property var flaggedWeKnowWhosPlaying: false
@@ -119,8 +120,8 @@ MuseScore {
 	property var lastTempoChangeMarking: null
 	property var lastTempoMarking: null
 	property var lastTempoMarkingBar: -1
-	property var lastArticulationBar: -1
-	property var lastDynamicBar: -1
+	property var lastArticulationTick: -1
+	property var lastDynamicTick: -1
 	property var lastMetronomeMarkingBar: -1
 	property var numConsecutiveMusicBars: 0
 	property var currentStaffNum: 0
@@ -449,7 +450,7 @@ MuseScore {
 		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, previousSlurEnd;
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
-		var currentHairpinNum, numHairpins, nextHairpinStart;
+		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin, expressiveSwell;
 		var numSystems, currentSystem, currentSystemNum, numNoteRestsInThisSystem, numBeatsInThisSystem, noteCountInSystem, beatCountInSystem;
 		var maxNoteCountPerSystem, minNoteCountPerSystem, maxBeatsPerSystem, minBeatsPerSystem, actualStaffSize;
 		var isSharedStaff;
@@ -514,8 +515,8 @@ MuseScore {
 			lastTempoMarking = null;
 			lastTempoMarkingBar = -1;
 			lastMetronomeMarkingBar = -1;
-			lastArticulationBar = -1;
-			lastDynamicBar = -1;
+			lastArticulationTick = -1;
+			lastDynamicTick = -1;
 			numConsecutiveMusicBars = 0;
 			lastDynamicFlagBar = -1;
 			
@@ -566,7 +567,9 @@ MuseScore {
 			currentHairpinNum = 0;
 			currentHairpinEnd = 0;
 			numHairpins = hairpins[currentStaffNum].length;
-			nextHairpinStart = (numHairpins == 0) ? 0 : hairpins[currentStaffNum][0].spannerTick.ticks;
+			nextHairpin = (numHairpins == 0) ? null : hairpins[currentStaffNum][0];
+			nextHairpinStart = (numHairpins == 0) ? 0 : nextHairpin.spannerTick.ticks;
+			expressiveSwell = false;
 			
 			// ** ottavas
 			currentOttava = null;
@@ -702,7 +705,7 @@ MuseScore {
 						isRest = false;
 						var currSeg = cursor.segment;
 						//logError ("Segment type: "+currSeg.segmentType);
-						var currTick = currSeg.tick;
+						currTick = currSeg.tick;
 						
 						// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
 						if (tempoText.length > 0) {
@@ -722,15 +725,18 @@ MuseScore {
 						}
 						
 						if (currTick != barEndTick) {
+							
 							tickHasDynamic = false;
-							
 							if (isMelisma[currentTrack] && melismaEndTick[currentTrack] > 0) isMelisma[currentTrack] = currTick < melismaEndTick[currentTrack];
-							
 							var annotations = currSeg.annotations;
 							var elem = cursor.element;
 							var eType = elem.type;
 							var eName = elem.name;
 							var sType = currSeg.segmentType;
+							
+							// ************ CHECK IF IT'S A NOTE OR REST FIRST ************ //
+							isNote = eType == Element.CHORD;
+							isRest = eType == Element.REST;
 						
 							// ************ UNDER A SLUR? ************ //
 							var readyToGoToNextSlur = false;
@@ -759,7 +765,7 @@ MuseScore {
 							if (readyToGoToNextSlur) {
 								if (currTick >= nextSlurStart) {
 									isSlurred = true;
-									lastArticulationBar = currentBarNum;
+									lastArticulationTick = currTick;
 									//logError("Slur started: isSlurred = true");
 									currentSlur = slurs[currentStaffNum][currentSlurNum];
 									var currentSlurStart = nextSlurStart;
@@ -871,7 +877,7 @@ MuseScore {
 									readyToGoToNextHairpin = true;
 								} else {
 									
-									lastDynamicBar = currentBarNum;
+									lastDynamicTick = currTick;
 									if (currTick >= currentHairpinEnd) {
 										//logError("Hairpin ended because currTick = "+currTick+" & currentHairpinEnd = "+currentHairpinEnd);
 										// was this hairpin long enough to require ending?
@@ -879,9 +885,10 @@ MuseScore {
 										isHairpin = false;
 										currentHairpinNum ++;
 										if (currentHairpinNum < numHairpins) {
-											nextHairpinStart = hairpins[currentStaffNum][currentHairpinNum].spannerTick.ticks;
+											nextHairpin = hairpins[currentStaffNum][currentHairpinNum];
+											nextHairpinStart = nextHairpin.spannerTick.ticks;
 											readyToGoToNextHairpin = true;
-											//logError("nextHairpinStart = "+nextHairpinStart);
+											logError("nextHairpin num = "+currentHairpinNum+" "+nextHairpin.hairpinType);
 										}
 									}
 								}
@@ -891,7 +898,7 @@ MuseScore {
 							
 								if (currTick >= nextHairpinStart) {
 									isHairpin = true;
-									lastDynamicBar = currentBarNum;
+									lastDynamicTick = currTick;
 									//logError("found hairpin, currTick = "+currTick);
 									//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
 									
@@ -900,7 +907,33 @@ MuseScore {
 									var hairpinStartTick = currentHairpin.spannerTick.ticks;
 									var hairpinDur = currentHairpin.spannerTicks.ticks;
 									currentHairpinEnd = hairpinStartTick + hairpinDur;
-									if (hairpinDur > barLength * 0.8) checkHairpinTermination(cursor);
+									if (currentHairpinNum == hairpins[currentStaffNum].length - 1){
+										nextHairpin = null;
+										nextHairpinStart = -1;
+									} else {
+										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
+										nextHairpinStart = nextHairpin.spannerTick.ticks;
+									}
+									if (hairpinDur > barLength * 0.8) {
+										if (expressiveSwell) {
+											expressiveSwell = false;
+										} else {
+											// even numbered hairpin types are cresc; odd-numbere are decresc
+											//logError ("hairpinDur = "+hairpinDur+" hairpinType = "+currentHairpin.hairpinType);
+											if (hairpinDur <= barLength && (currentHairpin.hairpinType %2 == 0)) {
+												if (nextHairpin != null) {	
+													//logError ("nextHairpinStart = "+nextHairpinStart+" end = "+(currentHairpinEnd + barLength)+" hairpinType = "+nextHairpin.hairpinType);
+													if (nextHairpinStart < currentHairpinEnd + barLength && (nextHairpin.hairpinType %2 == 1)) {
+														expressiveSwell = true;
+													//logError ("expressiveSwell = true");
+													}
+												}
+											}
+											// check hairpin termination if it's not just a little expressive swell 
+
+											if (!expressiveSwell) checkHairpinTermination(cursor);
+										}
+									}
 									
 									// **** Hairpin starting underneath a rest? **** //
 									//logError ("Checking hairpin: currTick = "+currTick+" hairpinStartTick = "+hairpinStartTick+" prevTick = "+prevTick[currentTrack]+" prevNote = "+prevNote);
@@ -911,9 +944,11 @@ MuseScore {
 									
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
-										nextHairpinStart = hairpins[currentStaffNum][currentHairpinNum+1].spannerTick.ticks;
+										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
+										nextHairpinStart = nextHairpin.spannerTick.ticks;
 										//logError("Next slur starts at "+nextHairpinStart);
 									} else {
+										nextHairpin = null;
 										nextHairpinStart = 0;
 										//logError("This is the last slur in this staff ");
 									}
@@ -967,17 +1002,28 @@ MuseScore {
 								checkTextObject (t);
 							} */
 							
+							// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
+							if (annotations && annotations.length) {
+								for (var aIndex in annotations) {
+									var theAnnotation = annotations[aIndex];
+									if (theAnnotation.track == currentTrack) {
+										var aType = theAnnotation.type;
+										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
+										//logError ("Found annotation: "+theAnnotation.name);					
+										// **** FOUND A TEXT OBJECT **** //
+										if (theAnnotation.text) checkTextObject(theAnnotation);
+									}
+								}
+							}
+							
 											
 							// ************ FOUND A CHORD OR REST ************ //
-							if (eType == Element.CHORD || eType == Element.REST) {
-							
+							if (isNote || isRest) {
 								numNoteRestsInThisTrack ++;
 								numNoteRestsInThisSystem ++;
-								var noteRest = cursor.element;
+								var noteRest = elem;
 								if (firstNoteInThisBar == null) firstNoteInThisBar = noteRest;
 								var isHidden = !noteRest.visible;
-								isRest = noteRest.type == Element.REST;
-								isNote = !isRest;
 								var displayDur = noteRest.duration.ticks;
 								var soundingDur = noteRest.actualDuration.ticks;
 								var tuplet = noteRest.tuplet;
@@ -991,9 +1037,9 @@ MuseScore {
 								
 								// ************ CHECK DYNAMICS ********** //
 
-								if (lastDynamicBar < currentBarNum - 8 && numConsecutiveMusicBars >= 8 && isNote) {
-									lastDynamicBar = currentBarNum + 1;
-									addError("This passage has had no dynamic markings for the last 8 bars\nConsider adding more dynamic detail to this passage.",noteRest);
+								if (lastDynamicTick < currTick - division * 32 && numConsecutiveMusicBars >= 8 && isNote) {
+									lastDynamicTick = currTick + 1;
+									addError("This passage has had no dynamic markings for the last while\nConsider adding more dynamic detail to this passage.",noteRest);
 								}
 							
 								// ************ CHECK DYNAMICS UNDER RESTS ********** //
@@ -1042,15 +1088,15 @@ MuseScore {
 									var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
 								
 									if (theArticulationArray) {
-										lastArticulationBar = currentBarNum;
+										lastArticulationTick = currTick;
 										for (var i = 0; i < theArticulationArray.length; i++) {
 											if (staccatoArray.includes(theArticulationArray[i].symbol)) checkStaccatoIssues (noteRest);
 										}
 									} else {
-										if (lastArticulationBar < currentBarNum - 8 && numConsecutiveMusicBars >= 8) {
+										if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
 											if (isStringInstrument || isWindOrBrassInstrument) {
-												lastArticulationBar = currentBarNum + 1;
-												addError("This passage has had no articulation for the last 8 bars\nConsider adding more detail to this passage",noteRest);
+												lastArticulationTick = currTick + 1;
+												addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage",noteRest);
 											}
 										}
 									}
@@ -1061,18 +1107,6 @@ MuseScore {
 									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
 									if (isChord) checkChordNotesTied(noteRest);
 								
-									if (isFirstNote) {
-										isFirstNote = false;
-									
-										// ************ CHECK IF INITIAL DYNAMIC SET ************ //
-										if (!firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.",noteRest);
-									
-									} else {
-									
-										// ************ CHECK DYNAMIC RESTATEMENT ************ //
-										if (barsSincePrevNote > 4 && !tickHasDynamic && !isGrandStaff[currentStaffNum] ) addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
-									
-									}
 								
 									// ************ CHECK OTTAVA ************ //
 									if (isOttava) checkOttava(noteRest,currentOttava);
@@ -1133,17 +1167,18 @@ MuseScore {
 							
 							} // end if eType == Element.Chord || .Rest
 							
-							// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
-							if (annotations && annotations.length) {
-								for (var aIndex in annotations) {
-									var theAnnotation = annotations[aIndex];
-									if (theAnnotation.track == currentTrack) {
-										var aType = theAnnotation.type;
-										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
-										//logError ("Found annotation: "+theAnnotation.name);					
-										// **** FOUND A TEXT OBJECT **** //
-										if (theAnnotation.text) checkTextObject(theAnnotation);
-									}
+							if (isNote) {
+								if (isFirstNote) {
+									isFirstNote = false;
+								
+									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
+									if (!firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.",noteRest);
+								
+								} else {
+								
+									// ************ CHECK DYNAMIC RESTATEMENT ************ //
+									if (barsSincePrevNote > 4 && !tickHasDynamic && !isGrandStaff[currentStaffNum] ) addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
+								
 								}
 							}
 						}
@@ -1161,8 +1196,9 @@ MuseScore {
 						}
 						if (isNote) {
 							prevNote = noteRest;
-							prevNotes[currentTrack] = prevNote;
-						} else {
+							prevNotes[currentTrack] = noteRest;
+						}
+						if (isRest) {
 							prevNote = null;
 							prevNotes[currentTrack] = null;
 						}
@@ -1368,8 +1404,12 @@ MuseScore {
 			
 			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
 			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
-			
+			/*if (etype == Element.REHEARSAL_MARK) {
+				logError ("Checking rehearsal mark at start"); 
+				checkRehearsalMark(e);
+			}*/
 			if (etype == Element.HAIRPIN) {
+				//logError ("Pushing hairpin "+hairpins[staffIdx].length+": "+e.hairpinType);
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 			}
@@ -1383,6 +1423,8 @@ MuseScore {
 				}
 				// only add it if it's not already added
 				if (!sameHairpin) {
+					
+					//logError ("Pushing hairpin segment "+e.hairpinType);
 					hairpins[staffIdx].push(e);
 					if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 				}
@@ -2286,7 +2328,7 @@ MuseScore {
 		if (isRest) {
 			for (var i = 0; i < techniques.length; i ++) {
 				if (lowerCaseText.includes(techniques[i])) {
-					addError("Avoid putting techniques over rests if possible.\(See ‘Behind Bars’, p. 492).",textObject);
+					addError("Avoid putting techniques over rests if possible, though\nthis may sometimes be needed to save space.\n(See ‘Behind Bars’, p. 492).",textObject);
 					continue;
 				}
 			}
@@ -2681,20 +2723,23 @@ MuseScore {
 		}
 		if (quietRegisterThresholdPitch != 0) {
 			if (lowestPitch <= quietRegisterThresholdPitch && currDynamicLevel > 3 && lastDynamicFlagBar < currentBarNum - 4) {
+				//logError ("quietRegisterPitch = "+quietRegisterThresholdPitch+" currDynamicLevel = "+currDynamicLevel);
 				lastDynamicFlagBar = currentBarNum;
 				addError ('This note is quite low and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
 			}
 		}
 		if (highLoudRegisterThresholdPitch != 0) {
-			if (highestPitch >= highLoudRegisterThresholdPitch && currDynamicLevel < 3 && lastDynamicFlagBar < currentBarNum - 4) {
+			if (highestPitch >= highLoudRegisterThresholdPitch && currDynamicLevel < 2 && lastDynamicFlagBar < currentBarNum - 4) {
 				lastDynamicFlagBar = currentBarNum;
 				addError ('This note is quite high and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
 			}
 		}
 		if (lowLoudRegisterThresholdPitch != 0) {
-			if (lowestPitch <= lowLoudRegisterThresholdPitch && currDynamicLevel < 3 && lastDynamicFlagBar < currentBarNum - 4) {
+			if (lowestPitch <= lowLoudRegisterThresholdPitch && currDynamicLevel < 2 && lastDynamicFlagBar < currentBarNum - 4) {
+				//logError ("lowLoudRegisterThresholdPitch = "+lowLoudRegisterThresholdPitch+" currDynamicLevel = "+currDynamicLevel);
+
 				lastDynamicFlagBar = currentBarNum;
 				addError ('This note is quite low and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
@@ -2773,6 +2818,7 @@ MuseScore {
 		}
 		
 		if (eType == Element.REHEARSAL_MARK) {
+			//logError ("Checking rehearsal mark from annotations");
 			checkRehearsalMark (textObject);
 			return;
 		}
@@ -3152,7 +3198,7 @@ MuseScore {
 						firstDynamic = true;
 						tickHasDynamic = true;
 						theDynamic = textObject;
-						lastDynamicBar = currentBarNum;
+						lastDynamicTick = currTick;
 						setDynamicLevel (plainText);
 						
 						var isError = false;
@@ -3415,11 +3461,19 @@ MuseScore {
 			if (noteRest.notes.length > 0) {
 				var pitch = noteRest.notes[0].pitch;
 				var prevPitch = 0, nextPitch = 0;
-				if (prev != null) if (prev.notes.length > 0) prevPitch = prev.notes[0].pitch;
-				if (next != null) if (next.notes.length > 0) nextPitch = next.notes[0].pitch;
+				if (prev != null) {
+					if (prev.notes != null) {
+						if (prev.notes.length > 0) prevPitch = prev.notes[0].pitch;
+					}
+				}
+				if (next != null) {
+					if (next.notes != null) {
+						if (next.notes.length > 0) nextPitch = next.notes[0].pitch;
+					}
+				}
 				var portatoOK = (pitch == prevPitch || pitch == nextPitch);
 				if (!portatoOK) {
-					addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them?",noteRest);
+					addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
 					flaggedSlurredStaccatoBar = currentBarNum;
 				}
 			}
@@ -3455,27 +3509,27 @@ MuseScore {
 			}
 		}
 		if (maxNumLedgerLines > 3 && minNumLedgerLines > 0) {
-			if (isBassClef && (readsTenor || readsTreble) && flaggedInstrumentRange != 3) {
+			if (isBassClef && readsBass && (readsTenor || readsTreble) && flaggedInstrumentRange != 3) {
 				addError("This passage is very high for bass clef;\nit may be better in tenor or treble clef",noteRest);
 				flaggedInstrumentRange = 3;
 			}
-			if (isTenorClef && readsTreble && flaggedInstrumentRange != 4) {
+			if (isTenorClef && readsTenor && readsTreble && flaggedInstrumentRange != 4) {
 				addError("This passage is very high for tenor clef;\nit may be better in treble clef",noteRest);
 				flaggedInstrumentRange = 4;
 			}
-			if (isAltoClef && readsTreble && flaggedInstrumentRange != 21) {
+			if (isAltoClef && readsAlto && readsTreble && flaggedInstrumentRange != 21) {
 				addError("This passage is very high for alto clef;\nit may be better in treble clef",noteRest);
 				flaggedInstrumentRange = 21;
 			}
 		}
 		if (maxNumLedgerLines > 5 && minNumLedgerLines > 2) {
-			if (isTrebleClef && reads8va && !isOttava && flaggedInstrumentRange != 5) {
+			if (isTrebleClef && readsTreble && reads8va && !isOttava && flaggedInstrumentRange != 5) {
 				addError("This passage is very high for treble clef;\nit may be better with an 8va symbol",noteRest);
 				flaggedInstrumentRange = 5;
 			}
 		}
 		if (maxNumLedgerLines < 0 && minNumLedgerLines <= 0) {
-			if (isTrebleClef) {
+			if (isTrebleClef && readsTreble) {
 				if (readsTenor && flaggedInstrumentRange != 6) {
 					addError("This passage is very low for treble clef;\nit may be better in tenor or bass clef",noteRest);
 					flaggedInstrumentRange = 6;
@@ -3491,11 +3545,11 @@ MuseScore {
 					}
 				}
 			}
-			if (isTenorClef && readsBass && maxNumLedgerLines < 0 && minNumLedgerLines <= 0 && flaggedInstrumentRange != 9) {
+			if (isTenorClef && readsTenor && readsBass && maxNumLedgerLines < 0 && minNumLedgerLines <= 0 && flaggedInstrumentRange != 9) {
 				addError("This passage is very low for tenor clef;\nit may be better in bass clef",noteRest);
 				flaggedInstrumentRange = 9;
 			}
-			if (isBassClef && reads8va && !isOttava && maxNumLedgerLines < -3 && minNumLedgerLines < -2 && flaggedInstrumentRange != 10) {
+			if (isBassClef && readsBass && reads8va && !isOttava && maxNumLedgerLines < -3 && minNumLedgerLines < -2 && flaggedInstrumentRange != 10) {
 				addError("This passage is very low for bass clef;\nit may be better with an 8ba",noteRest);
 				flaggedInstrumentRange = 10;
 			}
@@ -3908,7 +3962,7 @@ MuseScore {
 	
 	function checkSlurIssues (noteRest, staffNum, currentSlur) {
 		//logError("Slur off1 "+currentSlur.slurUoff1+" off2 "+currentSlur.slurUoff2+" off3 "+currentSlur.slurUoff3+" off4 "+currentSlur.slurUoff4);
-		var currTick = noteRest.parent.tick;
+		var currSlurTick = noteRest.parent.tick;
 		var accentsArray = [ kAccentAbove,	kAccentAbove+1,
 			kAccentStaccatoAbove,	kAccentStaccatoAbove+1,
 			kMarcatoAbove,	kMarcatoAbove+1,
@@ -3919,18 +3973,22 @@ MuseScore {
 			kSoftAccentTenutoAbove,	kSoftAccentTenutoAbove+1,
 			kSoftAccentTenutoStaccatoAbove, kSoftAccentTenutoStaccatoAbove+1];
 		var slurStart = currentSlur.spannerTick.ticks;
-		var isStartOfSlur = currTick == slurStart;
+		var isStartOfSlur = currSlurTick == slurStart;
 		var slurLength = currentSlur.spannerTicks.ticks;
 		var slurEnd = slurStart + slurLength;
-		var isEndOfSlur = currTick == slurEnd;
+		var isEndOfSlur = currSlurTick == slurEnd;
 		//logError("slurStart "+slurStart+" slurEnd "+slurEnd);
 
 		//logError("CHECKING SLUR: isRest: "+isRest);
 		if (isStartOfSlur && isStringInstrument && slurLength > division * 8) addError("Consider whether this slur is longer than one bow stroke\nand should be broken into multiple slurs.",currentSlur);
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
-		if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
-
+		if (isStartOfSlur) {
+			var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
+			//logError (t);
+			if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
+		}
+		
 		// **** CHECK SLUR GOING OVER A REST FOR STRINGS, WINDS & BRASS **** //
 		if (isRest) {
 			if ((isWindOrBrassInstrument || isStringInstrument) && !flaggedSlurredRest) {
@@ -3956,14 +4014,14 @@ MuseScore {
 					var noteheadStyle = noteRest.notes[0].headGroup;
 					var prevNoteheadStyle = prevNote.notes[0].headGroup;
 					if (noteRest.notes.length == prevNote.notes.length) {
-						var chordMatches = true;
 						var numNotes = noteRest.notes.length;
-						for (var i = 0; i < numNotes && chordMatches; i++) {
-							if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
-						}
+						var numPrevNotes = prevNote.notes.length;
+						var chordMatches = numNotes == numPrevNotes;
+						//logError ("numNotes matches = "+chordMatches);
+						if (chordMatches) for (var i = 0; i < numNotes && chordMatches; i++) if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
 						//logError ("chordMatches "+chordMatches);
 						if (chordMatches && noteheadStyle != NoteHeadGroup.HEAD_DIAMOND && prevNoteheadStyle != NoteHeadGroup.HEAD_DIAMOND) {
-						//	logError ("here1");
+							//logError ("here1");
 							if (getArticulationArray(noteRest,staffNum) == null) {
 								//logError ("here2");
 								if (isEndOfSlur && prevWasStartOfSlur) {
@@ -4034,7 +4092,7 @@ MuseScore {
 			var cursor = curScore.newCursor();
 			cursor.staffIdx = staffNum;
 			cursor.track = 0;
-			cursor.rewindToTick(currTick);
+			cursor.rewindToTick(currSlurTick);
 			var beatDurInSecs = 1./cursor.tempo;
 			var tickDurInSecs = beatDurInSecs / division;
 			var slurDurInSecs = currentSlur.spannerTicks.ticks*tickDurInSecs;
@@ -4061,13 +4119,13 @@ MuseScore {
 			
 				while (processingThisBar) {
 					var currSeg = cursor.segment;
-					var currTick = currSeg.tick;
+					var theTick = currSeg.tick;
 					var noteRest = cursor.element;
 					if (noteRest.type == Element.CHORD) {
 						var theNotes = noteRest.notes;
 						var nNotes = theNotes.length;
 						if (allNotes[currTick] == undefined) allNotes[currTick] = [];
-						for (var  i = 0; i < nNotes; i++) allNotes[currTick].push(theNotes[i]);
+						for (var  i = 0; i < nNotes; i++) allNotes[theTick].push(theNotes[i]);
 					}
 					if (cursor.next()) {
 						processingThisBar = cursor.measure.is(currentBar);
@@ -4229,9 +4287,9 @@ MuseScore {
 	function checkRehearsalMark (textObject) {
 		//logError("Found reh mark "+textObject.text);
 		if (getTick(textObject) != barStartTick) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
-		logError ("Checking rehearsal mark");
+		//logError ("Checking rehearsal mark");
 		if (currentBarNum < 2) {
-			addError ("Don’t put rehearsal marks at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
+			addError ("Don’t put a rehearsal mark at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
 			return;
 		}
 		if (textObject.text !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
