@@ -219,6 +219,8 @@ MuseScore {
 	property var flaggedSlurredRest: false
 	property var prevSlurNum: 0
 	property var currentSlurNum: 0
+	property var currentSlurLength: 0
+	property var prevSlurLength: 0
 	
 	// ** OTTAVAS ** //
 	property var ottavas: []
@@ -450,7 +452,7 @@ MuseScore {
 		var firstBarNum, firstSegmentInScore;
 		var prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var includesTransposingInstruments = false;
-		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, previousSlurEnd;
+		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, prevSlurEnd;
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
 		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin, expressiveSwell;
@@ -503,6 +505,8 @@ MuseScore {
 			prevMultipleStop = null;
 			prevIsMultipleStop = false;
 			prevMultipleStopInterval = 0;
+			prevSlurLength = 0;
+			currentSlurLength = 0;
 			currentMute = "senza";
 			currentPlayingTechnique = "arco";
 			currentContactPoint = "ord";
@@ -755,8 +759,16 @@ MuseScore {
 											var nextSlur = slurs[currentStaffNum][currentSlurNum];
 											if (currentSlur != null && nextSlur != null) {
 												nextSlurStart = nextSlur.spannerTick.ticks;
-												if (nextSlurStart < currTick && nextSlurStart != currentSlurEnd && !prevWasGraceNote) {
-													addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",[currentSlur,nextSlur]);
+												var nextSlurLength = nextSlur.spannerTicks.ticks;
+												//logError ("currTick "+currTick+" currentSlurEnd "+currentSlurEnd+" nextSlurStart "+nextSlurStart+" hasGraceNotes "+hasGraceNotes);
+												if (nextSlurStart < currentSlurEnd && nextSlurLength > 0 && currentSlurLength > 0) {
+													var nextSlurNote = getNoteRestAtTick(nextSlurStart);
+													if (nextSlurNote != null) {
+														if (nextSlurNote.graceNotes != null) {
+															//logError ("nextSlurNote.graceNotes.length "+(nextSlurNote.graceNotes.length > 0)+"; nextSlurLength = "+nextSlurLength);
+															if (nextSlurNote.graceNotes.length == 0) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",nextSlur);
+														}
+													}
 												}
 											}
 											readyToGoToNextSlur = true;
@@ -773,15 +785,17 @@ MuseScore {
 									//logError("Slur started: isSlurred = true");
 									currentSlur = slurs[currentStaffNum][currentSlurNum];
 									var currentSlurStart = nextSlurStart;
-									previousSlurEnd = currentSlurEnd;
-									currentSlurEnd = currentSlurStart + currentSlur.spannerTicks.ticks;
+									prevSlurEnd = currentSlurEnd;
+									prevSlurLength = currentSlurLength;
+									currentSlurLength = currentSlur.spannerTicks.ticks
+									currentSlurEnd = currentSlurStart + currentSlurLength;
 									//logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
 									//var off1 = currentSlur.slurUoff1 == undefined ? 0 : currentSlur.slurUoff1.x;
 									//var off2 = currentSlur.slurUoff2 == undefined ? 0 : currentSlur.slurUoff2.x;
 									///var off3 = currentSlur.slurUoff3 == undefined ? 0 : currentSlur.slurUoff3.x;
 									//var off4 = currentSlur.slurUoff4 == undefined ? 0 : currentSlur.slurUoff4.x;
 									//logError("Slur offs: "+currentSlur.posX+" "+currentSlur.offsetX+" "+off1+" "+off2+" "+off3+" "+off4); // ALWAYS RETURNS 0 0 0 0 0 0 :-(
-									if (currentSlurNum > 0 && currentSlurStart == previousSlurEnd && !prevWasGraceNote) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
+									if (currentSlurNum > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
 
 									if (currentSlurNum < numSlurs - 1) {
 										nextSlurStart = slurs[currentStaffNum][currentSlurNum+1].spannerTick.ticks;
@@ -963,6 +977,7 @@ MuseScore {
 							if (clefs[currentStaffNum][currTick] != null) {
 								var clefToCheck = clefs[currentStaffNum][currTick];
 								if (!clefToCheck.is(prevCheckedClef)) {
+									//logError ("Check non-header clef "+clefToCheck.subtypeName());
 									checkClef(clefToCheck);
 									prevCheckedClef = clefToCheck;
 								}
@@ -1321,6 +1336,16 @@ MuseScore {
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
 		dialog.show();
+	}
+	
+	function getNoteRestAtTick(targetTick) {
+		var cursor2 = curScore.newCursor();
+		cursor2.filter = Segment.ChordRest;
+		cursor2.staffIdx = currentStaffNum;
+		cursor2.rewind(curScore.SCORE_START);
+		while (cursor2 && cursor2.tick < targetTick) cursor2.next();
+		if (!cursor2) return null;
+		return cursor2.element;
 	}
 	
 		
@@ -3307,6 +3332,8 @@ MuseScore {
 		if (numTies > 0 && numTies < numNotes) addError ("This chord only has some notes tied to the next chord.\nShould they ALL be tied?",noteRest);
 	}
 	
+
+	
 	function checkLyrics (noteRest) {
 		if (noteRest.lyrics.length > 0) {
 			// lyrics found
@@ -3829,25 +3856,31 @@ MuseScore {
 			var noteheadStyle1 = noteRest.notes[0].headGroup;
 			var noteheadStyle2 = noteRest.notes[1].headGroup;
 			//logError("ns1 = "+noteheadStyle1+" vs "+NoteHeadGroup.HEAD_NORMAL+"); ns2 = "+noteheadStyle2+" vs "+NoteHeadGroup.HEAD_DIAMOND;
+			
+			// **** ARTIFICIAL HARMONICS **** //
 			if (noteheadStyle1 == NoteHeadGroup.HEAD_NORMAL && noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND) {
 				isStringHarmonic = true;
 				// we have a false harmonic
+				// are notes always in bottom-up order?
 				var noteheadPitch1 = noteRest.notes[0].pitch;
 				var noteheadPitch2 = noteRest.notes[1].pitch;
+				var bottomNote = noteheadPitch1 < noteheadPitch2 ? noteRest.notes[0] : noteRest.notes[1];
+				var topNote = noteheadPitch1 < noteheadPitch2 ? noteRest.notes[1] : noteRest.notes[0];
 				//logError("FALSE HARM FOUND: np1 "+noteheadPitch1+" np2 "+noteheadPitch2);
-				var interval = noteheadPitch2 - noteheadPitch1;
+				var interval = topNote.pitch - bottomNote.pitch;
 				
-				if (interval != 5) {
-					addError("This looks like an artificial harmonic, but the interval between\nthe fingered and touched pitch is not a perfect fourth.",noteRest);
-				}
+				if (interval != 5) addError("This looks like an artificial harmonic, but the interval between\nthe fingered and touched pitch is not a perfect fourth.",noteRest);
 				
 				// check override on the top note
 				if (noteRest.duration.ticks <= 2 * division) {
-					var noteheadType = noteRest.notes[1].headType;
+					var noteheadType = topNote.headType;
 					if (noteheadType != NoteHeadType.HEAD_HALF) {
 						addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
 					}
 				}
+				
+				// check register
+				if (bottomNote.pitch > stringsArray[3]+10) addError ("This artificial harmonic looks too high to be effective.\nConsider putting it down an octave",noteRest);
 			}
 		}
 		
@@ -4016,7 +4049,7 @@ MuseScore {
 		
 		// **** CHECK SLUR GOING OVER A REST FOR STRINGS, WINDS & BRASS **** //
 		if (isRest) {
-			if ((isWindOrBrassInstrument || isStringInstrument) && !flaggedSlurredRest) {
+			if ((isWindOrBrassInstrument || isStringInstrument) && !flaggedSlurredRest && currentSlur.spannerTicks.ticks > 0) {
 				addError("In general, avoid putting slurs over rests.",currentSlur);
 				flaggedSlurredRest = true;
 				return;
@@ -4088,7 +4121,8 @@ MuseScore {
 				if (theArticulationArray) {
 					for (var i = 0; i < theArticulationArray.length; i++) {
 						if (accentsArray.includes(theArticulationArray[i].symbol) ) {
-							addError("Don’t put accents on notes in the middle of a slur.",noteRest);
+							if (isStringInstrument) addError("In general, avoid putting accents on notes in the middle of a slur\nas strings usually articulate accents with a bow change.",noteRest);
+							if (isWindOrBrassInstrument) addError("In general, avoid putting accents on notes in the middle of a slur\nas winds and brass usually articulate accents with their tongue.",noteRest);
 							return;
 						}
 					}
@@ -4417,7 +4451,7 @@ MuseScore {
 			return;
 		}
 		if (isPitchedPercussionInstrument) {
-			addError(errors,"It’s best to write "+currentInstrumentName.toLowerCase()+" tremolos as one-note tremolos (through stem),\nrather than two-note tremolos (between notes).",noteRest);
+			addError("It’s best to write "+currentInstrumentName.toLowerCase()+" tremolos as one-note tremolos (through stem),\nrather than two-note tremolos (between notes).",noteRest);
 			return;
 		}
 		switch (numStrokes) {
@@ -4461,7 +4495,7 @@ MuseScore {
 						if (p1 < 54 && p2 < 54) {
 							var h1 = Math.floor((p1 - 40) / 6);
 							var h2 = Math.floor((p2 - 40) / 6);
-							if (h1 != h2) addError ("This gliss. is not possible on the tenor trombone.\nYou might want to reconsider");
+							if (h1 != h2) addError ("This gliss. is not possible on the tenor trombone.\nYou might want to reconsider", gliss);
 						}
 					}
 				}

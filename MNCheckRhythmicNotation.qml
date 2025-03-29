@@ -1389,9 +1389,36 @@ MuseScore {
 				}
 				addError(tempText+'These tied notes can be simplified to a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
 			}
-		} // possSimp > -1
+		} else {
+			// check for two note ties wrong way around
+			if (tiedNotes.length == 2) {
+				var note1 = tiedNotes[0];
+				var note2 = tiedNotes[1];
+				if (note1.tuplet == null && note2.tuplet == null) {
+					var startPos = getPositionInBar(note1);
+					var startBeat = Math.trunc(startPos/beatLength);
+					var startFrac = startPos % beatLength;
+					checkTiedPair (note1,note2,startPos,startBeat,startFrac);
+				}
+			}
+		}
 	}
 	
+	function checkTiedPair (note1,note2,startPos,startBeat,startFrac) {
+		var d1 = note1.actualDuration.ticks;
+		var d2 = note2.actualDuration.ticks;
+		var onBeat = startFrac == 0;
+		if (onBeat) {
+			// semiquaver crotchet
+			// quaver crotchet
+			if (beatLength == crotchet) {
+				if (d1 < crotchet && d2 == crotchet) addError ("Consider putting the crotchet first in this tie.",note1);
+				if (d1 < crotchet && d2 == minim) addError ("Consider putting the minim first in this tie",note1);
+				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting this as a minim tied to a quaver",note1);
+				if (d1 == dottedcrotchet && d2 == crotchet) addError ("Consider rewriting this as a minim tied to a quaver",note1);
+			} 
+		}
+	}	
 	function checkBeamBrokenError (noteRest) {		
 		// is this note able to be beamed?
 		if (displayDur >= crotchet) return;
