@@ -42,6 +42,7 @@ MuseScore {
 	
 	// **** PROPERTIES **** //
 	property var spatium: 0
+	property var inchesToMM: 25.4
 	property var pageWidth: 0
 	property var pageHeight: 0
 	property var checkClefs: false
@@ -349,7 +350,10 @@ MuseScore {
 		for (var i = 0; i < n; i++) if (parts[i].show) numParts ++;
 		isSoloScore = (numParts == 1);
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
-		var inchesToMM = 25.4;
+		var numExcerpts = curScore.excerpts.length;
+		
+		if (numParts > 1 && numExcerpts < numParts) addError ("Parts have not yet been created/opened,\nso I wasn’t able to check the part settings.\nOnce you have created and opened the parts,\nplease run this again to check the parts.\nIgnore this message if you do not plan to create parts.","pagetopright");
+		
 		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI; // NB spatium value is given in MuseScore's DPI setting
 		pageWidth = Math.round(curScore.style.value("pageWidth")*inchesToMM);
 		pageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
@@ -361,7 +365,6 @@ MuseScore {
 			return;
 		}
 				
-
 		initialTempoExists = false;
 		hasMoreThanOneSystem = !lastSystem.is(firstSystem);	
 				
@@ -380,7 +383,7 @@ MuseScore {
 		// ************  	GO THROUGH ALL INSTRUMENTS & STAVES LOOKING FOR INFO 	************ //
 		analyseInstrumentsAndStaves();
 		
-		// ************  					SAVE CURRENT SELECTION 					************ //
+		// ************  				SAVE CURRENT SELECTION 						************ //
 		saveSelection();
 		
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
@@ -388,6 +391,9 @@ MuseScore {
 
 		// ************  				CHECK SCORE & PAGE SETTINGS 				************ // 
 		checkScoreAndPageSettings();
+		
+		// ************  					CHECK PART SETTINGS 					************ // 
+		if (numParts > 1 && numExcerpts >= numParts) checkPartSettings();
 		
 		// ************					CHECK IF SCORE IS TRANSPOSED				************ //
 		if (curScore.style.value("concertPitch") && scoreIncludesTransposingInstrument) addError ("It looks like you have at least one transposing instrument, but the score is currently displayed in concert pitch.\nUntick ‘Concert Pitch’ in the bottom right to display a transposed score (see ‘Behind Bars’, p. 505)","pagetop");
@@ -1988,6 +1994,151 @@ MuseScore {
 		}
 	}
 	
+	function checkPartSettings () {
+	//	logError ("checkPartSettings");
+		var maxSize = 7.0;
+		var minSize = 6.6;
+		var excerpts = curScore.excerpts;
+		if (excerpts == null) return;
+		
+	//	logError ("excerpts not null");
+		var numExcerpts = excerpts.length;
+		if (numExcerpts < 2) return;
+		
+	//	logError ("2 or more excerpts");
+		var styleComments = [];
+		var pageSettingsComments = [];
+		var style;
+		var flaggedStaffSize = false;
+		var flaggedSystemSpacing = false;
+		var flaggedMinNoteDistance = false;
+		var flaggedVerticalFrameBottomMargin = false;
+		var flaggedMultiRests = false;
+		var flaggedMultiRestWidth = false;
+		var flaggedLastSystemFillLimit = false;
+		for (var i = 0; i < numExcerpts; i++) {
+			var thePart = excerpts[i];
+			
+		//	logError ("checking part "+i);
+			style = thePart.partScore.style;
+			var theSpatium = style.value("spatium")*inchesToMM/mscoreDPI; // spatium value is given in 360 DPI
+			// part should be 6.6-7.0mm
+			if (!flaggedStaffSize) {
+				var theStaffSize = theSpatium * 4.0;
+				if (theStaffSize > maxSize) {
+					pageSettingsComments.push("Decrease the stave space to within the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
+					flaggedStaffSize = true;
+				}
+				if (theStaffSize < minSize) {
+					pageSettingsComments.push("Increase the stave space to be in the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
+					flaggedStaffSize = true;
+				}
+			}		
+
+			
+			// check system spacing
+			if (!flaggedSystemSpacing) {
+				var minSystemDistance = style.value("minSystemDistance");
+				var maxSystemDistance = style.value("maxSystemDistance");
+				var minSystemSpread = style.value("minSystemSpread");
+				var maxSystemSpread = style.value("maxSystemSpread");
+				var enableVerticalSpread = style.value("enableVerticalSpread");
+				if (enableVerticalSpread) {
+					if (minSystemSpread < 6 || minSystemSpread > 8) {
+						styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
+						flaggedSystemSpacing = true;
+					}
+					if (maxSystemSpread < 10 || maxSystemSpread > 14) {
+						styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
+						flaggedSystemSpacing = true;
+					}
+				} else {
+					if (minSystemDistance < 6 || minSystemDistance > 8) {
+						styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–7.0sp");
+						flaggedSystemSpacing = true;
+					}
+					if (maxSystemDistance < 10 || maxSystemDistance > 14) {
+						styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
+						flaggedSystemSpacing = true;
+					}
+				}
+			}
+			
+			// vertical frame bottom margin
+			if (!flaggedVerticalFrameBottomMargin) {
+				var verticalFrameBottomMargin = style.value("frameSystemDistance");
+				if (verticalFrameBottomMargin != 8) {
+					styleComments.push("(Page tab) Set ‘Vertical frame bottom margin’ to 8.0sp");
+					flaggedVerticalFrameBottomMargin = true;
+				}
+			}
+			
+			// last system fille distance
+			if (!flaggedLastSystemFillLimit) {
+				var lastSystemFillLimit = style.value("lastSystemFillLimit");
+				if (lastSystemFillLimit != 0) {
+					styleComments.push("(Page tab) Set ‘Last system fill threshold’ to 0%");
+					flaggedLastSystemFillLimit = true;
+				}
+			}
+			
+			
+			// min note distance
+			if (!flaggedMinNoteDistance) {
+				var minNoteDistance = style.value("minNoteDistance");
+				if (minNoteDistance < 1.3 || minNoteDistance > 1.5) {	
+					styleComments.push("(Bars tab) Set the ‘Min. note distance’ to between 1.3-1.5sp");
+					flaggedMinNoteDistance = true;
+				}
+			}
+			
+			// multirests on
+			if (!flaggedMultiRests) {
+				var multirestsOn = style.value("createMultiMeasureRests");
+				if (!multirestsOn) {	
+					styleComments.push("(Rests tab) Switch ‘Multibar rests’ on");
+					flaggedMultiRests = true;
+				}
+			}
+			
+			// multirest width
+			if (!flaggedMultiRestWidth) {
+				var MMrestWidth = style.value("minMMRestWidth");
+				if (MMrestWidth < 18.0 || MMrestWidth > 36.0) {	
+					styleComments.push("(Rests tab) Set ‘Multibar rests→Minimum width’ to between 18–36sp");
+					flaggedMultiRestWidth = true;
+				}
+			}
+		}
+		
+		// ** POST STYLE COMMENTS
+		var styleCommentsStr = "";
+		var pageSettingsCommentsStr = "";
+
+		if (styleComments.length>0) {
+			if (styleComments.length == 1) {
+				styleCommentsStr = "The following change to the Style settings (Format→Style…) is recommended\n(though may not be suitable for all scenarios or style guides—use your discretion.):\n"+styleComments[0];
+			} else {
+				var theList = styleComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
+				styleCommentsStr = "The following changes to the Style settings (Format→Style…) are recommended\n(though may not be suitable for all scenarios or style guides—use your discretion.):\n"+theList;
+			}
+		}
+		
+		// ** SHOW PAGE SETTINGS ERROR ** //
+		if (pageSettingsComments.length > 0) {
+			if (pageSettingsComments.length == 1) {	
+				pageSettingsCommentsStr = "The following change to the Page Settings (Format→Page settings…) is recommended\n(though may not be suitable for all scenarios or style guides):\n"+pageSettingsComments[0];
+			} else {
+				var theList = pageSettingsComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
+				pageSettingsCommentsStr = "The following changes to the Page Settings (Format→Page settings…) are recommended\n(though may not be suitable for all scenarios or style guides)\n\n"+theList;
+			}
+		}
+		if (styleComments.length + pageSettingsComments.length > 0) {
+			var errorStr = ["PARTS","The following comments apply only to the parts, not the score. (To quickly change\nthe settings for all parts, change one part, then click ‘Apply to all parts’).",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
+			addError(errorStr,"pagetopright");
+		}
+	}
+	
 	function checkScoreAndPageSettings () {
 		var styleComments = [];
 		var pageSettingsComments = [];
@@ -1999,10 +2150,6 @@ MuseScore {
 		var minSystemSpread = style.value("minSystemSpread");
 		var maxSystemSpread = style.value("maxSystemSpread");
 		var enableVerticalSpread = style.value("enableVerticalSpread");
-				
-		var inchesToMM = 25.4;
-		var spatiumDPI = 360.;
-		var spatium = style.value("spatium")*inchesToMM/spatiumDPI; // spatium value is given in 360 DPI
 		var staffSize = spatium*4;
 		//errorMsg+= "\nspatium = "+spatium+"; staffSize = "+staffSize;
 		var staffLineWidth = Math.round(style.value("staffLineWidth")*inchesToMM*100)/100.;
@@ -2994,8 +3141,10 @@ MuseScore {
 								if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
 								
 								// does this require a metronome mark?
-								var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo 1o","tempo 1°","mouvt","au mouvt","au mouvement"];
-								if (!tempoMarkingToIgnoreArray.includes(lowerCaseText)) {
+								var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo 1o","tempo 1°","mouv"];
+								var ignoreTempoMarking = false;
+								for (var k = 0; k < tempoMarkingToIgnoreArray.length && !ignoreTempoMarking; k++) if (lowerCaseText.includes(tempoMarkingToIgnoreArray[k])) ignoreTempoMarking = true;
+								if (!ignoreTempoMarking) {
 									lastTempoMarking = textObject;
 									lastTempoMarkingBar = currentBarNum;
 								}
@@ -3017,7 +3166,7 @@ MuseScore {
 						if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
 						
 						// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
-						if (plainText.slice(-1) === '.') addError ("Tempo markings do not need a full-stop at the end.",textObject);
+						if (plainText.slice(-1) === '.' && !lowerCaseText.includes("mouv")) addError ("Tempo markings do not need a full-stop at the end.",textObject);
 						
 					}
 				
@@ -3076,7 +3225,7 @@ MuseScore {
 								addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject)
 							}
 							if (isTempoMarking && !metroIsPlain) {
-								addError ('It is recommended to have the metronome marking part of this tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
+								addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
 							}
 						}
 					}
@@ -4040,8 +4189,8 @@ MuseScore {
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur) {
-			if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged vertically away from its correct position.",currentSlur);
-			if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged horizontally away from its correct position.",currentSlur);
+			if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged\nvertically away from its correct position.",currentSlur);
+			if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.",currentSlur);
 		//	var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.posX,currentSlur.posY,currentSlur.pagePos.x,currentSlur.pagePos.y,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
 			//logError (t);
 			if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
@@ -4592,7 +4741,7 @@ MuseScore {
 				comment.autoplace = false;
 
 				if (isString) {
-					if (theLocation === "pagetop") {
+					if (theLocation.includes("pagetop")) {
 						desiredPosX = 2.5;
 						desiredPosY = 10.;
 					}
@@ -4625,7 +4774,8 @@ MuseScore {
 					comment.z = currentZ;
 					currentZ ++;
 					var commentHeight = comment.bbox.height;
-					var commentWidth = comment.bbox.width;					
+					var commentWidth = comment.bbox.width;
+					var placedX = comment.pagePos.x;				
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
 						comment.offsetY = desiredPosY - comment.pagePos.y;
@@ -4649,6 +4799,7 @@ MuseScore {
 						if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
 						var rhs = comment.pagePos.x + commentWidth;
 						if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
+						if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
 					}
 				}
 			}
