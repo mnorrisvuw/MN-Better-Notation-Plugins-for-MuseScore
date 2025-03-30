@@ -961,10 +961,12 @@ MuseScore {
 									
 									// **** Hairpin starting underneath a rest? **** //
 									//logError ("Checking hairpin: currTick = "+currTick+" hairpinStartTick = "+hairpinStartTick+" prevTick = "+prevTick[currentTrack]+" prevNote = "+prevNote);
-									var hairpinStartsOnRest = (currTick == hairpinStartTick && eType == Element.REST);
-									var hairpinStartsAfterRest = currTick >= hairpinStartTick && eType != Element.CHORD && prevTick[currentTrack] <= hairpinStartTick && prevNote == null;
+									var noteAtHairpinStart = getNoteRestAtTick(hairpinStartTick);
+									
+									var hairpinStartsOnRest = true;
+									if (noteAtHairpinStart != null) hairpinStartsOnRest = noteAtHairpinStart.type == Element.REST;
 									//logError ("hairpinStartsOnRest = "+hairpinStartsOnRest+" hairpinStartsAfterRest = "+hairpinStartsAfterRest);
-									if (hairpinStartsOnRest || hairpinStartsAfterRest) addError ("This hairpin appears to start underneath a rest.\nAlways start hairpins under notes.",currentHairpin);
+									if (hairpinStartsOnRest) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);
 									
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
@@ -1349,9 +1351,14 @@ MuseScore {
 		cursor2.filter = Segment.ChordRest;
 		cursor2.staffIdx = currentStaffNum;
 		cursor2.rewind(curScore.SCORE_START);
-		while (cursor2 && cursor2.tick < targetTick) cursor2.next();
+		var prevElem = null;
+		while (cursor2 && cursor2.tick < targetTick) {
+			prevElem = cursor2.element;
+			cursor2.next();
+		}
 		if (!cursor2) return null;
-		return cursor2.element;
+		if (cursor2.tick == targetTick) return cursor2.element;
+		return prevElem;
 	}
 	
 		
@@ -2026,11 +2033,11 @@ MuseScore {
 			if (!flaggedStaffSize) {
 				var theStaffSize = theSpatium * 4.0;
 				if (theStaffSize > maxSize) {
-					pageSettingsComments.push("Decrease the stave space to within the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
+					pageSettingsComments.push("Decrease the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 					flaggedStaffSize = true;
 				}
 				if (theStaffSize < minSize) {
-					pageSettingsComments.push("Increase the stave space to be in the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
+					pageSettingsComments.push("Increase the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 					flaggedStaffSize = true;
 				}
 			}		
@@ -2223,12 +2230,12 @@ MuseScore {
 			minSize = 3.7;
 		}
 		
-		if (staffSize > maxSize) pageSettingsComments.push("Decrease the stave space to within the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
+		if (staffSize > maxSize) pageSettingsComments.push("Decrease the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 		if (staffSize < minSize) {
 			if (staffSize < 3.7) {
 				if (staffSize < minSize) pageSettingsComments.push("The staff size is very small.\nIncrease the stave space to at least 0.92mm");
 			} else {
-				pageSettingsComments.push("Increase the stave space to be in the range "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
+				pageSettingsComments.push("Increase the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 			}
 		}
 		
@@ -2358,8 +2365,8 @@ MuseScore {
 		// **** STYLE SETTINGS — 9. BARS TAB **** //
 		if (minimumBarWidth != 14.0) styleComments.push("(Bars tab) Set ‘Minimum bar width’ to 14.0sp");
 		if (spacingRatio != 1.5) styleComments.push("(Bars tab) Set ‘Spacing Ratio’ to 1.5sp");
-		if (minNoteDistance < 0.6 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to within 0.6–0.7sp");
-		if (minNoteDistance > 0.7 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to within 0.6–0.7sp");
+		if (minNoteDistance < 0.6 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 0.6–0.7sp");
+		if (minNoteDistance > 0.7 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 0.6–0.7sp");
 		
 		// **** STYLE SETTINGS — 10. BARLINES TAB **** //
 		if (barlineWidth != 0.16) styleComments.push("(Barlines tab) Set ‘Thin barline thickness’ to 0.16sp");
