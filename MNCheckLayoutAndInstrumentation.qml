@@ -2141,7 +2141,7 @@ MuseScore {
 			}
 		}
 		if (styleComments.length + pageSettingsComments.length > 0) {
-			var errorStr = ["PARTS","The following comments apply only to the parts, not the score. (To quickly change\nthe settings for all parts, change one part, then click ‘Apply to all parts’).",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
+			var errorStr = ["PARTS SETTINGS","(These suggestions apply only to the parts, not the score. This comment box will remain\nuntil all parts have been changed; to quickly change the settings for all parts, change one part,\nthen click ‘Apply to all parts’).",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
 			addError(errorStr,"pagetopright");
 		}
 	}
@@ -2389,29 +2389,33 @@ MuseScore {
 		if (metronomeFontStyle != 0) styleComments.push("(Text Styles→Metronom) Use a plain font style for metronome markings");
 		
 		// ** OTHER STYLE ISSUES ** //
-		
+		var styleCommentsStr = "";
+		var pageSettingsCommentsStr = "";
+
 		// ** POST STYLE COMMENTS
 		if (styleComments.length>0) {
-			var styleCommentsStr = "";
 			if (styleComments.length == 1) {
 				styleCommentsStr = "The following change to the score’s Style settings (Format→Style…) is recommended\n(though may not be suitable for all scenarios or style guides—use your discretion):\n— "+styleComments[0];
 			} else {
 				var theList = styleComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
 				styleCommentsStr = "The following changes to the score’s Style settings (Format→Style…) are recommended\n(though may not be suitable for all scenarios or style guides—use your discretion):\n"+theList;
 			}
-			addError(styleCommentsStr,"pagetop");
 		}
 		
 		// ** SHOW PAGE SETTINGS ERROR ** //
 		if (pageSettingsComments.length > 0) {
-			var pageSettingsCommentsStr = "";
 			if (pageSettingsComments.length == 1) {	
 				pageSettingsCommentsStr = "The following change to the score’s Page Settings (Format→Page settings…) is recommended\n(though may not be suitable for all scenarios or style guides):\n— "+pageSettingsComments[0];
 			} else {
 				var theList = pageSettingsComments.map((line, index) => `${index + 1}) ${line}`).join('\n');
 				pageSettingsCommentsStr = "The following changes to the score’s Page Settings (Format→Page settings…) are recommended\n(though may not be suitable for all scenarios or style guides):\n"+theList;
 			}
-			addError(pageSettingsCommentsStr,"pagetop");
+		}
+		
+		
+		if (styleComments.length + pageSettingsComments.length > 0) {
+			var errorStr = ["SCORE SETTINGS",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
+			addError(errorStr,"pagetop");
 		}
 	}
 	
@@ -3405,7 +3409,10 @@ MuseScore {
 							var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
 							if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
 								// check if visual overlapping
-								if (textObject.bbox == prevDynamicObject.bbox) {
+								
+								if (textObject.pagePos == prevDynamicObject.pagePos && textObject.bbox.width == prevDynamicObject.bbox.width && textObject.bbox.height == prevDynamicObject.bbox.height) {
+									//logError (textObject.pagePos+' '+prevDynamicObject.pagePos);
+									//logError (textObject.text+" "+textObject.bbox+ " "+prevDynamicObject.text+" "+prevDynamicObject.bbox);
 									addError ("There appear to be two dynamic markings overlapped here.\nYou can safely delete one of them.",textObject);
 								} else {
 									addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicBarNum+".",textObject);
