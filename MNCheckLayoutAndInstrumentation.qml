@@ -12,7 +12,6 @@ import QtQuick.Layouts 1.15
 import Muse.UiComponents 1.0
 import FileIO 3.0
 
-
 MuseScore {
 	version:  "1.0"
 	description: "This plugin checks your score for common music layout, notation and instrumentation issues"
@@ -790,6 +789,8 @@ MuseScore {
 									lastArticulationTick = currTick;
 									//logError("Slur started: isSlurred = true");
 									currentSlur = slurs[currentStaffNum][currentSlurNum];
+									
+									//logError ("Found a slur: pagePos = {"+Math.round(currentSlur.pagePos.x*100)/100.+","+Math.round(currentSlur.pagePos.y*100)/100.+"}\nParent system pagePos = {"+Math.round(currentSlur.parent.pagePos.x*100)/100.+","+Math.round(currentSlur.parent.pagePos.y*100)/100.+"}");
 									var currentSlurStart = nextSlurStart;
 									prevSlurEnd = currentSlurEnd;
 									prevSlurLength = currentSlurLength;
@@ -1457,6 +1458,8 @@ MuseScore {
 			}
 			if (etype == Element.HAIRPIN_SEGMENT) {
 				// ONLY ADD THE HAIRPIN_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+				//logError ("Hairpin e.pagePos.x = "+e.pagePos.x);
+
 				var sameLoc = false;
 				var sameHairpin = false;
 				if (prevHairpinSegment != null) {
@@ -1474,7 +1477,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
-			if (etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameOttava = false;
 				if (prevOttavaSegment != null) {
@@ -1487,7 +1490,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
-			if (etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE EGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameGlissando = false;
 				if (prevGlissandoSegment != null) {
@@ -1500,8 +1503,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.SLUR) slurs[staffIdx].push(e);
-			if (etype == Element.SLUR_SEGMENT) {
-				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.SLUR_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameSlur = false;
 				if (prevSlurSegment != null) {
@@ -1514,8 +1516,7 @@ MuseScore {
 			}
 			
 			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
-			if (etype == Element.PEDAL_SEGMENT) {
-				// ONLY ADD THE SLUR_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.PEDAL_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var samePedal = false;
 				if (prevPedalSegment != null) {
@@ -4118,6 +4119,9 @@ MuseScore {
 			
 		var Minim = 2 * division;
 		
+		// ignore articulation issues if it's pizz
+		lastArticulationTick = currTick;
+		
 		if (staffNum == lastPizzIssueStaff && barNum-lastPizzIssueBar < 5) return;
 		// check staccato
 		if (typeof staffNum !== 'number') logError("checkPizzIssues() — Articulation error");
@@ -4203,8 +4207,12 @@ MuseScore {
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur) {
-			if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged\nvertically away from its correct position.",currentSlur);
-			if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.",currentSlur);
+			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
+				addError ("This slur looks like it has been dragged\naway from its correct position.",currentSlur);
+			} else {
+				if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged\nvertically away from its correct position.",currentSlur);
+				if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.",currentSlur);
+			}
 		//	var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.posX,currentSlur.posY,currentSlur.pagePos.x,currentSlur.pagePos.y,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
 			//logError (t);
 			if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
@@ -4671,6 +4679,10 @@ MuseScore {
 			//}
 	}
 
+	//---------------------------------------------------------
+	//  addError
+	//	pushes the error into an array
+	//---------------------------------------------------------
 	
 	function addError (text,element) {
 		if (element == null || element == undefined) {
@@ -4680,6 +4692,11 @@ MuseScore {
 			errorObjects.push(element);
 		}
 	}
+	
+	//---------------------------------------------------------
+	//	showAllErrors
+	//	goes through array of errors, setting up comment boxes
+	//---------------------------------------------------------
 	
 	function showAllErrors () {
 		var objectPageNum;
@@ -4705,10 +4722,10 @@ MuseScore {
 				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 			
 				// the errorObjects array includes a list of the Elements to attach the text object to
-				// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
-				// Here are the strings, and where the text object will be attached
-				// 		top 				— top of bar 1, staff 1
+				// Instead of an Element, you can use one of the following strings instead to indicate a special location unattached to an element:
+				// 		top 			— top of bar 1, staff 1
 				// 		pagetop			— top left of page 1
+				//		pagetopright	— top right of page 1
 				//		system1 n		— top of bar 1, staff n
 				//		system2 n		— first bar in second system, staff n
 			
@@ -4815,11 +4832,41 @@ MuseScore {
 						if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
 						if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
 					}
+					// check comment box is not covering the element
+					/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
+					if (!isString) {
+						var r1x = comment.pagePos.x;
+						var r1y = comment.pagePos.y;
+						var r1w = commentWidth;
+						var r1h = commentHeight;
+						var r2x = element.pagePos.x;
+						var r2y = element.pagePos.y;
+						var r2w = element.bbox.width;
+						var r2h = element.bbox.height;
+						if (element.type == Element.SLUR_SEGMENT) {
+							logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+						}
+						
+						var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+						var repeats = 0;
+						while (overlaps && repeats < 20) {
+							logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+							comment.offsetY -= commentOffset;
+							r1y -= 1.0;
+							repeats ++;
+							overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+						}
+					}*/
 				}
 			}
 		} // var i
 		curScore.endCmd();
 	}
+	
+	//---------------------------------------------------------
+	//	getTick
+	//	returns the tick of the element
+	//---------------------------------------------------------
 	
 	function getTick (e) {
 		if (e == null) {
