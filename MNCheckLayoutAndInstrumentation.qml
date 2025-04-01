@@ -325,6 +325,7 @@ MuseScore {
 		shouldbelowercase = shouldbelowercasefile.read().trim().split('\n');
 		shouldhavefullstop = shouldhavefullstopfile.read().trim().split('\n');
 		spellingerrorsanywhere = spellingerrorsanywherefile.read().trim().split('\n');
+		//logError(spellingerrorsanywhere);
 		spellingerrorsatstart = spellingerrorsatstartfile.read().trim().split('\n');
 		tempomarkings = tempomarkingsfile.read().trim().split('\n');
 		tempochangemarkings = tempochangemarkingsfile.read().trim().split('\n');
@@ -3218,7 +3219,7 @@ MuseScore {
 									metronomeDuration *= 1.5;
 									metroStr = "dotted "+metroStr;
 								}
-								if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does not match the time signature of "+currentTimeSig.str+".",textObject);
+								if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
 								lastMetronomeMarkingBar = currentBarNum;
 								if (nonBoldText === "") {
 									//logError ("styledText is "+styledText.replace(/</g,'{'));
@@ -4707,7 +4708,14 @@ MuseScore {
 	
 	function showAllErrors () {
 		var objectPageNum;
-		
+		var firstStaffNum = 0;
+		for (var k = 0; k < curScore.nstaves; k++) {
+			if (curScore.staves[k].part.show) {
+				break;
+			} else {
+				firstStaffNum ++;
+			}
+		}
 		curScore.startCmd()
 		for (var i in errorStrings) {
 			var text = errorStrings[i];
@@ -4723,7 +4731,8 @@ MuseScore {
 				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
-				var staffNum = 0;
+				var staffNum = firstStaffNum;
+				
 				var elementHeight = 0;
 				var commentOffset = 1.0;
 				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
@@ -4759,7 +4768,14 @@ MuseScore {
 								desiredPosY = element.bbox.y;
 								//logError(" x = "+desiredPosX+"); y = "+desiredPosY;
 							} else {
-								while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+								staffNum = 0;
+								while (!curScore.staves[staffNum].is(elemStaff)) {
+									staffNum ++; // I WISH: staffNum = element.staff.staffidx
+									if (curScore.staves[staffNum] == null || curScore.staves[staffNum] == undefined) {
+										logError ("showAllErrors () — got staff error "+staffNum+" — bailing");
+										return;
+									}
+								}
 							}
 						}
 					}
@@ -4821,49 +4837,55 @@ MuseScore {
 						comment.offsetY -= commentHeight;
 					}
 					var commentTopRounded = Math.round(comment.pagePos.y);
-					var commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
+					var commentPage = comment.parent;
+					while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
 					var commentPageWidth = commentPage.bbox.width; // get page width
 					if (commentPage != null && commentPage != undefined) {
-						var commentPageNum = commentPage.pagenumber;
-						var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
-						if (theOffset > 4 * commentOffset) {
-							theOffset = 0;
-							commentPosOffset[commentPageNum][commentTopRounded+1000] = 0;
-						} else {
-							commentPosOffset[commentPageNum][commentTopRounded+1000] += commentOffset;
+						if (commentPage.type == Element.PAGE) {
+							var commentPageNum = commentPage.pagenumber;
+							var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
+							if (theOffset > 4 * commentOffset) {
+								theOffset = 0;
+								commentPosOffset[commentPageNum][commentTopRounded+1000] = 0;
+							} else {
+								commentPosOffset[commentPageNum][commentTopRounded+1000] += commentOffset;
+							}
+							comment.offsetY -= theOffset;
+							comment.offsetX += theOffset;
+							if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+							var rhs = comment.pagePos.x + commentWidth;
+							if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
+							if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
 						}
-						comment.offsetY -= theOffset;
-						comment.offsetX += theOffset;
-						if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
-						var rhs = comment.pagePos.x + commentWidth;
-						if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
-						if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+						// check comment box is not covering the element
+						/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
+						if (!isString) {
+							var r1x = comment.pagePos.x;
+							var r1y = comment.pagePos.y;
+							var r1w = commentWidth;
+							var r1h = commentHeight;
+							var r2x = element.pagePos.x;
+							var r2y = element.pagePos.y;
+							var r2w = element.bbox.width;
+							var r2h = element.bbox.height;
+							if (element.type == Element.SLUR_SEGMENT) {
+								logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+							}
+							
+							var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+							var repeats = 0;
+							while (overlaps && repeats < 20) {
+								logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+								comment.offsetY -= commentOffset;
+								r1y -= 1.0;
+								repeats ++;
+								overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+							}
+						}*/
+					} else {
+						logError ("parent parent parent parent was not a page — element = "+element.name);
 					}
-					// check comment box is not covering the element
-					/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
-					if (!isString) {
-						var r1x = comment.pagePos.x;
-						var r1y = comment.pagePos.y;
-						var r1w = commentWidth;
-						var r1h = commentHeight;
-						var r2x = element.pagePos.x;
-						var r2y = element.pagePos.y;
-						var r2w = element.bbox.width;
-						var r2h = element.bbox.height;
-						if (element.type == Element.SLUR_SEGMENT) {
-							logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-						}
-						
-						var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-						var repeats = 0;
-						while (overlaps && repeats < 20) {
-							logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-							comment.offsetY -= commentOffset;
-							r1y -= 1.0;
-							repeats ++;
-							overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-						}
-					}*/
+					///logError ("Comment is at {"+comment.pagePos.x+" "+comment.pagePos.y+"}");
 				}
 			}
 		} // var i
