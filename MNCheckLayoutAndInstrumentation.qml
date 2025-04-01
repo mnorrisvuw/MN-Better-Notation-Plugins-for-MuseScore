@@ -354,7 +354,7 @@ MuseScore {
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		var numExcerpts = curScore.excerpts.length;
 		
-		if (numParts > 1 && numExcerpts < numParts) addError ("Parts have not yet been created/opened,\nso I wasn’t able to check the part settings.\nOnce you have created and opened the parts,\nplease run this again to check the parts.\nIgnore this message if you do not plan to create parts.","pagetopright");
+		if (numParts > 1 && numExcerpts < numParts) addError ("Parts have not yet been created/opened, so I wasn’t able to check the part settings.\nYou can do this by clicking ‘Parts’ then ’Open All’.\n\nOnce you have created and opened the parts, please run this again to check the parts.\nIgnore this message if you do not plan to create parts.","pagetopright");
 		
 		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI; // NB spatium value is given in MuseScore's DPI setting
 		pageWidth = Math.round(curScore.style.value("pageWidth")*inchesToMM);
@@ -930,13 +930,15 @@ MuseScore {
 								if (currTick >= nextHairpinStart) {
 									isHairpin = true;
 									lastDynamicTick = currTick;
-									//logError("found hairpin, currTick = "+currTick);
 									//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
 									
 								
 									currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
+
 									var hairpinStartTick = currentHairpin.spannerTick.ticks;
 									var hairpinDur = currentHairpin.spannerTicks.ticks;
+									//logError("found hairpin of type"+currentHairpin.hairpinType+", length "+hairpinDur);
+
 									currentHairpinEnd = hairpinStartTick + hairpinDur;
 									if (currentHairpinNum == hairpins[currentStaffNum].length - 1){
 										nextHairpin = null;
@@ -945,7 +947,7 @@ MuseScore {
 										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
 										nextHairpinStart = nextHairpin.spannerTick.ticks;
 									}
-									if (hairpinDur > barLength * 0.8) {
+									if (hairpinDur <= barLength) {
 										if (expressiveSwell) {
 											expressiveSwell = false;
 										} else {

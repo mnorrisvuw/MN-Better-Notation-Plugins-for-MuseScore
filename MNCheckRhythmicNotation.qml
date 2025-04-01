@@ -973,7 +973,7 @@ MuseScore {
 	}
 	
 	function checkTupletSettings (tuplet) {
-		var normalSettings = [0,0,3,2,6,4,4,4,12,8,8,8,8,8,8,8,8];
+		var normalSettings = [0,0,3,2,3,4,4,4,12,8,8,8,8,8,8,8,8];
 		var a = tuplet.actualNotes;
 		// check ratio is on
 		if (tuplet.numberType == 0 && a < normalSettings.length) {
