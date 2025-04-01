@@ -2101,8 +2101,8 @@ MuseScore {
 			// min note distance
 			if (!flaggedMinNoteDistance) {
 				var minNoteDistance = style.value("minNoteDistance");
-				if (minNoteDistance < 1.3 || minNoteDistance > 1.5) {	
-					styleComments.push("(Bars tab) Set the ‘Min. note distance’ to between 1.3-1.5sp");
+				if (minNoteDistance < 1.2 || minNoteDistance > 1.4) {	
+					styleComments.push("(Bars tab) Set the ‘Min. note distance’ to between 1.2-1.4sp");
 					flaggedMinNoteDistance = true;
 				}
 			}
