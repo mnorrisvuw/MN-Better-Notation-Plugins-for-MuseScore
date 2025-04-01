@@ -63,6 +63,7 @@ MuseScore {
 	property var prevKeySigSharps: 0
 	property var prevKeySigBarNum: 0
 	property var currentBarNum: 0
+	property var displayBarNum: 0
 	property var hasMoreThanOneSystem: false
 	property var scoreIncludesTransposingInstrument: false
 	property var virtualBeatLength: 0
@@ -132,6 +133,7 @@ MuseScore {
 	property var prevDynamic: ""
 	property var prevDynamicObject: null
 	property var prevDynamicBarNum: 0
+	property var prevDynamicDisplayBarNum: 0
 	property var prevIsMultipleStop: false
 	property var prevSoundingDur: 0
 	property var prevMultipleStopInterval: 0
@@ -506,6 +508,7 @@ MuseScore {
 			prevDynamic = "";
 			prevDynamicObject = null;
 			prevDynamicBarNum = 0;
+			prevDynamicDisplayBarNum = 0;
 			prevClefId = null;
 			prevMultipleStop = null;
 			prevIsMultipleStop = false;
@@ -620,7 +623,9 @@ MuseScore {
 						
 			for (var t = 0; t < numStaves * 4; t++) prevTick[t] = -1;
 			
+			displayBarNum = 0;
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
+				if (!currentBar.irregular) displayBarNum ++;
 				
 				barStartTick = currentBar.firstSegment.tick;
 				barEndTick = currentBar.lastSegment.tick;
@@ -1037,7 +1042,6 @@ MuseScore {
 									if (theAnnotation.track == currentTrack) {
 										var aType = theAnnotation.type;
 										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
-										//logError ("Found annotation: "+theAnnotation.name);					
 										// **** FOUND A TEXT OBJECT **** //
 										if (theAnnotation.text) checkTextObject(theAnnotation);
 									}
@@ -2524,8 +2528,9 @@ MuseScore {
 		if (isRest) {
 			for (var i = 0; i < techniques.length; i ++) {
 				if (lowerCaseText.includes(techniques[i])) {
+					//logError ("textObj "+textObject.text);
 					addError("Avoid putting techniques over rests if possible, though\nthis may sometimes be needed to save space.\n(See ‘Behind Bars’, p. 492).",textObject);
-					continue;
+					break;
 				}
 			}
 		}
@@ -2970,6 +2975,7 @@ MuseScore {
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			if (!e.is(tempText)) {
+				//logError ("Found text object "+e.text);
 				checkTextObject (e);
 				var eSubtype = e.subtypeName();
 				if (eSubtype == "Title" && getPageNumber(e) == firstPageNum) hasTitleOnFirstPageOfMusic = true;
@@ -3416,7 +3422,7 @@ MuseScore {
 									//logError (textObject.text+" "+textObject.bbox+ " "+prevDynamicObject.text+" "+prevDynamicObject.bbox);
 									addError ("There appear to be two dynamic markings overlapped here.\nYou can safely delete one of them.",textObject);
 								} else {
-									addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicBarNum+".",textObject);
+									addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicDisplayBarNum+".",textObject);
 								}
 								isError = true;
 							}
@@ -3424,6 +3430,7 @@ MuseScore {
 					
 						if (!dynamicException) {
 							prevDynamicBarNum = currentBarNum;
+							prevDynamicDisplayBarNum = displayBarNum;
 							prevDynamic = plainText;
 							prevDynamicObject = textObject;
 						} else {
@@ -4929,7 +4936,7 @@ MuseScore {
 	
 	function logError (str) {
 		numLogs ++;
-		errorMsg += "<p>Staff "+currentStaffNum+", b. "+currentBarNum+": "+str+"</p>";
+		errorMsg += "<p>Staff "+currentStaffNum+", b. "+displayBarNum+": "+str+"</p>";
 	}
 	
 	function saveSelection () {
