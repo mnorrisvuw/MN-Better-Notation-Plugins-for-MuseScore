@@ -2573,7 +2573,6 @@ MuseScore {
 		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
 		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
 		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
-
 		
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = cursor.staffIdx;
