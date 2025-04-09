@@ -946,35 +946,37 @@ MuseScore {
 	
 	function deleteAllCommentsAndHighlights () {
 
-		//errorMsg = "Num elemns: "+elems.length;
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		
 		// ** SAVE CURRENT SELECTION ** //
-		var s = curScore.selection;
-		var isRange = s.isRange;
-		var startStaff = 0, endStaff = 0, startTick = 0, endTick = curScore.lastSegment.tick;
-		if (isRange) {
-			startStaff = s.startStaff;
-			endStaff = s.endStaff;
-			if (s.startSegment) startTick = s.startSegment.tick;
-			if (s.endSegment) endTick = s.endSegment.tick + 1;
-		}
+		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		selectTitleText();
+		curScore.startCmd();
+		selectAll();
+		cmd ("insert-vbox");
+		var vbox = curScore.selection.elements[0];
+		cmd ("title-text");
+		cmd ("select-similar");
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
 			var c = e.color;	
-			// style the element
+			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
+		removeElement (vbox);
+		curScore.endCmd();
+		
+		// **** SELECT ALL **** //
+		selectAll();
 		
 		// **** GET ALL OTHER ITEMS **** //
-		selectAll();
 		var elems = curScore.selection.elements;
+		
+		// **** LOOP THROUGH ALL ITEMS AND ADD THEM TO AN ARRAY IF THEY MATCH **** //
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			var t = e.type;
@@ -984,9 +986,7 @@ MuseScore {
 				elementsToRecolor.push(e);
 			} else {
 				if (t == Element.STAFF_TEXT) {
-					if (Qt.colorEqual(e.frameBgColor,"yellow") && Qt.colorEqual(e.frameFgColor,"black")) {
-						elementsToRemove.push(e);
-					}
+					if (Qt.colorEqual(e.frameBgColor,"yellow") && Qt.colorEqual(e.frameFgColor,"black")) elementsToRemove.push(e);
 				}
 			}
 		}
@@ -994,7 +994,7 @@ MuseScore {
 		var segment = curScore.firstSegment();
 		while (segment) {
 			if (segment.segmentType == Segment.TimeSig) {
-				for (var i = 0; i < curScore.nstaves; i++) {
+				for (var i = 0; i < numStaves; i++) {
 					var theTimeSig = segment.elementAt(i*4);
 					if (theTimeSig.type == Element.TIMESIG) {
 						var c = theTimeSig.color;
@@ -1005,20 +1005,13 @@ MuseScore {
 			segment = segment.next;
 		}
 		
+		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		curScore.startCmd();
-		for (var i = 0; i < elementsToRecolor.length; i++) {
-			elementsToRecolor[i].color = "black";
-		}
-		for (var i = 0; i < elementsToRemove.length; i++) {
-			removeElement(elementsToRemove[i]);
-		}
-		// ** RESTORE SELECTION
-		if (isRange) {
-			curScore.selection.selectRange(startTick,endTick+1,startStaff,endStaff);
-		} else {
-			curScore.selection.clear();
-		}
+		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
 		curScore.endCmd();
+		
+		restoreSelection();
 	}
 
 	function addError (text,element) {

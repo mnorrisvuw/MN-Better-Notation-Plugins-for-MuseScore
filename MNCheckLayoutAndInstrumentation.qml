@@ -141,6 +141,7 @@ MuseScore {
 	property var theDynamic: null
 	property var errorStrings: []
 	property var errorObjects: []
+	property var prevBeam: null
 	
 	// ** INSTRUMENTS ** //
 	property var instrumentIds: []
@@ -521,6 +522,7 @@ MuseScore {
 			prevIsMultipleStop = false;
 			prevMultipleStopInterval = 0;
 			prevSlurLength = 0;
+			prevBeam = null;
 			currentSlurLength = 0;
 			currentMute = "senza";
 			currentPlayingTechnique = "arco";
@@ -1155,7 +1157,7 @@ MuseScore {
 									if (isOttava) checkOttava(noteRest,currentOttava);
 								
 									// ************ CHECK STEM DIRECTION ************ //
-									checkStemDirection(noteRest);
+									checkStemsAndBeams(noteRest);
 								
 									// ************ CHECK LEDGER LINES ************ //
 									checkInstrumentalRanges(noteRest);
@@ -2594,7 +2596,7 @@ MuseScore {
 		var isDecresc = currentHairpin.hairpinType %2 == 1;
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
-		
+		var hairpinZoneStartTick = hairpinStartTick - beatLength;
 		// allow an expressive swell
 		if (expressiveSwell) return;
 		
@@ -2602,7 +2604,7 @@ MuseScore {
 		if (isDecresc && currentBarNum == numBars) return;
 		
 		// cycle through the dynamics in the staff, looking to see whether there is one near the end of the hairpin
-		for (var i = 0;i < dynamics[currentStaffNum].length; i++) if (dynamics[currentStaffNum][i] >= currentHairpinEnd && dynamics[currentStaffNum][i] <= hairpinZoneEndTick) return;
+		for (var i = 0;i < dynamics[currentStaffNum].length; i++) if (dynamics[currentStaffNum][i] >= hairpinZoneStartTick && dynamics[currentStaffNum][i] <= hairpinZoneEndTick) return;
 		
 		//logError ("cursor2.tick = "+cursor2.tick+" currentHairpinEnd = "+currentHairpinEnd);
 		
@@ -3516,10 +3518,10 @@ MuseScore {
 					var objectIsDynamic = tn === "dynamic";
 					var includesADynamic = styledText.includes('<sym>dynamics');
 					var stringIsDynamic = isDynamic(lowerCaseText);
-				
+					//logError("plainText = "+plainText+" "+objectIsDynamic+" "+includesADynamic+" "+stringIsDynamic);
+
 					// **** CHECK REDUNDANT DYNAMIC **** //
-					if (objectIsDynamic || includesADynamic || stringIsDynamic) {
-						//logError("dynamic — plainText = "+plainText);
+					if (includesADynamic || stringIsDynamic) {
 											
 						firstDynamic = true;
 						tickHasDynamic = true;
@@ -4536,7 +4538,14 @@ MuseScore {
 		}
 	}
 	
-	function checkStemDirection (noteRest) {
+	function checkStemsAndBeams (noteRest) {
+		if (noteRest.beam) {
+			var theBeam = noteRest.beam;
+			if (!theBeam.is(prevBeam)) {
+				if (!theBeam.generated) addError ("This beam seems to have been moved away from its\ndefault position. If this was not deliberate, you can reset it\nby selecting it and pressing "+cmdKey+"-R",noteRest);
+				prevBeam = theBeam;
+			}
+		}
 		if (noteRest.stem) {
 			var stemDir = noteRest.stem.stemDirection;
 			if (stemDir > 0) {
@@ -4904,10 +4913,7 @@ MuseScore {
 						desiredPosY = 10.;
 					}
 					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
-					if (theLocation === "system2") {
-						tick = firstBarInSecondSystem.firstSegment.tick;
-						logError ("sys2: "+tick+" "+staffNum);
-					}
+					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
 				} else {
 					tick = getTick(element);
 				}
@@ -5117,7 +5123,6 @@ MuseScore {
 	
 	function deleteAllCommentsAndHighlights () {
 
-		//errorMsg = "Num elemns: "+elems.length;
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		

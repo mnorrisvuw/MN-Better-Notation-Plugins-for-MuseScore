@@ -32,7 +32,12 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		selectTitleText();
+		curScore.startCmd();
+		selectAll();
+		cmd ("insert-vbox");
+		var vbox = curScore.selection.elements[0];
+		cmd ("title-text");
+		cmd ("select-similar");
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -41,19 +46,21 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
+		removeElement (vbox);
+		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
 		selectAll();
 		
-		// **** GET ALL ITEMS **** //
+		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
 		
 		// **** LOOP THROUGH ALL ITEMS AND ADD THEM TO AN ARRAY IF THEY MATCH **** //
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			var t = e.type;
-			var c = e.color;
-			// check element style
+			var c = e.color;	
+			// style the element
 			if (Qt.colorEqual(c,"hotpink")) {
 				elementsToRecolor.push(e);
 			} else {
@@ -66,7 +73,7 @@ MuseScore {
 		var segment = curScore.firstSegment();
 		while (segment) {
 			if (segment.segmentType == Segment.TimeSig) {
-				for (var i = 0; i < curScore.nstaves; i++) {
+				for (var i = 0; i < numStaves; i++) {
 					var theTimeSig = segment.elementAt(i*4);
 					if (theTimeSig.type == Element.TIMESIG) {
 						var c = theTimeSig.color;
@@ -84,13 +91,6 @@ MuseScore {
 		curScore.endCmd();
 		
 		restoreSelection();
-	}
-	
-	function selectTitleText () {
-		curScore.startCmd();
-		cmd("title-text");
-		cmd("select-similar");
-		curScore.endCmd();
 	}
 	
 	function selectAll () {
