@@ -96,6 +96,7 @@ MuseScore {
 	property var numGrandStaves: []
 	property var grandStaffTops: []
 	property var numParts: 0
+	property var visibleParts: []
 	property var numStaves: 0
 	property var parts: null
 	property var scoreHasStrings: false
@@ -351,9 +352,13 @@ MuseScore {
 		var cursor = curScore.newCursor();
 		var cursor2 = curScore.newCursor();
 		parts = curScore.parts;
-		var n = parts.length;
+		//logError ("Count of curScore.parts = "+parts.length);
+		numParts = 0;
 		// ** calculate number of parts, but ignore hidden ones
-		for (var i = 0; i < n; i++) if (parts[i].show) numParts ++;
+		for (var i = 0; i < parts.length; i++) if (parts[i].show) visibleParts.push(parts[i]);
+		numParts = visibleParts.length;
+			
+		//logError ("I found "+numParts+" parts");
 		isSoloScore = (numParts == 1);
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		var numExcerpts = curScore.excerpts.length;
@@ -1575,7 +1580,7 @@ MuseScore {
 				visiblePartFound = true;
 				firstVisibleStaff = i;
 			}
-			if (!staffVisible[i]) numParts--;
+
 			var id = part.instrumentId;
 			instrumentIds.push(id);
 			var calcid = id;
@@ -1859,9 +1864,8 @@ MuseScore {
 				if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
 			}
 			
-			//logError("Staff "+i+" long = "+full1+" short = "+short1);
 			var checkThisStaff = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numStaves - 1;
-			//logError("Staff "+full1+" check = "+checkThisStaff);
+
 			// **** CHECK FOR REPEATED STAFF NAMES **** //
 			if (checkThisStaff) {
 				for (var j = i+1; j < numStaves; j++) {
@@ -2066,7 +2070,7 @@ MuseScore {
 		for (var i = 0; i < numExcerpts; i++) {
 			var thePart = excerpts[i];
 			
-		//	logError ("checking part "+i);
+		//logError ("checking part "+i);
 			style = thePart.partScore.style;
 			var theSpatium = style.value("spatium")*inchesToMM/mscoreDPI; // spatium value is given in 360 DPI
 			// part should be 6.6-7.0mm
@@ -2170,12 +2174,10 @@ MuseScore {
 				var type = style.value ("partInstrumentFrameType");
 				var padding = style.value ("partInstrumentFramePadding");
 				if (type != 1) {
-					logError (type);
 					styleComments.push("(Text Styles→Instrument name (Part)) Set Frame type to Rectangle");
 					flaggedPartNameStyle = true;
 				}
 				if (padding != 0.8) {
-					logError (padding);
 					styleComments.push("(Text Styles→Instrument name (Part)) Set Frame Padding to 0.80");
 					flaggedPartNameStyle = true;
 				}
@@ -2211,6 +2213,7 @@ MuseScore {
 	}
 	
 	function checkScoreAndPageSettings () {
+		
 		var styleComments = [];
 		var pageSettingsComments = [];
 		var style = curScore.style;
@@ -2320,17 +2323,18 @@ MuseScore {
 			var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
 			var firstStaffNamesVisible = firstStaffNamesVisibleSetting < 2;
 			var blankStaffNames = [];
+			//logError ("numParts = "+numParts);
 			if (firstStaffNamesVisible) {
 				for (var i = 0; i < numParts; i++) {
 					var partName;
 					if (firstStaffNamesVisibleSetting == 0) {
-						partName = parts[i].longName;
+						partName = visibleParts[i].longName;
 					} else {
-						partName = parts[i].shortName;
+						partName = visibleParts[i].shortName;
 					}
 					if (partName === "") {
 						for (var j = 0; j < numStaves; j++) {
-							if (curScore.staves[j].part.is(parts[i])) {
+							if (curScore.staves[j].part.is(visibleParts[i])) {
 								blankStaffNames.push(j);
 								break;
 							}
@@ -2340,7 +2344,10 @@ MuseScore {
 				if (blankStaffNames.length == numParts) {
 					firstStaffNamesVisible = false;
 				} else {
-					for (var i = 0; i < blankStaffNames.length; i++) addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system1 "+i);
+					for (var i = 0; i < blankStaffNames.length; i++) {
+						//logError ("(Main staff names) Trying to add error about staff "+(blankStaffNames[i]+1));
+						addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system1 "+blankStaffNames[i]);
+					}
 				}
 			}
 			if (firstStaffNamesVisible && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
@@ -2355,13 +2362,15 @@ MuseScore {
 				for (var i = 0; i < numParts; i++) {
 					var partName;
 					if (subsequentStaffNamesVisibleSetting == 0) {
-						partName = parts[i].longName;
+						partName = visibleParts[i].longName;
 					} else {
-						partName = parts[i].shortName;
+						partName = visibleParts[i].shortName;
 					}
-					if (partName === "") {
+					var isBlank = partName == '';
+					//logError ("partName "+i+" = "+partName+" — empty = "+isBlank);
+					if (isBlank) {
 						for (var j = 0; j < numStaves; j++) {
-							if (curScore.staves[j].part.is(parts[i])) {
+							if (curScore.staves[j].part.is(visibleParts[i])) {
 								blankStaffNames.push(j);
 								break;
 							}
@@ -2371,7 +2380,10 @@ MuseScore {
 				if (blankStaffNames.length == numParts) {
 					subsequentStaffNamesVisible = false;
 				} else {
-					for (var i = 0; i < blankStaffNames.length; i++) addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system2 "+i);
+					for (var i = 0; i < blankStaffNames.length; i++) {
+						//logError ("(Sub Staff Names) Trying to add error about staff "+(blankStaffNames[i]+1));
+						addError ("Staff "+(blankStaffNames[i]+1)+" has no staff name.","system2 "+blankStaffNames[i]);
+					}
 				}
 			}
 			fullInstNamesShowing = (firstStaffNamesVisible && firstStaffNamesVisibleSetting == 0) || (subsequentStaffNamesVisible && subsequentStaffNamesVisibleSetting == 0);
@@ -4677,7 +4689,7 @@ MuseScore {
 		//logError(" TREMOLO HAS "+numStrokes+" strokes); dur is "+dur;
 		switch (numStrokes) {
 			case 0:
-				logError("checkOneNoteTremolo — Couldn't calculate number of strokes");
+				logError("checkOneNoteTremolo() — Couldn’t calculate number of strokes");
 				break;
 			case 1:
 				if (!flaggedOneStrokeTrem) addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
@@ -4718,7 +4730,7 @@ MuseScore {
 		}
 		switch (numStrokes) {
 			case 0:
-				logError("checkTwoNoteTremolo() — Couldn't calculate number of strokes");
+				logError("checkTwoNoteTremolo() — Couldn’t calculate number of strokes");
 				break;
 			case 1:
 				addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
@@ -4836,6 +4848,7 @@ MuseScore {
 				if (isString) {
 					if (element.includes(' ')) {
 						staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
+						//logError ("elem = "+element+" = "+staffNum);
 						theLocation = element.split(' ')[0];
 						if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
 					}
@@ -4858,7 +4871,7 @@ MuseScore {
 								while (!curScore.staves[staffNum].is(elemStaff)) {
 									staffNum ++; // I WISH: staffNum = element.staff.staffidx
 									if (curScore.staves[staffNum] == null || curScore.staves[staffNum] == undefined) {
-										logError ("showAllErrors () — got staff error "+staffNum+" — bailing");
+										logError ("showAllErrors() — got staff error "+staffNum+" — bailing");
 										return;
 									}
 								}
@@ -4891,7 +4904,10 @@ MuseScore {
 						desiredPosY = 10.;
 					}
 					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
-					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
+					if (theLocation === "system2") {
+						tick = firstBarInSecondSystem.firstSegment.tick;
+						logError ("sys2: "+tick+" "+staffNum);
+					}
 				} else {
 					tick = getTick(element);
 				}
