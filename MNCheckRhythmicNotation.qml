@@ -1896,7 +1896,7 @@ MuseScore {
 		var segment = curScore.firstSegment();
 		while (segment) {
 			if (segment.segmentType == Segment.TimeSig) {
-				for (var i = 0; i < numStaves; i++) {
+				for (var i = 0; i < curScore.nstaves; i++) {
 					var theTimeSig = segment.elementAt(i*4);
 					if (theTimeSig.type == Element.TIMESIG) {
 						var c = theTimeSig.color;

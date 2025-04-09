@@ -2580,9 +2580,9 @@ MuseScore {
 		var endOffset = currentHairpin.userOff2.x;
 		//logError ("off: "+startOffset+" "+endOffset);
 		var m = 1.0;
-		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
-		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
-		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
 		
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = cursor.staffIdx;
@@ -5167,7 +5167,7 @@ MuseScore {
 		var segment = curScore.firstSegment();
 		while (segment) {
 			if (segment.segmentType == Segment.TimeSig) {
-				for (var i = 0; i < numStaves; i++) {
+				for (var i = 0; i < curScore.nstaves; i++) {
 					var theTimeSig = segment.elementAt(i*4);
 					if (theTimeSig.type == Element.TIMESIG) {
 						var c = theTimeSig.color;
