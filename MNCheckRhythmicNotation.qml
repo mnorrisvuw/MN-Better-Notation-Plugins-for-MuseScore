@@ -26,8 +26,6 @@ MuseScore {
 	property var selectionArray: []
 	property var timeSigs: []
 	property var timeSigTicks: []
-	property var prevCommentPage: null
-	property var commentPosOffset: []
 	property var rests: []
 	property var tiedNotes: []
 	property var errorMsg: ''

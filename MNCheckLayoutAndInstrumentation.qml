@@ -90,10 +90,6 @@ MuseScore {
 	property var isNote: false
 	property var isRest: false
 	
-	// ** COMMMENTS ** //
-	property var prevCommentPage: null
-	property var commentPosOffset: []
-	
 	// ** PARTS ** //
 	property var isGrandStaff: []
 	property var isTopOfGrandStaff: []

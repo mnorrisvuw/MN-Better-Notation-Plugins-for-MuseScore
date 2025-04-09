@@ -29,8 +29,6 @@ MuseScore {
 	
 	// **** PROPERTIES **** //
 
-	property var prevCommentPage: null
-	property var commentPosOffset: []
 	property var selectionArray: []
 	property var diatonicPitchAlts: []
 	property var currAccs: []
