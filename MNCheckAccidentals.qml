@@ -109,7 +109,6 @@ MuseScore {
 		currPCAccs = Array(7).fill(0);
 		barAltered = Array(120).fill(0);
 		barAlteredPC = Array(7).fill(0);
-		commentPosOffset = Array(10000).fill(0);
 		
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;
@@ -151,10 +150,6 @@ MuseScore {
 		var lastPage = lastSystem.parent;
 		var firstPageNum = firstPage.pagenumber;
 		var lastPageNum = lastPage.pagenumber;
-		
-
-		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
-		for (var i = 0; i <= lastPageNum; i++) commentPosOffset[i] = Array(10000).fill(0);
 				
 		// ** LOOP THROUGH NOTES **//
 		// ** NB — endStaff IS EXCLUDED FROM RANGE — SEE MUSESCORE DOCS ** //
@@ -1223,7 +1218,6 @@ MuseScore {
 									
 									//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
 									while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition) {
-										//var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
 										comment.offsetY -= commentOffset;
 										comment.offsetX += commentOffset;
 										dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);

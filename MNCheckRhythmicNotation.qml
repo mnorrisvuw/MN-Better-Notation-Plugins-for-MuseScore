@@ -201,9 +201,6 @@ MuseScore {
 		var firstPageNum = firstPage.pagenumber;
 		var lastPageNum = lastPage.pagenumber;
 		
-		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
-		for (var i = 0; i <= lastPageNum; i++) commentPosOffset[i] = Array(10000).fill(0);
-		
 		// **** INITIALISE VARIABLES FOR THE LOOP **** //
 		var numBarsProcessed,wasTied, currentTimeSig;
 		var prevNoteWasDoubleTremolo;
@@ -1747,7 +1744,6 @@ MuseScore {
 									
 									//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
 									while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition) {
-										//var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
 										comment.offsetY -= commentOffset;
 										comment.offsetX += commentOffset;
 										dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);

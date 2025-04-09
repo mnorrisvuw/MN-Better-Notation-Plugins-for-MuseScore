@@ -425,9 +425,6 @@ MuseScore {
 			}
 		}
 		
-		// **** INITIALISE THE COMMENT POSITION OFFSET **** //
-		for (var i = 0; i <= lastPageNum; i++) commentPosOffset[i] = Array(10000).fill(0);
-		
 		// ************  					SELECT AND PRE-PROCESS ENTIRE SCORE 							************ //
 		selectAll();
 		setProgress (1);
@@ -976,27 +973,12 @@ MuseScore {
 											//logError ("hairpinDur = "+hairpinDur+" hairpinType = "+currentHairpin.hairpinType);
 											if (hairpinDur <= barLength && (currentHairpin.hairpinType %2 == 0)) {
 												if (nextHairpin != null) {	
-													//logError ("nextHairpinStart = "+nextHairpinStart+" end = "+(currentHairpinEnd + barLength)+" hairpinType = "+nextHairpin.hairpinType);
-													if (nextHairpinStart < currentHairpinEnd + barLength && (nextHairpin.hairpinType %2 == 1)) {
-														expressiveSwell = true;
-													//logError ("expressiveSwell = true");
-													}
+													if (nextHairpinStart < currentHairpinEnd + barLength && (nextHairpin.hairpinType %2 == 1)) expressiveSwell = true;
 												}
 											}
-											// check hairpin termination if it's not just a little expressive swell 
-
-											if (!expressiveSwell) checkHairpinTermination(cursor);
 										}
 									}
-									
-									// **** Hairpin starting underneath a rest? **** //
-									//logError ("Checking hairpin: currTick = "+currTick+" hairpinStartTick = "+hairpinStartTick+" prevTick = "+prevTick[currentTrack]+" prevNote = "+prevNote);
-									var noteAtHairpinStart = getNoteRestAtTick(hairpinStartTick);
-									
-									var hairpinStartsOnRest = true;
-									if (noteAtHairpinStart != null) hairpinStartsOnRest = noteAtHairpinStart.type == Element.REST;
-									//logError ("hairpinStartsOnRest = "+hairpinStartsOnRest+" hairpinStartsAfterRest = "+hairpinStartsAfterRest);
-									if (hairpinStartsOnRest) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);
+									checkHairpins(cursor, expressiveSwell);
 									
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
@@ -2574,7 +2556,25 @@ MuseScore {
 		}
 	}
 	
-	function checkHairpinTermination (cursor) {
+	function checkHairpins (cursor, expressiveSwell) {
+		var hairpinStartTick = currentHairpin.spannerTick.ticks;
+		var hairpinDur = currentHairpin.spannerTicks.ticks;
+		
+		// **** Does the hairpin start under a rest? **** //
+		var noteAtHairpinStart = getNoteRestAtTick(hairpinStartTick);
+		var hairpinStartsOnRest = (noteAtHairpinStart == null) ? true : noteAtHairpinStart.type == Element.REST;
+		if (hairpinStartsOnRest) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);
+		
+		
+		var startOffset = Math.abs(currentHairpin.offset.x);
+		var endOffset = currentHairpin.userOff2.x;
+		//logError ("off: "+startOffset+" "+endOffset);
+		var m = 1.0;
+		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nDelete the hairpin, and recreate by first selecting a passage and then creating the hairpin.",currentHairpin);
+
+		
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = cursor.staffIdx;
 		cursor2.track = cursor.track;
@@ -2584,22 +2584,30 @@ MuseScore {
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
 		
+		// allow an expressive swell
+		if (expressiveSwell) return;
+		
 		// allow a terminating decrescendo on the last bar
 		if (isDecresc && currentBarNum == numBars) return;
 		
 		// cycle through the dynamics in the staff, looking to see whether there is one near the end of the hairpin
-		for (var i=0;i<dynamics[currentStaffNum].length;i++) if (dynamics[currentStaffNum][i] >= currentHairpinEnd && dynamics[currentStaffNum][i] <= hairpinZoneEndTick) return;
+		for (var i = 0;i < dynamics[currentStaffNum].length; i++) if (dynamics[currentStaffNum][i] >= currentHairpinEnd && dynamics[currentStaffNum][i] <= hairpinZoneEndTick) return;
+		
+		//logError ("cursor2.tick = "+cursor2.tick+" currentHairpinEnd = "+currentHairpinEnd);
 		
 		// allow a decrescendo going to a rest without needing a terminating dynamic
 		if (isDecresc) {
-			while (cursor2 != null && cursor2.tick < currentHairpinEnd) cursor2.next();
-			if (cursor2 == null) return;
-			if (cursor2.element == null) return;
+			while (cursor2 != null) {
+				cursor2.next();
+				if (cursor2 == null) return;
+				if (cursor2.element == null) return;
+				if (cursor2.tick >= currentHairpinEnd) break;
+			}
 			if (cursor2.element.notes == null) return;
 			if (cursor2.element.notes.length == 0) return;
 		}
 
-		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.",currentHairpin);
+		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.", currentHairpin);
 	}
 	
 	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText) {
@@ -4947,7 +4955,6 @@ MuseScore {
 									
 									//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
 									while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition) {
-										//var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
 										comment.offsetY -= commentOffset;
 										comment.offsetX += commentOffset;
 										dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);
