@@ -2584,26 +2584,25 @@ MuseScore {
 		cursor2.track = cursor.track;
 		cursor2.rewindToTick(cursor.tick);
 		cursor2.filter = Segment.ChordRest;
-		
+		var isDecresc = currentHairpin.hairpinType %2 == 1;
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
-		//logError (currentHairpin.hairpinType+" "+currentBarNum+ " "+numBars);
 		
-		// allow a terminating decrescendo to a rest or on the last bar
-		if (currentHairpin.hairpinType %2 == 1 && currentBarNum == numBars) return;
-
-		for (var i=0;i<dynamics[currentStaffNum].length;i++) {
-			var theTick = dynamics[currentStaffNum][i];
-		//	if (theTick > (currentHairpinEnd - division * 4) && theTick < (currentHairpinEnd + division * 4)) logError ("Found a dynamic at "+theTick+"; needs to be between "+currentHairpinEnd+" and "+hairpinZoneEndTick);
-			if (theTick >= currentHairpinEnd && theTick <= hairpinZoneEndTick) return;
+		// allow a terminating decrescendo on the last bar
+		if (isDecresc && currentBarNum == numBars) return;
+		
+		// cycle through the dynamics in the staff, looking to see whether there is one near the end of the hairpin
+		for (var i=0;i<dynamics[currentStaffNum].length;i++) if (dynamics[currentStaffNum][i] >= currentHairpinEnd && dynamics[currentStaffNum][i] <= hairpinZoneEndTick) return;
+		
+		// allow a decrescendo going to a rest without needing a terminating dynamic
+		if (isDecresc) {
+			while (cursor2 != null && cursor2.tick < currentHairpinEnd) cursor2.next();
+			if (cursor2 == null) return;
+			if (cursor2.element == null) return;
+			if (cursor2.element.notes == null) return;
+			if (cursor2.element.notes.length == 0) return;
 		}
-		
-		// check not rests
-		while (cursor2 != null && cursor2.tick < theTick) cursor2.next();
-		if (cursor2 == null) return;
-		if (cursor2.element == null) return;
-		if (cursor2.element.notes == null) return;
-		if (cursor2.element.notes.length == 0) return;
+
 		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.",currentHairpin);
 	}
 	
