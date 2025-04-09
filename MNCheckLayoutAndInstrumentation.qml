@@ -604,7 +604,7 @@ MuseScore {
 			numHairpins = hairpins[currentStaffNum].length;
 			nextHairpin = (numHairpins == 0) ? null : hairpins[currentStaffNum][0];
 			nextHairpinStart = (numHairpins == 0) ? 0 : nextHairpin.spannerTick.ticks;
-			expressiveSwell = false;
+			expressiveSwell = 0;
 			
 			// ** ottavas
 			currentOttava = null;
@@ -972,21 +972,17 @@ MuseScore {
 										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
 										nextHairpinStart = nextHairpin.spannerTick.ticks;
 									}
-									if (hairpinDur <= barLength) {
-										if (expressiveSwell) {
-											expressiveSwell = false;
-										} else {
-											// even numbered hairpin types are cresc; odd-numbere are decresc
-											//logError ("hairpinDur = "+hairpinDur+" hairpinType = "+currentHairpin.hairpinType);
-											if (hairpinDur <= barLength && (currentHairpin.hairpinType %2 == 0)) {
-												if (nextHairpin != null) {	
-													if (nextHairpinStart < currentHairpinEnd + barLength && (nextHairpin.hairpinType %2 == 1)) expressiveSwell = true;
-												}
+									if (hairpinDur <= barLength && !expressiveSwell) {
+										// even numbered hairpin types are cresc; odd-numbere are decresc
+										//logError ("hairpinDur = "+hairpinDur+" hairpinType = "+currentHairpin.hairpinType);
+										if (hairpinDur <= barLength && (currentHairpin.hairpinType %2 == 0)) {
+											if (nextHairpin != null) {	
+												if (nextHairpinStart < currentHairpinEnd + barLength && (nextHairpin.hairpinType %2 == 1)) expressiveSwell = 1;
 											}
 										}
 									}
 									checkHairpins(cursor, expressiveSwell);
-									
+									if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
 										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
@@ -2598,7 +2594,7 @@ MuseScore {
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
 		var hairpinZoneStartTick = hairpinStartTick - beatLength;
 		// allow an expressive swell
-		if (expressiveSwell) return;
+		if (expressiveSwell > 0) return;
 		
 		// allow a terminating decrescendo on the last bar
 		if (isDecresc && currentBarNum == numBars) return;
