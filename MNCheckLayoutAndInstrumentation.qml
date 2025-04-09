@@ -63,7 +63,7 @@ MuseScore {
 	property var prevKeySigSharps: 0
 	property var prevKeySigBarNum: 0
 	property var currentBarNum: 0
-	property var displayBarNum: 0
+	property var currentDisplayBarNum: 0
 	property var hasMoreThanOneSystem: false
 	property var scoreIncludesTransposingInstrument: false
 	property var virtualBeatLength: 0
@@ -125,6 +125,8 @@ MuseScore {
 	property var lastArticulationTick: -1
 	property var lastDynamicTick: -1
 	property var lastMetronomeMarkingBar: -1
+	property var lastMetronomeMarkingDisplayBar: -1
+	property var lastMetroSection: ''
 	property var numConsecutiveMusicBars: 0
 	property var currentStaffNum: 0
 	property var currentTimeSig: null
@@ -189,6 +191,8 @@ MuseScore {
 	property var highLoudRegisterThresholdPitch: 0
 	property var lowLoudRegisterThresholdPitch: 0
 	property var lastDynamicFlagBar: -1
+	property var stringsArray: []
+	property var stringNames: []
 	
 	// ** DYNAMICS ** //
 	property var dynamics: []
@@ -218,9 +222,13 @@ MuseScore {
 	// ** SLURS ** //
 	property var slurs:[]
 	property var isSlurred: false
+	property var isStartOfSlur: false
+	property var isEndOfSlur: false
 	property var flaggedSlurredRest: false
 	property var prevSlurNum: 0
 	property var currentSlurNum: 0
+	property var currentSlurStart: 0
+	property var currentSlurEnd: 0
 	property var currentSlurLength: 0
 	property var prevSlurLength: 0
 	
@@ -532,6 +540,8 @@ MuseScore {
 			lastTempoMarking = null;
 			lastTempoMarkingBar = -1;
 			lastMetronomeMarkingBar = -1;
+			lastMetronomeMarkingDisplayBar = -1;
+			lastMetroSection = '';
 			lastArticulationTick = -1;
 			lastDynamicTick = -1;
 			numConsecutiveMusicBars = 0;
@@ -555,9 +565,17 @@ MuseScore {
 			
 			// ** slurs
 			currentSlur = null;
-			isSlurred = false;			
+			isSlurred = false;	
+			isStartOfSlur = false;	
+			isEndOfSlur = false;	
 			currentSlurNum = 0;
 			currentSlurEnd = 0;	
+			prevSlurNum = 0;
+			currentSlurStart = 0;
+			currentSlurEnd = 0;
+			currentSlurLength = 0;
+			prevSlurLength = 0;
+			
 			numSlurs = slurs[currentStaffNum].length;
 			if (numSlurs == 0) {
 				nextSlurStart = 0;
@@ -624,9 +642,9 @@ MuseScore {
 						
 			for (var t = 0; t < numStaves * 4; t++) prevTick[t] = -1;
 			
-			displayBarNum = 0;
+			currentDisplayBarNum = 0;
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
-				if (!currentBar.irregular) displayBarNum ++;
+				if (!currentBar.irregular) currentDisplayBarNum ++;
 				
 				barStartTick = currentBar.firstSegment.tick;
 				barEndTick = currentBar.lastSegment.tick;
@@ -759,10 +777,13 @@ MuseScore {
 						
 							// ************ UNDER A SLUR? ************ //
 							var readyToGoToNextSlur = false;
+								
 							if (currentSlurNum < numSlurs) {
 								if (currentSlur == null) {
 									readyToGoToNextSlur = true;
 								} else {
+									
+										
 									if (currTick > currentSlurEnd) {
 										currentSlurNum ++;
 										//logError ("Now at slur "+currentSlurNum);
@@ -797,7 +818,8 @@ MuseScore {
 									currentSlur = slurs[currentStaffNum][currentSlurNum];
 									
 									//logError ("Found a slur: pagePos = {"+Math.round(currentSlur.pagePos.x*100)/100.+","+Math.round(currentSlur.pagePos.y*100)/100.+"}\nParent system pagePos = {"+Math.round(currentSlur.parent.pagePos.x*100)/100.+","+Math.round(currentSlur.parent.pagePos.y*100)/100.+"}");
-									var currentSlurStart = nextSlurStart;
+									
+									currentSlurStart = currentSlur.spannerTick.ticks;
 									prevSlurEnd = currentSlurEnd;
 									prevSlurLength = currentSlurLength;
 									currentSlurLength = currentSlur.spannerTicks.ticks
@@ -819,6 +841,9 @@ MuseScore {
 									}
 								}
 							}
+							
+							isStartOfSlur = isSlurred ? currTick == currentSlurStart : false;
+							isEndOfSlur = isSlurred ? currTick == currentSlurEnd : false;
 						
 							// ************ PEDAL? ************ //
 							var readyToGoToNextPedal = false;
@@ -1823,6 +1848,7 @@ MuseScore {
 			var short1 = staff1.part.shortName;
 			var full1l = full1.toLowerCase();
 			var short1l = short1.toLowerCase();
+			//logError ("Staff br = "+i+" "+staff1.bracketSpan+" "+staff1.bracketColumn);
 			
 			// **** CHECK FOR NON-STANDARD DEFAULT STAFF NAMES **** //
 			
@@ -1893,6 +1919,14 @@ MuseScore {
 	}
 		
 	function setInstrumentVariables () {
+		var violinStrings = [55,62,69,76];
+		var violinStringNames = ["G","D","A","E"];
+		var violaStrings = [48,55,62,69];
+		var violaStringNames = ["C","G","D","A"];
+		var celloStrings = [36,43,50,57];
+		var celloStringNames = ["C","G","D","A"];
+		var bassStrings = [28,33,38,43];
+		var bassStringNames = ["E","A","D","G"];
 		
 		if (currentInstrumentId != "") {
 			isStringInstrument = currentInstrumentId.includes("strings.");
@@ -1968,20 +2002,37 @@ MuseScore {
 			}
 		
 			// STRINGS
+			stringsArray = [];
+			stringNames = [];
 			if (currentInstrumentId.includes("strings.")) {
 				if (currentInstrumentCalcId.includes("violin")) {
 					checkClefs = true;
 					reads8va = true;
+					stringsArray = violinStrings;
+					stringNames = violinStringNames;
 				}
 				if (currentInstrumentCalcId.includes("viola")) {
 					readsAlto = true;
 					checkClefs = true;
+					stringsArray = violaStrings;
+					stringNames = violaStringNames;
 				}
-				if (currentInstrumentCalcId.includes("cello") || currentInstrumentCalcId.includes("contrabass")) {
+				if (currentInstrumentCalcId.includes("cello")) {
 					readsTenor = true;
 					readsBass = true;
 					checkClefs = true;
+					stringsArray = celloStrings;
+					stringNames = celloStringNames;
 				}
+				if (currentInstrumentCalcId.includes("contrabass")) {
+					readsTenor = true;
+					readsBass = true;
+					checkClefs = true;
+					stringsArray = bassStrings;
+					stringNames = bassStringNames;
+				}
+				
+				if (stringsArray.length == 0) logError ("setInstrumentVariables() — I couldn’t work out what string instrument this was — "+currentInstrumentId);
 			}
 			
 			// VOICE
@@ -2031,6 +2082,9 @@ MuseScore {
 		var flaggedMultiRests = false;
 		var flaggedMultiRestWidth = false;
 		var flaggedLastSystemFillLimit = false;
+		var flaggedPartNameStyle = false;
+		var flaggedIndentation = false;
+		
 		for (var i = 0; i < numExcerpts; i++) {
 			var thePart = excerpts[i];
 			
@@ -2048,7 +2102,15 @@ MuseScore {
 					pageSettingsComments.push("Increase the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 					flaggedStaffSize = true;
 				}
-			}		
+			}
+			
+			if (!flaggedIndentation) {
+				var indent = style.value("enableIndentationOnFirstSystem");
+				if (indent) {
+					styleComments.push("(Score tab) Uncheck ‘Enable indentation on first system'");
+					flaggedIndentation = true;
+				}
+			}
 
 			
 			// check system spacing
@@ -2124,6 +2186,22 @@ MuseScore {
 					flaggedMultiRestWidth = true;
 				}
 			}
+			
+			// part title setup
+			if (!flaggedPartNameStyle) {
+				var type = style.value ("partInstrumentFrameType");
+				var padding = style.value ("partInstrumentFramePadding");
+				if (type != 1) {
+					logError (type);
+					styleComments.push("(Text Styles→Instrument name (Part)) Set Frame type to Rectangle");
+					flaggedPartNameStyle = true;
+				}
+				if (padding != 0.8) {
+					logError (padding);
+					styleComments.push("(Text Styles→Instrument name (Part)) Set Frame Padding to 0.80");
+					flaggedPartNameStyle = true;
+				}
+			}
 		}
 		
 		// ** POST STYLE COMMENTS
@@ -2180,6 +2258,8 @@ MuseScore {
 		var pageOddRightMargin = pageWidth - pagePrintableWidth - pageOddLeftMargin;
 		var tupletsFontFace = style.value("tupletFontFace");
 		var tupletsFontStyle = style.value("tupletFontStyle");
+		var tupletsFontSize = style.value("tupletFontSize");
+		var barNumberFontSize = style.value("measureNumberFontSize");
 		var pageNumberFontStyle = style.value("pageNumberFontStyle");
 		var barlineWidth = style.value("barWidth");
 		var minimumBarWidth = style.value("minMeasureWidth");
@@ -2355,7 +2435,7 @@ MuseScore {
 		if (!isSoloScore) {
 			if (enableVerticalSpread) {
 				if (minStaffSpread < 5 || minStaffSpread > 6) styleComments.push("(Page tab) Set the ‘Min. stave distance’ to between 5.0–6.0sp");
-				if (maxStaffSpread < 10 || maxStaffSpread > 12) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 10.0–12.0sp");
+				if (maxStaffSpread < 8 || maxStaffSpread > 9) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 8.0–9.0sp");
 			} else {
 				if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Page tab) Set the ‘Stave distance’ to between 5.0–6.0sp");
 			}
@@ -2388,6 +2468,8 @@ MuseScore {
 		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman italic for tuplets");
 		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle == 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman for tuplets");
 		if (tupletsFontFace === "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use an italic font for tuplets");
+		if (tupletsFontSize < 9 || tupletsFontSize > 10) styleComments.push("(Text Styles→Tuplet) Set tuplet font size to between 9–10pt");
+		if (barNumberFontSize < 9 || barNumberFontSize > 11) styleComments.push("(Text Styles→Tuplet) Set tuplet font size to between 9–11pt");
 		if (pageNumberFontStyle != 0 && numPages > 1) {
 			var s = 'bold';
 			if (pageNumberFontStyle > 1) s = 'italics';
@@ -2966,10 +3048,15 @@ MuseScore {
 	}
 	
 	function checkScoreText() {
+		var textToCheck = [];
 		curScore.startCmd();
-		cmd("title-text");
+		selectAll();
+		cmd ("insert-vbox");
+		var vbox = curScore.selection.elements[0];
+		
+		cmd ("title-text");
 		var tempText = curScore.selection.elements[0];
-		cmd("select-similar");
+		cmd ("select-similar");
 		var elems = curScore.selection.elements;
 		currentBarNum = 0;
 		var hasTitleOnFirstPageOfMusic = false;
@@ -2979,18 +3066,22 @@ MuseScore {
 			var e = elems[i];
 			if (!e.is(tempText)) {
 				//logError ("Found text object "+e.text);
-				checkTextObject (e);
 				var eSubtype = e.subtypeName();
+				if (eSubtype != "Tuplet") textToCheck.push(e);
 				if (eSubtype == "Title" && getPageNumber(e) == firstPageNum) hasTitleOnFirstPageOfMusic = true;
 				if (eSubtype == "Subtitle" && getPageNumber(e) == firstPageNum) hasSubtitleOnFirstPageOfMusic = true;
 				if (eSubtype == "Composer" && getPageNumber(e) == firstPageNum) hasComposerOnFirstPageOfMusic = true;
 
 			}
 		}
-		curScore.endCmd(true); // undo
+		removeElement (vbox);
+		curScore.endCmd(); // undo
+		for (var i = 0; i < textToCheck.length; i++) checkTextObject (textToCheck[i]);
+
 		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
 		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
+		
 		selectAll();
 	}
 	
@@ -3068,6 +3159,8 @@ MuseScore {
 				if (eSubtype === "Composer" && plainText === 'Composer / arranger') addError( "You have not changed the default composer text",textObject);
 			
 				// **** CHECK FOR STRAIGHT QUOTES THAT SHOULD BE CURLY **** //
+				//logError ("Checking "+lowerCaseText+" for straight quote — "+lowerCaseText.includes("'"));
+
 				if (lowerCaseText.includes("'")) addError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.",textObject);	
 				if (lowerCaseText.includes('\"')) addError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.',textObject);
 				
@@ -3222,7 +3315,6 @@ MuseScore {
 									metroStr = "dotted "+metroStr;
 								}
 								if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
-								lastMetronomeMarkingBar = currentBarNum;
 								if (nonBoldText === "") {
 									//logError ("styledText is "+styledText.replace(/</g,'{'));
 									if (styledText.includes('<b>')) {
@@ -3239,6 +3331,7 @@ MuseScore {
 						}
 						if (isMetronomeMarking) {
 							
+							if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
 							// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
 							var metroIsPlain = nonBoldText.includes('=');
 							//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
@@ -3248,8 +3341,15 @@ MuseScore {
 							if (isTempoMarking && !metroIsPlain) {
 								addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
 							}
+							var metroSection = styledTextWithoutTags.split('=')[1];
+							if (metroSection === lastMetroSection) addError ('This looks like the same metronome marking that was set in b. '+currentDisplayBarNum, textObject);
+							lastMetroSection = metroSection;
+							lastMetronomeMarkingBar = currentBarNum;
+							lastMetronomeMarkingDisplayBar = currentDisplayBarNum;
 						}
 					}
+					
+					if (isTempoChangeMarking || (isTempoMarking && !isMetronomeMarking)) lastMetroSection = '';
 				
 					// **** CHECK DIV/UNIS. **** //
 					if (lowerCaseText.includes('div.')) {
@@ -3433,7 +3533,7 @@ MuseScore {
 					
 						if (!dynamicException) {
 							prevDynamicBarNum = currentBarNum;
-							prevDynamicDisplayBarNum = displayBarNum;
+							prevDynamicDisplayBarNum = currentDisplayBarNum;
 							prevDynamic = plainText;
 							prevDynamicObject = textObject;
 						} else {
@@ -3679,7 +3779,7 @@ MuseScore {
 			addError ("Don’t put staccato dots on tied notes",noteRest);
 			return;
 		}
-		if (isSlurred && flaggedSlurredStaccatoBar < currentBarNum - 4 && isStringInstrument) {
+		if (isSlurred && !isEndOfSlur && flaggedSlurredStaccatoBar < currentBarNum - 4 && isStringInstrument) {
 			var prev = getPreviousNoteRest(noteRest);
 			var next = getNextNoteRest(noteRest);
 			if (noteRest.notes.length > 0) {
@@ -3695,10 +3795,12 @@ MuseScore {
 						if (next.notes.length > 0) nextPitch = next.notes[0].pitch;
 					}
 				}
-				var portatoOK = (pitch == prevPitch || pitch == nextPitch);
-				if (!portatoOK) {
-					addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
-					flaggedSlurredStaccatoBar = currentBarNum;
+				if (!isEndOfSlur) {
+					var portatoOK = (pitch == prevPitch || pitch == nextPitch);
+					if (!portatoOK) {
+						addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
+						flaggedSlurredStaccatoBar = currentBarNum;
+					}
 				}
 			}
 		}
@@ -3882,20 +3984,13 @@ MuseScore {
 	
 	function checkMultipleStop (chord) {
 		if (isStringHarmonic) return;
-		var violinStrings = [55,62,69,76];
-		var violinStringNames = ["G","D","A","E"];
-		var violaStrings = [48,55,62,69];
-		var violaStringNames = ["C","G","D","A"];
-		var celloStrings = [36,43,50,57];
-		var celloStringNames = ["C","G","D","A"];
-		var bassStrings = [28,33,38,43];
-		var bassStringNames = ["E","A","D","G"];
+		
 		var noteOnString = [-1,-1,-1,-1];
-		var stringsArray = [];
-		var stringNames = [];
 		var iName = "";
 		var maxStretch = 13; // 6 + 7
 		var numNotes = chord.notes.length;
+		var prevNoteRest = getPreviousNoteRest(chord);
+		var prevIsChord = prevNoteRest == null ? false : prevNoteRest.type == Element.CHORD;
 		
 		if (numNotes > 4) {
 			addError ("This multiple stop has more than 4 notes in it",chord);
@@ -3910,24 +4005,16 @@ MuseScore {
 		
 		if (currentInstrumentId.includes("violin") || currentInstrumentName.toLowerCase().includes("violin")) {
 			iName = "violin";
-			stringsArray = violinStrings;
-			stringNames = violinStringNames;
 		}
 		if (currentInstrumentId.includes("viola") || currentInstrumentName.toLowerCase().includes("viola")) {
 			iName = "viola";
-			stringsArray = violaStrings;
-			stringNames = violaStringNames;
 			maxStretch = 12;
 		}
 		if (currentInstrumentId.includes("cello") || currentInstrumentName.toLowerCase().includes("cello")) {
 			iName = "cello";
-			stringsArray = celloStrings;
-			stringNames = celloStringNames;
 		}
 		if (currentInstrumentId.includes("bass") || currentInstrumentName.toLowerCase().includes("bass")) {
 			iName = "double bass";
-			stringsArray = bassStrings;
-			stringNames = bassStringNames;
 			maxStretch = 9;
 		}
 		if (iName === "") return; // unknown string instrument
@@ -3983,12 +4070,13 @@ MuseScore {
 				addError ("This double-stop is quite high, with the bottom note over an octave above II.\nThe intonation may be poor — consider rewriting.",chord);
 			}
 		}
-		if (prevIsMultipleStop && chord.actualDuration.ticks <= division && prevSoundingDur <= division && interval > 0 && prevMultipleStopInterval > 0 && !flaggedFastMultipleStops) {
+		if (prevIsChord && prevIsMultipleStop && chord.actualDuration.ticks <= division && prevSoundingDur <= division && interval > 0 && prevMultipleStopInterval > 0 && !flaggedFastMultipleStops) {
 			//logError("Checking sequence");
 			
 			var pi1 = interval > 7;
 			var pi2 = prevMultipleStopInterval > 7;
 			if (pi1 != pi2) {
+				
 				addError ("This sequence of double-stops looks very difficult,\nas the hand has to change its position and orientation.",chord);
 				flaggedFastMultipleStops = true;
 				
@@ -3996,13 +4084,13 @@ MuseScore {
 				//logError("Checking identical chords");
 				
 				if (!chordsAreIdentical (chord,prevMultipleStop)) {
-					addError ("This looks like a sequence of relatively quick double-stops,\nwhich might be challenging to play accurately.",chord);
-					flaggedFastMultipleStops = true;
-				} else {
 					if (interval == 7 && !isCello) {
 						addError ("This looks like a sequence of relatively quick perfect fifths,\nwhich is challenging to play accurately.",chord);
-						flaggedFastMultipleStops = true;
+					} else {
+						addError ("This looks like a sequence of relatively quick double-stops,\nwhich might be challenging to play accurately.",chord);
 					}
+					flaggedFastMultipleStops = true;
+					
 				}
 			}
 		}
@@ -4060,7 +4148,6 @@ MuseScore {
 		
 		if (nn == 1) {
 			var harmonicArray = [];
-			var stringsArray = [];
 			var noteheadStyle = noteRest.notes[0].headGroup;
 
 			if (typeof staffNum !== 'number') logError("Artic error in checkStringHarmonic nn1");
@@ -4090,11 +4177,7 @@ MuseScore {
 			if (isStringHarmonic) {
 				var p = noteRest.notes[0].pitch;
 				var harmonicOK = false;
-				if (currentInstrumentId.includes("violin") || currentInstrumentName.toLowerCase().includes("violin")) stringsArray = violinStrings;
-				if (currentInstrumentId.includes("viola") || currentInstrumentName.toLowerCase().includes("viola")) stringsArray = violaStrings;
-				if (currentInstrumentId.includes("cello") || currentInstrumentName.toLowerCase().includes("cello")) stringsArray = celloStrings;
-				if (currentInstrumentId.includes("bass") || currentInstrumentName.toLowerCase().includes("bass")) stringsArray = bassStrings;
-				if (stringsArray.length == 0) logError ("checkStringHarmonic() — I couldn’t work out what string instrument this was — "+currentInstrumentId);
+				
 				for (var i = 0; i < stringsArray.length && !harmonicOK; i++) {
 					for (var j = 0; j < harmonicArray.length && !harmonicOK; j++) {
 						harmonicOK = (p == stringsArray[i]+harmonicArray[j]);
@@ -4205,15 +4288,11 @@ MuseScore {
 			kSoftAccentStaccatoAbove,	kSoftAccentStaccatoAbove+1,
 			kSoftAccentTenutoAbove,	kSoftAccentTenutoAbove+1,
 			kSoftAccentTenutoStaccatoAbove, kSoftAccentTenutoStaccatoAbove+1];
-		var slurStart = currentSlur.spannerTick.ticks;
-		var isStartOfSlur = currSlurTick == slurStart;
-		var slurLength = currentSlur.spannerTicks.ticks;
-		var slurEnd = slurStart + slurLength;
-		var isEndOfSlur = currSlurTick == slurEnd;
+		
 		//logError("slurStart "+slurStart+" slurEnd "+slurEnd);
 
 		//logError("CHECKING SLUR: isRest: "+isRest);
-		if (isStartOfSlur && isStringInstrument && slurLength > division * 8) addError("Consider whether this slur is longer than one bow stroke\nand should be broken into multiple slurs.",currentSlur);
+		if (isStartOfSlur && isStringInstrument && currentSlurLength > division * 8) addError("Consider whether this slur is longer than one bow stroke\nand should be broken into multiple slurs.",currentSlur);
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur) {
@@ -4230,7 +4309,7 @@ MuseScore {
 		
 		// **** CHECK SLUR GOING OVER A REST FOR STRINGS, WINDS & BRASS **** //
 		if (isRest) {
-			if ((isWindOrBrassInstrument || isStringInstrument) && !flaggedSlurredRest && currentSlur.spannerTicks.ticks > 0) {
+			if ((isWindOrBrassInstrument || isStringInstrument) && !flaggedSlurredRest && currentSlurLength > 0) {
 				addError("In general, avoid putting slurs over rests.",currentSlur);
 				flaggedSlurredRest = true;
 				return;
@@ -4335,7 +4414,7 @@ MuseScore {
 			cursor.rewindToTick(currSlurTick);
 			var beatDurInSecs = 1./cursor.tempo;
 			var tickDurInSecs = beatDurInSecs / division;
-			var slurDurInSecs = currentSlur.spannerTicks.ticks*tickDurInSecs;
+			var slurDurInSecs = currentSlurLength*tickDurInSecs;
 			if (slurDurInSecs > maxSlurDuration) addError ("This slur/bow mark may be too long at the stated dynamic.\nCheck with a performer whether a shorter one would be more appropriate.",currentSlur);
 		}
 		
@@ -4718,9 +4797,12 @@ MuseScore {
 				firstStaffNum ++;
 			}
 		}
+		var comments = [];
+		var commentPages = [];
+		
 		curScore.startCmd()
 		for (var i in errorStrings) {
-			var text = errorStrings[i];
+			var theText = errorStrings[i];
 			var element = errorObjects[i];
 			var isArray = Array.isArray(element);
 			var objectArray;
@@ -4778,13 +4860,18 @@ MuseScore {
 										return;
 									}
 								}
+								// Handle the case where a system-attached object reports a staff that is hidden
+								if (eType == Element.TEMPO_TEXT || eType == Element.SYSTEM_TEXT || eType == Element.REHEARSAL_MARK || eType == Element.METRONOME) {
+									while (!curScore.staves[staffNum].part.show && staffNum < curScore.nstaves) staffNum ++;
+								}
 							}
 						}
 					}
 				}
 				// add a text object at the location where the element is
 				var comment = newElement(Element.STAFF_TEXT);
-				comment.text = text;
+				comment.text = theText;
+				//logError ("Adding comment "+theText.substring(0,10));
 		
 				// style the text object
 				comment.frameType = 1;
@@ -4838,56 +4925,81 @@ MuseScore {
 					} else {
 						comment.offsetY -= commentHeight;
 					}
-					var commentTopRounded = Math.round(comment.pagePos.y);
+
 					var commentPage = comment.parent;
 					while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
-					var commentPageWidth = commentPage.bbox.width; // get page width
+
 					if (commentPage != null && commentPage != undefined) {
 						if (commentPage.type == Element.PAGE) {
-							var commentPageNum = commentPage.pagenumber;
-							var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
-							if (theOffset > 4 * commentOffset) {
-								theOffset = 0;
-								commentPosOffset[commentPageNum][commentTopRounded+1000] = 0;
-							} else {
-								commentPosOffset[commentPageNum][commentTopRounded+1000] += commentOffset;
+							var commentPageWidth = commentPage.bbox.width; // get page width
+							var commentPageNum = commentPage.pagenumber; // get page number
+							
+							// move over to the top right of the page if needed
+							if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+
+							// check to see if this comment has been placed too close to other comments
+							var maxOffset = 10;
+							var minOffset = 1.5;
+							for (var k = 0; k < comments.length; k++) {
+								var otherComment = comments[k];
+								var otherCommentPage = commentPages[k];
+								//logError ("Checking against comment "+k);
+								if (commentPage.is(otherCommentPage)) {
+									var dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);
+									var dy = Math.abs(comment.pagePos.y - otherComment.pagePos.y);
+									var isCloseToOtherComment = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
+									var isNotTooFarFromOriginalPosition = (isString) || (Math.abs(comment.offsetY) < maxOffset && Math.abs(comment.offsetX) < maxOffset);
+									
+									//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
+									while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition) {
+										//var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
+										comment.offsetY -= commentOffset;
+										comment.offsetX += commentOffset;
+										dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);
+										dy = Math.abs(comment.pagePos.y - otherComment.pagePos.y);
+										isCloseToOtherComment = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
+										isNotTooFarFromOriginalPosition = (isString) || (Math.abs(comment.offsetY) < maxOffset && Math.abs(comment.offsetX) < maxOffset);
+										//logError ("Too close: shifting comment.offsetX = "+comment.offsetX+" comment.offsetY = "+comment.offsetY+" tooClose = "+isCloseToOtherComment);
+									}
+								}
+								// check comment box is not covering the element
+								/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
+								if (!isString) {
+									var r1x = comment.pagePos.x;
+									var r1y = comment.pagePos.y;
+									var r1w = commentWidth;
+									var r1h = commentHeight;
+									var r2x = element.pagePos.x;
+									var r2y = element.pagePos.y;
+									var r2w = element.bbox.width;
+									var r2h = element.bbox.height;
+									if (element.type == Element.SLUR_SEGMENT) {
+										logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+									}
+									
+									var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+									var repeats = 0;
+									while (overlaps && repeats < 20) {
+										logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+										comment.offsetY -= commentOffset;
+										r1y -= 1.0;
+										repeats ++;
+										overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+									}
+								}*/
 							}
-							comment.offsetY -= theOffset;
-							comment.offsetX += theOffset;
+							
+							
 							if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
 							var rhs = comment.pagePos.x + commentWidth;
 							if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
-							if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+						} else {
+							logError ("parent parent parent parent was not a page — element = "+element.name);
 						}
-						// check comment box is not covering the element
-						/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
-						if (!isString) {
-							var r1x = comment.pagePos.x;
-							var r1y = comment.pagePos.y;
-							var r1w = commentWidth;
-							var r1h = commentHeight;
-							var r2x = element.pagePos.x;
-							var r2y = element.pagePos.y;
-							var r2w = element.bbox.width;
-							var r2h = element.bbox.height;
-							if (element.type == Element.SLUR_SEGMENT) {
-								logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-							}
-							
-							var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-							var repeats = 0;
-							while (overlaps && repeats < 20) {
-								logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-								comment.offsetY -= commentOffset;
-								r1y -= 1.0;
-								repeats ++;
-								overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-							}
-						}*/
-					} else {
-						logError ("parent parent parent parent was not a page — element = "+element.name);
 					}
-					///logError ("Comment is at {"+comment.pagePos.x+" "+comment.pagePos.y+"}");
+					//logError ("Added comment ‘"+theText.substring(0,10)+"’ at {"+comment.pagePos.x+" "+comment.pagePos.y+"}");
+					comments.push (comment);
+					commentPages.push (commentPage);
 				}
 			}
 		} // var i
@@ -4951,16 +5063,9 @@ MuseScore {
 		}
 	}
 	
-	function selectTitleText () {
-		curScore.startCmd();
-		cmd("title-text");
-		cmd("select-similar");
-		curScore.endCmd();
-	}
-	
 	function logError (str) {
 		numLogs ++;
-		errorMsg += "<p>Staff "+currentStaffNum+", b. "+displayBarNum+": "+str+"</p>";
+		errorMsg += "<p>Staff "+currentStaffNum+", b. "+currentDisplayBarNum+": "+str+"</p>";
 	}
 	
 	function saveSelection () {
@@ -5003,7 +5108,12 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		selectTitleText();
+		curScore.startCmd();
+		selectAll();
+		cmd ("insert-vbox");
+		var vbox = curScore.selection.elements[0];
+		cmd ("title-text");
+		cmd ("select-similar");
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -5012,6 +5122,8 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
+		removeElement (vbox);
+		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
 		selectAll();

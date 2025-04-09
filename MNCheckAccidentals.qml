@@ -37,6 +37,7 @@ MuseScore {
 	property var currPCAccs: []
 	property var wasGraceNote: []
 	property var barAltered: []
+	property var barAlteredPC: []
 	property var errorStrings: []
 	property var errorObjects: []
 	property var prevBarNum: 0
@@ -59,6 +60,7 @@ MuseScore {
 	property var prevNote: null
 	property var prevPrevNote: null
 	property var prevAlterationLabel: ""
+	property var prevIsTritone: false
 	property var currentKeySig: 0
 	property var prevWhichNoteToRewrite: null
 	property var kFlatStr: 'b'
@@ -77,6 +79,7 @@ MuseScore {
 	property var prevNoteHighlighted: false
 	property var prevPrevNoteHighlighted: false
 	property var scoreIncludesTransposingInstrument: false
+	property var lastAccidentalBarNum: 0
 
   onRun: {
 		if (!curScore) return;
@@ -105,8 +108,9 @@ MuseScore {
 		
 		// **** INITIALIZE VARIABLES **** //
 		currAccs = Array(120).fill(0);
-		currPCAccs = Array(120).fill(0);
+		currPCAccs = Array(7).fill(0);
 		barAltered = Array(120).fill(0);
+		barAlteredPC = Array(7).fill(0);
 		commentPosOffset = Array(10000).fill(0);
 		
 		var startStaff = curScore.selection.startStaff;
@@ -190,14 +194,16 @@ MuseScore {
 			prevNote = null;
 			prevPrevNote = null;
 			prevAccInKeySig = false;
-			thisNoteHighlighted = false
-			prevNoteHighlighted = false
-			prevPrevNoteHighlighted = false
+			thisNoteHighlighted = false;
+			prevNoteHighlighted = false;
+			prevPrevNoteHighlighted = false;
+			prevIsTritone = false;
 
 			// clear the arrays
 			currAccs.fill(0);
 			currPCAccs.fill(0);
 			barAltered.fill(0);
+			barAlteredPC.fill(0);
 			
 			// get start clef
 			cursor.filter = Segment.HeaderClef;
@@ -338,6 +344,7 @@ MuseScore {
 		var isProblematic, accidentalName, currentAccidental, prevAccidental;
 		var notes = chord.notes;
 		var numNotes = notes.length;
+		var numAccidentals = 0;
 
 		prevPrevNoteHighlighted = prevNoteHighlighted;
 		prevNoteHighlighted = thisNoteHighlighted;
@@ -360,6 +367,7 @@ MuseScore {
 				accObject = note.accidental;
 				accVisible = accObject.visible;
 				accType = note.accidentalType;
+				if (accVisible) lastAccidentalBarNum = currentBarNum;
 			}
 			acc = 0;
 			var isDoubleAcc = false;
@@ -410,39 +418,63 @@ MuseScore {
 				// ** CHECK Cb OR Fb ** //
 				if (currentKeySig > -3) isBadAcc = (tpc == 6 || tpc == 7);
 				if (!isBadAcc && currentKeySig < 3) isBadAcc = (tpc == 25 || tpc == 26);
-				prevBarNum = barAltered[diatonicPitch];
 
 				// **** CHECK UNNECESSARY ACCIDENTALS **** //
 				// **** THERE ARE THREE SITUATIONS WE WANT TO FLAG THIS **** //
+				
+				// **** First we check when this specific pitch was last altered **** //
+				prevBarNum = barAltered[diatonicPitch];
+
 				// **** 1. THIS ACCIDENTAL WAS SET EARLIER IN THE BAR (currentBarNum == prevBarNum)
 				var situation1 = currAccs[diatonicPitch] == acc && currentBarNum == prevBarNum && accVisible;
+				
 				// **** 2. THIS ACCIDENTAL WAS IN THE KEY SIGNATURE ALREADY AND THE PREVIOUS ACCIDENTAL WAS AT LEAST 2 BARS AGO
 				var situation2 = accInKeySig && currentBarNum > prevBarNum + 2 && accVisible;
+				
 				// **** 3. THIS ACCIDENTAL WAS IN THE KEY SIGNATURE ALREADY AND THIS WAS ALSO THE PREVIOUS ACCIDENTAL SET IN ANY BAR
 				var situation3 = accInKeySig && currAccs[diatonicPitch] == acc && accVisible;
 				
-				if ((situation1 || situation2 || situation3) && !wasGraceNote[diatonicPitchClass]) addError("This was already a "+accidentalNames[acc+2]+".",note);
+				// **** Also, only flag if:
+				// **** 	a) the accidental is visible
+				// ****		b) if the previous accidental was not a grace note
+				// ****		c) the accidental does not have a bracket around it
+				var otherAccFlags = accVisible && !wasGraceNote[diatonicPitchClass] && accObject.accidentalBracket == 0;
+				if ((situation1 || situation2 || situation3) && otherAccFlags) addError("This was already a "+accidentalNames[acc+2]+".",note);
 				
 				// **** CHECK NOTES NEEDING COURTESY ACCIDENTALS **** //
-				if (currAccs[diatonicPitch] != acc) {
-					prevBarNum = barAltered[diatonicPitch];
-					if (prevBarNum > 0) {
-						if (!accVisible && currentBarNum != prevBarNum && currentBarNum - prevBarNum < 2) {
+				var prevBarNumPC = barAlteredPC[diatonicPitchClass];
+
+				//logError (acc+" "+currAccs[diatonicPitch]+" "+currPCAccs[diatonicPitchClass]+" "+prevBarNum+" "+prevBarNumPC);
+				if (currAccs[diatonicPitch] != acc || currPCAccs[diatonicPitchClass] != acc) {
+					
+					// **** For courtesy accidentals, we can check when this ** pitch class ** was last altered **** //
+
+					if (prevBarNum > 0 || prevBarNumPC != 0) {
+						// SITUATION 1
+						// An accidental in any octave in prev bar
+						if (!accVisible && currentBarNum != prevBarNumPC && currentBarNum - prevBarNumPC < 2) {
 							currentAccidental = accidentalNames[acc+2];
-							prevAccidental = accidentalNames[currAccs[diatonicPitch] + 2];
+							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
 							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" in the previous bar.",note);
 						}
-						if (!accVisible && currentBarNum == prevBarNum) {
+						
+						// SITUATION 2
+						// An accidental in any octave in this bar
+						if (!accVisible && currentBarNum != prevBarNum && currentBarNum == prevBarNumPC && currPCAccs[diatonicPitchClass] != acc) {
 							currentAccidental = accidentalNames[acc+2];
-							prevAccidental = accidentalNames[currAccs[diatonicPitch] + 2];
+							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
 							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" earlier in the bar.",note);
 						}
 					}
 				}
+				
 				currAccs[diatonicPitch] = acc;
 				currPCAccs[diatonicPitchClass] = acc;
 				wasGraceNote[diatonicPitchClass] = isGraceNote;
-				if (accVisible && !accInKeySig) barAltered[diatonicPitch] = currentBarNum;
+				
+				if (accVisible && !accInKeySig) barAlteredPC[diatonicPitchClass] = currentBarNum;
+				barAltered[diatonicPitch] = currentBarNum;
+				
 				var alterationLabel = "";
 				var doShowError = false;
 				var isAug = false;
@@ -541,18 +573,20 @@ MuseScore {
 							prevAlterationLabel = alterationLabel;
 							prevShowError = doShowError;
 							prevWhichNoteToRewrite = whichNoteToRewrite;
+							prevIsTritone = isTritone;
 							return;
 						}
 						
 						// **** SHOW AN ERROR IF BOTH THE CURRENT AND PREVIOUS INTERVAL WERE AUG/DIM **** //
 						// **** THOUGH NOT IF CURRENT INTERVAL IS A TRITONE ****
 						
-						doShowError = isAugDim && prevIsAugDim && !isTritone;
+						doShowError = isAugDim && prevIsAugDim && !(isTritone && prevIsTritone);
 						
 						// **** EXCEPTIONS
 						// **** IGNORE AUG UNISON IF FOLLOWED BY ANOTHER ONE OR A TRITONE
 						if (chromaticIntervalClass == 1 && (prevChromaticInterval == chromaticInterval || prevChromaticIntervalClass == 6)) doShowError = false;
-														
+						
+						var weightingIsClose = false;							
 						if (doShowError) {
 							var foundNote = false;
 							
@@ -578,8 +612,9 @@ MuseScore {
 								whichNoteToRewrite = 0;
 								if (w2dist > w1dist && w2dist > w3dist) whichNoteToRewrite = 1;
 								if (w3dist > w1dist && w3dist > w2dist) whichNoteToRewrite = 2;
-								
-								//logError(Weighting1: "+weighting1+"); weighting2: "+weighting2+"; weight3: "+weighting3+" flag noteToHighlight = "+whichNoteToRewrite;
+								var maxWeightingDist = Math.max (w1dist, w2dist, w3dist);
+								weightingIsClose = maxWeightingDist < 5;
+								//logError("w1dist: "+w1dist+"); w2dist: "+w2dist+"; w3dist: "+w3dist);
 								
 							} // if !foundNote
 						} // if doshowerror
@@ -727,11 +762,14 @@ MuseScore {
 							}
 							//if (newNotePitch === "") logError(Couldnt find new note pitch");
 							var newNoteLabel = newNotePitch+newNoteAccidental;
-							var changeIsBad = false;
-							if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
-							if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
+							var changeIsBad = newNoteAccidental === "bb" || newNoteAccidental === "x";
+							if (!changeIsBad) {
+								if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
+								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
+							}
 							if (doShowError && !changeIsBad) {
 								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press Cmd-J)";
+								if (weightingIsClose && scalarIntervalAbs != 0) t = "Note: The current spelling may be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.\n[SUGGESTION] "+t;
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
 							} else {
@@ -830,6 +868,7 @@ MuseScore {
 					prevAlterationLabel = alterationLabel;
 					prevShowError = doShowError;
 					prevWhichNoteToRewrite = whichNoteToRewrite;
+					prevIsTritone = isTritone;
 				} // end if chromatic interval
 			} // if !note.tieBack
 		} // end var i in notes
@@ -1023,10 +1062,20 @@ MuseScore {
 	
 	function showAllErrors () {
 		var objectPageNum;
+		var firstStaffNum = 0;
+		for (var k = 0; k < curScore.nstaves; k++) {
+			if (curScore.staves[k].part.show) {
+				break;
+			} else {
+				firstStaffNum ++;
+			}
+		}
+		var comments = [];
+		var commentPages = [];
 		
 		curScore.startCmd()
 		for (var i in errorStrings) {
-			var text = errorStrings[i];
+			var theText = errorStrings[i];
 			var element = errorObjects[i];
 			var isArray = Array.isArray(element);
 			var objectArray;
@@ -1039,16 +1088,17 @@ MuseScore {
 				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
-				var staffNum = 0;
+				var staffNum = firstStaffNum;
+				
 				var elementHeight = 0;
 				var commentOffset = 1.0;
 				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 			
-				// the errorObjects array contains a list of the Elements to attach the text object to
-				// There are 4 special strings you can use instead of an Element: these are special locations that don't necessarily have an element there
-				// Here are the strings, and where the text object will be attached
-				// 		top 				— top of bar 1, staff 1
+				// the errorObjects array includes a list of the Elements to attach the text object to
+				// Instead of an Element, you can use one of the following strings instead to indicate a special location unattached to an element:
+				// 		top 			— top of bar 1, staff 1
 				// 		pagetop			— top left of page 1
+				//		pagetopright	— top right of page 1
 				//		system1 n		— top of bar 1, staff n
 				//		system2 n		— first bar in second system, staff n
 			
@@ -1075,14 +1125,26 @@ MuseScore {
 								desiredPosY = element.bbox.y;
 								//logError(" x = "+desiredPosX+"); y = "+desiredPosY;
 							} else {
-								while (!curScore.staves[staffNum].is(elemStaff)) staffNum ++; // I WISH: staffNum = element.staff.staffidx
+								staffNum = 0;
+								while (!curScore.staves[staffNum].is(elemStaff)) {
+									staffNum ++; // I WISH: staffNum = element.staff.staffidx
+									if (curScore.staves[staffNum] == null || curScore.staves[staffNum] == undefined) {
+										logError ("showAllErrors () — got staff error "+staffNum+" — bailing");
+										return;
+									}
+								}
+								// Handle the case where a system-attached object reports a staff that is hidden
+								if (eType == Element.TEMPO_TEXT || eType == Element.SYSTEM_TEXT || eType == Element.REHEARSAL_MARK || eType == Element.METRONOME) {
+									while (!curScore.staves[staffNum].part.show && staffNum < curScore.nstaves) staffNum ++;
+								}
 							}
 						}
 					}
 				}
 				// add a text object at the location where the element is
 				var comment = newElement(Element.STAFF_TEXT);
-				comment.text = text;
+				comment.text = theText;
+				//logError ("Adding comment "+theText.substring(0,10));
 		
 				// style the text object
 				comment.frameType = 1;
@@ -1095,7 +1157,7 @@ MuseScore {
 				comment.autoplace = false;
 	
 				if (isString) {
-					if (theLocation === "pagetop") {
+					if (theLocation.includes("pagetop")) {
 						desiredPosX = 2.5;
 						desiredPosY = 10.;
 					}
@@ -1128,31 +1190,89 @@ MuseScore {
 					comment.z = currentZ;
 					currentZ ++;
 					var commentHeight = comment.bbox.height;
-					var commentWidth = comment.bbox.width;					
+					var commentWidth = comment.bbox.width;
+					var placedX = comment.pagePos.x;				
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
 						comment.offsetY = desiredPosY - comment.pagePos.y;
 					} else {
 						comment.offsetY -= commentHeight;
 					}
-					var commentTopRounded = Math.round(comment.pagePos.y);
-					var commentPage = comment.parent.parent.parent.parent; // in theory this should get the page
-					var commentPageWidth = commentPage.bbox.width; // get page width
+	
+					var commentPage = comment.parent;
+					while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
+	
 					if (commentPage != null && commentPage != undefined) {
-						var commentPageNum = commentPage.pagenumber;
-						var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
-						if (theOffset > 4 * commentOffset) {
-							theOffset = 0;
-							commentPosOffset[commentPageNum][commentTopRounded+1000] = 0;
+						if (commentPage.type == Element.PAGE) {
+							var commentPageWidth = commentPage.bbox.width; // get page width
+							var commentPageNum = commentPage.pagenumber; // get page number
+							
+							// move over to the top right of the page if needed
+							if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+	
+							// check to see if this comment has been placed too close to other comments
+							var maxOffset = 10;
+							var minOffset = 1.5;
+							for (var k = 0; k < comments.length; k++) {
+								var otherComment = comments[k];
+								var otherCommentPage = commentPages[k];
+								//logError ("Checking against comment "+k);
+								if (commentPage.is(otherCommentPage)) {
+									var dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);
+									var dy = Math.abs(comment.pagePos.y - otherComment.pagePos.y);
+									var isCloseToOtherComment = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
+									var isNotTooFarFromOriginalPosition = (isString) || (Math.abs(comment.offsetY) < maxOffset && Math.abs(comment.offsetX) < maxOffset);
+									
+									//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
+									while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition) {
+										//var theOffset = commentPosOffset[commentPageNum][commentTopRounded+1000];
+										comment.offsetY -= commentOffset;
+										comment.offsetX += commentOffset;
+										dx = Math.abs(comment.pagePos.x - otherComment.pagePos.x);
+										dy = Math.abs(comment.pagePos.y - otherComment.pagePos.y);
+										isCloseToOtherComment = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
+										isNotTooFarFromOriginalPosition = (isString) || (Math.abs(comment.offsetY) < maxOffset && Math.abs(comment.offsetX) < maxOffset);
+										//logError ("Too close: shifting comment.offsetX = "+comment.offsetX+" comment.offsetY = "+comment.offsetY+" tooClose = "+isCloseToOtherComment);
+									}
+								}
+								// check comment box is not covering the element
+								/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
+								if (!isString) {
+									var r1x = comment.pagePos.x;
+									var r1y = comment.pagePos.y;
+									var r1w = commentWidth;
+									var r1h = commentHeight;
+									var r2x = element.pagePos.x;
+									var r2y = element.pagePos.y;
+									var r2w = element.bbox.width;
+									var r2h = element.bbox.height;
+									if (element.type == Element.SLUR_SEGMENT) {
+										logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+									}
+									
+									var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+									var repeats = 0;
+									while (overlaps && repeats < 20) {
+										logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+										comment.offsetY -= commentOffset;
+										r1y -= 1.0;
+										repeats ++;
+										overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+									}
+								}*/
+							}
+							
+							
+							if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+							var rhs = comment.pagePos.x + commentWidth;
+							if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
 						} else {
-							commentPosOffset[commentPageNum][commentTopRounded+1000] += commentOffset;
+							logError ("parent parent parent parent was not a page — element = "+element.name);
 						}
-						comment.offsetY -= theOffset;
-						comment.offsetX += theOffset;
-						if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
-						var rhs = comment.pagePos.x + commentWidth;
-						if (rhs > commentPageWidth) comment.offsetX -= (rhs - commentPageWidth);
 					}
+					//logError ("Added comment ‘"+theText.substring(0,10)+"’ at {"+comment.pagePos.x+" "+comment.pagePos.y+"}");
+					comments.push (comment);
+					commentPages.push (commentPage);
 				}
 			}
 		} // var i
