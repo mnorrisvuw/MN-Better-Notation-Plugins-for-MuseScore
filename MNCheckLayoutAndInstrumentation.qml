@@ -69,8 +69,11 @@ MuseScore {
 	property var virtualBeatLength: 0
 	property var barStartTick: 0
 	property var barEndTick: 0
+	property var barLength: 0
 	property var currTick: 0
 	property var numBars: 0
+	property var firstPageHeight: 0
+	property var hasFooter: false
 		
 	// ** FLAGS ** //
 	property var flaggedWeKnowWhosPlaying: false
@@ -195,6 +198,7 @@ MuseScore {
 	// ** DYNAMICS ** //
 	property var dynamics: []
 	property var currDynamicLevel: 0
+	property var expressiveSwell: 0
 	
 	// ** CLEFS ** //
 	property var clefs: []
@@ -369,7 +373,8 @@ MuseScore {
 		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI; // NB spatium value is given in MuseScore's DPI setting
 		pageWidth = Math.round(curScore.style.value("pageWidth")*inchesToMM);
 		pageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
-		var viewHeight = Math.round(firstPage.bbox.height*spatium);
+		firstPageHeight = firstPage.bbox.height;
+		var viewHeight = Math.round(firstPageHeight*spatium);
 		
 		if (viewHeight != pageHeight) {
 			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin works best if the score is viewed in Page View.</p><p>Change ‘Continuous View’ to ‘Page View’ from the pop-up menu in the bottom-right of the window.</p>";
@@ -470,7 +475,7 @@ MuseScore {
 		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, prevSlurEnd;
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
-		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin, expressiveSwell;
+		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin;
 		var numSystems, currentSystem, currentSystemNum, numNoteRestsInThisSystem, numBeatsInThisSystem, noteCountInSystem, beatCountInSystem;
 		var maxNoteCountPerSystem, minNoteCountPerSystem, maxBeatsPerSystem, minBeatsPerSystem, actualStaffSize;
 		var isSharedStaff;
@@ -648,7 +653,7 @@ MuseScore {
 				
 				barStartTick = currentBar.firstSegment.tick;
 				barEndTick = currentBar.lastSegment.tick;
-				var barLength = barEndTick - barStartTick;
+				barLength = barEndTick - barStartTick;
 				var startTrack = currentStaffNum * 4;
 				var goneToNextBar = false;
 				var firstNoteInThisBar = null;
@@ -962,26 +967,21 @@ MuseScore {
 
 									var hairpinStartTick = currentHairpin.spannerTick.ticks;
 									var hairpinDur = currentHairpin.spannerTicks.ticks;
+									var nextHairpinDur;
 									//logError("found hairpin of type"+currentHairpin.hairpinType+", length "+hairpinDur);
 
 									currentHairpinEnd = hairpinStartTick + hairpinDur;
 									if (currentHairpinNum == hairpins[currentStaffNum].length - 1){
 										nextHairpin = null;
 										nextHairpinStart = -1;
+										nextHairpinDur = 0;
 									} else {
 										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
 										nextHairpinStart = nextHairpin.spannerTick.ticks;
+										nextHairpinDur = nextHairpin.spannerTicks.ticks;
 									}
-									if (hairpinDur <= barLength && !expressiveSwell) {
-										// even numbered hairpin types are cresc; odd-numbere are decresc
-										//logError ("hairpinDur = "+hairpinDur+" hairpinType = "+currentHairpin.hairpinType);
-										if (hairpinDur <= barLength && (currentHairpin.hairpinType %2 == 0)) {
-											if (nextHairpin != null) {	
-												if (nextHairpinStart < currentHairpinEnd + barLength && (nextHairpin.hairpinType %2 == 1)) expressiveSwell = 1;
-											}
-										}
-									}
-									checkHairpins(cursor, expressiveSwell);
+									checkExpressiveSwell (cursor, nextHairpin);
+									checkHairpins(cursor);
 									if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
 									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 									if (currentHairpinNum < numHairpins - 1) {
@@ -2535,6 +2535,8 @@ MuseScore {
 		var pageHeight = 0;
 		var thresholdb = 0;
 		var cursor = curScore.newCursor();
+		var page1 = firstBarInScore.parent.parent;
+		//logError ("page1 = "+page1);
 		cursor.staffIdx = 0;
 		cursor.track = 0;
 		cursor.rewind(Cursor.SCORE_START);
@@ -2548,14 +2550,20 @@ MuseScore {
 			if (!currSystem.is(prevSystem)) {
 				// new system
 				var currPage = currSystem.parent;
+				//logError ("currPage = "+currPage);
 				if (!currPage.is(prevPage)) {
 					// prevSystem was bottom
+					
 					if (prevSystem != null) {
+						var checkThisSystem = prevPage.is(page1) ? !hasFooter : true;
+						//logError ("checkThisSystem = "+checkThisSystem+" p1 = "+prevPage.is(page1)+" hasFooter = "+hasFooter);
 						//logError ("Found system at bottom of page with y "+prevSystem.pagePos.y+" height "+prevSystem.bbox.height);
-						var systemBottom = prevSystem.pagePos.y + prevSystem.bbox.height;
-						if (systemBottom < thresholdb) {
-							addError ("This system should ideally be justified to the bottom of the page",prevFirstMeasure);
-							//logError ("System Bottom = "+systemBottom+"; thresholdB = "+thresholdb);
+						if (checkThisSystem) {
+							var systemBottom = prevSystem.pagePos.y + prevSystem.bbox.height;
+							if (systemBottom < thresholdb) {
+								addError ("This system should ideally be justified to the bottom of the page",prevFirstMeasure);
+								//logError ("System Bottom = "+systemBottom+"; thresholdB = "+thresholdb);
+							}
 						}
 					}
 					prevPage = currPage;
@@ -2566,7 +2574,57 @@ MuseScore {
 		}
 	}
 	
-	function checkHairpins (cursor, expressiveSwell) {
+	function checkExpressiveSwell (cursor, nextHairpin) {
+		// checks if this hairpin is the start of an expressive swell
+		// There are 8 conditions to be met:
+		
+		// 1) we're not already in the middle of one
+		if (expressiveSwell != 0) return;
+		
+		// 2) there is a hairpin coming up
+		if (nextHairpin == null) return;
+		
+		// 3) the current hairpin is a crescendo
+		if (currentHairpin.hairpinType % 2 != 0) return;
+		
+		// 4) the next hairpin is a decrescendo 
+		if (nextHairpin.hairpinType %2 != 1) return;
+		
+		// 5) the current hairpin is short (bar length or less)		
+		var hairpinDur = currentHairpin.spannerTicks.ticks;
+		if (hairpinDur > barLength) return;
+		
+		// 6) the next hairpin is short (bar length or less)
+		var nextHairpinDur = nextHairpin.spannerTicks.ticks;
+		if (nextHairpinDur > barLength) return;
+		
+		// 7) the next hairpin starts within a bar length of the current hairpin's end
+		var nextHairpinStart = nextHairpin.spannerTick.ticks;
+		if (nextHairpinStart > currentHairpinEnd + barLength) return;
+			
+		// 8) there are no rests between the end of this hairpin and the start of the next
+		var cursor2 = curScore.newCursor();
+		cursor2.staffIdx = cursor.staffIdx;
+		cursor2.track = cursor.track;
+		cursor2.rewindToTick(currentHairpinEnd);
+		cursor2.filter = Segment.ChordRest;
+		
+		while (cursor2 != null) {
+			cursor2.next();
+			if (cursor2.tick >= nextHairpinStart) break;
+			if (cursor2 == null) return;
+			if (cursor2.element == null) return;
+			if (cursor2.element.type == Element.REST) return;
+			if (cursor2.element.notes == null) return;
+			if (cursor2.element.notes.length == 0) return;
+		}
+		
+		// OK, so it's an expressive swell
+		//logError ("expressive swell");
+		expressiveSwell = 1;
+	}
+	
+	function checkHairpins (cursor) {
 		var hairpinStartTick = currentHairpin.spannerTick.ticks;
 		var hairpinDur = currentHairpin.spannerTicks.ticks;
 		
@@ -2592,7 +2650,8 @@ MuseScore {
 		var isDecresc = currentHairpin.hairpinType %2 == 1;
 		var beatLength = (currentTimeSig.denominator == 8 && !(currentTimeSig.numerator % 3)) ? (1.5 * division) : division;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
-		var hairpinZoneStartTick = hairpinStartTick - beatLength;
+		var hairpinZoneStartTick = currentHairpinEnd - beatLength;
+		//logError ("Checking hairpin termination");
 		// allow an expressive swell
 		if (expressiveSwell > 0) return;
 		
@@ -3074,6 +3133,7 @@ MuseScore {
 		var hasTitleOnFirstPageOfMusic = false;
 		var hasSubtitleOnFirstPageOfMusic = false;
 		var hasComposerOnFirstPageOfMusic = false;
+		hasFooter = false;
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			if (!e.is(tempText)) {
@@ -3083,12 +3143,19 @@ MuseScore {
 				if (eSubtype == "Title" && getPageNumber(e) == firstPageNum) hasTitleOnFirstPageOfMusic = true;
 				if (eSubtype == "Subtitle" && getPageNumber(e) == firstPageNum) hasSubtitleOnFirstPageOfMusic = true;
 				if (eSubtype == "Composer" && getPageNumber(e) == firstPageNum) hasComposerOnFirstPageOfMusic = true;
-
 			}
 		}
 		removeElement (vbox);
 		curScore.endCmd(); // undo
-		for (var i = 0; i < textToCheck.length; i++) checkTextObject (textToCheck[i]);
+		var threshold = firstPageHeight*0.7;
+		for (var i = 0; i < textToCheck.length; i++) {
+			var box = textToCheck[i].parent;
+			if (box != null) {
+				if (box.pagePos.y > threshold) hasFooter = true;
+				//logError ("box = "+box.pagePos.y+" "+threshold);
+				checkTextObject (textToCheck[i]);
+			}
+		}
 
 		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
