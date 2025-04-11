@@ -1869,7 +1869,11 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		removeElement (vbox);
+		if (vbox == null) {
+			logError ("deleteAllCommentsAndHighlights () — vbox was null");
+		} else {
+			removeElement (vbox);
+		}
 		curScore.endCmd();
 		
 		// **** SELECT ALL **** //

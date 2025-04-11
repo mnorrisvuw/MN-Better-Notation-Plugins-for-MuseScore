@@ -2070,10 +2070,9 @@ MuseScore {
 			
 		//logError ("checking part "+i);
 			style = thePart.partScore.style;
-			var theSpatium = style.value("spatium")*inchesToMM/mscoreDPI; // spatium value is given in 360 DPI
 			// part should be 6.6-7.0mm
 			if (!flaggedStaffSize) {
-				var theStaffSize = theSpatium * 4.0;
+				var theStaffSize = spatium * 4.0;
 				if (theStaffSize > maxSize) {
 					pageSettingsComments.push("Decrease the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 					flaggedStaffSize = true;
@@ -2552,19 +2551,10 @@ MuseScore {
 				var currPage = currSystem.parent;
 				//logError ("currPage = "+currPage);
 				if (!currPage.is(prevPage)) {
-					// prevSystem was bottom
-					
 					if (prevSystem != null) {
+						// we check the *previous* system and *previous* page, which, because we have now gone to a new page, will be the last system on the previous page
 						var checkThisSystem = prevPage.is(page1) ? !hasFooter : true;
-						//logError ("checkThisSystem = "+checkThisSystem+" p1 = "+prevPage.is(page1)+" hasFooter = "+hasFooter);
-						//logError ("Found system at bottom of page with y "+prevSystem.pagePos.y+" height "+prevSystem.bbox.height);
-						if (checkThisSystem) {
-							var systemBottom = prevSystem.pagePos.y + prevSystem.bbox.height;
-							if (systemBottom < thresholdb) {
-								addError ("This system should ideally be justified to the bottom of the page",prevFirstMeasure);
-								//logError ("System Bottom = "+systemBottom+"; thresholdB = "+thresholdb);
-							}
-						}
+						if (checkThisSystem) if (prevSystem.pagePos.y + prevSystem.bbox.height < thresholdb) addError ("This system should ideally be justified to the bottom of the page",prevFirstMeasure);
 					}
 					prevPage = currPage;
 				}
@@ -2575,7 +2565,7 @@ MuseScore {
 	}
 	
 	function checkExpressiveSwell (cursor, nextHairpin) {
-		// checks if this hairpin is the start of an expressive swell
+		// *** checks if this hairpin is the start of an expressive swell *** //
 		// There are 8 conditions to be met:
 		
 		// 1) we're not already in the middle of one
@@ -3145,7 +3135,11 @@ MuseScore {
 				if (eSubtype == "Composer" && getPageNumber(e) == firstPageNum) hasComposerOnFirstPageOfMusic = true;
 			}
 		}
-		removeElement (vbox);
+		if (vbox == null) {
+			logError ("checkScoreText () — vbox was null");
+		} else {
+			removeElement (vbox);
+		}
 		curScore.endCmd(); // undo
 		var threshold = firstPageHeight*0.7;
 		for (var i = 0; i < textToCheck.length; i++) {
@@ -5207,7 +5201,11 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		removeElement (vbox);
+		if (vbox == null) {
+			logError ("deleteAllCommentsAndHighlights () — vbox was null");
+		} else {
+			removeElement (vbox);
+		}
 		curScore.endCmd();
 		
 		// **** SELECT ALL **** //

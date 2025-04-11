@@ -46,7 +46,7 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		removeElement (vbox);
+		if (vbox != null) removeElement (vbox);
 		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
