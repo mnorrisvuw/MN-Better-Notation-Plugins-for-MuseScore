@@ -1990,7 +1990,7 @@ function showAllErrors () {
 		
 		Rectangle {
 			x:20
-			width: parent.width-40
+			width: parent.width-45
 			y:45
 			height: 1
 			color: "black"

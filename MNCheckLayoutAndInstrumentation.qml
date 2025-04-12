@@ -1843,18 +1843,18 @@ MuseScore {
 				if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+(i+1)+" to ‘Cello II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
 				
 				if (full1l === 'violas') addError ("Change the long name of staff "+(i+1)+" to ‘Viola’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
-				if (full1l === 'violoncellos' || full1l === 'violpncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
+				if (full1l === 'violoncellos' || full1l === 'violoncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
 				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+(i+1)+" to ‘Double Bass’ or ‘D. Bass’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
 			}
 			
 			if (shortInstNamesShowing) {
 			
-				if (short1l === 'vlns. 1' || short1l === 'vln. 1' || short1l === 'vlns 1' || short1l === 'vln 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. I’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
-				if (short1l === 'vlas. 1' || short1l === 'vla. 1' || short1l === 'vlas 1' || short1l === 'vla 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. I’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vlns. 1' || short1l === 'vln. 1' || short1l === 'vlns 1' || short1l === 'vln 1' || short1l === "vn 1" || short1l === "vn. 1") addError ("Change the short name of staff "+(i+1)+" to ‘Vln. I’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vlas. 1' || short1l === 'vla. 1' || short1l === 'vlas 1' || short1l === 'vla 1' || short1l === 'va 1' || short1l === 'va. 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. I’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
 				if (short1l === 'vcs. 1' || short1l === 'vc. 1' || short1l === 'vcs 1' || short1l === 'vc 1') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. I’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
 				
-				if (short1l === 'vlns. 2' || short1l === 'vln. 2' || short1l === 'vlns 2' || short1l === 'vln 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vln. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
-				if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vlns. 2' || short1l === 'vln. 2' || short1l === 'vlns 2' || short1l === 'vln 2' || short1l === "vn 2" || short1l === "vn. 2") addError ("Change the short name of staff "+(i+1)+" to ‘Vln. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
+				if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2' || short1l === 'va 2' || short1l === 'va. 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
 				if (short1l === 'vcs. 2' || short1l === 'vc. 2' || short1l === 'vcs 2' || short1l === 'vc 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
 				
 				if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
@@ -2223,7 +2223,6 @@ MuseScore {
 		var enableVerticalSpread = style.value("enableVerticalSpread");
 		var staffSize = spatium*4;
 		//errorMsg+= "\nspatium = "+spatium+"; staffSize = "+staffSize;
-		var staffLineWidth = Math.round(style.value("staffLineWidth")*inchesToMM*100)/100.;
 		var pageEvenLeftMargin = Math.round(style.value("pageEvenLeftMargin")*inchesToMM*100)/100.;
 		var pageOddLeftMargin = Math.round(style.value("pageOddLeftMargin")*inchesToMM*100)/100.;
 		var pageEvenTopMargin = Math.round(style.value("pageEvenTopMargin")*inchesToMM*100)/100.;
@@ -2250,7 +2249,7 @@ MuseScore {
 		var minStaffSpread = style.value("minStaffSpread");
 		var maxStaffSpread = style.value("maxStaffSpread");
 		var staffDistance = style.value("staffDistance");
-		var staffLowerBorder = style.value("staffLowerBorder");
+		//var staffLowerBorder = style.value("staffLowerBorder");
 		var lastSystemFillLimit = style.value("lastSystemFillLimit");
 		var crossMeasureValues = style.value("crossMeasureValues");
 		tempoFontStyle = curScore.style.value("tempoFontStyle");
@@ -2438,7 +2437,7 @@ MuseScore {
 		if (showFirstBarNum) styleComments.push("(Bar numbers tab) Uncheck ‘Show first’");
 		
 		// **** STYLE SETTINGS — 9. BARS TAB **** //
-		if (minimumBarWidth != 14.0) styleComments.push("(Bars tab) Set ‘Minimum bar width’ to 14.0sp");
+		if (minimumBarWidth < 14.0 || minimumBarWidth > 16.0) styleComments.push("(Bars tab) Set ‘Minimum bar width’ to between 14.0-16.0sp");
 		if (spacingRatio != 1.5) styleComments.push("(Bars tab) Set ‘Spacing Ratio’ to 1.5sp");
 		if (minNoteDistance < 0.6 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 0.6–0.7sp");
 		if (minNoteDistance > 0.7 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 0.6–0.7sp");
@@ -2455,8 +2454,8 @@ MuseScore {
 		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman italic for tuplets");
 		if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle == 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman for tuplets");
 		if (tupletsFontFace === "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use an italic font for tuplets");
-		if (tupletsFontSize < 9 || tupletsFontSize > 10) styleComments.push("(Text Styles→Tuplet) Set tuplet font size to between 9–10pt");
-		if (barNumberFontSize < 9 || barNumberFontSize > 11) styleComments.push("(Text Styles→Tuplet) Set tuplet font size to between 9–11pt");
+		if (tupletsFontSize < 9 || tupletsFontSize > 11) styleComments.push("(Text Styles→Tuplet) Set tuplet font size to between 9–11pt");
+		if (barNumberFontSize < 8.5 || barNumberFontSize > 11) styleComments.push("(Text Styles→Tuplet) Set bar number font size to between 8.5–11pt");
 		if (pageNumberFontStyle != 0 && numPages > 1) {
 			var s = 'bold';
 			if (pageNumberFontStyle > 1) s = 'italics';
@@ -5296,7 +5295,7 @@ MuseScore {
 		
 		Rectangle {
 			x:20
-			width: parent.width-40
+			width: parent.width-45
 			y:45
 			height: 1
 			color: "black"
