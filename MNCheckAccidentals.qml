@@ -102,7 +102,11 @@ MuseScore {
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
-		if (!curScore.selection.isRange) selectAll();
+		if (!curScore.selection.isRange) {
+			doCmd ("select-all");
+			var startStaff = curScore.selection.startStaff;
+			var endStaff = curScore.selection.endStaff;
+		}
 		
 		// **** INITIALIZE VARIABLES **** //
 		currAccs = Array(120).fill(0);
@@ -871,6 +875,13 @@ MuseScore {
 		dialog.show();
 	}
 	
+	
+	function doCmd (theCmd) {
+		curScore.startCmd ();
+		cmd (theCmd);
+		curScore.endCmd ();
+	}
+	
 	function previousNoteRestIsNote (noteRest) {
 		var cursor2 = curScore.newCursor();
 		cursor2.track = noteRest.track;
@@ -929,19 +940,9 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
-	function selectAll () {
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
-		curScore.endCmd();
-		var startStaff = curScore.selection.startStaff;
-		var endStaff = curScore.selection.endStaff;
-	}
-	
 	function selectTitleText () {
-		curScore.startCmd();
-		cmd("title-text");
-		cmd("select-similar");
-		curScore.endCmd();
+		doCmd("title-text");
+		doCmd("select-similar");
 	}
 	
 	function deleteAllCommentsAndHighlights () {
@@ -953,12 +954,11 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		selectAll();
-		cmd ("insert-vbox");
+		doCmd ("select-all");
+		doCmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		cmd ("select-similar");
+		doCmd ("title-text");
+		doCmd ("select-similar");
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -972,10 +972,9 @@ MuseScore {
 		} else {
 			removeElement (vbox);
 		}
-		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
-		selectAll();
+		doCmd ("select-all");
 		
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
@@ -1010,10 +1009,8 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
-		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
 		
 		restoreSelection();
 	}
@@ -1063,7 +1060,6 @@ function showAllErrors () {
 		var comments = [];
 		var commentPages = [];
 		
-		curScore.startCmd()
 		for (var i in errorStrings) {
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
@@ -1290,7 +1286,6 @@ function showAllErrors () {
 				}
 			}
 		} // var i
-		curScore.endCmd();
 	}
 	
 	function getPageNumber (e) {

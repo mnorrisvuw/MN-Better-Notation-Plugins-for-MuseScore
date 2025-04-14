@@ -156,7 +156,7 @@ MuseScore {
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
-		if (!curScore.selection.isRange) selectAll();
+		if (!curScore.selection.isRange) doCmd ("select-all");
 		firstStaffNum = curScore.selection.startStaff;
 		lastStaffNum = curScore.selection.endStaff;
 		//errorMsg+="\nfirstStaffNum= "+firstStaffNum+"; lastStaffNum = "+lastStaffNum;
@@ -647,12 +647,6 @@ MuseScore {
 			var es = selectionArray[3];
 			curScore.selection.selectRange(st,et+1,ss,es + 1);
 		}
-		curScore.endCmd();
-	}
-	
-	function selectAll () {
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,curScore.nstaves);
 		curScore.endCmd();
 	}
 	
@@ -1579,7 +1573,13 @@ MuseScore {
 		errorObjects.push(element);
 	}
 	
-function showAllErrors () {
+	function doCmd (theCmd) {
+		curScore.startCmd ();
+		cmd (theCmd);
+		curScore.endCmd ();
+	}
+	
+	function showAllErrors () {
 		var objectPageNum;
 		var firstStaffNum = 0;
 		for (var k = 0; k < curScore.nstaves; k++) {
@@ -1592,7 +1592,7 @@ function showAllErrors () {
 		var comments = [];
 		var commentPages = [];
 		
-		curScore.startCmd()
+		
 		for (var i in errorStrings) {
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
@@ -1819,7 +1819,6 @@ function showAllErrors () {
 				}
 			}
 		} // var i
-		curScore.endCmd();
 	}
 	
 	function getTick (e) {
@@ -1865,10 +1864,8 @@ function showAllErrors () {
 	}
 	
 	function selectTitleText () {
-		curScore.startCmd();
-		cmd("title-text");
-		cmd("select-similar");
-		curScore.endCmd();
+		doCmd("title-text");
+		doCmd("select-similar");
 	}
 	
 	function deleteAllCommentsAndHighlights () {
@@ -1880,12 +1877,11 @@ function showAllErrors () {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		selectAll();
-		cmd ("insert-vbox");
+		doCmd ("select-all");
+		doCmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		cmd ("select-similar");
+		doCmd ("title-text");
+		doCmd ("select-similar");
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -1899,10 +1895,9 @@ function showAllErrors () {
 		} else {
 			removeElement (vbox);
 		}
-		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
-		selectAll();
+		doCmd ("select-all");
 		
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
@@ -1937,10 +1932,8 @@ function showAllErrors () {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
-		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
 		
 		restoreSelection();
 	}

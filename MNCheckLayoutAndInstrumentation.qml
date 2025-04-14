@@ -437,7 +437,7 @@ MuseScore {
 		}
 		
 		// ************  					SELECT AND PRE-PROCESS ENTIRE SCORE 							************ //
-		selectAll();
+		doCmd ("select-all");
 		setProgress (1);
 		
 		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, SLURS, OTTAVAS, ETC) 	************ //
@@ -2214,7 +2214,6 @@ MuseScore {
 		var styleComments = [];
 		var pageSettingsComments = [];
 		var style = curScore.style;
-		var staffSpacing = style.value("staffDistance");		
 		var akkoladeDistance = style.value("akkoladeDistance");
 		var minSystemDistance = style.value("minSystemDistance");
 		var maxSystemDistance = style.value("maxSystemDistance");
@@ -3109,14 +3108,12 @@ MuseScore {
 	
 	function checkScoreText() {
 		var textToCheck = [];
-		curScore.startCmd();
-		selectAll();
-		cmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		
-		cmd ("title-text");
+		doCmd ("select-all");
+		doCmd ("insert-vbox");
+		var vbox = curScore.selection.elements[0];		
+		doCmd ("title-text");
 		var tempText = curScore.selection.elements[0];
-		cmd ("select-similar");
+		doCmd ("select-similar");
 		var elems = curScore.selection.elements;
 		currentBarNum = 0;
 		var hasTitleOnFirstPageOfMusic = false;
@@ -3139,7 +3136,6 @@ MuseScore {
 		} else {
 			removeElement (vbox);
 		}
-		curScore.endCmd(); // undo
 		var threshold = firstPageHeight*0.7;
 		for (var i = 0; i < textToCheck.length; i++) {
 			var box = textToCheck[i].parent;
@@ -3154,7 +3150,7 @@ MuseScore {
 		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
 		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		
-		selectAll();
+		doCmd ("select-all");
 	}
 	
 	function checkTextObject (textObject) {
@@ -4879,7 +4875,6 @@ MuseScore {
 		var comments = [];
 		var commentPages = [];
 		
-		curScore.startCmd()
 		for (var i in errorStrings) {
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
@@ -5106,7 +5101,6 @@ MuseScore {
 				}
 			}
 		} // var i
-		curScore.endCmd();
 	}
 	
 	//---------------------------------------------------------
@@ -5181,12 +5175,6 @@ MuseScore {
 		}
 	}
 	
-	function selectAll () {
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick + 1,0,numStaves);
-		curScore.endCmd();
-	}
-	
 	function restoreSelection () {
 		curScore.startCmd();
 		if (selectionArray.length == 0) {
@@ -5201,6 +5189,12 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
+	function doCmd (theCmd) {
+		curScore.startCmd ();
+		cmd (theCmd);
+		curScore.endCmd ();
+	}
+	
 	function deleteAllCommentsAndHighlights () {
 
 		var elementsToRemove = [];
@@ -5210,12 +5204,11 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		selectAll();
-		cmd ("insert-vbox");
+		doCmd ("select-all");
+		doCmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		cmd ("select-similar");
+		doCmd ("title-text");
+		doCmd ("select-similar");
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -5229,10 +5222,9 @@ MuseScore {
 		} else {
 			removeElement (vbox);
 		}
-		curScore.endCmd();
 		
 		// **** SELECT ALL **** //
-		selectAll();
+		doCmd ("select-all");
 		
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
@@ -5267,10 +5259,8 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
-		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
 		
 		restoreSelection();
 	}
