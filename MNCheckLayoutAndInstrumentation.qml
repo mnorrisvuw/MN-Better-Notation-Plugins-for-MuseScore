@@ -403,8 +403,8 @@ MuseScore {
 		// ************  				SAVE CURRENT SELECTION 						************ //
 		saveSelection();
 		
-		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
-		deleteAllCommentsAndHighlights();
+		// ************  		deleteObj ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
+		deleteObjAllCommentsAndHighlights();
 
 		// ************  				CHECK SCORE & PAGE SETTINGS 				************ // 
 		checkScoreAndPageSettings();
@@ -803,7 +803,7 @@ MuseScore {
 													if (nextSlurNote != null) {
 														if (nextSlurNote.graceNotes != null) {
 															//logError ("nextSlurNote.graceNotes.length "+(nextSlurNote.graceNotes.length > 0)+"; nextSlurLength = "+nextSlurLength);
-															if (nextSlurNote.graceNotes.length == 0) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",nextSlur);
+															if (nextSlurNote.graceNotes.length == 0) addError("Avoid putting slurs underneath other slurs.\ndeleteObj one of these slurs.",nextSlur);
 														}
 													}
 												}
@@ -1347,8 +1347,8 @@ MuseScore {
 		
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
-		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN deleteObj Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN deleteObj Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		
 		if (progressShowing) progress.close();
 		
@@ -2314,7 +2314,7 @@ MuseScore {
 			if (!staffNamesHiddenBecauseSoloScore) styleComments.push("(Score tab) Tick ‘Hide if there is only one instrument’");
 		} else {
 			// ** FIRST STAFF NAMES SHOULD BE SHOWING — STYLE SET TO 0 **//
-			// ** ALSO CHECK THEY HAVEN'T BEEN MANUALLY DELETED ** //		
+			// ** ALSO CHECK THEY HAVEN'T BEEN MANUALLY deleteObjD ** //		
 			var firstStaffNamesVisibleSetting = style.value("firstSystemInstNameVisibility"); //  0 = long names, 1 = short names, 2 = hidden
 			var firstStaffNamesVisible = firstStaffNamesVisibleSetting < 2;
 			var blankStaffNames = [];
@@ -2346,7 +2346,7 @@ MuseScore {
 				}
 			}
 			if (firstStaffNamesVisible && firstStaffNamesVisibleSetting != 0) styleComments.push("(Score tab) Set Instrument names→On first system of sections to ‘Long name’.");
-			if (!firstStaffNamesVisible && firstStaffNamesVisibleSetting < 2) addError("It looks like you have manually deleted the staff names.\nThese should be showing on the first system.","pagetop");
+			if (!firstStaffNamesVisible && firstStaffNamesVisibleSetting < 2) addError("It looks like you have manually deleteObjd the staff names.\nThese should be showing on the first system.","pagetop");
 
 			// ** are the subsequent staff names visible? ** //
 			var subsequentStaffNamesShouldBeHidden = numParts < 6;
@@ -2393,7 +2393,7 @@ MuseScore {
 					if (subsequentStaffNamesVisibleSetting == 2) {
 						styleComments.push("(Score tab) Switch Instrument names→On subsequent systems to ‘Short name’ for a large ensemble");
 					} else {
-						addError("It looks like you have manually deleted the staff names on subsequent systems.\nThese should be showing.","pagetop");
+						addError("It looks like you have manually deleteObjd the staff names on subsequent systems.\nThese should be showing.","pagetop");
 					}
 				} else {
 					// check they are short names
@@ -2626,9 +2626,9 @@ MuseScore {
 		var endOffset = currentHairpin.userOff2.x;
 		//logError ("off: "+startOffset+" "+endOffset);
 		var m = 1.0;
-		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
-		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
-		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or deleteObj the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or deleteObj the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or deleteObj the hairpin,\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
 		
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = cursor.staffIdx;
@@ -2978,7 +2978,7 @@ MuseScore {
 		}
 		
 		// **** CHECK FOR REDUNDANT CLEFS **** //
-		if (clefId === prevClefId) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
+		if (clefId === prevClefId) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleteObjd",clef);
 		prevClefId = clefId;
 	}
 	
@@ -3134,7 +3134,7 @@ MuseScore {
 		if (vbox == null) {
 			logError ("checkScoreText () — vbox was null");
 		} else {
-			removeElement (vbox);
+			deleteObj (vbox);
 		}
 		var threshold = firstPageHeight*0.7;
 		for (var i = 0; i < textToCheck.length; i++) {
@@ -3235,7 +3235,7 @@ MuseScore {
 				// **** CHECK FOR TEXT STARTING WITH SPACE OR NON-ALPHANUMERIC **** //
 				var c = plainText.charCodeAt(0);
 				if (c == 32) {
-					addError("‘"+plainText+"’ begins with a space, which could be deleted.",textObject);
+					addError("‘"+plainText+"’ begins with a space, which could be deleteObjd.",textObject);
 					return;
 				}
 				if (c < 32 && c != 10 && c != 13) {
@@ -3591,7 +3591,7 @@ MuseScore {
 								if (textObject.pagePos == prevDynamicObject.pagePos && textObject.bbox.width == prevDynamicObject.bbox.width && textObject.bbox.height == prevDynamicObject.bbox.height) {
 									//logError (textObject.pagePos+' '+prevDynamicObject.pagePos);
 									//logError (textObject.text+" "+textObject.bbox+ " "+prevDynamicObject.text+" "+prevDynamicObject.bbox);
-									addError ("There appear to be two dynamic markings overlapped here.\nYou can safely delete one of them.",textObject);
+									addError ("There appear to be two dynamic markings overlapped here.\nYou can safely deleteObj one of them.",textObject);
 								} else {
 									addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicDisplayBarNum+".",textObject);
 								}
@@ -3777,7 +3777,7 @@ MuseScore {
 			prevKeySigSharps = sharps;
 			prevKeySigBarNum = currentBarNum;
 		} else {
-			addError("This key signature is the same as the one in bar "+prevKeySigBarNum+".\nPerhaps delete it?",keySig);
+			addError("This key signature is the same as the one in bar "+prevKeySigBarNum+".\nPerhaps deleteObj it?",keySig);
 		}
 	}
 	
@@ -3800,7 +3800,7 @@ MuseScore {
 				if (theTimeSig.type == Element.TIMESIG) {
 					if (theTimeSig.visible) {
 						var theTimeSigStr = theTimeSig.timesig.str;
-						if (theTimeSigStr === prevTimeSig) addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",theTimeSig);
+						if (theTimeSigStr === prevTimeSig) addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleteObjd.",theTimeSig);
 						prevTimeSig = theTimeSigStr;
 						var n = theTimeSig.subtypeName();
 						if (n.includes("Common")) addError ("The ‘Common time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 4/4",theTimeSig);
@@ -5195,7 +5195,13 @@ MuseScore {
 		curScore.endCmd ();
 	}
 	
-	function deleteAllCommentsAndHighlights () {
+	function deleteObj (theElem) {
+		curScore.startCmd ();
+		removeElement (theElem);
+		curScore.endCmd ();
+	}
+	
+	function deleteObjAllCommentsAndHighlights () {
 
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
@@ -5218,9 +5224,9 @@ MuseScore {
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
 		if (vbox == null) {
-			logError ("deleteAllCommentsAndHighlights () — vbox was null");
+			logError ("deleteObjAllCommentsAndHighlights () — vbox was null");
 		} else {
-			removeElement (vbox);
+			deleteObj (vbox);
 		}
 		
 		// **** SELECT ALL **** //
@@ -5258,9 +5264,9 @@ MuseScore {
 			segment = segment.next;
 		}
 		
-		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		// **** deleteObj EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
 		
 		restoreSelection();
 	}

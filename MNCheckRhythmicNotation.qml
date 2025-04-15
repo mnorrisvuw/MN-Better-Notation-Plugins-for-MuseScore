@@ -152,8 +152,8 @@ MuseScore {
 		possibleOffbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet];
 		possibleOffbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet"];
 		
-		// **** DELETE ALL EXISTING COMMENTS AND HIGHLIGHTS **** //
-		deleteAllCommentsAndHighlights();
+		// **** deleteObj ALL EXISTING COMMENTS AND HIGHLIGHTS **** //
+		deleteObjAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
 		if (!curScore.selection.isRange) doCmd ("select-all");
@@ -365,7 +365,7 @@ MuseScore {
 							hasBeam = currentBeam != null;
 							if (!isHidden) totalMusicDurThisTrack += soundingDur;
 							//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
-							if (isPickupBar && isRest && noteRest.durationType.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
+							if (isPickupBar && isRest && noteRest.durationType.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘deleteObj’.",noteRest);
 							
 							
 							// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
@@ -593,8 +593,8 @@ MuseScore {
 		var numErrors = errorStrings.length;
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
-		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN deleteObj Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN deleteObj Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		if (progressShowing) progress.close();
 		
 		var h = 250+numLogs*10;
@@ -667,7 +667,7 @@ MuseScore {
 		if (isPickupBar) return;
 		isBarRest = isRest && soundingDur == barDur;
 		isManuallyEnteredBarRest = isBarRest && noteRest.durationType.type < 14;
-		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to create a correctly positioned bar rest.",noteRest);
+		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar and press ‘deleteObj’ to create a correctly positioned bar rest.",noteRest);
 	}
 	
 	function isTwoNoteTremolo(noteRest) {
@@ -995,7 +995,7 @@ MuseScore {
 		
 		// CHECK THAT IT COULD BE SIMPLIFIED AS A BAR REST
 		if (totalRestDur == barDur && !isPickupBar) {
-			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘delete’', rests)
+			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘deleteObj’', rests)
 		} else {
 			//logError(Here with "+rests.length+" rests"); 
 			var maxSimplificationFound = false;
@@ -1173,7 +1173,7 @@ MuseScore {
 							if (theArray[0].displayDur != quaver) addError('Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 							return;
 						}
-						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘deleteObj’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 					}
 				} else {
 					var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
@@ -1189,7 +1189,7 @@ MuseScore {
 					if (p == dottedquaver && (lastRestDur != quaver || totalNumRests > 2)) {
 						addError ('Spell as a semiquaver followed by a quaver.',theArray);
 					} else {
-						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘deleteObj’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 					}
 				}
 			}
@@ -1579,6 +1579,12 @@ MuseScore {
 		curScore.endCmd ();
 	}
 	
+	function deleteObj (theElem) {
+		curScore.startCmd ();
+		removeElement (theElem);
+		curScore.endCmd ();
+	}
+	
 	function showAllErrors () {
 		var objectPageNum;
 		var firstStaffNum = 0;
@@ -1868,7 +1874,7 @@ MuseScore {
 		doCmd("select-similar");
 	}
 	
-	function deleteAllCommentsAndHighlights () {
+	function deleteObjAllCommentsAndHighlights () {
 
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
@@ -1891,9 +1897,9 @@ MuseScore {
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
 		if (vbox == null) {
-			logError ("deleteAllCommentsAndHighlights () — vbox was null");
+			logError ("deleteObjAllCommentsAndHighlights () — vbox was null");
 		} else {
-			removeElement (vbox);
+			deleteObj (vbox);
 		}
 		
 		// **** SELECT ALL **** //
@@ -1931,9 +1937,9 @@ MuseScore {
 			segment = segment.next;
 		}
 		
-		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		// **** deleteObj EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
 		
 		restoreSelection();
 	}

@@ -45,7 +45,7 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		if (vbox != null) removeElement (vbox);
+		if (vbox != null) deleteObj (vbox);
 		
 		// **** SELECT ALL **** //
 		doCmd ("select-all");
@@ -84,7 +84,7 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
 		
 		restoreSelection();
 	}
@@ -105,6 +105,12 @@ MuseScore {
 	function doCmd (theCmd) {
 		curScore.startCmd ();
 		cmd (theCmd);
+		curScore.endCmd ();
+	}
+	
+	function deleteObj (theElem) {
+		curScore.startCmd ();
+		removeElement (theElem);
 		curScore.endCmd ();
 	}
 	
