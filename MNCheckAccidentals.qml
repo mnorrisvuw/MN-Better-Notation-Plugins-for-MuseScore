@@ -98,8 +98,8 @@ MuseScore {
 		var numStaves = curScore.nstaves;
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		
-		// ************  		deleteObj ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
-		deleteObjAllCommentsAndHighlights();
+		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
+		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
 		if (!curScore.selection.isRange) {
@@ -276,8 +276,8 @@ MuseScore {
 		var numErrors = errorStrings.length;
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
-		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN deleteObj Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN deleteObj Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;		
+		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
+		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;		
 		if (progressShowing) progress.close();
 		
 		var h = 250+numLogs*10;
@@ -951,7 +951,7 @@ MuseScore {
 		doCmd("select-similar");
 	}
 	
-	function deleteObjAllCommentsAndHighlights () {
+	function deleteAllCommentsAndHighlights () {
 	
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
@@ -974,7 +974,7 @@ MuseScore {
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
 		if (vbox == null) {
-			logError ("deleteObjAllCommentsAndHighlights () — vbox was null");
+			logError ("deleteAllCommentsAndHighlights () — vbox was null");
 		} else {
 			deleteObj (vbox);
 		}
@@ -1014,7 +1014,7 @@ MuseScore {
 			segment = segment.next;
 		}
 		
-		// **** deleteObj EVERYTHING IN THE ARRAY **** //
+		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
 		
