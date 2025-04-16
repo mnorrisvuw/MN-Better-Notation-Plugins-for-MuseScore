@@ -2408,8 +2408,13 @@ MuseScore {
 		// **** 1D: CHECK SYSTEM SPACING
 		if (hasMoreThanOneSystem) {
 			if (enableVerticalSpread) {
-				if (minSystemSpread < 12 || minSystemSpread > 14) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-				if (maxSystemSpread < 24 || maxSystemSpread > 28) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–28.0sp");
+				if (isSoloScore) {
+					if (minSystemSpread < 6 || minSystemSpread > 8) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
+					if (maxSystemSpread < 12 || maxSystemSpread > 16) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 12.0–16.0sp");				
+				} else {
+					if (minSystemSpread < 12 || minSystemSpread > 14) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
+					if (maxSystemSpread < 24 || maxSystemSpread > 28) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–28.0sp");
+				}
 			} else {
 				if (minSystemDistance < 12 || minSystemDistance > 16) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
 				if (maxSystemDistance < 24 || maxSystemDistance > 28) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–28.0sp");
@@ -2438,9 +2443,14 @@ MuseScore {
 		// **** STYLE SETTINGS — 9. BARS TAB **** //
 		if (minimumBarWidth < 14.0 || minimumBarWidth > 16.0) styleComments.push("(Bars tab) Set ‘Minimum bar width’ to between 14.0-16.0sp");
 		if (spacingRatio != 1.5) styleComments.push("(Bars tab) Set ‘Spacing Ratio’ to 1.5sp");
-		if (minNoteDistance < 0.6 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 0.6–0.7sp");
-		if (minNoteDistance > 0.7 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 0.6–0.7sp");
-		
+		if (isSoloScore) {
+			if (minNoteDistance < 1.0 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 1.0–1.2sp");
+			if (minNoteDistance > 1.2 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 1.0–1.2sp");
+			
+		} else {
+			if (minNoteDistance < 0.6 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 0.6–0.7sp");
+			if (minNoteDistance > 0.7 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 0.6–0.7sp");
+		}
 		// **** STYLE SETTINGS — 10. BARLINES TAB **** //
 		if (barlineWidth != 0.16) styleComments.push("(Barlines tab) Set ‘Thin barline thickness’ to 0.16sp");
 		
