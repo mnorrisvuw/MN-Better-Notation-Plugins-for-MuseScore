@@ -86,7 +86,10 @@ MuseScore {
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
 		
-		restoreSelection();
+		cmd ('escape');
+		cmd ('escape');
+		cmd ('concert-pitch');
+		cmd ('concert-pitch');
 	}
 	
 	function saveSelection () {

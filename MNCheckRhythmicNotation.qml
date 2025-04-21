@@ -586,8 +586,11 @@ MuseScore {
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
-		// ************								RESTORE PREVIOUS SELECTION 							************ //
-		restoreSelection();
+		// ************								DESELECT ALL AND FORCE REDRAW 							************ //
+		cmd ('escape');
+		cmd ('escape');
+		cmd ('concert-pitch');
+		cmd ('concert-pitch');
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;

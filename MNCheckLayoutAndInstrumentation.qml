@@ -1130,9 +1130,14 @@ MuseScore {
 								
 									if (theArticulationArray) {
 										lastArticulationTick = currTick;
+										var numStaccatos = 0;
 										for (var i = 0; i < theArticulationArray.length; i++) {
-											if (staccatoArray.includes(theArticulationArray[i].symbol)) checkStaccatoIssues (noteRest);
+											if (staccatoArray.includes(theArticulationArray[i].symbol)) {
+												numStaccatos++;
+												if (numStaccatos == 1) checkStaccatoIssues (noteRest);
+											}
 										}
+										if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
 									} else {
 										if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
 											if (isStringInstrument || isWindOrBrassInstrument) {
@@ -1339,9 +1344,12 @@ MuseScore {
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
-		// ************  								RESTORE PREVIOUS SELECTION 							************ //
-		restoreSelection();
-		
+		// ************  								DESELECT AND FORCE REDRAW 							************ //
+		cmd ('escape');
+		cmd ('escape');
+		cmd ('concert-pitch');
+		cmd ('concert-pitch');
+				
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
 		
@@ -2229,7 +2237,7 @@ MuseScore {
 		var pageEvenBottomMargin = Math.round(style.value("pageEvenBottomMargin")*inchesToMM*100)/100.;
 		var pageOddBottomMargin = Math.round(style.value("pageOddBottomMargin")*inchesToMM*100)/100.;
 		var pagePrintableWidth = Math.round(style.value("pagePrintableWidth")*inchesToMM);
-		var pagePrintableHeight = Math.round(style.value("pagePrintableHeight")*inchesToMM);
+		//var pagePrintableHeight = Math.round(style.value("pagePrintableHeight")*inchesToMM);
 		var pageEvenRightMargin = pageWidth - pagePrintableWidth - pageEvenLeftMargin;
 		var pageOddRightMargin = pageWidth - pagePrintableWidth - pageOddLeftMargin;
 		var tupletsFontFace = style.value("tupletFontFace");
@@ -2413,11 +2421,11 @@ MuseScore {
 					if (maxSystemSpread < 12 || maxSystemSpread > 16) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 12.0–16.0sp");				
 				} else {
 					if (minSystemSpread < 12 || minSystemSpread > 14) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-					if (maxSystemSpread < 24 || maxSystemSpread > 28) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–28.0sp");
+					if (maxSystemSpread < 24 || maxSystemSpread > 36) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
 				}
 			} else {
 				if (minSystemDistance < 12 || minSystemDistance > 16) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-				if (maxSystemDistance < 24 || maxSystemDistance > 28) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–28.0sp");
+				if (maxSystemDistance < 24 || maxSystemDistance > 36) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
 			}
 		}
 		
@@ -2425,7 +2433,7 @@ MuseScore {
 		if (!isSoloScore) {
 			if (enableVerticalSpread) {
 				if (minStaffSpread < 5 || minStaffSpread > 6) styleComments.push("(Page tab) Set the ‘Min. stave distance’ to between 5.0–6.0sp");
-				if (maxStaffSpread < 8 || maxStaffSpread > 9) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 8.0–9.0sp");
+				if (maxStaffSpread < 8 || maxStaffSpread > 10) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 8.0–10.0sp");
 			} else {
 				if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Page tab) Set the ‘Stave distance’ to between 5.0–6.0sp");
 			}
@@ -3303,6 +3311,9 @@ MuseScore {
 								
 					// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
 					if (isTempoChangeMarking) {
+						if (lastTempoChangeMarkingBar > -1) {
+							if (textObject.text === lastTempoChangeMarking.text) addError ("This looks like the same tempo change marking as the previous one in b. "+lastTempoChangeMarkingBar, textObject);
+						}
 						lastTempoChangeMarkingBar = currentBarNum;
 						//logError("lastTempoChangeMarkingBar is now "+lastTempoChangeMarkingBar);
 						lastTempoChangeMarking = textObject;
@@ -3375,7 +3386,6 @@ MuseScore {
 							//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
 							if (styledTextWithoutTags.includes(metronomemarkings[j])) {
 								isMetronomeMarking = true;
-								
 								// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
 								var metronomeDuration = division; // crotchet
 								var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
@@ -3420,7 +3430,14 @@ MuseScore {
 								addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
 							}
 							var metroSection = styledTextWithoutTags.split('=')[1];
-							if (metroSection === lastMetroSection) addError ('This looks like the same metronome marking that was set in b. '+currentDisplayBarNum, textObject);
+							if (metroSection === lastMetroSection) {
+								if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
+									addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
+								} else {
+									addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar, textObject);
+								}
+							}
+							//logError ('checking last Metro section = '+metroSection);
 							lastMetroSection = metroSection;
 							lastMetronomeMarkingBar = currentBarNum;
 							lastMetronomeMarkingDisplayBar = currentDisplayBarNum;
