@@ -5335,8 +5335,8 @@ MuseScore {
 			ScrollBar.vertical.policy: ScrollBar.AsNeeded
 			TextArea {
 				height: parent.height
-				textFormat: Text.RichText
 				text: dialog.msg
+				textFormat: Text.RichText
 				wrapMode: TextEdit.Wrap
 				leftInset: 0
 				leftPadding: 0
