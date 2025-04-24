@@ -4618,13 +4618,14 @@ MuseScore {
 	}
 	
 	function checkStemsAndBeams (noteRest) {
-		if (noteRest.beam) {
+		// REINSTATE THIS ONCE THE API SUPPORTS USER_MODIFIED PROPERTY
+		/*if (noteRest.beam) {
 			var theBeam = noteRest.beam;
 			if (!theBeam.is(prevBeam)) {
 				if (!theBeam.generated) addError ("This beam seems to have been moved away from its\ndefault position. If this was not deliberate, you can reset it\nby selecting it and pressing "+cmdKey+"-R",noteRest);
 				prevBeam = theBeam;
 			}
-		}
+		}*/
 		if (noteRest.stem) {
 			var stemDir = noteRest.stem.stemDirection;
 			if (stemDir > 0) {
@@ -5293,7 +5294,7 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
 		
 		restoreSelection();
 	}
