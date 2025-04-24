@@ -2062,7 +2062,7 @@ MuseScore {
 	//	logError ("2 or more excerpts");
 		var styleComments = [];
 		var pageSettingsComments = [];
-		var style;
+		var partStyle;
 		var flaggedStaffSize = false;
 		var flaggedSystemSpacing = false;
 		var flaggedMinNoteDistance = false;
@@ -2077,10 +2077,11 @@ MuseScore {
 			var thePart = excerpts[i];
 			
 		//logError ("checking part "+i);
-			style = thePart.partScore.style;
+			partStyle = thePart.partScore.style;
+			var thePartSpatium = partStyle.value("spatium")*inchesToMM/mscoreDPI;
 			// part should be 6.6-7.0mm
 			if (!flaggedStaffSize) {
-				var theStaffSize = spatium * 4.0;
+				var theStaffSize = thePartSpatium * 4.0;
 				if (theStaffSize > maxSize) {
 					pageSettingsComments.push("Decrease the stave space to between "+Math.round(minSize*250)/1000.+"–"+Math.round(maxSize*250)/1000.+"mm");
 					flaggedStaffSize = true;
@@ -2092,7 +2093,7 @@ MuseScore {
 			}
 			
 			if (!flaggedIndentation) {
-				var indent = style.value("enableIndentationOnFirstSystem");
+				var indent = partStyle.value("enableIndentationOnFirstSystem");
 				if (indent) {
 					styleComments.push("(Score tab) Uncheck ‘Enable indentation on first system'");
 					flaggedIndentation = true;
@@ -2102,11 +2103,11 @@ MuseScore {
 			
 			// check system spacing
 			if (!flaggedSystemSpacing) {
-				var minSystemDistance = style.value("minSystemDistance");
-				var maxSystemDistance = style.value("maxSystemDistance");
-				var minSystemSpread = style.value("minSystemSpread");
-				var maxSystemSpread = style.value("maxSystemSpread");
-				var enableVerticalSpread = style.value("enableVerticalSpread");
+				var minSystemDistance = partStyle.value("minSystemDistance");
+				var maxSystemDistance = partStyle.value("maxSystemDistance");
+				var minSystemSpread = partStyle.value("minSystemSpread");
+				var maxSystemSpread = partStyle.value("maxSystemSpread");
+				var enableVerticalSpread = partStyle.value("enableVerticalSpread");
 				if (enableVerticalSpread) {
 					if (minSystemSpread < 6 || minSystemSpread > 8) {
 						styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
@@ -2130,7 +2131,7 @@ MuseScore {
 			
 			// vertical frame bottom margin
 			if (!flaggedVerticalFrameBottomMargin) {
-				var verticalFrameBottomMargin = style.value("frameSystemDistance");
+				var verticalFrameBottomMargin = partStyle.value("frameSystemDistance");
 				if (verticalFrameBottomMargin != 8) {
 					styleComments.push("(Page tab) Set ‘Vertical frame bottom margin’ to 8.0sp");
 					flaggedVerticalFrameBottomMargin = true;
@@ -2139,7 +2140,7 @@ MuseScore {
 			
 			// last system fille distance
 			if (!flaggedLastSystemFillLimit) {
-				var lastSystemFillLimit = style.value("lastSystemFillLimit");
+				var lastSystemFillLimit = partStyle.value("lastSystemFillLimit");
 				if (lastSystemFillLimit != 0) {
 					styleComments.push("(Page tab) Set ‘Last system fill threshold’ to 0%");
 					flaggedLastSystemFillLimit = true;
@@ -2149,7 +2150,7 @@ MuseScore {
 			
 			// min note distance
 			if (!flaggedMinNoteDistance) {
-				var minNoteDistance = style.value("minNoteDistance");
+				var minNoteDistance = partStyle.value("minNoteDistance");
 				if (minNoteDistance < 1.2 || minNoteDistance > 1.4) {	
 					styleComments.push("(Bars tab) Set the ‘Min. note distance’ to between 1.2-1.4sp");
 					flaggedMinNoteDistance = true;
@@ -2158,7 +2159,7 @@ MuseScore {
 			
 			// multirests on
 			if (!flaggedMultiRests) {
-				var multirestsOn = style.value("createMultiMeasureRests");
+				var multirestsOn = partStyle.value("createMultiMeasureRests");
 				if (!multirestsOn) {	
 					styleComments.push("(Rests tab) Switch ‘Multibar rests’ on");
 					flaggedMultiRests = true;
@@ -2167,7 +2168,7 @@ MuseScore {
 			
 			// multirest width
 			if (!flaggedMultiRestWidth) {
-				var MMrestWidth = style.value("minMMRestWidth");
+				var MMrestWidth = partStyle.value("minMMRestWidth");
 				if (MMrestWidth < 18.0 || MMrestWidth > 36.0) {	
 					styleComments.push("(Rests tab) Set ‘Multibar rests→Minimum width’ to between 18–36sp");
 					flaggedMultiRestWidth = true;
@@ -2176,8 +2177,8 @@ MuseScore {
 			
 			// part title setup
 			if (!flaggedPartNameStyle) {
-				var type = style.value ("partInstrumentFrameType");
-				var padding = style.value ("partInstrumentFramePadding");
+				var type = partStyle.value ("partInstrumentFrameType");
+				var padding = partStyle.value ("partInstrumentFramePadding");
 				if (type != 1) {
 					styleComments.push("(Text Styles→Instrument name (Part)) Set Frame type to Rectangle");
 					flaggedPartNameStyle = true;
