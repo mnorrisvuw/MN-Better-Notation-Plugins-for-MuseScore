@@ -92,6 +92,7 @@ MuseScore {
 	property var flaggedSlurredStaccatoBar: -10
 	property var isNote: false
 	property var isRest: false
+	property var flaggedUnterminatedTempoChange: false
 	
 	// ** PARTS ** //
 	property var isGrandStaff: []
@@ -120,6 +121,7 @@ MuseScore {
 	property var lastTempoChangeMarkingBar: -1
 	property var tempoChangeMarkingEnd: -1
 	property var lastTempoChangeMarking: null
+	property var lastTempoChangeMarkingText: ''
 	property var lastTempoMarking: null
 	property var lastTempoMarkingBar: -1
 	property var lastArticulationTick: -1
@@ -437,7 +439,9 @@ MuseScore {
 		}
 		
 		// ************  					SELECT AND PRE-PROCESS ENTIRE SCORE 							************ //
+		curScore.startCmd();
 		doCmd ("select-all");
+		curScore.endCmd();
 		setProgress (1);
 		
 		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, SLURS, OTTAVAS, ETC) 	************ //
@@ -540,6 +544,8 @@ MuseScore {
 			isDiv = false;
 			firstDynamic = false;
 			lastTempoChangeMarkingBar = -1;
+			lastTempoChangeMarkingText = '';
+			lastTempoChangeMarking = null;
 			tempoChangeMarkingEnd = -1;
 			prevCheckedClef = null;
 			lastTempoMarking = null;
@@ -567,6 +573,7 @@ MuseScore {
 			flaggedOneStrokeTrem = false;
 			haveHadPlayingIndication = false;
 			flaggedSlurredStaccatoBar = -10;
+			flaggedUnterminatedTempoChange = false;
 			
 			// ** slurs
 			currentSlur = null;
@@ -716,17 +723,20 @@ MuseScore {
 				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues(currentBar,currentStaffNum);
 				
 				// ************ CHECK UNTERMINATED TEMPO CHANGE ************ //
-				if (lastTempoChangeMarkingBar != -1 && currentBarNum >= lastTempoChangeMarkingBar + 8) {
+				if (lastTempoChangeMarkingBar != -1 && tempoChangeMarkingEnd == -1 && lastTempoChangeMarking != null && currentBarNum >= lastTempoChangeMarkingBar + 8) {
 					//logError("Found unterminated tempo change in b. "+currentBarNum);
-					addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
-					lastTempoChangeMarkingBar = -1;
+					if (lastTempoChangeMarking.type != Element.GRADUAL_TEMPO_CHANGE) {
+						addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
+						lastTempoChangeMarkingBar = -1;
+						tempoChangeMarkingEnd = -1;
+					}
 				}
 				
 				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
 					//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
 					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
-					lastTempoChangeMarkingBar = -1;
+					//lastTempoChangeMarkingBar = -1;
 				}
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
@@ -753,13 +763,13 @@ MuseScore {
 						if (tempoText.length > 0) {
 							var t = tempoText[0];
 							if (t.type == Element.GRADUAL_TEMPO_CHANGE) {
-								if (currTick > t.spannerTick.ticks) {
+								if (currTick >= t.spannerTick.ticks) {
 									checkTextObject(t);
 									tempoChangeMarkingEnd = t.spannerTick.ticks + t.spannerTicks.ticks;
 									tempoText.shift();
 								}
 							} else {
-								if (currTick > t.parent.tick) {
+								if (currTick >= t.parent.tick) {
 									checkTextObject(t);
 									tempoText.shift();
 								}
@@ -1229,10 +1239,10 @@ MuseScore {
 							}
 						}
 						
+						// GRADUAL TEMPO CHANGES
 						if (tempoChangeMarkingEnd != -1 && currTick > tempoChangeMarkingEnd + division * 2) {
-							addError ("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
+							addError ("You have indicated a gradual tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
 							tempoChangeMarkingEnd = -1;
-							lastTempoChangeMarkingBar = -1;
 						}
 						
 						if (cursor.next()) {
@@ -1460,27 +1470,24 @@ MuseScore {
 			var e = elems[i];
 			
 			// check if elem is hidden
-			if (e.parent == null) continue;
+			//if (e.parent == null) {
+			//	logError ('e.parent == null');
+			//	continue;
+			//}
 			//logError ("Found elem "+e.name);
 			var etype = e.type;
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
 			
-			// ** MuseScore versions prior to 4.5.1 had broken segment objects that would return 'undefined' for spannerTick or spannerTicks
-			// ** Therefore, we'll only collect these objects if we have the right version of MuseScore
 			/*if (etype == Element.REHEARSAL_MARK) {
 				logError ("Checking rehearsal mark at start"); 
 				checkRehearsalMark(e);
 			}*/
 			if (etype == Element.HAIRPIN) {
-				//logError ("Pushing hairpin "+hairpins[staffIdx].length+": "+e.hairpinType);
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 			}
 			if (etype == Element.HAIRPIN_SEGMENT) {
-				// ONLY ADD THE HAIRPIN_SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				//logError ("Hairpin e.pagePos.x = "+e.pagePos.x);
-
 				var sameLoc = false;
 				var sameHairpin = false;
 				if (prevHairpinSegment != null) {
@@ -1489,8 +1496,6 @@ MuseScore {
 				}
 				// only add it if it's not already added
 				if (!sameHairpin) {
-					
-					//logError ("Pushing hairpin segment "+e.hairpinType);
 					hairpins[staffIdx].push(e);
 					if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 				}
@@ -1564,7 +1569,10 @@ MuseScore {
 				var locArr = staffIdx+' '+theTick;
 				fermataLocs.push(locArr);
 			}
-			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) tempoText.push(e);
+			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) {
+				//logError ("Pushing tempo "+e.name+" "+e.subtypeName());
+				tempoText.push(e);
+			}
 			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e.parent.tick);
 			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
 		}
@@ -3190,10 +3198,10 @@ MuseScore {
 		
 		if (eType == Element.GRADUAL_TEMPO_CHANGE) {
 			styledText = textObject.beginText;
+			//logError ("checking gradual tempo change: "+styledText);
 		} else {
 			styledText = textObject.text;
 		}
-		//logError ("checking text: "+styledText+" subtype "+eSubtype+" name "+eName);
 
 		if (styledText == undefined) {
 			logError ("checkTextObject() — styledText is undefined");
@@ -3227,6 +3235,7 @@ MuseScore {
 			}
 			
 			var lowerCaseText = plainText.toLowerCase();
+			//logError ('lowerCaseText = '+lowerCaseText);
 			//logError("Text style is "+textStyle+"); subtype = "+eSubtype+"; styledtext = "+styledText+"; lowerCaseText = "+lowerCaseText);
 			
 			if (lowerCaseText != '') {
@@ -3312,17 +3321,23 @@ MuseScore {
 								
 					// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
 					if (isTempoChangeMarking) {
+						//logError("1) lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar);
+
 						if (lastTempoChangeMarkingBar > -1) {
-							if (textObject.text === lastTempoChangeMarking.text) addError ("This looks like the same tempo change marking as the previous one in b. "+lastTempoChangeMarkingBar, textObject);
+							//logError("lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar+"; this = "+styledText+"; last = "+lastTempoChangeMarkingText);
+
+							if (styledText === lastTempoChangeMarkingText) addError ("This looks like the same tempo change marking\nas the previous ‘"+lastTempoChangeMarkingText+"’ in b. "+lastTempoChangeMarkingBar, textObject);
 						}
 						lastTempoChangeMarkingBar = currentBarNum;
-						//logError("lastTempoChangeMarkingBar is now "+lastTempoChangeMarkingBar);
+						//logError("2) lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar);
 						lastTempoChangeMarking = textObject;
+						lastTempoChangeMarkingText = styledText;
 						if (eType != Element.TEMPO_TEXT && eType != Element.GRADUAL_TEMPO_CHANGE) {
 							addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
 							return;
 						}
 						if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo\nif it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
+						flaggedUnterminatedTempoChange = false;
 					}
 		
 					// **** IS THIS A TEMPO MARKING? **** //
@@ -3359,6 +3374,9 @@ MuseScore {
 					if (isTempoMarking) {
 						
 						lastTempoChangeMarkingBar = -1;
+						//logError ('set to -1 #3');
+						lastTempoChangeMarking = null;
+						lastTempoChangeMarkingText = '';
 						tempoChangeMarkingEnd = -1;
 						//logError ("isTempoMarking — tempoChangeMarkingEnd is now "+tempoChangeMarkingEnd);
 						//logError("Cancelled tempo change marking in b. "+currentBarNum);
@@ -3784,7 +3802,7 @@ MuseScore {
 			currDynamicLevel = 4;
 			return;
 		}
-		logError ('Can’t find dynamic level for '+str);
+		logError ('setDynamicLevel() — Can’t find dynamic level for '+str);
 	}
 	
 	function checkKeySignature (keySig,sharps) {
@@ -4879,7 +4897,7 @@ MuseScore {
 	
 	function addError (text,element) {
 		if (element == null || element == undefined) {
-			logError("addError() — element undefined for text: "+text);
+			logError("addError() — ‘element’ undefined for error: "+text);
 		} else {
 			errorStrings.push(text);
 			errorObjects.push(element);
