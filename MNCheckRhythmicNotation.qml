@@ -19,6 +19,7 @@ MuseScore {
 	id: mncheckrhythmicnotation
 	thumbnailName: "MNCheckRhythmicNotation.png"
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation"
+	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 
 	// **** GLOBALS **** //
 	property var numLogs: 0
@@ -151,12 +152,17 @@ MuseScore {
 		possibleOnbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet", "minim", "dotted minim", "semibreve"];
 		possibleOffbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet];
 		possibleOffbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet"];
-		
+		var versionNumber = versionnumberfile.read().trim();
+
 		// **** DELETE ALL EXISTING COMMENTS AND HIGHLIGHTS **** //
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
-		if (!curScore.selection.isRange) doCmd ("select-all");
+		if (!curScore.selection.isRange) {
+			curScore.startCmd();
+			cmd ("select-all");
+			curScore.endCmd();
+		}
 		firstStaffNum = curScore.selection.startStaff;
 		lastStaffNum = curScore.selection.endStaff;
 		//errorMsg+="\nfirstStaffNum= "+firstStaffNum+"; lastStaffNum = "+lastStaffNum;
@@ -605,6 +611,8 @@ MuseScore {
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
+		dialog.titleText = 'MN CHECK RHYTHMIC NOTATION '+versionNumber;
+
 		dialog.show();
 	
 	}
@@ -977,7 +985,17 @@ MuseScore {
 		for (var i = 0; i < l; i++) nn += tuplet.elements[i].type == Element.CHORD || tuplet.elements[i].type == Element.REST;
 		if (nn >= a * 2) {
 			if (nn == 6 && a == 3) {
-				addError ("This triplet should be a sextuplet", tuplet);
+				//logError ('actualDuration = ' + tuplet.actualDuration.ticks);
+				if (tuplet.actualDuration.ticks <= beatLength) {
+					var allNotesEqual = true;
+					
+					//logError ('tuplet.duration.ticks / 6 = ' + (tuplet.duration.ticks / 6));
+					for (var i = 0; i < 6 && allNotesEqual; i++) {
+						//logError ('tuplet.elements[i].actualDuration.ticks = ' + tuplet.elements[i].actualDuration.ticks);
+						if (tuplet.elements[i].actualDuration.ticks != tuplet.duration.ticks / 6) allNotesEqual = false;
+					}
+					if (allNotesEqual) addError ("This triplet should be a sextuplet", tuplet);
+				}
 			} else {
 				addError ("This tuplet is meant to have "+a+" notes/rests,\nbut instead contains "+nn+".\nConsider rewriting the tuplet",tuplet);
 			}
@@ -1576,18 +1594,6 @@ MuseScore {
 		errorObjects.push(element);
 	}
 	
-	function doCmd (theCmd) {
-		curScore.startCmd ();
-		cmd (theCmd);
-		curScore.endCmd ();
-	}
-	
-	function deleteObj (theElem) {
-		curScore.startCmd ();
-		removeElement (theElem);
-		curScore.endCmd ();
-	}
-	
 	function showAllErrors () {
 		var objectPageNum;
 		var firstStaffNum = 0;
@@ -1873,8 +1879,10 @@ MuseScore {
 	}
 	
 	function selectTitleText () {
-		doCmd("title-text");
-		doCmd("select-similar");
+		cmd("title-text");
+		curScore.startCmd();
+		cmd("select-similar");
+		curScore.endCmd();
 	}
 	
 	function deleteAllCommentsAndHighlights () {
@@ -1886,11 +1894,15 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		doCmd ("select-all");
-		doCmd ("insert-vbox");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+		cmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
-		doCmd ("title-text");
-		doCmd ("select-similar");
+		cmd ("title-text");
+		curScore.startCmd();
+		cmd ("select-similar");
+		curScore.endCmd();
 		
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -1902,11 +1914,13 @@ MuseScore {
 		if (vbox == null) {
 			logError ("deleteAllCommentsAndHighlights () — vbox was null");
 		} else {
-			deleteObj (vbox);
+			removeElement (vbox);
 		}
 		
 		// **** SELECT ALL **** //
-		doCmd ("select-all");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
@@ -1941,9 +1955,10 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
-		
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		curScore.endCmd();
 		restoreSelection();
 	}
 	
@@ -1976,8 +1991,9 @@ MuseScore {
 		id: dialog
 		title: "CHECK COMPLETED"
 		contentHeight: 232
-		contentWidth: 456
+		contentWidth: 505
 		property var msg: ""
+		property var titleText: ""
 
 		Text {
 			id: theText
@@ -1985,7 +2001,7 @@ MuseScore {
 			x: 20
 			y: 20
 
-			text: "MN CHECK RHYTHMIC NOTATION"
+			text: dialog.titleText
 			font.bold: true
 			font.pointSize: 18
 		}

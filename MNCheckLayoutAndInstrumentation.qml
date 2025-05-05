@@ -32,6 +32,7 @@ MuseScore {
 	FileIO { id: spellingerrorsatstartfile; source: Qt.resolvedUrl("./assets/spellingerrorsatstart.txt").toString().slice(8); onError: { console.log(msg); } }
 	FileIO { id: tempomarkingsfile; source: Qt.resolvedUrl("./assets/tempomarkings.txt").toString().slice(8); onError: { console.log(msg); } }
 	FileIO { id: tempochangemarkingsfile; source: Qt.resolvedUrl("./assets/tempochangemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 
 	// ** DEBUG **
 	property var debug: true
@@ -201,6 +202,8 @@ MuseScore {
 	property var dynamics: []
 	property var currDynamicLevel: 0
 	property var expressiveSwell: 0
+	property var currentDynamicNum: 0
+	property var numDynamics: 0
 	
 	// ** CLEFS ** //
 	property var clefs: []
@@ -342,6 +345,8 @@ MuseScore {
 		tempomarkings = tempomarkingsfile.read().trim().split('\n');
 		tempochangemarkings = tempochangemarkingsfile.read().trim().split('\n');
 		var tempinstrumentranges = instrumentrangesfile.read().trim().split('\n');
+		var versionNumber = versionnumberfile.read().trim();
+
 		for (var i = 0; i < tempinstrumentranges.length; i++) instrumentranges.push(tempinstrumentranges[i].split(','));
 		
 		// **** INITIALISE MAIN VARIABLES **** //
@@ -440,7 +445,7 @@ MuseScore {
 		
 		// ************  					SELECT AND PRE-PROCESS ENTIRE SCORE 							************ //
 		curScore.startCmd();
-		doCmd ("select-all");
+		cmd ("select-all");
 		curScore.endCmd();
 		setProgress (1);
 		
@@ -510,12 +515,12 @@ MuseScore {
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			//logError("\n——— STAFF "+currentStaffNum+" ————");
 			
+			
 			//don't process if this part is hidden
 			if (!staffVisible[currentStaffNum]) {
 				loop += numBars * 4;
 				continue;
 			}
-			
 			//logError("top = "+isTopOfGrandStaff[currentStaffNum]);
 			
 			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
@@ -557,6 +562,8 @@ MuseScore {
 			lastDynamicTick = -1;
 			numConsecutiveMusicBars = 0;
 			lastDynamicFlagBar = -1;
+			currentDynamicNum = 0;
+			var numDynamics = dynamics[currentStaffNum].length;
 			
 			// ** clear flags ** //
 			flaggedInstrumentRange = 0;
@@ -1005,6 +1012,28 @@ MuseScore {
 									}
 								}
 							}
+							
+							// ************ DYNAMIC? ************ //
+							var readyToGoToNextDynamic = false;
+							if (currentDynamicNum < numDynamics) {
+								var nextDynamic = dynamics[currentStaffNum][currentDynamicNum];
+								if (nextDynamic == null || nextDynamic == undefined) {
+									logError ('nextDynamic is '+nextDynamic);
+								} else {
+									var p = nextDynamic.parent;
+									if (p == undefined) {
+										logError ('Type = '+nextDynamic.type+'; Subtype = '+nextDynamic.subtypeName()+'; text = '+nextDynamic.text+'; parent is undefined');
+									} else {
+										while (p.type != Element.SEGMENT) p = p.parent;
+										var nextDynamicTick = p.tick;
+										if (currTick >= nextDynamicTick) {
+											checkTextObject(nextDynamic);
+											currentDynamicNum ++;
+										}
+									}
+								}
+							}
+							
 						
 							// ************ FOUND A CLEF ************ //
 							if (clefs[currentStaffNum][currTick] != null) {
@@ -1060,7 +1089,7 @@ MuseScore {
 									var theAnnotation = annotations[aIndex];
 									if (theAnnotation.track == currentTrack) {
 										var aType = theAnnotation.type;
-										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME) continue;
+										if (aType == Element.GRADUAL_TEMPO_CHANGE || aType == Element.TEMPO_TEXT || aType == Element.METRONOME || aType == Element.DYNAMIC) continue;
 										// **** FOUND A TEXT OBJECT **** //
 										if (theAnnotation.text) checkTextObject(theAnnotation);
 									}
@@ -1375,6 +1404,7 @@ MuseScore {
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
+		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
 		dialog.show();
 	}
 	
@@ -1532,7 +1562,7 @@ MuseScore {
 			if (etype == Element.SLUR_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameSlur = false;
-				if (prevSlurSegment != null) {
+				if (prevSlurSegment != null && e.parent != null) {
 					sameLoc = (e.spannerTick.ticks == prevSlurSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevSlurSegment.spannerTicks.ticks);
 					if (sameLoc) sameSlur = !e.parent.is(prevSlurSegment.parent);
 				}
@@ -1573,7 +1603,7 @@ MuseScore {
 				//logError ("Pushing tempo "+e.name+" "+e.subtypeName());
 				tempoText.push(e);
 			}
-			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e.parent.tick);
+			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e);
 			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
 		}
 	}
@@ -2674,7 +2704,10 @@ MuseScore {
 		if (isDecresc && currentBarNum == numBars) return;
 		
 		// cycle through the dynamics in the staff, looking to see whether there is one near the end of the hairpin
-		for (var i = 0;i < dynamics[currentStaffNum].length; i++) if (dynamics[currentStaffNum][i] >= hairpinZoneStartTick && dynamics[currentStaffNum][i] <= hairpinZoneEndTick) return;
+		for (var i = 0;i < dynamics[currentStaffNum].length; i++) {
+			var dynamicTick = dynamics[currentStaffNum][i].parent.tick;
+			if (dynamicTick >= hairpinZoneStartTick && dynamicTick <= hairpinZoneEndTick) return;
+		}
 		
 		//logError ("cursor2.tick = "+cursor2.tick+" currentHairpinEnd = "+currentHairpinEnd);
 		
@@ -3135,12 +3168,16 @@ MuseScore {
 	
 	function checkScoreText() {
 		var textToCheck = [];
-		doCmd ("select-all");
-		doCmd ("insert-vbox");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+		cmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];		
-		doCmd ("title-text");
+		cmd ("title-text");
 		var tempText = curScore.selection.elements[0];
-		doCmd ("select-similar");
+		curScore.startCmd();
+		cmd ("select-similar");
+		curScore.endCmd();
 		var elems = curScore.selection.elements;
 		currentBarNum = 0;
 		var hasTitleOnFirstPageOfMusic = false;
@@ -3161,7 +3198,9 @@ MuseScore {
 		if (vbox == null) {
 			logError ("checkScoreText () — vbox was null");
 		} else {
-			deleteObj (vbox);
+			curScore.startCmd();
+			removeElement (vbox);
+			curScore.endCmd();
 		}
 		var threshold = firstPageHeight*0.7;
 		for (var i = 0; i < textToCheck.length; i++) {
@@ -3176,8 +3215,10 @@ MuseScore {
 		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
 		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
-		
-		doCmd ("select-all");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+
 	}
 	
 	function checkTextObject (textObject) {
@@ -3348,6 +3389,7 @@ MuseScore {
 							if (lowerCaseText.includes(tempomarkings[j])) {
 								isTempoMarking = true;
 								//logError ("Styled text = "+styledText.replace(/</g,'{'));
+								if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of the text should align with the time signature or first note.\n(See Behind Bars, p. 183)", textObject);
 								if (styledText.includes("<b>")) {
 									// strip anything not between <b> tags, then strip any other tags (to ensure '=' is no longer in string)
 									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
@@ -3491,6 +3533,26 @@ MuseScore {
 						addError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
 						return;
 					}
+					
+					if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
+						addError ("Change this to ‘poco sul tasto’",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul tasto molto") {
+						addError ("Change this to ‘molto sul tasto’",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul pont. poco" || lowerCaseText === "sul pont. un poco") {
+						addError ("Change this to ‘poco sul pont.’",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul pont. molto") {
+						addError ("Change this to ‘molto sul pont.’",textObject);
+						return;
+					}
 				
 					// **** CHECK SUL + STRING INDICATION **** //
 					var strings = ["I","II","III","IV"];
@@ -3614,13 +3676,13 @@ MuseScore {
 					}
 					
 					var objectIsDynamic = tn === "dynamic";
-					var includesADynamic = styledText.includes('<sym>dynamics');
+					var includesADynamic = styledText.includes('<sym>dynamic');
 					var stringIsDynamic = isDynamic(lowerCaseText);
-					//logError("plainText = "+plainText+" "+objectIsDynamic+" "+includesADynamic+" "+stringIsDynamic);
-
+					
+					//logError("styledText = "+styledText.replace(/</g,'≤')+"; lct = "+lowerCaseText+" objectIsDynamic = "+objectIsDynamic+"; includesADynamic = "+includesADynamic+"; stringIsDynamic = "+stringIsDynamic);
 					// **** CHECK REDUNDANT DYNAMIC **** //
 					if (includesADynamic || stringIsDynamic) {
-											
+						
 						firstDynamic = true;
 						tickHasDynamic = true;
 						theDynamic = textObject;
@@ -3630,6 +3692,7 @@ MuseScore {
 						var isError = false;
 						var dynamicException = plainText.includes("fp") || plainText.includes("fmp") || plainText.includes("sf") || plainText.includes("fz");
 						if (prevDynamicBarNum > 0) {
+							
 							var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
 							if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
 								// check if visual overlapping
@@ -3780,8 +3843,16 @@ MuseScore {
 	function setDynamicLevel (str) {
 		// set multiple dynamics first and return
 		// dynamicLevel — 0 = ppp–p, 1 = mp, 2 = mf, 3 = f, 4 = ff+
-		if (str === 'sf' || str === 'sfz' || str === 'sffz' || str === 'rf' || str === 'rfz') return;
+		if (str === 'sf' || str === 'sfz' || str === 'sffz' || str === 'rf' || str === 'rfz' || str === 'fz') return;
 		var strWords = str.split(' ');
+		if (str.includes ('meno f') || str.includes('più p')) {
+			if (currDynamicLevel > 0) currDynamicLevel--;
+			return;
+		}
+		if (str.includes ('più f') || str.includes('meno p')) {
+			if (currDynamicLevel < 4) currDynamicLevel++;
+			return;
+		}
 		if (strWords.includes ('p') || strWords.includes ('pp') || str.includes('ppp') || str.includes('fp') || str.includes('fzp')) {
 			currDynamicLevel = 0;
 			return;
@@ -4557,7 +4628,7 @@ MuseScore {
 					if (noteRest.type == Element.CHORD) {
 						var theNotes = noteRest.notes;
 						var nNotes = theNotes.length;
-						if (allNotes[currTick] == undefined) allNotes[currTick] = [];
+						if (allNotes[theTick] == undefined) allNotes[theTick] = [];
 						for (var  i = 0; i < nNotes; i++) allNotes[theTick].push(theNotes[i]);
 					}
 					if (cursor.next()) {
@@ -4910,7 +4981,7 @@ MuseScore {
 	//---------------------------------------------------------
 	
 	function showAllErrors () {
-		var objectPageNum;
+		var objectPageNum = 0;
 		var firstStaffNum = 0;
 		for (var k = 0; k < curScore.nstaves; k++) {
 			if (curScore.staves[k].part.show) {
@@ -4923,6 +4994,7 @@ MuseScore {
 		var commentPages = [];
 		
 		for (var i in errorStrings) {
+			curScore.startCmd();
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
 			var isArray = Array.isArray(element);
@@ -4932,12 +5004,11 @@ MuseScore {
 			} else {
 				objectArray = [element];
 			}
-			for (var j in objectArray) {
+			for (var j=0; j < objectArray.length; j++) {
 				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
 				var staffNum = firstStaffNum;
-				
 				var elementHeight = 0;
 				var commentOffset = 1.0;
 				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
@@ -4970,8 +5041,8 @@ MuseScore {
 							if (elemStaff == undefined) {
 								isString = true;
 								theLocation = "";
-								desiredPosX = element.bbox.x;
-								desiredPosY = element.bbox.y;
+								desiredPosX = element.pagePos.x;
+								desiredPosY = element.pagePos.y;
 								//logError(" x = "+desiredPosX+"); y = "+desiredPosY;
 							} else {
 								staffNum = 0;
@@ -5003,12 +5074,13 @@ MuseScore {
 				comment.frameFgColor = "black";
 				comment.fontSize = 7.0;
 				comment.fontFace = "Helvetica";
+				comment.align = Align.TOP;
 				comment.autoplace = false;
 
 				if (isString) {
 					if (theLocation.includes("pagetop")) {
 						desiredPosX = 2.5;
-						desiredPosY = 10.;
+						desiredPosY = 2.5;
 					}
 					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
 					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
@@ -5030,19 +5102,22 @@ MuseScore {
 					}
 				}
 				
-				// add text object to score
+				// add text object to score for the first object in the array
 				if (j == 0) {
 					var cursor = curScore.newCursor();
 					cursor.staffIdx = staffNum;
 					cursor.rewindToTick(tick);
+					//logError ("Adding comment to staff "+staffNum+" @ tick "+tick);
 					cursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
-					var commentHeight = comment.bbox.height;
+					var commentHeight = comment.bbox.height; // convert to pixels
 					var commentWidth = comment.bbox.width;
 					var placedX = comment.pagePos.x;				
 					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
 					if (desiredPosY != 0) {
+						//comment.placement = Placement.BELOW;
+						//logError ('comment.placement = '+comment.placement);
 						comment.offsetY = desiredPosY - comment.pagePos.y;
 					} else {
 						comment.offsetY -= commentHeight;
@@ -5053,7 +5128,8 @@ MuseScore {
 
 					if (commentPage != null && commentPage != undefined) {
 						if (commentPage.type == Element.PAGE) {
-							var commentPageWidth = commentPage.bbox.width; // get page width
+
+							var commentPageWidth = commentPage.bbox.width; // get page width in spaitum
 							var commentPageNum = commentPage.pagenumber; // get page number
 							
 							// move over to the top right of the page if needed
@@ -5137,6 +5213,14 @@ MuseScore {
 									}
 								}*/
 							}
+							
+							//var minY = 10;
+							//var commentTop = (comment.pagePos.y - commentHeight);
+							//if (commentTop < minY) comment.offsetY += (minY - commentTop) + 3;
+						
+							//commentTop = (comment.pagePos.y - commentHeight);
+							//if (isString) logError ('Comment ‘'+theText.substring(0,10)+'’; {'+comment.pagePos.x+', '+comment.pagePos.y+', '+comment.bbox.width+', '+comment.bbox.height+'}');
+
 							if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
 						} else {
 							logError ("parent parent parent parent was not a page — element = "+element.name);
@@ -5147,6 +5231,7 @@ MuseScore {
 					commentPages.push (commentPage);
 				}
 			}
+			curScore.endCmd();
 		} // var i
 	}
 	
@@ -5236,17 +5321,6 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
-	function doCmd (theCmd) {
-		curScore.startCmd ();
-		cmd (theCmd);
-		curScore.endCmd ();
-	}
-	
-	function deleteObj (theElem) {
-		curScore.startCmd ();
-		removeElement (theElem);
-		curScore.endCmd ();
-	}
 	
 	function deleteAllCommentsAndHighlights () {
 
@@ -5257,12 +5331,16 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		doCmd ("select-all");
-		doCmd ("insert-vbox");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+		cmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
-		doCmd ("title-text");
-		doCmd ("select-similar");
-		
+		cmd ("title-text");
+		curScore.startCmd();
+		cmd ("select-similar");
+		curScore.endCmd();
+
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
@@ -5273,11 +5351,15 @@ MuseScore {
 		if (vbox == null) {
 			logError ("deleteAllCommentsAndHighlights () — vbox was null");
 		} else {
-			deleteObj (vbox);
+			curScore.startCmd();
+			removeElement (vbox);
+			curScore.endCmd();
 		}
 		
 		// **** SELECT ALL **** //
-		doCmd ("select-all");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
@@ -5312,9 +5394,10 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		
+		curScore.endCmd();
 		restoreSelection();
 	}
 	
@@ -5322,8 +5405,9 @@ MuseScore {
 		id: dialog
 		title: "CHECK COMPLETED"
 		contentHeight: 232
-		contentWidth: 456
+		contentWidth: 505
 		property var msg: ""
+		property var titleText: ""
 
 		Text {
 			id: theText
@@ -5331,7 +5415,7 @@ MuseScore {
 			x: 20
 			y: 20
 
-			text: "MN CHECK LAYOUT AND INSTRUMENTATION"
+			text: dialog.titleText
 			font.bold: true
 			font.pointSize: 18
 		}

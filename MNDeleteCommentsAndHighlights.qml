@@ -21,23 +21,26 @@ MuseScore {
 	id: mndeletecommentsandhighlights
 	thumbnailName: "MNDeleteCommentsAndHighlights.png"	
 	property var selectionArray: [];
+	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 
   onRun: {
 		if (!curScore) return;
-				
+		var versionNumber = versionnumberfile.read().trim();
+
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 		
-		// ** SAVE CURRENT SELECTION ** //
-		saveSelection();
-		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		doCmd ("select-all");
-		doCmd ("insert-vbox");
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+		cmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
-		doCmd ("title-text");
-		doCmd ("select-similar");
-		
+		cmd ("title-text");
+		curScore.startCmd();
+		cmd ("select-similar");
+		curScore.endCmd();
+
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
@@ -45,11 +48,13 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		if (vbox != null) deleteObj (vbox);
+		if (vbox != null) removeElement (vbox);
 		
 		// **** SELECT ALL **** //
-		doCmd ("select-all");
-		
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
 		
@@ -83,9 +88,11 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
-		
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		curScore.endCmd();
+
 		cmd ('escape');
 		cmd ('escape');
 		cmd ('concert-pitch');
@@ -102,36 +109,8 @@ MuseScore {
 			selectionArray[2] = curScore.selection.startStaff;
 			selectionArray[3] = curScore.selection.endStaff;
 		}
-	}
+	}	
 	
-	
-	function doCmd (theCmd) {
-		curScore.startCmd ();
-		cmd (theCmd);
-		curScore.endCmd ();
-	}
-	
-	function deleteObj (theElem) {
-		curScore.startCmd ();
-		removeElement (theElem);
-		curScore.endCmd ();
-	}
-	
-	function restoreSelection () {
-		curScore.startCmd();
-
-		if (selectionArray.length == 0) {
-			curScore.selection.clear();
-		} else {
-			var st = selectionArray[0];
-			var et = selectionArray[1];
-			var ss = selectionArray[2];
-			var es = selectionArray[3];
-			curScore.selection.selectRange(st,et+1,ss,es + 1);
-			//errorMsg += "\n"+st+" "+et+" "+ss+" "+es;
-		}
-		curScore.endCmd();
-	}
 	
 	ApplicationWindow {
 		id: dialog

@@ -19,7 +19,8 @@ MuseScore {
 	title: "MN Check Accidentals"
 	id: mncheckaccidentals
 	thumbnailName: "MNCheckAccidentals.png"
-	
+	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
+
 	
 	// ** DEBUG **
 	property var debug: true
@@ -97,13 +98,18 @@ MuseScore {
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
-		
+		var versionNumber = versionnumberfile.read().trim();
+
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
 		if (!curScore.selection.isRange) {
-			doCmd ("select-all");
+			
+			curScore.startCmd();
+			cmd ("select-all");
+			curScore.endCmd();
+
 			var startStaff = curScore.selection.startStaff;
 			var endStaff = curScore.selection.endStaff;
 		}
@@ -288,6 +294,8 @@ MuseScore {
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
+		dialog.titleText = 'MN CHECK ACCIDENTALS '+versionNumber;
+
 		dialog.show();
 	}
 	
@@ -524,7 +532,7 @@ MuseScore {
 								//logError(Found Chromatic Ascent");
 								
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
-									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
+									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
 								}
 							}
 							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
@@ -532,7 +540,7 @@ MuseScore {
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
 									//logError(Prev notes");
 									
-									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J).", prevNote);
+									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
 								}
 							}
 						}
@@ -768,7 +776,7 @@ MuseScore {
 								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
 							}
 							if (doShowError && !changeIsBad) {
-								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press Cmd-J)";
+								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press "+cmdKey+"-J until you get this note)";
 								if (weightingIsClose && scalarIntervalAbs != 0) t = "Note: The current spelling may be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.\n[SUGGESTION] "+t;
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
@@ -879,18 +887,6 @@ MuseScore {
 	}
 	
 	
-	function doCmd (theCmd) {
-		curScore.startCmd ();
-		cmd (theCmd);
-		curScore.endCmd ();
-	}
-	
-	function deleteObj (theElem) {
-		curScore.startCmd ();
-		removeElement (theElem);
-		curScore.endCmd ();
-	}
-	
 	function previousNoteRestIsNote (noteRest) {
 		var cursor2 = curScore.newCursor();
 		cursor2.track = noteRest.track;
@@ -950,8 +946,9 @@ MuseScore {
 	}
 	
 	function selectTitleText () {
-		doCmd("title-text");
-		doCmd("select-similar");
+		cmd("title-text");
+		curScore.startCmd();
+		cmd("select-similar");
 	}
 	
 	function deleteAllCommentsAndHighlights () {
@@ -963,12 +960,19 @@ MuseScore {
 		saveSelection();
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		doCmd ("select-all");
-		doCmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		doCmd ("title-text");
-		doCmd ("select-similar");
 		
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+
+		cmd ("insert-vbox");
+		var vbox = curScore.selection.elements[0];
+		cmd ("title-text");
+		
+		curScore.startCmd();
+		cmd ("select-similar");
+		curScore.endCmd();
+
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
@@ -979,12 +983,15 @@ MuseScore {
 		if (vbox == null) {
 			logError ("deleteAllCommentsAndHighlights () — vbox was null");
 		} else {
-			deleteObj (vbox);
+			removeElement (vbox);
 		}
 		
 		// **** SELECT ALL **** //
-		doCmd ("select-all");
 		
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
+
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
 		
@@ -1018,9 +1025,10 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) deleteObj(elementsToRemove[i]);
-		
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		curScore.endCmd();
 		restoreSelection();
 	}
 
@@ -1321,9 +1329,10 @@ function showAllErrors () {
 		id: dialog
 		title: "CHECK COMPLETED"
 		contentHeight: 252
-		contentWidth: 456
+		contentWidth: 505
 		margins: 10
 		property var msg: ""
+		property var titleText: ""
 
 		Text {
 			id: theText
@@ -1331,7 +1340,7 @@ function showAllErrors () {
 			x: 20
 			y: 20
 
-			text: "MN CHECK ACCIDENTALS"
+			text: dialog.titleText
 			font.bold: true
 			font.pointSize: 18
 		}
