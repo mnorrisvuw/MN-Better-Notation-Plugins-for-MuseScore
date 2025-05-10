@@ -54,6 +54,7 @@ MuseScore {
 	property var doCheckOttavas: true
 	property var doCheckSlursAndTies: true
 	property var doCheckArticulation: true
+	property var doCheckExpressiveDetail: true
 	property var doCheckTremolosAndFermatas: true
 	property var doCheckGraceNotes: true
 	property var doCheckStemsAndBeams: true
@@ -123,6 +124,8 @@ MuseScore {
 	property var isRest: false
 	property var flaggedUnterminatedTempoChange: false
 	property var flaggedFlz: false
+	property var flaggedPolyphony: false
+	property var lastStemDirectionFlagBarNum: -1;
 	
 	// ** PARTS ** //
 	property var isGrandStaff: []
@@ -616,6 +619,8 @@ MuseScore {
 			flaggedUnterminatedTempoChange = false;
 			flzFound = false;
 			flaggedFlz = false;
+			flaggedPolyphony = false;
+			lastStemDirectionFlagBarNum = -1;
 			
 			// ** slurs
 			currentSlur = null;
@@ -1150,8 +1155,8 @@ MuseScore {
 									flaggedInstrumentRange = 0;
 								}
 								
-								// ************ CHECK DYNAMICS ********** //
-								if (doCheckDynamics) {
+								// ************ CHECK EXPRESSIVE DETAIL (DYNAMICS) ********** //
+								if (doCheckExpressiveDetail) {
 									if (lastDynamicTick < currTick - division * 32 && numConsecutiveMusicBars >= 8 && isNote) {
 										lastDynamicTick = currTick + 1;
 										addError("This passage has had no dynamic markings for the last while\nConsider adding more dynamic detail to this passage.",noteRest);
@@ -1167,7 +1172,7 @@ MuseScore {
 								} else {
 									numNotesInThisTrack ++;
 									isTied = noteRest.notes[0].tieBack != null;
-									if (isChord && !isTrem) flzFound = false;
+									if (isNote && !isTrem) flzFound = false;
 									if (noteRest.notes[0].tieForward != null) {
 										var nextChordRest = getNextChordRest(cursor);
 										if (nextChordRest != null) {
@@ -1202,31 +1207,34 @@ MuseScore {
 									}
 																
 									// ************ CHECK STACCATO ISSUES ************ //
-									if (doCheckArticulation) {
-										var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
-										
-										if (theArticulationArray) {
-											lastArticulationTick = currTick;
-											var numStaccatos = 0;
-											for (var i = 0; i < theArticulationArray.length; i++) {
-												if (staccatoArray.includes(theArticulationArray[i].symbol)) {
-													numStaccatos++;
-													if (numStaccatos == 1) checkStaccatoIssues (noteRest);
-												}
+									var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
+									
+									if (theArticulationArray) {
+										lastArticulationTick = currTick;
+										var numStaccatos = 0;
+										for (var i = 0; i < theArticulationArray.length; i++) {
+											if (staccatoArray.includes(theArticulationArray[i].symbol)) {
+												numStaccatos++;
+												if (numStaccatos == 1) checkStaccatoIssues (noteRest);
 											}
-											if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
-										} else {
-											if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
-												if (isStringInstrument || isWindOrBrassInstrument) {
-													lastArticulationTick = currTick + 1;
-													addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage",noteRest);
-												}
+										}
+										if (doCheckArticulation && numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
+									} else {
+										if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
+											if (doCheckExpressiveDetail && isStringInstrument || isWindOrBrassInstrument) {
+												lastArticulationTick = currTick + 1;
+												addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage",noteRest);
 											}
 										}
 									}
 								
 									var nn = noteRest.notes.length;
 									isChord = nn > 1;
+									
+									if (doCheckWindsAndBrass && isChord && isWindOrBrassInstrument && !isSharedStaff && !flaggedPolyphony) {
+										addError ('This is a chord in a monophonic instrument.\nIf this is not a multiphonic, is this an error?',noteRest);
+										flaggedPolyphony = true;
+									}
 									
 									// ************ CHECK WHETHER CHORD NOTES ARE TIED ************ //
 									if (doCheckSlursAndTies && isChord) checkChordNotesTied(noteRest);
@@ -3126,6 +3134,7 @@ MuseScore {
 		clefIs15ma = clefId.includes("15ma alta");
 		clefIs8ba = clefId.includes("8va bassa");
 		diatonicPitchOfMiddleLine = 41; // B4 = 41 in diatonic pitch notation (where C4 = 35)
+		if (isBassClef && clefIs8ba) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
 		if (isAltoClef) diatonicPitchOfMiddleLine = 35; // C4 = 35
 		if (isTenorClef) diatonicPitchOfMiddleLine = 33; // A3 = 33
 		if (isBassClef) diatonicPitchOfMiddleLine = 29; // D3 = 29
@@ -3208,11 +3217,12 @@ MuseScore {
 	}
 	
 	function checkInstrumentRange(noteRest) {
+		if (lowestPitchPossible == 0 && highestPitchPossible == 0) return;
 		// the currentInstrumentRange array is formatted thus:
 		//[instrumentId,lowestSoundingPitchPossible,quietRegisterThresholdPitch,highestSoundPitchPossible,highLoudRegisterThreshold,lowLoudRegisterThreshold] 
 		var lowestPitch = getLowestPitch(noteRest);
 		var highestPitch = getHighestPitch(noteRest);
-		if (lowestPitch < lowestPitchPossible) {
+		if (lowestPitchPossible > 0 && lowestPitch < lowestPitchPossible) {
 			if (isBrassInstrument) {
 				addError ('This note is very low and may not\nbe possible on this instrument.\nCheck with a player.',noteRest);
 				return;
@@ -3221,7 +3231,7 @@ MuseScore {
 				return;
 			}
 		}
-		if (highestPitch > highestPitchPossible) {
+		if (highestPitchPossible > 0 && highestPitch > highestPitchPossible) {
 			if (isPercussionInstrument || isHarp || isKeyboardInstrument) {
 				addError ('This note appears to be above the\nhighest note possible on this instrument.',noteRest);
 				return;
@@ -3230,7 +3240,7 @@ MuseScore {
 				return;
 			}
 		}
-		if (quietRegisterThresholdPitch != 0) {
+		if (quietRegisterThresholdPitch > 0) {
 			if (lowestPitch <= quietRegisterThresholdPitch && currDynamicLevel > 3 && lastDynamicFlagBar < currentBarNum - 4) {
 				//logError ("quietRegisterPitch = "+quietRegisterThresholdPitch+" currDynamicLevel = "+currDynamicLevel);
 				lastDynamicFlagBar = currentBarNum;
@@ -3238,14 +3248,14 @@ MuseScore {
 				return;
 			}
 		}
-		if (highLoudRegisterThresholdPitch != 0) {
+		if (highLoudRegisterThresholdPitch > 0) {
 			if (highestPitch >= highLoudRegisterThresholdPitch && currDynamicLevel < 2 && lastDynamicFlagBar < currentBarNum - 4) {
 				lastDynamicFlagBar = currentBarNum;
 				addError ('This note is quite high and may not\nbe able to be played at the indicated dynamic.',noteRest);
 				return;
 			}
 		}
-		if (lowLoudRegisterThresholdPitch != 0) {
+		if (lowLoudRegisterThresholdPitch > 0) {
 			if (lowestPitch <= lowLoudRegisterThresholdPitch && currDynamicLevel < 2 && lastDynamicFlagBar < currentBarNum - 4) {
 				//logError ("lowLoudRegisterThresholdPitch = "+lowLoudRegisterThresholdPitch+" currDynamicLevel = "+currDynamicLevel);
 
@@ -4461,11 +4471,8 @@ MuseScore {
 				isStringHarmonic = true;
 				harmonicArray = diamondHarmonicIntervals;
 				// check override on the top note
-				if (noteRest.duration.ticks <= 2 * division) {
-					var noteheadType = noteRest.notes[0].headType;
-					if (noteheadType != NoteHeadType.HEAD_HALF) {
-						addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
-					}
+				if (noteRest.duration.ticks < 2 * division) {
+					if (noteRest.notes[0].headType != NoteHeadType.HEAD_HALF) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
 				}
 			}
 			if (isStringHarmonic) {
@@ -4853,8 +4860,9 @@ MuseScore {
 						if (Math.abs(minL) > Math.abs(maxL)) calcDir = 2;
 						if (Math.abs(minL) < Math.abs(maxL)) calcDir = 1;
 					}
-					if (calcDir > 0 && stemDir != calcDir) {
+					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
 						addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’",noteRest);
+						lastStemDirectionFlagBarNum = currentBarNum;
 					}
 				}
 			}
@@ -5667,7 +5675,7 @@ MuseScore {
 		property var tremolosAndFermatas: true
 		property var graceNotes: true
 		property var stemsAndBeams: true
-		property var yyyy: true
+		property var expressiveDetail: true
 		
 		property var dynamics: true
 		property var tempoMarkings: true
@@ -5850,11 +5858,11 @@ MuseScore {
 				}
 			}
 			CheckBox {
-				text: "Check yyyy"
-				checked: options.yyyy
+				text: "Check expressive detail"
+				checked: options.expressiveDetail
 				onClicked: {
 					checked = !checked
-					options.yyyy = checked
+					options.expressiveDetail = checked
 				}
 			}
 			
