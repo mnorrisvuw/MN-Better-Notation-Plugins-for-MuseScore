@@ -40,7 +40,6 @@ MuseScore {
 	property var barAlteredPC: []
 	property var errorStrings: []
 	property var errorObjects: []
-	property var prevBarNum: 0
 	property var prevMIDIPitch: -1
 	property var prevPrevMIDIPitch: -1
 	property var prevDiatonicPitch: 0
@@ -181,7 +180,7 @@ MuseScore {
 			var partVisible = part.show;
 			if (!partVisible) continue;
 			var currentInstrumentId = part.instrumentId;
-			isHarp = currentInstrumentId === "pluck.harp";
+			var isHarp = currentInstrumentId === "pluck.harp";
 			if (isHarp) hasHarp = true;
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
@@ -448,15 +447,19 @@ MuseScore {
 				// **** THERE ARE THREE SITUATIONS WE WANT TO FLAG THIS **** //
 				
 				// **** First we check when this pitch (any octave) was last altered **** //
-				prevBarNum = barAlteredPC[diatonicPitchClass];
+				var prevBarNumSameOctave = barAltered[diatonicPitch];
+				var prevBarNumAnyOctave = barAlteredPC[diatonicPitchClass];
 
-				// **** 1. THIS ACCIDENTAL WAS SET IN THIS SPECIFIC OCTAVE EARLIER IN THE BAR (currentBarNum == prevBarNum)
-				var situation1 = currAccs[diatonicPitch] == acc && currentBarNum == prevBarNum && accVisible;
+				// **** 1. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS SET IN THIS OCTAVE ALREADY AND THERE IS NO OTHER CONFLICTING SETTINGS
+				var situation1 = currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && currentBarNum == prevBarNumSameOctave && accVisible;
 				
-				// **** 2. THIS ACCIDENTAL WAS IN THE KEY SIGNATURE ALREADY AND THE PREVIOUS ACCIDENTAL WAS AT LEAST 2 BARS AGO
-				var situation2 = accInKeySig && currentBarNum > prevBarNum + 2 && accVisible;
+				// **** 2. THIS ACCIDENTAL WAS SET IN THIS SPECIFIC OCTAVE EARLIER IN THE BAR
+				//var situation2 = false; //currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && currentBarNum == prevBarNum && accVisible;
 				
-				// **** 3. THIS ACCIDENTAL WAS IN THE KEY SIGNATURE ALREADY AND THIS WAS ALSO THE PREVIOUS ACCIDENTAL SET IN ANY BAR
+				// **** 3. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THE PREVIOUS ACCIDENTAL OF THIS NOTE (IN ANY OCTAVE) WAS AT LEAST 2 BARS AGO
+				var situation2 = accInKeySig && currentBarNum > prevBarNumAnyOctave + 2 && accVisible;
+				
+				// **** 4. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THIS WAS ALSO THE LAST ACCIDENTAL OF THIS NOTE IN ANY OCTAVE
 				var situation3 = accInKeySig && currPCAccs[diatonicPitchClass] == acc && accVisible;
 				
 				// **** Also, only flag if:
@@ -464,20 +467,19 @@ MuseScore {
 				// ****		b) if the previous accidental was not a grace note
 				// ****		c) the accidental does not have a bracket around it
 				var otherAccFlags = accVisible && !wasGraceNote[diatonicPitchClass] && accObject.accidentalBracket == 0;
-				if ((situation1 || situation2 || situation3) && otherAccFlags) addError("This was already a "+accidentalNames[acc+2]+".",note);
+				if ((situation1 || situation2 || situation3 ) && otherAccFlags) addError("This was already a "+accidentalNames[acc+2]+".",note);
 				
 				// **** CHECK NOTES NEEDING COURTESY ACCIDENTALS **** //
-				var prevBarNumPC = barAlteredPC[diatonicPitchClass];
 
 				//logError (acc+" "+currAccs[diatonicPitch]+" "+currPCAccs[diatonicPitchClass]+" "+prevBarNum+" "+prevBarNumPC);
 				if (currAccs[diatonicPitch] != acc || currPCAccs[diatonicPitchClass] != acc) {
 					
 					// **** For courtesy accidentals, we can check when this ** pitch class ** was last altered **** //
 
-					if (prevBarNum > 0 || prevBarNumPC != 0) {
+					if (prevBarNumSameOctave > 0 || prevBarNumAnyOctave != 0) {
 						// SITUATION 1
 						// An accidental in any octave in prev bar
-						if (!accVisible && currentBarNum != prevBarNumPC && currentBarNum - prevBarNumPC < 2) {
+						if (!accVisible && currentBarNum != prevBarNumAnyOctave && currentBarNum - prevBarNumAnyOctave < 2) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
 							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" in the previous bar.",note);
@@ -485,7 +487,7 @@ MuseScore {
 						
 						// SITUATION 2
 						// An accidental in any octave in this bar
-						if (!accVisible && currentBarNum != prevBarNum && currentBarNum == prevBarNumPC && currPCAccs[diatonicPitchClass] != acc) {
+						if (!accVisible && currentBarNum != prevBarNumSameOctave && currentBarNum == prevBarNumAnyOctave && currPCAccs[diatonicPitchClass] != acc) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
 							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" earlier in the bar.",note);
