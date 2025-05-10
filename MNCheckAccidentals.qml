@@ -27,6 +27,7 @@ MuseScore {
 	property var errorMsg: ''
 	property var currentZ: 16384
 	property var numLogs: 0
+	property var hasHarp: false
 	
 	// **** PROPERTIES **** //
 
@@ -179,7 +180,9 @@ MuseScore {
 			var part = theStaff.part;
 			var partVisible = part.show;
 			if (!partVisible) continue;
-
+			var currentInstrumentId = part.instrumentId;
+			isHarp = currentInstrumentId === "pluck.harp";
+			if (isHarp) hasHarp = true;
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevMIDIPitch = -1;
 			prevPrevMIDIPitch = -1;
@@ -225,7 +228,7 @@ MuseScore {
 			currentBar = cursor.measure;
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
-				//logError(b. "+currentBarNum);
+				
 				loop++;
 				setProgress(5+loop*95./totalNumLoops);
 				var startTrack = currentStaffNum * 4;
@@ -247,8 +250,9 @@ MuseScore {
 							currentClef = cursor.element;
 							checkClef();
 						} else {
-							if (!isPercussionClef) {
+							if (!isPercussionClef && !isHarp) {
 								var noteRest = cursor.element;
+								var noteRestDur = noteRest.actualDuration.ticks;
 								//logError(\nFound "+noteRest.name+" at "+cursor.tick);
 								var isRest = noteRest.type == Element.REST;
 								var graceNoteChords = noteRest.graceNotes;
@@ -256,8 +260,17 @@ MuseScore {
 									for (var g in graceNoteChords) {
 										checkChord (graceNoteChords[g],noteRest.parent,true);
 									}
-								}	
-								if (!isRest) checkChord (noteRest,noteRest.parent,false);
+								}
+								if (isRest) {
+									// how long is it?
+									if (noteRestDur >= division * 2) {
+										// forget the last note
+										prevMIDIPitch = -1;
+										prevDiatonicPitch = -1;
+									}
+								} else {
+									checkChord (noteRest,noteRest.parent,false);
+								}
 							}
 						}
 						if (cursor.next()) {
@@ -286,16 +299,20 @@ MuseScore {
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
 		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;		
-		if (progressShowing) progress.close();
-		
+		if (numErrors > 1 && numErrors <= 100) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
+		if (numErrors > 100) errorMsg = "<p>CHECK COMPLETED: I found over 100 issues — I have only flagged the first 100.<p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;	
 		var h = 250+numLogs*10;
 		if (h > 500) h =500;
+		if (hasHarp) {
+			errorMsg += "<p>NOTE: This score included a harp part. Due to the idiosyncracies of harp accidental spelling, I did not check this part.</p>";
+			h += 40;
+		}
+		if (progressShowing) progress.close();
+		
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
 		dialog.titleText = 'MN CHECK ACCIDENTALS '+versionNumber;
-
 		dialog.show();
 	}
 	
@@ -430,17 +447,17 @@ MuseScore {
 				// **** CHECK UNNECESSARY ACCIDENTALS **** //
 				// **** THERE ARE THREE SITUATIONS WE WANT TO FLAG THIS **** //
 				
-				// **** First we check when this specific pitch was last altered **** //
-				prevBarNum = barAltered[diatonicPitch];
+				// **** First we check when this pitch (any octave) was last altered **** //
+				prevBarNum = barAlteredPC[diatonicPitchClass];
 
-				// **** 1. THIS ACCIDENTAL WAS SET EARLIER IN THE BAR (currentBarNum == prevBarNum)
+				// **** 1. THIS ACCIDENTAL WAS SET IN THIS SPECIFIC OCTAVE EARLIER IN THE BAR (currentBarNum == prevBarNum)
 				var situation1 = currAccs[diatonicPitch] == acc && currentBarNum == prevBarNum && accVisible;
 				
 				// **** 2. THIS ACCIDENTAL WAS IN THE KEY SIGNATURE ALREADY AND THE PREVIOUS ACCIDENTAL WAS AT LEAST 2 BARS AGO
 				var situation2 = accInKeySig && currentBarNum > prevBarNum + 2 && accVisible;
 				
 				// **** 3. THIS ACCIDENTAL WAS IN THE KEY SIGNATURE ALREADY AND THIS WAS ALSO THE PREVIOUS ACCIDENTAL SET IN ANY BAR
-				var situation3 = accInKeySig && currAccs[diatonicPitch] == acc && accVisible;
+				var situation3 = accInKeySig && currPCAccs[diatonicPitchClass] == acc && accVisible;
 				
 				// **** Also, only flag if:
 				// **** 	a) the accidental is visible
@@ -532,7 +549,7 @@ MuseScore {
 								//logError(Found Chromatic Ascent");
 								
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
-									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
+									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
 								}
 							}
 							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
@@ -540,7 +557,7 @@ MuseScore {
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
 									//logError(Prev notes");
 									
-									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling (select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
+									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
 								}
 							}
 						}
@@ -776,7 +793,7 @@ MuseScore {
 								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
 							}
 							if (doShowError && !changeIsBad) {
-								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+" (select the note and press "+cmdKey+"-J until you get this note)";
+								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press "+cmdKey+"-J until you get this note)";
 								if (weightingIsClose && scalarIntervalAbs != 0) t = "Note: The current spelling may be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.\n[SUGGESTION] "+t;
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
@@ -1064,38 +1081,32 @@ MuseScore {
 		return tick;
 	}
 	
-function showAllErrors () {
-		var objectPageNum;
+	function showAllErrors () {
+		var objectPageNum = 0;
 		var firstStaffNum = 0;
-		for (var k = 0; k < curScore.nstaves; k++) {
-			if (curScore.staves[k].part.show) {
-				break;
-			} else {
-				firstStaffNum ++;
-			}
-		}
+		for (var i = 0; k < curScore.nstaves && curScore.staves[i].part.show; i++) firstStaffNum ++;
 		var comments = [];
 		var commentPages = [];
+		var commentsDesiredPosX = [];
+		var commentsDesiredPosY = [];
 		
-		for (var i in errorStrings) {
+		// limit the number of errors shown to 100 to avoid a massive wait
+		var numErrors = (errorStrings.length > 100) ? 100 : errorStrings.length;
+		var desiredPosX, desiredPosY;
+		var cursor = curScore.newCursor();
+		
+		curScore.startCmd();
+		for (var i = 0; i < numErrors; i++) {
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
-			var isArray = Array.isArray(element);
-			var objectArray;
-			if (isArray) {
-				objectArray = element;
-			} else {
-				objectArray = [element];
-			}
-			for (var j in objectArray) {
+			var objectArray = (Array.isArray(element)) ? element : [element];
+			desiredPosX = 0;
+			desiredPosY = 0;
+			for (var j = 0; j < objectArray.length; j++) {
 				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
 				var staffNum = firstStaffNum;
-				
-				var elementHeight = 0;
-				var commentOffset = 1.0;
-				var tick = 0, desiredPosX = 0, desiredPosY = 0, commentPage = null;
 			
 				// the errorObjects array includes a list of the Elements to attach the text object to
 				// Instead of an Element, you can use one of the following strings instead to indicate a special location unattached to an element:
@@ -1110,7 +1121,6 @@ function showAllErrors () {
 				if (isString) {
 					if (element.includes(' ')) {
 						staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
-						//logError ("elem = "+element+" = "+staffNum);
 						theLocation = element.split(' ')[0];
 						if (theLocation === "system2" && !hasMoreThanOneSystem) continue; // don't show if only one system
 					}
@@ -1119,15 +1129,11 @@ function showAllErrors () {
 					if (element.bbox == undefined) {
 						logError("showAllErrors() — bbox undefined — elem type is "+element.name);
 					} else {
-						elementHeight = element.bbox.height;
 						if (eType != Element.MEASURE) {
 							var elemStaff = element.staff;
 							if (elemStaff == undefined) {
 								isString = true;
 								theLocation = "";
-								desiredPosX = element.bbox.x;
-								desiredPosY = element.bbox.y;
-								//logError(" x = "+desiredPosX+"); y = "+desiredPosY;
 							} else {
 								staffNum = 0;
 								while (!curScore.staves[staffNum].is(elemStaff)) {
@@ -1145,164 +1151,205 @@ function showAllErrors () {
 						}
 					}
 				}
-				// add a text object at the location where the element is
-				var comment = newElement(Element.STAFF_TEXT);
-				comment.text = theText;
-				//logError ("Adding comment "+theText.substring(0,10));
-		
-				// style the text object
-				comment.frameType = 1;
-				comment.framePadding = 0.6;
-				comment.frameWidth = 0.2;
-				comment.frameBgColor = "yellow";
-				comment.frameFgColor = "black";
-				comment.fontSize = 7.0;
-				comment.fontFace = "Helvetica";
-				comment.autoplace = false;
-	
-				if (isString) {
-					if (theLocation.includes("pagetop")) {
-						desiredPosX = 2.5;
-						desiredPosY = 10.;
-					}
-					if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
-					if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
-				} else {
-					tick = getTick(element);
-				}
-				if (eType == Element.TEXT) {
-					checkObjectPage = true;
-					objectPageNum = getPageNumber(element);
-				}
-	
+				
 				// style the element
-				if (element !== "pagetop" && element !== "top") {
+				if (element !== "pagetop" && element !== "top" && element !== "pagetopright") {
 					if (element.type == Element.CHORD) {
 						element.color = "hotpink";
-						for (var i=0; i<element.notes.length; i++) element.notes[i].color = "hotpink";
+						for (var k = 0; k<element.notes.length; k++) element.notes[k].color = "hotpink";
 					} else {
 						element.color = "hotpink";
 					}
 				}
 				
-				// add text object to score
+				// add text object to score for the first object in the array
 				if (j == 0) {
-					var cursor = curScore.newCursor();
+					var tick;		
+					if (isString) {
+						tick = 0;
+						if (theLocation.includes("pagetop")) {
+							desiredPosX = 2.5;
+							desiredPosY = 2.5;
+						}
+						if (theLocation === "system1" || theLocation === "system2") desiredPosX = 5.0;
+						if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
+					} else {
+						tick = getTick(element);
+						//desiredPosX = element.pagePos.x;
+						//desiredPosY = element.pagePos.y;
+					}
+					
+					// add a text object at the location where the element is
+					var comment = newElement(Element.STAFF_TEXT);
+					comment.text = theText;
+					// style the text object
+					comment.frameType = 1;
+					comment.framePadding = 0.6;
+					comment.frameWidth = 0.2;
+					comment.frameBgColor = "yellow";
+					comment.frameFgColor = "black";
+					comment.fontSize = 7.0;
+					comment.fontFace = "Helvetica";
+					comment.align = Align.TOP;
+					comment.autoplace = false;
 					cursor.staffIdx = staffNum;
 					cursor.rewindToTick(tick);
 					cursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
-					var commentHeight = comment.bbox.height;
-					var commentWidth = comment.bbox.width;
-					var placedX = comment.pagePos.x;				
-					if (desiredPosX != 0) comment.offsetX = desiredPosX - comment.pagePos.x;
-					if (desiredPosY != 0) {
-						comment.offsetY = desiredPosY - comment.pagePos.y;
-					} else {
-						comment.offsetY -= commentHeight;
-					}
-	
+					comments.push (comment);
 					var commentPage = comment.parent;
 					while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
-	
+					var pushed = false;
 					if (commentPage != null && commentPage != undefined) {
 						if (commentPage.type == Element.PAGE) {
-							var commentPageWidth = commentPage.bbox.width; // get page width
-							var commentPageNum = commentPage.pagenumber; // get page number
-							
-							// move over to the top right of the page if needed
-							if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
-	
-							// check to see if this comment has been placed too close to other comments
-							var maxOffset = 10;
-							var minOffset = 1.5;
-							var commentX = comment.pagePos.x;
-							var commentY = comment.pagePos.y;
-							var commentOriginalX = commentX;
-							var commentOriginalY = commentY;
-							var commentRHS = commentX + commentWidth;
-							var commentB = commentY + commentHeight;
-							if (commentRHS > commentPageWidth) {
-								comment.offsetX -= (commentRHS - commentPageWidth);
-								commentX = comment.pagePos.x;
-								commentRHS = commentX + commentWidth;
-							}
-							
-							for (var k = 0; k < comments.length; k++) {
-								var otherComment = comments[k];
-								var otherCommentPage = commentPages[k];
-								var otherCommentX = otherComment.pagePos.x;
-								var otherCommentY = otherComment.pagePos.y;
-								//logError ("Checking against comment "+k);
-								if (commentPage.is(otherCommentPage)) {
-									var dx = Math.abs(commentX - otherCommentX);
-									var dy = Math.abs(commentY - otherCommentY);
-									if (dx <= minOffset || dy <= minOffset) {
-										var otherCommentRHS = otherCommentX + otherComment.bbox.width;
-										var otherCommentB = otherCommentY + otherComment.bbox.height;
-										var overlapsH = dy < minOffset && commentX < otherCommentRHS && commentRHS > otherCommentX;
-										var overlapsV = dx < minOffset && commentY < otherCommentB && commentB > otherCommentY;
-										var generalProximity = dx + dy < maxOffset;
-										var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
-										var isNotTooFarFromOriginalPosition = true;
-										
-										//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
-										while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition) {
-											comment.offsetY -= commentOffset;
-											comment.offsetX += commentOffset;
-											commentX = comment.pagePos.x;
-											commentY = comment.pagePos.y;
-											commentRHS = commentX + commentWidth;
-											commentB = commentY + commentHeight;
-											dx = Math.abs(commentX - otherCommentX);
-											dy = Math.abs(commentY - otherCommentY);
-											overlapsH = dy < minOffset && commentX < otherCommentRHS && commentRHS > otherCommentX;
-											overlapsV = dx < minOffset && commentY < otherCommentB && commentB > otherCommentY;
-											generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
-											isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
-											isNotTooFarFromOriginalPosition = Math.abs(commentX - commentOriginalX) < maxOffset && Math.abs(commentY - commentOriginalY) < maxOffset;
-											//logError ("Too close: shifting comment.offsetX = "+comment.offsetX+" comment.offsetY = "+comment.offsetY+" tooClose = "+isCloseToOtherComment);				
-										}
-									}
-								}
-								// check comment box is not covering the element
-								/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
-								if (!isString) {
-									var r1x = comment.pagePos.x;
-									var r1y = comment.pagePos.y;
-									var r1w = commentWidth;
-									var r1h = commentHeight;
-									var r2x = element.pagePos.x;
-									var r2y = element.pagePos.y;
-									var r2w = element.bbox.width;
-									var r2h = element.bbox.height;
-									if (element.type == Element.SLUR_SEGMENT) {
-										logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-									}
-									
-									var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-									var repeats = 0;
-									while (overlaps && repeats < 20) {
-										logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-										comment.offsetY -= commentOffset;
-										r1y -= 1.0;
-										repeats ++;
-										overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-									}
-								}*/
-							}
-							if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
-						} else {
-							logError ("parent parent parent parent was not a page — element = "+element.name);
+							commentPages.push (commentPage);
+							pushed = true;
 						}
 					}
-					//logError ("Added comment ‘"+theText.substring(0,10)+"’ at {"+comment.pagePos.x+" "+comment.pagePos.y+"}");
-					comments.push (comment);
-					commentPages.push (commentPage);
+					if (!pushed) commentPages.push (null);
+					if (theLocation === "pagetopright" && commentPage != null) desiredPosX = commentPage.bbox.width - comment.bbox.width - 2.5;
+					commentsDesiredPosX.push (desiredPosX);
+					commentsDesiredPosY.push (desiredPosY);
 				}
 			}
 		} // var i
+		// NOW TWEAK LOCATIONS OF COMMENTS
+		var offx = [];
+		var offy = [];
+		
+		for (var i = 0; i < comments.length; i++) {
+			
+			var elementHeight = 0;
+			var commentOffset = 1.0;
+			var comment = comments[i];
+			offx.push(0);
+			offy.push(-(comment.bbox.height) - 2.5);
+			desiredPosX = commentsDesiredPosX[i];
+			desiredPosY = commentsDesiredPosY[i];
+			var commentHeight = comment.bbox.height;
+			var commentWidth = comment.bbox.width;
+			var element = errorObjects[i];
+			if (eType == Element.TEXT) {
+				checkObjectPage = true;
+				objectPageNum = getPageNumber(element);
+			}
+			theLocation = element;
+			var placedX = comment.pagePos.x;
+			var placedY = comment.pagePos.y;
+	
+			var et = comment.text.substring(0,5).replace(/<[^>]+>/g, "").replace(/</g,'≤');
+			if (desiredPosX != 0 || desiredPosY != 0) {
+				offx[i] = desiredPosX - placedX;
+				offy[i] = desiredPosY - placedY;
+			}
+			var commentPage = comment.parent;
+			while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
+		
+			if (commentPage != null && commentPage != undefined) {
+				if (commentPage.type == Element.PAGE) {
+		
+					var commentPageWidth = commentPage.bbox.width;
+					var commentPageHeight = commentPage.bbox.height;
+					var commentPageNum = commentPage.pagenumber; // get page number
+					
+					// move over to the top right of the page if needed
+					if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+		
+					// check to see if this comment has been placed too close to other comments
+					var maxOffset = 10;
+					var minOffset = 1.5;
+					var commentOriginalX = placedX;
+					var commentOriginalY = placedY;
+					var commentRHS = placedX + commentWidth;
+					var commentB = placedY + commentHeight;
+					
+					// check comment is within the page bounds
+					if (placedX < 0) offx[i] -= placedX; // LEFT HAND SIDE
+					if (commentRHS > commentPageWidth) offx[i] -= (commentRHS - commentPageWidth); // RIGHT HAND SIDE
+					if (placedY < 0) offy[i] -= placedY; // TOP
+					if (commentB > commentPageHeight) offy[i] -= (commentB - commentPageHeight); // BOTTOM
+					
+					for (var k = 0; k < i; k++) {
+						var otherComment = comments[k];
+						var otherCommentPage = commentPages[k];
+						var otherCommentX = otherComment.pagePos.x + offx[k];
+						var otherCommentY = otherComment.pagePos.y + offy[k];
+						var actualCommentX = placedX + offx[i];
+						var actualCommentRHS = commentRHS + offx[i];
+						var actualCommentY = placedY + offy[i];
+						var actualCommentB = commentB + offy[i];
+	
+						if (commentPage.is(otherCommentPage)) {
+							var dx = Math.abs(actualCommentX - otherCommentX);
+							var dy = Math.abs(actualCommentY - otherCommentY);
+							if (dx <= minOffset || dy <= minOffset) {
+								var otherCommentRHS = otherCommentX + otherComment.bbox.width;
+								var otherCommentB = otherCommentY + otherComment.bbox.height;
+								var overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
+								var overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
+								var generalProximity = dx + dy < maxOffset;
+								var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
+								var isNotTooFarFromOriginalPosition = true;
+								//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
+								while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0) {
+									offx[i] += commentOffset;
+									offy[i] -= commentOffset;
+									actualCommentX = placedX + offx[i];
+									actualCommentY = placedY + offy[i];
+									actualCommentRHS = actualCommentX + commentWidth;
+									actualCommentB = actualCommentY + commentHeight;
+									dx = Math.abs(actualCommentX - otherCommentX);
+									dy = Math.abs(actualCommentY - otherCommentY);
+									overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
+									overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
+									generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
+									isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
+									isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
+									//logError ("Too close: shifting comment.offsetX = "+offx[i]+" comment.offsetY = "+offy[i]+" tooClose = "+isCloseToOtherComment);				
+								}
+							}
+						}
+						// check comment box is not covering the element
+						/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
+						if (!isString) {
+							var r1x = comment.pagePos.x;
+							var r1y = comment.pagePos.y;
+							var r1w = commentWidth;
+							var r1h = commentHeight;
+							var r2x = element.pagePos.x;
+							var r2y = element.pagePos.y;
+							var r2w = element.bbox.width;
+							var r2h = element.bbox.height;
+							if (element.type == Element.SLUR_SEGMENT) {
+								logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+							}
+							
+							var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+							var repeats = 0;
+							while (overlaps && repeats < 20) {
+								logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+								comment.offsetY -= commentOffset;
+								r1y -= 1.0;
+								repeats ++;
+								overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+							}
+						} */
+					}
+					if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+				} else {
+					logError ("parent parent parent parent was not a page — element = "+element.name);
+				}
+			}
+		}
+		
+		// now reposition all the elements
+		for (var i = 0; i < comments.length; i++) {
+			var comment = comments[i];
+			comment.offsetX = offx[i];
+			comment.offsetY = offy[i];
+		}
+		curScore.endCmd();
 	}
 	
 	function getPageNumber (e) {
