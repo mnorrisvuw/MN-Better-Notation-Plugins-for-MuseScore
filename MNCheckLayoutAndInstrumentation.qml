@@ -324,6 +324,7 @@ MuseScore {
 	
 	// ** HARP ** //
 	property var pedalSettings: [-1,-1,-1,-1,-1,-1,-1]
+	property var pedalSettingLastNeededTick: [-1,-1,-1,-1,-1,-1,-1]
 	property var pedalChangesInThisBar: 0
 	property var flaggedPedalChangesInThisBar: false
 	property var cmdKey: 'command'
@@ -416,6 +417,7 @@ MuseScore {
 		doCheckSlursAndTies = options.slursAndTies;
 		doCheckArticulation = options.articulation;
 		doCheckTremolosAndFermatas = options.tremolosAndFermatas;
+		doCheckExpressiveDetail = options.expressiveDetail;
 		doCheckDynamics = options.dynamics;
 		doCheckTempoMarkings = options.tempoMarkings;
 		doCheckSpellingAndFormat = options.spellingAndFormat;
@@ -427,7 +429,7 @@ MuseScore {
 		doCheckPianoHarpAndPercussion = options.pianoHarpAndPercussion;
 		doCheckStrings = options.strings;
 		
-		//logError (doCheckScoreStyle);
+		//logError (doCheckScoreStyle+' '+doCheckPartStyle+' '+doCheckTempoMarkings+' '+doCheckDynamics);
 		
 		options.close();
 		// ************  	INITIALISE VARIABLES 	************ //
@@ -600,6 +602,8 @@ MuseScore {
 			lastDynamicFlagBar = -1;
 			currentDynamicNum = 0;
 			var numDynamics = dynamics[currentStaffNum].length;
+			pedalSettings = [-1,-1,-1,-1,-1,-1,-1];
+			pedalSettingLastNeededTick = [-1,-1,-1,-1,-1,-1,-1];
 			
 			// ** clear flags ** //
 			flaggedInstrumentRange = 0;
@@ -770,20 +774,22 @@ MuseScore {
 				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues(currentBar,currentStaffNum);
 				
 				// ************ CHECK UNTERMINATED TEMPO CHANGE ************ //
-				if (lastTempoChangeMarkingBar != -1 && tempoChangeMarkingEnd == -1 && lastTempoChangeMarking != null && currentBarNum >= lastTempoChangeMarkingBar + 8) {
-					//logError("Found unterminated tempo change in b. "+currentBarNum+" lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar);
-					if (lastTempoChangeMarking.type != Element.GRADUAL_TEMPO_CHANGE) {
-						addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
-						lastTempoChangeMarkingBar = -1;
-						tempoChangeMarkingEnd = -1;
+				if (doCheckTempoMarkings) {
+					if (lastTempoChangeMarkingBar != -1 && tempoChangeMarkingEnd == -1 && lastTempoChangeMarking != null && currentBarNum >= lastTempoChangeMarkingBar + 8) {
+						//logError("Found unterminated tempo change in b. "+currentBarNum+" lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar);
+						if (lastTempoChangeMarking.type != Element.GRADUAL_TEMPO_CHANGE) {
+							addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
+							lastTempoChangeMarkingBar = -1;
+							tempoChangeMarkingEnd = -1;
+						}
 					}
-				}
-				
-				// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
-				if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
-					//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
-					addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
-					//lastTempoChangeMarkingBar = -1;
+					
+					// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
+					if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 1 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
+						//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
+						addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
+						//lastTempoChangeMarkingBar = -1;
+					}
 				}
 				
 				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
@@ -1220,10 +1226,12 @@ MuseScore {
 										}
 										if (doCheckArticulation && numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
 									} else {
-										if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
-											if (doCheckExpressiveDetail && isStringInstrument || isWindOrBrassInstrument) {
-												lastArticulationTick = currTick + 1;
-												addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage",noteRest);
+										if (doCheckExpressiveDetail) {
+											if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
+												if (isStringInstrument || isWindOrBrassInstrument) {
+													lastArticulationTick = currTick + 1;
+													addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage",noteRest);
+												}
 											}
 										}
 									}
@@ -3810,7 +3818,7 @@ MuseScore {
 						
 						var isError = false;
 						var dynamicException = plainText.includes("fp") || plainText.includes("fmp") || plainText.includes("sf") || plainText.includes("fz");
-						if (prevDynamicBarNum > 0) {
+						if (prevDynamicBarNum > 0 && doCheckDynamics) {
 							
 							var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
 							if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
@@ -4768,6 +4776,7 @@ MuseScore {
 				var pedalSettingInThisChord = [-1,-1,-1,-1,-1,-1,-1];
 				for (var j = 0; j < numNotes; j++) {		
 					var tpc = theNotes[j].tpc;
+					var theTick = theNotes[j].parent.tick;
 					if (tpc < 6) {
 						addError ("You can’t use double flats in harp parts", nn[i]);
 						continue;
@@ -4786,21 +4795,22 @@ MuseScore {
 						//logError(pedalLabels[pedalNumber]+pedalAccs[pedalSetting]);
 						pedalSettings[pedalNumber] = pedalSetting;
 						pedalSettingInThisChord[pedalNumber] = pedalSetting;
+						pedalSettingLastNeededTick[pedalNumber] = theTick;
 					} else {
 						if (pedalSettings[pedalNumber] != pedalSetting) {
-							//change
-							//logError(""+pedalLabels[pedalNumber]+pedalAccs[pedalSettings[pedalNumber]]+"→"+pedalLabels[pedalNumber]+pedalAccs[pedalSetting]);
+							// change of pedal
 		
 							pedalSettings[pedalNumber] = pedalSetting;
-							pedalChangesInThisBar ++;
+							// only mark if it was last changed
+							if (pedalSettingLastNeededTick[pedalNumber] != -1 && theTick - pedalSettingLastNeededTick[pedalNumber] < 4 * division) pedalChangesInThisBar ++;
 							//logError("pedalChangesInThisBar now "+pedalChangesInThisBar);
 		
 							if (pedalChangesInThisBar > 2 && !flaggedPedalChangesInThisBar) {
 								addError ("There are a number of pedal changes in this bar.\nIt might be challenging for the harpist to play.",noteRest);
 								flaggedPedalChangesInThisBar = true;
 							}
-		
 						}
+						pedalSettingLastNeededTick[pedalNumber] = theTick;
 						// check this chord first
 	
 						if (pedalSettingInThisChord[pedalNumber] == -1) {
@@ -5736,6 +5746,8 @@ MuseScore {
 				checked: options.scoreStyle
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.scoreStyle = checked
 				}
 			}
@@ -5744,6 +5756,8 @@ MuseScore {
 				checked: options.partStyle
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.partStyle = checked
 				}
 			}
@@ -5752,6 +5766,8 @@ MuseScore {
 				checked: options.pageSettings
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.pageSettings = checked
 				}
 			}
@@ -5760,6 +5776,8 @@ MuseScore {
 				checked: options.staffNamesAndOrder
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.staffNamesAndOrder = checked
 				}
 			}
@@ -5768,6 +5786,8 @@ MuseScore {
 				checked: options.fonts
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.fonts = checked
 				}
 			}
@@ -5776,6 +5796,8 @@ MuseScore {
 				checked: options.musicSpacing
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.musicSpacing = checked
 				}
 			}
@@ -5790,6 +5812,8 @@ MuseScore {
 				checked: options.clefs
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.clefs = checked
 				}
 			}
@@ -5798,6 +5822,8 @@ MuseScore {
 				checked: options.timeSignatures
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.timeSignatures = checked
 				}
 			}
@@ -5806,6 +5832,8 @@ MuseScore {
 				checked: options.keySignatures
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.keySignatures = checked
 				}
 			}
@@ -5814,6 +5842,8 @@ MuseScore {
 				checked: options.ottavas
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.ottavas = checked
 				}
 			}
@@ -5822,6 +5852,8 @@ MuseScore {
 				checked: options.slursAndTies
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.slursAndTies = checked
 				}
 			}
@@ -5830,6 +5862,8 @@ MuseScore {
 				checked: options.articulation
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.articulation = checked
 				}
 			}
@@ -5838,6 +5872,8 @@ MuseScore {
 				checked: options.tremolosAndFermatas
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.tremolosAndFermatas = checked
 				}
 			}
@@ -5846,6 +5882,8 @@ MuseScore {
 				checked: options.graceNotes
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.graceNotes = checked
 				}
 			}
@@ -5854,6 +5892,8 @@ MuseScore {
 				checked: options.stemsAndBeams
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.stemsAndBeams = checked
 				}
 			}
@@ -5862,6 +5902,8 @@ MuseScore {
 				checked: options.expressiveDetail
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.expressiveDetail = checked
 				}
 			}
@@ -5877,6 +5919,8 @@ MuseScore {
 				checked: options.dynamics
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.dynamics = checked
 				}
 			}
@@ -5885,6 +5929,8 @@ MuseScore {
 				checked: options.tempoMarkings
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.tempoMarkings = checked
 				}
 			}
@@ -5893,6 +5939,8 @@ MuseScore {
 				checked: options.spellingAndFormat
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.spellingAndFormat = checked
 				}
 			}
@@ -5901,6 +5949,8 @@ MuseScore {
 				checked: options.rehearsalMarks
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.rehearsalMarks = checked
 				}
 			}
@@ -5915,6 +5965,8 @@ MuseScore {
 				checked: options.rangeRegister
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.rangeRegister = checked
 				}
 			}
@@ -5923,6 +5975,8 @@ MuseScore {
 				checked: options.orchestralSharedStaves
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.orchestralSharedStaves = checked
 				}
 			}
@@ -5931,6 +5985,8 @@ MuseScore {
 				checked: options.voice
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.voice = checked
 				}
 			}
@@ -5939,6 +5995,8 @@ MuseScore {
 				checked: options.windsAndBrass
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.windsAndBrass = checked
 				}
 			}
@@ -5947,6 +6005,8 @@ MuseScore {
 				checked: options.pianoHarpAndPercussion
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.pianoHarpAndPercussion = checked
 				}
 			}
@@ -5955,6 +6015,8 @@ MuseScore {
 				checked: options.strings
 				onClicked: {
 					checked = !checked
+				}
+				onCheckedChanged: {
 					options.strings = checked
 				}
 			}

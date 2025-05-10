@@ -99,6 +99,7 @@ MuseScore {
 	property var semiquaver: 0
 	property var semibreve: 0
 	property var lastCheckedTuplet: null
+	property var numConsecutiveSemiquaverTriplets: 0
 	
 	property var possibleOnbeatSimplificationDurs: []
 	property var possibleOnbeatSimplificationLabels: []
@@ -248,6 +249,7 @@ MuseScore {
 			prevNoteRest = null;
 			firstNoteInTuplet = false;
 			prevTuplet = null;
+			numConsecutiveSemiquaverTriplets = 0;
 			
 			// ** REWIND TO START OF SELECTION ** //
 			cursor.filter = Segment.All;
@@ -261,9 +263,7 @@ MuseScore {
 			
 			
 			for (currentBarNum = firstBarNum; currentBarNum <= lastBarNum && currentBar; currentBarNum ++) {
-				
-				//logError(b. "+currentBarNum);
-								
+												
 				// **** GET TIME SIGNATURE **** //
 				currentTimeSig = currentBar.timesigNominal;
 				timeSigNum = currentTimeSig.numerator;
@@ -274,13 +274,10 @@ MuseScore {
 				barStart = currentBar.firstSegment.tick;
 				var barEnd = currentBar.lastSegment.tick;
 				barDur = barEnd - barStart;
-				
 				beatLength = crotchet;
 				isPickupBar = false;
-				
 				var expectedDuration = timeSigNum * (semibreve/timeSigDenom);
 				isPickupBar = currentBarNum == 1 && expectedDuration != barDur;
-				//logError ("isPickupBar = "+isPickupBar+"; irregular = "+currentBar.irregular);
 				var canCheckThisBar = false;
 				isCompound = false;
 				
@@ -288,6 +285,7 @@ MuseScore {
 					isCompound = !(timeSigNum % 3);
 					if (isCompound) beatLength = (division * 12) / timeSigDenom;
 				}
+				
 				virtualBeatLength = beatLength;
 				if (timeSigDenom == 4 || timeSigDenom == 2) isCompound = !(timeSigNum % 3) && (timeSigNum > 3);
 				if (isCompound) {
@@ -551,11 +549,24 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							if (noteRest.tuplet == null) {
 								firstNoteInTuplet = null;
+								numConsecutiveSemiquaverTriplets = 0;
 							} else {
 								if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
 									firstNoteInTuplet = true;
 									checkTupletSettings (noteRest.tuplet);
 									prevTuplet = noteRest.tuplet;
+								}
+								
+								// Is it a semiquaver triplet?
+								if (noteRest.tuplet.actualDuration.ticks == division / 2 && noteRest.tuplet.actualNotes == 3) {
+									if (numConsecutiveSemiquaverTriplets == 0) {
+										if (firstNoteInTuplet && isOnTheBeat) numConsecutiveSemiquaverTriplets = 1;
+									} else {
+										numConsecutiveSemiquaverTriplets ++;
+									}
+									if (numConsecutiveSemiquaverTriplets == 6) addError ('These semiquaver triplets could be rewritten\nas a semiquaver sextuplet.',noteRest);
+								} else {
+									numConsecutiveSemiquaverTriplets = 0;
 								}
 							}
 							
@@ -603,7 +614,9 @@ MuseScore {
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
 		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
-		if (numErrors > 1) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
+		if (numErrors > 1 && numErrors <= 100) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
+		if (numErrors > 100) errorMsg = "<p>CHECK COMPLETED: I found over 100 issues — I have only flagged the first 100.<p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
+
 		if (progressShowing) progress.close();
 		
 		var h = 250+numLogs*10;
@@ -836,9 +849,17 @@ MuseScore {
 					return;
 				}
 				
-				if (soundingDur == crotchet && timeSigStr == "3/8") {
-					addError ("Never write a crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 161)",noteRest);
-					return;
+				if (soundingDur == crotchet) {
+					if (timeSigStr == "3/8") {
+						addError ("Never write a crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 161)",noteRest);
+						return;
+					}
+					if (!isCompound) {
+						if (!prevIsNote && prevDisplayDur == quaver) {
+							addError ("This crotchet is hiding the beat.\nConsider swapping with the previous quaver rest.",noteRest);
+							return;
+						}
+					}
 				}
 			}
 			
@@ -856,7 +877,7 @@ MuseScore {
 						// FOR SIMPLE TIME SIGNATURES, allow only if a) even-numbered numerator, b) previous and next notes are quavers, c) it's on the off of an odd-numbered note
 						//logError ("p = "+(prevDisplayDur == quaver)+" n = "+(nextDisplayDur == quaver)+" t= "+(timeSigNum % 2 == 0) +" d = "+(timeSigDenom < 4) +" h = "+(startOffset % minim != quaver));
 						//logError ("startOffset = "+startOffset+" % = "+ (startOffset % minim));
-						if (!isCompound && prevDisplayDur == quaver && nextDisplayDur == quaver) {
+						if (!isCompound && prevDisplayDur == quaver && nextDisplayDur <= quaver) {
 							if (timeSigNum % 2 == 0 || timeSigDenom < 4) {
 								hidingBeatError = startOffset % minim != quaver;
 							} else {
