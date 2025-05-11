@@ -70,6 +70,7 @@ MuseScore {
 	property var doCheckWindsAndBrass: true
 	property var doCheckPianoHarpAndPercussion: true
 	property var doCheckStrings: true
+	property var doCheckBarStretches: true
 	
 	// **** PROPERTIES **** //
 	property var spatium: 0
@@ -262,6 +263,10 @@ MuseScore {
 	property var pedals: []
 	property var isPedalled: false
 	
+	// ** LV ** //
+	property var lv: []
+	property var isLv: false
+	
 	// ** SLURS ** //
 	property var slurs:[]
 	property var isSlurred: false
@@ -445,6 +450,7 @@ MuseScore {
 		doCheckWindsAndBrass = options.windsAndBrass;
 		doCheckPianoHarpAndPercussion = options.pianoHarpAndPercussion;
 		doCheckStrings = options.strings;
+		doCheckBarStretches = options.barStretches;
 		
 		//logError (doCheckScoreStyle+' '+doCheckPartStyle+' '+doCheckTempoMarkings+' '+doCheckDynamics);
 		
@@ -494,6 +500,7 @@ MuseScore {
 			ottavas[i] = [];
 			dynamics[i] = [];
 			clefs[i] = [];
+			lv[i] = [];
 			for (var j = 0; j < 4; j++) {
 				isMelisma[i*4+j] = false;
 				melismaEndTick[i*4+j] = 0;
@@ -754,7 +761,7 @@ MuseScore {
 					numBeatsInThisSystem += numBeats;
 					
 					// **** CHECK FOR NON-STANDARD STRETCH FACTOR **** //
-					if (stretch != 1) addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
+					if (stretch != 1 && doCheckBarStretches) addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
 				}
 				if (!currentBar.parent.is(currentSystem)) {
 					// start of system
@@ -860,7 +867,10 @@ MuseScore {
 							// ************ CHECK IF IT'S A NOTE OR REST FIRST ************ //
 							isNote = eType == Element.CHORD;
 							isRest = eType == Element.REST;
-						
+							
+							// ************ IS LV? ************ //
+							isLv = (isNote && lv[currentStaffNum][currTick] != null);
+							
 							// ************ UNDER A SLUR? ************ //
 							var readyToGoToNextSlur = false;
 								
@@ -1012,67 +1022,70 @@ MuseScore {
 								}
 							}
 						
-							// ************ UNDER A HAIRPIN? ************ //
-							var readyToGoToNextHairpin = false;
-							if (currentHairpinNum < numHairpins) {
-								if (currentHairpin == null) {
-									readyToGoToNextHairpin = true;
-								} else {
-									
-									lastDynamicTick = currTick;
-									if (currTick >= currentHairpinEnd) {
-										//logError("Hairpin ended because currTick = "+currTick+" & currentHairpinEnd = "+currentHairpinEnd);
-										// was this hairpin long enough to require ending?
-										currentHairpin = null;
-										isHairpin = false;
-										currentHairpinNum ++;
-										if (currentHairpinNum < numHairpins) {
-											nextHairpin = hairpins[currentStaffNum][currentHairpinNum];
-											nextHairpinStart = nextHairpin.spannerTick.ticks;
-											readyToGoToNextHairpin = true;
-											//logError("nextHairpin num = "+currentHairpinNum+" "+nextHairpin.hairpinType);
+							if (doCheckDynamics) {
+								// ************ UNDER A HAIRPIN? ************ //
+								var readyToGoToNextHairpin = false;
+								if (currentHairpinNum < numHairpins) {
+									if (currentHairpin == null) {
+										readyToGoToNextHairpin = true;
+									} else {
+										
+										lastDynamicTick = currTick;
+										if (currTick >= currentHairpinEnd) {
+											//logError("Hairpin ended because currTick = "+currTick+" & currentHairpinEnd = "+currentHairpinEnd);
+											// was this hairpin long enough to require ending?
+											currentHairpin = null;
+											isHairpin = false;
+											currentHairpinNum ++;
+											if (currentHairpinNum < numHairpins) {
+												nextHairpin = hairpins[currentStaffNum][currentHairpinNum];
+												nextHairpinStart = nextHairpin.spannerTick.ticks;
+												readyToGoToNextHairpin = true;
+												//logError("nextHairpin num = "+currentHairpinNum+" "+nextHairpin.hairpinType);
+											}
 										}
 									}
 								}
-							}
-							if (readyToGoToNextHairpin) {
-								//logError("Next hairpin start = "+nextHairpinStart+" currTick = "+currTick);
-							
-								if (currTick >= nextHairpinStart) {
-									isHairpin = true;
-									lastDynamicTick = currTick;
-									//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
-									
+								if (readyToGoToNextHairpin) {
+									//logError("Next hairpin start = "+nextHairpinStart+" currTick = "+currTick);
 								
-									currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
-
-									var hairpinStartTick = currentHairpin.spannerTick.ticks;
-									var hairpinDur = currentHairpin.spannerTicks.ticks;
-									var nextHairpinDur;
-									//logError("found hairpin of type"+currentHairpin.hairpinType+", length "+hairpinDur);
-
-									currentHairpinEnd = hairpinStartTick + hairpinDur;
-									if (currentHairpinNum == hairpins[currentStaffNum].length - 1){
-										nextHairpin = null;
-										nextHairpinStart = -1;
-										nextHairpinDur = 0;
-									} else {
-										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
-										nextHairpinStart = nextHairpin.spannerTick.ticks;
-										nextHairpinDur = nextHairpin.spannerTicks.ticks;
-									}
-									checkExpressiveSwell (cursor, nextHairpin);
-									checkHairpins(cursor);
-									if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
-									//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
-									if (currentHairpinNum < numHairpins - 1) {
-										nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
-										nextHairpinStart = nextHairpin.spannerTick.ticks;
-										//logError("Next slur starts at "+nextHairpinStart);
-									} else {
-										nextHairpin = null;
-										nextHairpinStart = 0;
-										//logError("This is the last slur in this staff ");
+									if (currTick >= nextHairpinStart) {
+										isHairpin = true;
+										lastDynamicTick = currTick;
+										//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
+										
+									
+										currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
+	
+										var hairpinStartTick = currentHairpin.spannerTick.ticks;
+										var hairpinDur = currentHairpin.spannerTicks.ticks;
+										var nextHairpinDur;
+										//logError("found hairpin of type"+currentHairpin.hairpinType+", length "+hairpinDur);
+	
+										currentHairpinEnd = hairpinStartTick + hairpinDur;
+										if (currentHairpinNum == hairpins[currentStaffNum].length - 1){
+											nextHairpin = null;
+											nextHairpinStart = -1;
+											nextHairpinDur = 0;
+										} else {
+											nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
+											nextHairpinStart = nextHairpin.spannerTick.ticks;
+											nextHairpinDur = nextHairpin.spannerTicks.ticks;
+										}
+										
+										checkExpressiveSwell (cursor, nextHairpin);
+										checkHairpins(cursor);
+										if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
+										//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
+										if (currentHairpinNum < numHairpins - 1) {
+											nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
+											nextHairpinStart = nextHairpin.spannerTick.ticks;
+											//logError("Next slur starts at "+nextHairpinStart);
+										} else {
+											nextHairpin = null;
+											nextHairpinStart = 0;
+											//logError("This is the last slur in this staff ");
+										}
 									}
 								}
 							}
@@ -1097,7 +1110,6 @@ MuseScore {
 									}
 								}
 							}
-							
 						
 							// ************ FOUND A CLEF ************ //
 							if (clefs[currentStaffNum][currTick] != null) {
@@ -1194,7 +1206,7 @@ MuseScore {
 									numNotesInThisTrack ++;
 									isTied = noteRest.notes[0].tieBack != null;
 									if (isNote && !isTrem) flzFound = false;
-									if (noteRest.notes[0].tieForward != null) {
+									if (noteRest.notes[0].tieForward != null && !isLv) {
 										var nextChordRest = getNextChordRest(cursor);
 										if (nextChordRest != null) {
 											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest",noteRest);
@@ -1202,7 +1214,7 @@ MuseScore {
 									}
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
-									if (isTied) {
+									if (isTied && !isLv) {
 										var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
 										if (theArticulationArray != null) {
 											var hasStaccato = false, hasHarmonic = false;
@@ -1622,7 +1634,7 @@ MuseScore {
 			if (firstChord == null && etype == Element.CHORD) firstChord = e;
 			if (etype == Element.HAIRPIN) {
 				hairpins[staffIdx].push(e);
-				if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
+				if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 			}
 			if (etype == Element.HAIRPIN_SEGMENT) {
 				var sameLoc = false;
@@ -1634,7 +1646,7 @@ MuseScore {
 				// only add it if it's not already added
 				if (!sameHairpin) {
 					hairpins[staffIdx].push(e);
-					if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
+					if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 				}
 				prevHairpinSegment = e;
 			}
@@ -1701,6 +1713,7 @@ MuseScore {
 			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) tempoText.push(e);
 			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e);
 			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
+			if (etype == Element.LAISSEZ_VIB_SEGMENT) lv[staffIdx][e.spannerTick.ticks] = e;
 			
 			// this doesn't get articulation grace notes unfortunately
 			if (etype == Element.ARTICULATION) {
@@ -4564,7 +4577,7 @@ MuseScore {
 		}
 		
 		// check tied pizz
-		if (noteRest.notes[0].tieForward) {
+		if (noteRest.notes[0].tieForward && !isLv) {
 			addError("In general, you shouldn’t need to tie pizzicato notes.\nPerhaps this is supposed to be arco?",noteRest);
 			lastPizzIssueBar = barNum;
 			lastPizzIssueStaff = staffNum;
@@ -4692,7 +4705,7 @@ MuseScore {
 					addError("Don’t end a slur in the middle of a tied note.\nExtend the slur to the end of the tie",currentSlur);
 					return;
 				}
-				if (isStartOfTie && !prevWasGraceNote) {
+				if (isStartOfTie && !prevWasGraceNote && !isLv) {
 					addError("Don’t end a slur at the beginning of a tied note.\nInclude the full duration of tied note in the slur",currentSlur);
 					return;
 				}
@@ -5146,7 +5159,7 @@ MuseScore {
 	function showAllErrors () {
 		var objectPageNum = 0;
 		var firstStaffNum = 0;
-		for (var i = 0; k < curScore.nstaves && curScore.staves[i].part.show; i++) firstStaffNum ++;
+		for (var i = 0; i < curScore.nstaves && curScore.staves[i].part.show; i++) firstStaffNum ++;
 		var comments = [];
 		var commentPages = [];
 		var commentsDesiredPosX = [];
@@ -5155,10 +5168,15 @@ MuseScore {
 		// limit the number of errors shown to 100 to avoid a massive wait
 		var numErrors = (errorStrings.length > 100) ? 100 : errorStrings.length;
 		var desiredPosX, desiredPosY;
-		var cursor = curScore.newCursor();
 		
+		// create new cursor to add the comments
+		var cursor = curScore.newCursor();
+		cursor.filter = Segment.All;
+		cursor.next();
 		curScore.startCmd();
+
 		for (var i = 0; i < numErrors; i++) {
+
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
 			var objectArray = (Array.isArray(element)) ? element : [element];
@@ -5254,7 +5272,11 @@ MuseScore {
 					comment.fontFace = "Helvetica";
 					comment.align = Align.TOP;
 					comment.autoplace = false;
+					comment.offsetx = 0;
+					comment.offsety = 0;
+					
 					cursor.staffIdx = staffNum;
+					cursor.track = staffNum * 4;
 					cursor.rewindToTick(tick);
 					cursor.add(comment);
 					comment.z = currentZ;
@@ -5276,12 +5298,12 @@ MuseScore {
 				}
 			}
 		} // var i
+		
 		// NOW TWEAK LOCATIONS OF COMMENTS
 		var offx = [];
 		var offy = [];
 		
 		for (var i = 0; i < comments.length; i++) {
-			
 			var elementHeight = 0;
 			var commentOffset = 1.0;
 			var comment = comments[i];
@@ -5299,12 +5321,12 @@ MuseScore {
 			theLocation = element;
 			var placedX = comment.pagePos.x;
 			var placedY = comment.pagePos.y;
+			//logError ('Comment '+i+'  = '+placedX+' '+placedY+' '+commentWidth+' '+commentHeight);
 
 			var et = comment.text.substring(0,5).replace(/<[^>]+>/g, "").replace(/</g,'≤');
-			if (desiredPosX != 0 || desiredPosY != 0) {
-				offx[i] = desiredPosX - placedX;
-				offy[i] = desiredPosY - placedY;
-			}
+			if (desiredPosX != 0) offx[i] = desiredPosX - placedX;
+			if (desiredPosY != 0) offy[i] = desiredPosY - placedY;
+			
 			var commentPage = comment.parent;
 			while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
 		
@@ -5341,7 +5363,7 @@ MuseScore {
 						var actualCommentRHS = commentRHS + offx[i];
 						var actualCommentY = placedY + offy[i];
 						var actualCommentB = commentB + offy[i];
-
+	
 						if (commentPage.is(otherCommentPage)) {
 							var dx = Math.abs(actualCommentX - otherCommentX);
 							var dy = Math.abs(actualCommentY - otherCommentY);
@@ -5702,6 +5724,7 @@ MuseScore {
 			property alias settingsGraceNotes: options.graceNotes
 			property alias settingsStemsAndBeams: options.stemsAndBeams
 			property alias settingsExpressiveDetail: options.expressiveDetail
+			property alias settingsBarStretches: options.barStretches
 			
 			property alias settingsDynamics: options.dynamics
 			property alias settingsTempoMarkings: options.tempoMarkings
@@ -5736,6 +5759,7 @@ MuseScore {
 		property var graceNotes: true
 		property var stemsAndBeams: true
 		property var expressiveDetail: true
+		property var barStretches: true
 		
 		property var dynamics: true
 		property var tempoMarkings: true
@@ -5750,6 +5774,8 @@ MuseScore {
 		property var windsAndBrass: true
 		property var pianoHarpAndPercussion: true
 		property var strings: true
+		
+		
 	
 		Text {
 			id: styleText
@@ -5959,6 +5985,16 @@ MuseScore {
 					options.expressiveDetail = checked
 				}
 			}
+			CheckBox {
+				text: "Check bar stretches"
+				checked: options.barStretches
+				onClicked: {
+					checked = !checked
+				}
+				onCheckedChanged: {
+					options.barStretches = checked
+				}
+			}
 			
 			Text {
 				text: "Text and dynamics"
@@ -6095,14 +6131,12 @@ MuseScore {
 		}
 		
 		ButtonBox {
-			width: parent.width - 20
+			width: parent.width-40;
 			anchors {
-				bottom: parent.bottom
-				left: parent.left
-				margins: 10
+				left: rect.left;
+				bottom: parent.bottom;
+				bottomMargin: 10;
 			}
-			buttons: [ ButtonBoxModel.Cancel, ButtonBoxModel.Ok ]
-			navigationPanel.section: dialog.navigationSection
 			FlatButton {
 				text: 'Tick all'
 				buttonRole: ButtonBoxModel.CustomRole
@@ -6135,6 +6169,9 @@ MuseScore {
 					}
 				}
 			}
+			buttons : [ButtonBoxModel.Cancel, ButtonBoxModel.Ok]
+
+			navigationPanel.section: options.navigationSection
 			onStandardButtonClicked: function(buttonId) {
 				if (buttonId === ButtonBoxModel.Cancel) {
 					options.close();
@@ -6149,8 +6186,5 @@ MuseScore {
 				}
 			}
 		}
-		
-		
 	}
-
 }
