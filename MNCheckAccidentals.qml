@@ -1086,7 +1086,7 @@ MuseScore {
 	function showAllErrors () {
 		var objectPageNum = 0;
 		var firstStaffNum = 0;
-		for (var i = 0; k < curScore.nstaves && curScore.staves[i].part.show; i++) firstStaffNum ++;
+		for (var i = 0; i < curScore.nstaves && curScore.staves[i].part.show; i++) firstStaffNum ++;
 		var comments = [];
 		var commentPages = [];
 		var commentsDesiredPosX = [];
@@ -1095,10 +1095,15 @@ MuseScore {
 		// limit the number of errors shown to 100 to avoid a massive wait
 		var numErrors = (errorStrings.length > 100) ? 100 : errorStrings.length;
 		var desiredPosX, desiredPosY;
-		var cursor = curScore.newCursor();
 		
+		// create new cursor to add the comments
+		var cursor = curScore.newCursor();
+		cursor.filter = Segment.All;
+		cursor.next();
 		curScore.startCmd();
+	
 		for (var i = 0; i < numErrors; i++) {
+	
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
 			var objectArray = (Array.isArray(element)) ? element : [element];
@@ -1194,7 +1199,11 @@ MuseScore {
 					comment.fontFace = "Helvetica";
 					comment.align = Align.TOP;
 					comment.autoplace = false;
+					comment.offsetx = 0;
+					comment.offsety = 0;
+					
 					cursor.staffIdx = staffNum;
+					cursor.track = staffNum * 4;
 					cursor.rewindToTick(tick);
 					cursor.add(comment);
 					comment.z = currentZ;
@@ -1216,12 +1225,12 @@ MuseScore {
 				}
 			}
 		} // var i
+		
 		// NOW TWEAK LOCATIONS OF COMMENTS
 		var offx = [];
 		var offy = [];
 		
 		for (var i = 0; i < comments.length; i++) {
-			
 			var elementHeight = 0;
 			var commentOffset = 1.0;
 			var comment = comments[i];
@@ -1239,12 +1248,12 @@ MuseScore {
 			theLocation = element;
 			var placedX = comment.pagePos.x;
 			var placedY = comment.pagePos.y;
+			//logError ('Comment '+i+'  = '+placedX+' '+placedY+' '+commentWidth+' '+commentHeight);
 	
 			var et = comment.text.substring(0,5).replace(/<[^>]+>/g, "").replace(/</g,'≤');
-			if (desiredPosX != 0 || desiredPosY != 0) {
-				offx[i] = desiredPosX - placedX;
-				offy[i] = desiredPosY - placedY;
-			}
+			if (desiredPosX != 0) offx[i] = desiredPosX - placedX;
+			if (desiredPosY != 0) offy[i] = desiredPosY - placedY;
+			
 			var commentPage = comment.parent;
 			while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
 		
