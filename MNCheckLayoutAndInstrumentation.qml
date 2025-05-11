@@ -60,8 +60,10 @@ MuseScore {
 	property var doCheckStemsAndBeams: true
 	property var doCheckDynamics: true
 	property var doCheckTempoMarkings: true
+	property var doCheckTitleAndSubtitle: true
 	property var doCheckSpellingAndFormat: true
 	property var doCheckRehearsalMarks: true
+	property var doCheckTextPositions: true
 	property var doCheckRangeRegister: true
 	property var doCheckOrchestralSharedStaves: true
 	property var doCheckVoice: true
@@ -342,6 +344,15 @@ MuseScore {
 		
 		setProgress (0);
 		
+		
+						
+		// **** READ IN TEXT FILES **** //
+		loadTextFiles();
+		
+		// ** SET DIALOG HEADER ** //
+		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
+
+		
 		// **** VERSION CHECK **** //
 		var versionafter450 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5 || (mscoreMinorVersion == 5 && mscoreUpdateVersion > 0);
 		if (!versionafter450) {
@@ -349,9 +360,6 @@ MuseScore {
 			dialog.show();
 			return;
 		}
-						
-		// **** READ IN TEXT FILES **** //
-		loadTextFiles();
 		
 		// **** INITIALISE MAIN VARIABLES **** //
 		var staves = curScore.staves;
@@ -402,6 +410,12 @@ MuseScore {
 	
 	function checkScore() {
 		
+		if (options.numOptionsChecked == 0) {
+			options.close();
+			dialog.msg = "<p><font size=\"6\">🛑</font> No options were selected.</p> ";
+			dialog.show();
+			return;
+		}
 		// ************  	GET USER-SELECT OPTIONS 	************ //
 
 		doCheckScoreStyle = options.scoreStyle;
@@ -415,13 +429,16 @@ MuseScore {
 		doCheckKeySignatures = options.keySignatures;
 		doCheckOttavas = options.ottavas;
 		doCheckSlursAndTies = options.slursAndTies;
+		doCheckStemsAndBeams = options.stemsAndBeams;
 		doCheckArticulation = options.articulation;
 		doCheckTremolosAndFermatas = options.tremolosAndFermatas;
 		doCheckExpressiveDetail = options.expressiveDetail;
 		doCheckDynamics = options.dynamics;
 		doCheckTempoMarkings = options.tempoMarkings;
+		doCheckTitleAndSubtitle = options.titleAndSubtitle;
 		doCheckSpellingAndFormat = options.spellingAndFormat;
 		doCheckRehearsalMarks = options.rehearsalMarks;
+		doCheckTextPositions = options.textPositions;
 		doCheckRangeRegister = options.rangeRegister;
 		doCheckOrchestralSharedStaves = options.orchestralSharedStaves;
 		doCheckVoice = options.voice;
@@ -463,7 +480,7 @@ MuseScore {
 		if (curScore.style.value("concertPitch") && scoreIncludesTransposingInstrument) addError ("It looks like you have at least one transposing instrument, but the score is currently displayed in concert pitch.\nUntick ‘Concert Pitch’ in the bottom right to display a transposed score (see ‘Behind Bars’, p. 505)","pagetop");
 		
 		// ************  					CHECK TITLE PAGE EXISTS 				************ // 
-		if (lastPageNum > 1 && firstPageNum == 0) addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
+		if (doCheckTitleAndSubtitle && lastPageNum > 1 && firstPageNum == 0) addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
 		
 		// **** INITIALISE ALL ARRAYS **** //
 		for (var i = 0; i<numStaves; i++) {
@@ -494,7 +511,7 @@ MuseScore {
 		setProgress (2);
 		
 		// ************  				CHECK TITLE TEXT AND STAFF TEXT OBJECTS FOR ERRORS 					************ //
-		checkScoreText();
+		if (doCheckTitleAndSubtitle) checkScoreText();
 		
 		// ************ 								CHECK TIME SIGNATURES								************ //
 		if (doCheckTimeSignatures) checkTimeSignatures();
@@ -820,8 +837,6 @@ MuseScore {
 								var tempoChangeDuration = t.spannerTicks.ticks;
 								if (currTick >= tempoChangeStartTick) {
 									checkTextObject(t);
-									tempoChangeMarkingEnd = tempoChangeStartTick + tempoChangeDuration;
-									// remove the first element
 									tempoText.shift();
 								}
 							} else {
@@ -1464,7 +1479,7 @@ MuseScore {
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
-		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
+		//dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
 		dialog.show();
 	}
 	
@@ -2860,16 +2875,10 @@ MuseScore {
 			}
 		}
 		
-		if (isWindOrBrassInstrument) {
-			if (lowerCaseText.includes("tutti")) {
-				addError("Don’t use ‘Tutti’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
-			}
-			if (lowerCaseText.includes("unis.")) {
-				addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
-			}
-			if (lowerCaseText.includes("div.")) {
-				addError("Don’t use ‘div.’ for winds and brass.",textObject);
-			}
+		if (isWindOrBrassInstrument && doCheckWindsAndBrass) {
+			if (lowerCaseText.includes("tutti")) addError("Don’t use ‘Tutti’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
+			if (lowerCaseText.includes("unis.")) addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
+			if (lowerCaseText.includes("div.")) addError("Don’t use ‘div.’ for winds and brass.",textObject);
 			
 			if (lowerCaseText.substring(0,3) === "flz") {
 				// check trem
@@ -2877,7 +2886,7 @@ MuseScore {
 				if (!isTrem) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
 			}
 		}
-		if (isStringInstrument) {
+		if (isStringInstrument && doCheckStrings) {
 			
 			if (lowerCaseText === "détaché" || lowerCaseText === "detaché" || lowerCaseText === "detache") addError ("You don’t need to write ‘détaché’ here.\nA passage without slurs will be played détaché by default.",textObject);
 			
@@ -3101,26 +3110,28 @@ MuseScore {
 		} // end isStringInstrument
 		
 		// **** CHECK ALREADY PLAYING MUTED **** //
-		if (lowerCaseText.includes("con sord")) {
-			if (currentMute === "con") {
-				if (!isBracketed) {
-					addError("Instrument is already muted?",textObject);
+		if ((isWindOrBrassInstrument && doCheckWindsAndBrass) || (isStringInstrument && doCheckStrings)) {
+			if (lowerCaseText.includes("con sord")) {
+				if (currentMute === "con") {
+					if (!isBracketed) {
+						addError("Instrument is already muted?",textObject);
+					}
+				} else {
+					if (isBracketed) addError ("This looks like a change to con sord.\nYou don’t need the parentheses around the technique.",textObject);
+					currentMute = "con";
 				}
-			} else {
-				if (isBracketed) addError ("This looks like a change to con sord.\nYou don’t need the parentheses around the technique.",textObject);
-				currentMute = "con";
 			}
-		}
-		
-		// **** CHECK ALREADY PLAYING SENZA SORD **** //
-		if (lowerCaseText.includes("senza sord")) {
-			if (currentMute === "senza") {
-				if (!isBracketed) {
-					addError("Instrument is already unmuted?",textObject);
+			
+			// **** CHECK ALREADY PLAYING SENZA SORD **** //
+			if (lowerCaseText.includes("senza sord")) {
+				if (currentMute === "senza") {
+					if (!isBracketed) {
+						addError("Instrument is already unmuted?",textObject);
+					}
+				} else {
+					if (isBracketed) addError ("This looks like a change to senza sord.\nYou don’t need the parentheses around the technique.",textObject);
+					currentMute = "senza";
 				}
-			} else {
-				if (isBracketed) addError ("This looks like a change to senza sord.\nYou don’t need the parentheses around the technique.",textObject);
-				currentMute = "senza";
 			}
 		}
 
@@ -3417,277 +3428,55 @@ MuseScore {
 				// ** CHECK COMPOSER ** //
 				if (eSubtype === "Composer" && plainText === 'Composer / arranger') addError( "You have not changed the default composer text",textObject);
 			
+				// ****		CHECK SPELLING AND FORMAT ERRORS		**** //
+				
 				// **** CHECK FOR STRAIGHT QUOTES THAT SHOULD BE CURLY **** //
-				//logError ("Checking "+lowerCaseText+" for straight quote — "+lowerCaseText.includes("'"));
-
-				if (lowerCaseText.includes("'")) addError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.",textObject);	
-				if (lowerCaseText.includes('\"')) addError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.',textObject);
-				
-				// **** CHECK FOR TEXT STARTING WITH SPACE OR NON-ALPHANUMERIC **** //
-				var c = plainText.charCodeAt(0);
-				if (c == 32) {
-					addError("‘"+plainText+"’ begins with a space, which could be deleted.",textObject);
-					return;
-				}
-				if (c < 32 && c != 10 && c != 13) {
-					addError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?",textObject);
-					return;
-				}
-			
-				// **** CHECK COMMON SPELLING ERRORS & ABBREVIATIONS **** //
-				//logError("Checking spelling of "+lowerCaseText);
-				var isSpellingError = false;
-				for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
-					var spellingError = spellingerrorsatstart[i*2];
-					if (lowerCaseText.substring(0,spellingError.length) === spellingError) {
-						isSpellingError = true;
-						var correctSpelling = spellingerrorsatstart[i*2+1];
-						var diff = plainText.length-spellingError.length;
-						var correctText = '';
-						if (diff > 0) {
-							correctText = correctSpelling+plainText.substring(spellingError.length);
-							//logError("correctSpelling = "+correctSpelling+" splength="+spellingError.length+" plength="+plainText.length+" diff="+diff+" correct="+correctText);
-						} else {
-							correctText = correctSpelling;
-						}
-						//logError("styledText = "+styledText+" plainText = "+plainText);
-						addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
+				if (doCheckSpellingAndFormat) {
+					if (lowerCaseText.includes("'")) addError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.",textObject);	
+					if (lowerCaseText.includes('\"')) addError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.',textObject);
+					
+					// **** CHECK FOR TEXT STARTING WITH SPACE OR NON-ALPHANUMERIC **** //
+					var c = plainText.charCodeAt(0);
+					if (c == 32) {
+						addError("‘"+plainText+"’ begins with a space, which could be deleted.",textObject);
 						return;
 					}
-				}
-				// **** CHECK TEXT WITH SPELLING ERRORS ANY WHERE **** //
-				if (!isSpellingError) {
-					var correctText = plainText;
-					for (var i = 0; i < spellingerrorsanywhere.length / 2; i++) {
-						var spellingError = spellingerrorsanywhere[i*2];
-						if (correctText.includes(spellingError)) {
+					if (c < 32 && c != 10 && c != 13) {
+						addError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?",textObject);
+						return;
+					}
+				
+					// **** CHECK COMMON SPELLING ERRORS & ABBREVIATIONS **** //
+					var isSpellingError = false;
+					for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
+						var spellingError = spellingerrorsatstart[i*2];
+						if (lowerCaseText.substring(0,spellingError.length) === spellingError) {
 							isSpellingError = true;
-							var correctSpelling = spellingerrorsanywhere[i*2+1];
-							correctText = correctText.replace(spellingError,correctSpelling);
-						}
-					}
-					if (isSpellingError) addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
-				}
-				
-				// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
-				if (currentBarNum > 0) {
-					
-					// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
-					if (!initialTempoExists && eType == Element.TEMPO_TEXT && currentBarNum == 1) initialTempoExists = true;
-		
-					// **** IS THIS A TEMPO CHANGE MARKING??? **** //
-					var isTempoChangeMarking = false;
-					//logError ("Checking "+lowerCaseText);
-					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-						for (var i = 0; i < tempochangemarkings.length && !isTempoChangeMarking; i++) if (lowerCaseText.includes(tempochangemarkings[i])) isTempoChangeMarking = true;
-					}
-								
-					// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
-					if (isTempoChangeMarking) {
-						//logError("1) lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar);
-
-						if (lastTempoChangeMarkingBar > -1) {
-							//logError("lastTempoChangeMarkingBar = "+lastTempoChangeMarkingBar+"; this = "+styledText+"; last = "+lastTempoChangeMarkingText);
-
-							if (styledText === lastTempoChangeMarkingText) addError ("This looks like the same tempo change marking\nas the previous ‘"+lastTempoChangeMarkingText+"’ in b. "+lastTempoChangeMarkingBar, textObject);
-						}
-						lastTempoChangeMarkingBar = currentBarNum;
-						//logError ('4) lastTempoChangeMarkingBar now '+lastTempoChangeMarkingBar+' text = '+lowerCaseText);
-						lastTempoChangeMarking = textObject;
-						lastTempoChangeMarkingText = styledText;
-						if (eType != Element.TEMPO_TEXT && eType != Element.GRADUAL_TEMPO_CHANGE) {
-							addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
-							return;
-						}
-						if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo\nif it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
-						flaggedUnterminatedTempoChange = false;
-					}
-		
-					// **** IS THIS A TEMPO MARKING? **** //
-					var isTempoMarking = false;
-					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-						//logError ("Checking "+lowerCaseText);
-						for (var j = 0; j < tempomarkings.length && !isTempoMarking; j++) {
-							if (lowerCaseText.includes(tempomarkings[j])) {
-								isTempoMarking = true;
-								//logError ("Styled text = "+styledText.replace(/</g,'{'));
-								if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of the text should align with the time signature or first note.\n(See Behind Bars, p. 183)", textObject);
-								if (styledText.includes("<b>")) {
-									// strip anything not between <b> tags, then strip any other tags (to ensure '=' is no longer in string)
-									nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
-								} else {
-									//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-									if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
-									if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
-								}
-								//logError ("Found a tempo marking: non bold text is "+nonBoldText);
-								if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
-								
-								// does this require a metronome mark?
-								var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo 1o","tempo 1°","mouv"];
-								var ignoreTempoMarking = false;
-								for (var k = 0; k < tempoMarkingToIgnoreArray.length && !ignoreTempoMarking; k++) if (lowerCaseText.includes(tempoMarkingToIgnoreArray[k])) ignoreTempoMarking = true;
-								if (!ignoreTempoMarking) {
-									lastTempoMarking = textObject;
-									lastTempoMarkingBar = currentBarNum;
-								}
+							var correctSpelling = spellingerrorsatstart[i*2+1];
+							var diff = plainText.length-spellingError.length;
+							var correctText = '';
+							if (diff > 0) {
+								correctText = correctSpelling+plainText.substring(spellingError.length);
+							} else {
+								correctText = correctSpelling;
 							}
-						}
-					}
-					
-					if (isTempoMarking) {
-						
-						lastTempoChangeMarkingBar = -1;
-						lastTempoChangeMarking = null;
-						lastTempoChangeMarkingText = '';
-						tempoChangeMarkingEnd = -1;
-						//logError ('5) lastTempoChangeMarkingBar now '+lastTempoChangeMarkingBar);
-
-						//logError ("isTempoMarking — tempoChangeMarkingEnd is now "+tempoChangeMarkingEnd);
-						//logError("Cancelled tempo change marking in b. "+currentBarNum);
-					
-						// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
-						if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking,\nbut has not been entered as Tempo Text.\Change in Properties→Show more→Text style→Tempo.",textObject);
-				
-						// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
-						if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
-						
-						// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
-						if (plainText.slice(-1) === '.' && !lowerCaseText.includes("mouv")) addError ("Tempo markings do not need a full-stop at the end.",textObject);
-						
-					}
-				
-					// **** CHECK TEMPO POINT SIZE **** //
-					if (isTempoMarking || isTempoChangeMarking) {
-						if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
-						if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
-					}
-					
-					// **** CHECK METRONOME MARKINGS **** //
-					var isMetronomeMarking = false;
-					if (styledTextWithoutTags.includes("=")) {
-						for (var j = 0; j < metronomemarkings.length && !isMetronomeMarking; j++) {
-							//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
-							if (styledTextWithoutTags.includes(metronomemarkings[j])) {
-								isMetronomeMarking = true;
-								// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
-								var metronomeDuration = division; // crotchet
-								var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
-								var metroStr = "crotchet/quarter note";
-								if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('\uECA7')) {
-									metronomeDuration = division / 2; // quaver
-									metroStr = "quaver/eighth note";
-								}
-								if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('\uECA3')) {
-									metronomeDuration = division * 2; // minim
-									metroStr = "minim/half note";
-								}
-								if (hasAugDot) {
-									metronomeDuration *= 1.5;
-									metroStr = "dotted "+metroStr;
-								}
-								if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
-								if (nonBoldText === "") {
-									//logError ("styledText is "+styledText.replace(/</g,'{'));
-									if (styledText.includes('<b>')) {
-										// see comment above on the RegExp
-										nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
-									} else {
-										//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-										if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
-										if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
-									}
-								}
-								//logError ("Found a metronome marking: non bold text is "+nonBoldText);
-							}
-						}
-						if (isMetronomeMarking) {
-							
-							if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
-							// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
-							var metroIsPlain = nonBoldText.includes('=');
-							//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
-							if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
-								addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject)
-							}
-							if (isTempoMarking && !metroIsPlain) {
-								addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
-							}
-							var metroSection = styledTextWithoutTags.split('=')[1];
-							if (metroSection === lastMetroSection) {
-								if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
-									addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
-								} else {
-									addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar, textObject);
-								}
-							}
-							lastMetroSection = metroSection;
-							lastMetronomeMarkingBar = currentBarNum;
-							lastMetronomeMarkingDisplayBar = currentDisplayBarNum;
-							lastTempoChangeMarkingBar = -1;
-							lastTempoChangeMarking = null;
-							lastTempoChangeMarkingText = '';
-							tempoChangeMarkingEnd = -1;
-							//logError ('1) lastTempoChangeMarkingBar now '+lastTempoChangeMarkingBar);
-						}
-					}
-					
-					if (isTempoChangeMarking || (isTempoMarking && !isMetronomeMarking)) lastMetroSection = '';
-				
-					// **** CHECK DIV/UNIS. **** //
-					if (lowerCaseText.includes('div.')) {
-						if (isStringSection) {
-							isDiv = true;
-							flaggedDivError = false;
-						} else {
-							addError("You’ve written a string div. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
+							//logError("styledText = "+styledText+" plainText = "+plainText);
+							addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
 							return;
 						}
 					}
-				
-					if (lowerCaseText.includes('unis.')) {
-						if (isStringSection) {
-							isDiv = false;
-							flaggedDivError = false;
-						} else {
-							addError("You’ve written a string unis. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
-							return;
+					// **** CHECK TEXT WITH SPELLING ERRORS ANY WHERE **** //
+					if (!isSpellingError) {
+						var correctText = plainText;
+						for (var i = 0; i < spellingerrorsanywhere.length / 2; i++) {
+							var spellingError = spellingerrorsanywhere[i*2];
+							if (correctText.includes(spellingError)) {
+								isSpellingError = true;
+								var correctSpelling = spellingerrorsanywhere[i*2+1];
+								correctText = correctText.replace(spellingError,correctSpelling);
+							}
 						}
-					}
-				
-					// **** CHECK WRITTEN OUT TREM **** //
-					if (lowerCaseText === "trem" || lowerCaseText === "trem." || lowerCaseText === "tremolo") {
-						addError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
-						return;
-					}
-					
-					if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
-						addError ("Change this to ‘poco sul tasto’",textObject);
-						return;
-					}
-					
-					if (lowerCaseText === "sul tasto molto") {
-						addError ("Change this to ‘molto sul tasto’",textObject);
-						return;
-					}
-					
-					if (lowerCaseText === "sul pont. poco" || lowerCaseText === "sul pont. un poco") {
-						addError ("Change this to ‘poco sul pont.’",textObject);
-						return;
-					}
-					
-					if (lowerCaseText === "sul pont. molto") {
-						addError ("Change this to ‘molto sul pont.’",textObject);
-						return;
-					}
-				
-					// **** CHECK SUL + STRING INDICATION **** //
-					var strings = ["I","II","III","IV"];
-					for (var i = 0; i < 4; i++) {
-						if (lowerCaseText === "sul "+strings[i]) {
-							addError ( "You don’t need ‘sul’ here;\nyou can just write the string number", textObject);
-							return;
-						}
+						if (isSpellingError) addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
 					}
 					
 					// **** CHECK Brass, Strings, Winds, Percussion **** //
@@ -3716,7 +3505,7 @@ MuseScore {
 							}
 						}
 					}
-			
+					
 					// **** CHECK TEXT THAT SHOULD HAVE A FULL-STOP AT THE END **** //
 					for (var i = 0; i < shouldhavefullstop.length; i++) {
 						if (lowerCaseText === shouldhavefullstop[i]) {
@@ -3771,7 +3560,7 @@ MuseScore {
 						addError("Abbreviate ‘normale’ as ‘norm.’ or ‘ord.’.",textObject);
 						return;
 					}
-			
+					
 					// **** CHECK FOR INCORRECT STYLES **** //
 					if (styledText.includes("<i>arco")) {
 						addError("‘arco’ should not be italicised.",textObject);
@@ -3801,6 +3590,228 @@ MuseScore {
 						addError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);
 						return;
 					}
+				}
+				
+				// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
+				if (currentBarNum > 0) {
+					
+					
+					// **** 	CHECK TEMPO MARKINGS, METRONOME MARKINGS & TEMPO CHANGE MARKINGS 	****
+					if (doCheckTempoMarkings) {
+
+						// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
+						if (!initialTempoExists && eType == Element.TEMPO_TEXT && currentBarNum == 1) initialTempoExists = true;
+			
+						// **** IS THIS A TEMPO CHANGE MARKING??? **** //
+						var isTempoChangeMarking = eType == Element.GRADUAL_TEMPO_CHANGE;
+						if (!isTempoChangeMarking && !lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+							for (var i = 0; i < tempochangemarkings.length && !isTempoChangeMarking; i++) if (lowerCaseText.includes(tempochangemarkings[i])) isTempoChangeMarking = true;
+						}
+									
+						// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
+						if (isTempoChangeMarking) {
+	
+							if (lastTempoChangeMarkingBar > -1) {
+								if (styledText === lastTempoChangeMarkingText) addError ("This looks like the same tempo change marking\nas the previous ‘"+lastTempoChangeMarkingText+"’ in b. "+lastTempoChangeMarkingBar, textObject);
+							}
+							lastTempoChangeMarkingBar = currentBarNum;
+							lastTempoChangeMarking = textObject;
+							lastTempoChangeMarkingText = styledText;
+							if (eType != Element.TEMPO_TEXT && eType != Element.GRADUAL_TEMPO_CHANGE) {
+								addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
+								return;
+							}
+							if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
+							flaggedUnterminatedTempoChange = false;
+						}
+			
+						// **** IS THIS A TEMPO MARKING? **** //
+						var isTempoMarking = false;
+						if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+							//logError ("Checking "+lowerCaseText);
+							for (var j = 0; j < tempomarkings.length && !isTempoMarking; j++) {
+								if (lowerCaseText.includes(tempomarkings[j])) {
+									isTempoMarking = true;
+									//logError ("Styled text = "+styledText.replace(/</g,'{'));
+									if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of the text should align with the time signature or first note.\n(See Behind Bars, p. 183)", textObject);
+									if (styledText.includes("<b>")) {
+										// strip anything not between <b> tags, then strip any other tags (to ensure '=' is no longer in string)
+										nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
+									} else {
+										//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
+										if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
+										if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
+									}
+									//logError ("Found a tempo marking: non bold text is "+nonBoldText);
+									if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
+									
+									// does this require a metronome mark?
+									var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo 1o","tempo 1°","mouv"];
+									var ignoreTempoMarking = false;
+									for (var k = 0; k < tempoMarkingToIgnoreArray.length && !ignoreTempoMarking; k++) if (lowerCaseText.includes(tempoMarkingToIgnoreArray[k])) ignoreTempoMarking = true;
+									if (!ignoreTempoMarking) {
+										lastTempoMarking = textObject;
+										lastTempoMarkingBar = currentBarNum;
+									}
+								}
+							}
+						}
+						
+						if (isTempoMarking) {
+							
+							lastTempoChangeMarkingBar = -1;
+							lastTempoChangeMarking = null;
+							lastTempoChangeMarkingText = '';
+							tempoChangeMarkingEnd = -1;
+								
+							// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
+							if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
+					
+							// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
+							if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
+							
+							// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
+							if (plainText.slice(-1) === '.' && !lowerCaseText.includes("mouv")) addError ("Tempo markings do not need a full-stop at the end.",textObject);
+						}
+					
+						// **** CHECK TEMPO POINT SIZE **** //
+						if (isTempoMarking || isTempoChangeMarking) {
+							if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
+							if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
+						}
+						
+						// **** CHECK METRONOME MARKINGS **** //
+						var isMetronomeMarking = false;
+						if (styledTextWithoutTags.includes("=")) {
+							for (var j = 0; j < metronomemarkings.length && !isMetronomeMarking; j++) {
+								//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
+								if (styledTextWithoutTags.includes(metronomemarkings[j])) {
+									isMetronomeMarking = true;
+									// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
+									var metronomeDuration = division; // crotchet
+									var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
+									var metroStr = "crotchet/quarter note";
+									if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('\uECA7')) {
+										metronomeDuration = division / 2; // quaver
+										metroStr = "quaver/eighth note";
+									}
+									if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('\uECA3')) {
+										metronomeDuration = division * 2; // minim
+										metroStr = "minim/half note";
+									}
+									if (hasAugDot) {
+										metronomeDuration *= 1.5;
+										metroStr = "dotted "+metroStr;
+									}
+									if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
+									if (nonBoldText === "") {
+										//logError ("styledText is "+styledText.replace(/</g,'{'));
+										if (styledText.includes('<b>')) {
+											// see comment above on the RegExp
+											nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
+										} else {
+											//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
+											if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
+											if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
+										}
+									}
+									//logError ("Found a metronome marking: non bold text is "+nonBoldText);
+								}
+							}
+							if (isMetronomeMarking) {
+								
+								if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
+								// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
+								var metroIsPlain = nonBoldText.includes('=');
+								//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
+								if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
+									addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject)
+								}
+								if (isTempoMarking && !metroIsPlain) {
+									addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
+								}
+								var metroSection = styledTextWithoutTags.split('=')[1];
+								if (metroSection === lastMetroSection) {
+									if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
+										addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
+									} else {
+										addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar, textObject);
+									}
+								}
+								lastMetroSection = metroSection;
+								lastMetronomeMarkingBar = currentBarNum;
+								lastMetronomeMarkingDisplayBar = currentDisplayBarNum;
+								lastTempoChangeMarkingBar = -1;
+								lastTempoChangeMarking = null;
+								lastTempoChangeMarkingText = '';
+								tempoChangeMarkingEnd = -1;
+								//logError ('1) lastTempoChangeMarkingBar now '+lastTempoChangeMarkingBar);
+							}
+						}
+						
+						if (isTempoChangeMarking || (isTempoMarking && !isMetronomeMarking)) lastMetroSection = '';
+					}
+				
+					if (doCheckStrings) {
+						
+						// **** CHECK DIV/UNIS. **** //
+						if (lowerCaseText.includes('div.')) {
+							if (isStringSection) {
+								isDiv = true;
+								flaggedDivError = false;
+							} else {
+								addError("You’ve written a string div. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
+								return;
+							}
+						}
+					
+						if (lowerCaseText.includes('unis.')) {
+							if (isStringSection) {
+								isDiv = false;
+								flaggedDivError = false;
+							} else {
+								addError("You’ve written a string unis. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
+								return;
+							}
+						}
+					
+						// **** CHECK WRITTEN OUT TREM **** //
+						if (lowerCaseText === "trem" || lowerCaseText === "trem." || lowerCaseText === "tremolo") {
+							addError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
+							return;
+						}
+						
+						if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
+							addError ("Change this to ‘poco sul tasto’",textObject);
+							return;
+						}
+						
+						if (lowerCaseText === "sul tasto molto") {
+							addError ("Change this to ‘molto sul tasto’",textObject);
+							return;
+						}
+						
+						if (lowerCaseText === "sul pont. poco" || lowerCaseText === "sul pont. un poco") {
+							addError ("Change this to ‘poco sul pont.’",textObject);
+							return;
+						}
+						
+						if (lowerCaseText === "sul pont. molto") {
+							addError ("Change this to ‘molto sul pont.’",textObject);
+							return;
+						}
+					
+						// **** CHECK SUL + STRING INDICATION **** //
+						var strings = ["I","II","III","IV"];
+						for (var i = 0; i < 4; i++) {
+							if (lowerCaseText === "sul "+strings[i]) {
+								addError ( "You don’t need ‘sul’ here;\nyou can just write the string number", textObject);
+								return;
+							}
+						}
+					}
+					
+					
 					
 					var objectIsDynamic = tn === "dynamic";
 					var includesADynamic = styledText.includes('<sym>dynamic');
@@ -3863,23 +3874,27 @@ MuseScore {
 					//logError(""+lowerCaseText+" isDyn = "+isDyn);
 				
 					// **** CHECK FOR DYNAMIC ENTERED AS EXPRESSION (OR OTHER) TEXT **** //
-					if (!objectIsDynamic && (includesADynamic || stringIsDynamic)) {
+					if (doCheckDynamics && !objectIsDynamic && (includesADynamic || stringIsDynamic)) {
 						addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette",textObject);
 						return;
 					}
 			
 					// **** CHECK FOR TECHNIQUES ENTERED AS EXPRESSION TEXT **** //
 					if (tn === "expression") {
-						for (var i = 0; i < techniques.length; i ++) {
-							if (lowerCaseText.includes(techniques[i])) {
-								addError("This looks like a technique, but has been\nincorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
-								return;
+						if (doCheckSpellingAndFormat){
+							for (var i = 0; i < techniques.length; i ++) {
+								if (lowerCaseText.includes(techniques[i])) {
+									addError("This looks like a technique, but has been\nincorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
+									return;
+								}
 							}
 						}
-						var canBeAbove = plainText === "loco" || plainText.includes("ten.") || plainText.includes("tenuto") || plainText.includes("legato") || plainText.includes("flz");
-						if (textObject.placement == Placement.ABOVE && !canBeAbove) {
-							addError("Expression text should appear below the staff.\nCheck it is attached to the right staff, or it should be a technique.",textObject);
-							return;
+						if (doCheckTextPositions) {
+							var canBeAbove = plainText === "loco" || plainText.includes("ten.") || plainText.includes("tenuto") || plainText.includes("legato") || plainText.includes("flz");
+							if (textObject.placement == Placement.ABOVE && !canBeAbove) {
+								addError("Expression text should appear below the staff.\nCheck it is attached to the right staff, or it should be a technique.",textObject);
+								return;
+							}
 						}
 					}
 					
@@ -5665,10 +5680,45 @@ MuseScore {
 	StyledDialogView {
 		id: options
 		title: "MN CHECK LAYOUT & INSTRUMENTATION"
-		contentHeight: 620
-		contentWidth: 580
+		contentHeight: 520
+		contentWidth: 720
 		property color backgroundColor: ui.theme.backgroundSecondaryColor
 		
+		Settings {
+			property alias settingsScoreStyle: options.scoreStyle
+			property alias settingsPartStyle: options.partStyle
+			property alias settingsPageSettings: options.pageSettings
+			property alias settingsMusicSpacing: options.musicSpacing
+			property alias settingsStaffNamesAndOrder: options.staffNamesAndOrder
+			property alias settingsFonts: options.fonts
+			
+			property alias settingsClefs: options.clefs
+			property alias settingsTimeSignatures: options.timeSignatures
+			property alias settingsKeySignatures: options.keySignatures
+			property alias settingsOttavas: options.ottavas
+			property alias settingsSlursAndTies: options.slursAndTies
+			property alias settingsArticulation: options.articulation
+			property alias settingsTremolosAndFermatas: options.tremolosAndFermatas
+			property alias settingsGraceNotes: options.graceNotes
+			property alias settingsStemsAndBeams: options.stemsAndBeams
+			property alias settingsExpressiveDetail: options.expressiveDetail
+			
+			property alias settingsDynamics: options.dynamics
+			property alias settingsTempoMarkings: options.tempoMarkings
+			property alias settingsTitleAndSubtitle: options.titleAndSubtitle
+			property alias settingsSpellingAndFormat: options.spellingAndFormat
+			property alias settingsRehearsalMarks: options.rehearsalMarks
+			property alias settingsTextPositions: options.textPositions
+			
+			property alias settingsRangeRegister: options.rangeRegister
+			property alias settingsOrchestralSharedStaves: options.orchestralSharedStaves
+			property alias settingsVoice: options.voice
+			property alias settingsWindsAndBrass: options.windsAndBrass
+			property alias settingsPianoHarpAndPercussion: options.pianoHarpAndPercussion
+			property alias settingsStrings: options.strings
+		}
+		
+		property var numOptionsChecked: 0
 		property var scoreStyle: true
 		property var partStyle: true
 		property var pageSettings: true
@@ -5689,8 +5739,10 @@ MuseScore {
 		
 		property var dynamics: true
 		property var tempoMarkings: true
+		property var titleAndSubtitle: true
 		property var spellingAndFormat: true
 		property var rehearsalMarks: true
+		property var textPositions: true
 		
 		property var rangeRegister: true
 		property var orchestralSharedStaves: true
@@ -5726,7 +5778,7 @@ MuseScore {
 		
 		GridLayout {
 			id: grid
-			columns: 2
+			columns: 3
 			columnSpacing: 15
 			rowSpacing: 10
 			width: parent.width-20;
@@ -5739,7 +5791,7 @@ MuseScore {
 				id: layoutLabel
 				text: "Layout"
 				font.bold: true
-				Layout.columnSpan: 2
+				Layout.columnSpan: 3
 			}
 			CheckBox {
 				text: "Check optimal score style settings"
@@ -5805,7 +5857,7 @@ MuseScore {
 			Text {
 				text: "Fundamentals"
 				font.bold: true
-				Layout.columnSpan: 2
+				Layout.columnSpan: 3
 			}
 			CheckBox {
 				text: "Check clefs"
@@ -5911,7 +5963,7 @@ MuseScore {
 			Text {
 				text: "Text and dynamics"
 				font.bold: true
-				Layout.columnSpan: 2
+				Layout.columnSpan: 3
 			}
 			
 			CheckBox {
@@ -5935,6 +5987,16 @@ MuseScore {
 				}
 			}
 			CheckBox {
+				text: "Check title, subtitle & composer"
+				checked: options.titleAndSubtitle
+				onClicked: {
+					checked = !checked
+				}
+				onCheckedChanged: {
+					options.titleAndSubtitle = checked
+				}
+			}
+			CheckBox {
 				text: "Check spelling & formatting errors"
 				checked: options.spellingAndFormat
 				onClicked: {
@@ -5954,11 +6016,21 @@ MuseScore {
 					options.rehearsalMarks = checked
 				}
 			}
+			CheckBox {
+				text: "Check text object positions"
+				checked: options.textPositions
+				onClicked: {
+					checked = !checked
+				}
+				onCheckedChanged: {
+					options.textPositions = checked
+				}
+			}
 			
 			Text {
 				text: "Instrumentation"
 				font.bold: true
-				Layout.columnSpan: 2
+				Layout.columnSpan: 3
 			}
 			CheckBox {
 				text: "Check range/register issues"
@@ -6068,6 +6140,11 @@ MuseScore {
 					options.close();
 				}
 				if (buttonId === ButtonBoxModel.Ok) {
+					var c = grid.children;
+					options.numOptionsChecked = 0;
+					for (var i = 0; i < c.length; i++) {
+						if (c[i].toString().includes('CheckBox')) options.numOptionsChecked += c[i].checked;
+					}
 					checkScore();
 				}
 			}
