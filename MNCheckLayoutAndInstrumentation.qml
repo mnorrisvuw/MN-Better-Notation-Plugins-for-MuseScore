@@ -610,16 +610,20 @@ MuseScore {
 			isSharedStaff = isSharedStaffArray[currentStaffNum];
 			isDiv = false;
 			firstDynamic = false;
-			lastTempoChangeMarkingBar = -1;
-			lastTempoChangeMarkingText = '';
-			lastTempoChangeMarking = null;
-			tempoChangeMarkingEnd = -1;
-			prevCheckedClef = null;
-			lastTempoMarking = null;
-			lastTempoMarkingBar = -1;
+			
+			lastMetroSection = '';
 			lastMetronomeMarkingBar = -1;
 			lastMetronomeMarkingDisplayBar = -1;
-			lastMetroSection = '';
+
+			lastTempoChangeMarkingBar = -1;
+			lastTempoChangeMarking = null;
+			lastTempoChangeMarkingText = '';
+			tempoChangeMarkingEnd = -1;
+			
+			lastTempoMarking = null;
+			lastTempoMarkingBar = -1;
+			
+			prevCheckedClef = null;
 			lastArticulationTick = -1;
 			lastDynamicTick = -1;
 			numConsecutiveMusicBars = 0;
@@ -848,6 +852,7 @@ MuseScore {
 								}
 							} else {
 								if (currTick >= t.parent.tick) {
+									logError ('Checking tempo object '+t.text.replace(/</g,'≤'));
 									checkTextObject(t);
 									tempoText.shift();
 								}
@@ -1391,7 +1396,7 @@ MuseScore {
 					} else {
 
 						//logError("numTracksWithNotes="+numTracksWithNotes+" weKnowWhosPlaying="+weKnowWhosPlaying+" flaggedWeKnowWhosPlaying="+flaggedWeKnowWhosPlaying);
-						if (numTracksWithNoteRests == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
+						if (numTracksWithNotes == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
 							addError("This bar has only one melodic line on a shared staff\nThis needs to be marked with, e.g., 1./2./a 2",firstNoteInThisBar);
 							flaggedWeKnowWhosPlaying = true;
 						}
@@ -1710,7 +1715,34 @@ MuseScore {
 				var locArr = staffIdx+' '+theTick;
 				fermataLocs.push(locArr);
 			}
-			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) tempoText.push(e);
+			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) {
+				var theText = '';
+				var theTick = 0;
+				if (etype == Element.GRADUAL_TEMPO_CHANGE) {
+					theText = e.beginText;
+					theTick = e.spannerTick.ticks;
+				} else {
+					theText = e.text;
+					theTick = e.parent.tick;
+				}
+				var foundObj = false;
+				for (var j = 0; j < tempoText.length && !foundObj; j ++) {
+					var compe = tempoText[j];
+					if (compe.type == etype) {
+						var compareText = '';
+						var compareTick = 0;
+						if (compe.type == Element.GRADUAL_TEMPO_CHANGE) {
+							compareText = compe.beginText;
+							compareTick = compe.spannerTick.ticks;
+						} else {
+							compareText = compe.text;
+							compareTick = compe.parent.tick;
+						}
+						if (compareText === theText && compareTick == theTick) foundObj = true;
+					}
+				}
+				if (!foundObj) tempoText.push(e);
+			}
 			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e);
 			if (etype == Element.CLEF) clefs[staffIdx][e.parent.tick] = e;
 			if (etype == Element.LAISSEZ_VIB_SEGMENT) lv[staffIdx][e.spannerTick.ticks] = e;
@@ -3736,7 +3768,7 @@ MuseScore {
 								if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
 								// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
 								var metroIsPlain = nonBoldText.includes('=');
-								//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
+								logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
 								if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
 									addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject)
 								}
@@ -4973,21 +5005,24 @@ MuseScore {
 		if (getTick(textObject) != barStartTick) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
 		//logError ("Checking rehearsal mark");
 		if (currentBarNum < 2) addError ("Don’t put a rehearsal mark at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
-		if (textObject.text !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
-			flaggedRehearsalMarkError = true;
-			addError ("This is not the rehearsal mark I would expect.\nDid you miss rehearsal mark ‘"+expectedRehearsalMark+"’?", textObject);
+		var isNumeric = !isNaN(textObject.text) && !isNaN(parseFloat(textObject.text));
+		if (!isNumeric) {
+			if (textObject.text !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
+				flaggedRehearsalMarkError = true;
+				addError ("This is not the rehearsal mark I would expect.\nDid you miss rehearsal mark ‘"+expectedRehearsalMark+"’?", textObject);
+			}
+			
+			numRehearsalMarks ++;
+			var currASCIICode = expectedRehearsalMark.charCodeAt(0);
+			if (currASCIICode == 90) {
+				expectedRehearsalMarkLength ++;
+				currASCIICode = 65;
+			} else {
+				currASCIICode ++;
+			}
+			expectedRehearsalMark = '';
+			for (var i = 0; i<expectedRehearsalMarkLength; i++) expectedRehearsalMark += String.fromCharCode(currASCIICode);
 		}
-		
-		numRehearsalMarks ++;
-		var currASCIICode = expectedRehearsalMark.charCodeAt(0);
-		if (currASCIICode == 90) {
-			expectedRehearsalMarkLength ++;
-			currASCIICode = 65;
-		} else {
-			currASCIICode ++;
-		}
-		expectedRehearsalMark = '';
-		for (var i = 0; i<expectedRehearsalMarkLength; i++) expectedRehearsalMark += String.fromCharCode(currASCIICode);
 	}
 	
 	function checkRehearsalMarks () {
