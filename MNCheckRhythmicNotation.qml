@@ -2065,26 +2065,39 @@ MuseScore {
 		Text {
 			id: theText
 			width: parent.width-40
-			x: 20
-			y: 20
+			anchors {
+				left: parent.left
+				top: parent.top
+				leftMargin: 20
+				topMargin: 20
+			}
 
 			text: dialog.titleText
 			font.bold: true
-			font.pointSize: 18
+			font.pointSize: 16
 		}
 		
 		Rectangle {
-			x:20
+			id: dialogRect
+			anchors {
+				top: theText.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
 			width: parent.width-45
-			y:45
-			height: 1
+			height: 2
 			color: "black"
 		}
 
 		ScrollView {
 			id: view
-			x: 20
-			y: 60
+			anchors {
+				top: dialogRect.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
 			height: parent.height-100
 			width: parent.width-40
 			leftInset: 0

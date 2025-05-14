@@ -138,6 +138,7 @@ MuseScore {
 	property var numParts: 0
 	property var visibleParts: []
 	property var numStaves: 0
+	property var numTracks: 0
 	property var numExcerpts: 0
 	property var parts: null
 	property var scoreHasStrings: false
@@ -369,6 +370,7 @@ MuseScore {
 		// **** INITIALISE MAIN VARIABLES **** //
 		var staves = curScore.staves;
 		numStaves = curScore.nstaves;
+		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
 		lastBarInScore = curScore.lastMeasure;
 		var firstSystem = firstBarInScore.parent;
@@ -490,7 +492,6 @@ MuseScore {
 		
 		// **** INITIALISE ALL ARRAYS **** //
 		for (var i = 0; i<numStaves; i++) {
-			articulations[i] = [];
 			slurs[i] = [];
 			pedals[i] = [];
 			hairpins[i] = [];
@@ -505,6 +506,9 @@ MuseScore {
 				isMelisma[i*4+j] = false;
 				melismaEndTick[i*4+j] = 0;
 			}
+		}
+		for (var i = 0; i < numTracks; i++) {
+			articulations[i] = [];
 		}
 		
 		// ************  					SELECT AND PRE-PROCESS ENTIRE SCORE 							************ //
@@ -852,7 +856,7 @@ MuseScore {
 								}
 							} else {
 								if (currTick >= t.parent.tick) {
-									logError ('Checking tempo object '+t.text.replace(/</g,'≤'));
+									//logError ('Checking tempo object '+t.text.replace(/</g,'≤'));
 									checkTextObject(t);
 									tempoText.shift();
 								}
@@ -860,7 +864,6 @@ MuseScore {
 						}
 						
 						if (currTick != barEndTick) {
-							
 							tickHasDynamic = false;
 							if (isMelisma[currentTrack] && melismaEndTick[currentTrack] > 0) isMelisma[currentTrack] = currTick < melismaEndTick[currentTrack];
 							var annotations = currSeg.annotations;
@@ -1396,7 +1399,12 @@ MuseScore {
 					} else {
 
 						//logError("numTracksWithNotes="+numTracksWithNotes+" weKnowWhosPlaying="+weKnowWhosPlaying+" flaggedWeKnowWhosPlaying="+flaggedWeKnowWhosPlaying);
-						if (numTracksWithNotes == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
+						// We might have a situation for shared staves if all of the following are true:
+						// 1. There was only one voice with notes in it
+						// 2. There was not a second voice with only rests in it
+						// 3. It has not been clarified if this is 1./2./a 2
+						// 4. We haven't already flagged this as an issue
+						if (numTracksWithNotes == 1 && numTracksWithNoteRests == 1 && !weKnowWhosPlaying && !flaggedWeKnowWhosPlaying) {
 							addError("This bar has only one melodic line on a shared staff\nThis needs to be marked with, e.g., 1./2./a 2",firstNoteInThisBar);
 							flaggedWeKnowWhosPlaying = true;
 						}
@@ -1750,8 +1758,9 @@ MuseScore {
 			// this doesn't get articulation grace notes unfortunately
 			if (etype == Element.ARTICULATION) {
 				var theTick = (e.parent.parent.type == Element.CHORD) ? e.parent.parent.parent.tick : e.parent.parent.tick;
-				if (articulations[staffIdx][theTick] == null || articulations[staffIdx][theTick] == undefined) articulations[staffIdx][theTick] = new Array();
-				articulations[staffIdx][theTick].push(e);
+				var theTrack = e.track;
+				if (articulations[theTrack][theTick] == null || articulations[theTrack][theTick] == undefined) articulations[theTrack][theTick] = new Array();
+				articulations[theTrack][theTick].push(e);
 				//logError("Found articulation "+e.subtypeName()+"; pushed to artic["+staffIdx+"]["+theTick+"] — now has "+articulations[staffIdx][theTick].length+" items");
 			}
 		}
@@ -3768,7 +3777,7 @@ MuseScore {
 								if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
 								// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
 								var metroIsPlain = nonBoldText.includes('=');
-								logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
+								//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
 								if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
 									addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject)
 								}
@@ -4975,26 +4984,26 @@ MuseScore {
 		}
 	}
 	
-	function getArticulationArray (noteRest, staffNum) {
+	function getArticulationArray (noteRest) {
 		// I WISH: you could just get the articulations of a note instead of having to do this hack
 		// I WISH: you could get the staffidx of a note/staff
-		if (typeof staffNum !== 'number') logError("getArticulationArray() — articulation error staffNum wrong");
 		var theTick;
 		if (noteRest.parent.type == Element.CHORD) {
 			theTick = noteRest.parent.parent.tick;
 		} else {
 			theTick = noteRest.parent.tick;
 		}
+		var theTrack = noteRest.track;
 		//logError("Getting artic at tick = "+theTick);
 		
 		if (theTick == undefined || theTick == null) {
 			logError("getArticulationArray() — couldn’t get articulation tick for this item = "+theTick);
 		} else {
-			if (articulations[staffNum] == null || articulations[staffNum] == undefined) {
-				logError("getArticulationArray() — articulations["+staffNum+"] is undefined "+staffNum.length);
+			if (articulations[theTrack] == null || articulations[theTrack] == undefined) {
+				logError("getArticulationArray() — articulations["+theTrack+"] is undefined ");
 			} else {
-				if (articulations[staffNum][theTick] == null || articulations[staffNum][theTick] == undefined) return null;
-				return articulations[staffNum][theTick];
+				if (articulations[theTrack][theTick] == null || articulations[theTrack][theTick] == undefined) return null;
+				return articulations[theTrack][theTick];
 			}
 		}
 		return null;
@@ -5656,26 +5665,38 @@ MuseScore {
 		Text {
 			id: theText
 			width: parent.width-40
-			x: 20
-			y: 20
-
+			anchors {
+				left: parent.left
+				top: parent.top
+				leftMargin: 20
+				topMargin: 20
+			}
 			text: dialog.titleText
 			font.bold: true
-			font.pointSize: 18
+			font.pointSize: 16
 		}
 		
 		Rectangle {
-			x:20
+			id: dialogRect
+			anchors {
+				top: theText.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
 			width: parent.width-45
-			y:45
-			height: 1
+			height: 2
 			color: "black"
 		}
 
 		ScrollView {
 			id: view
-			x: 20
-			y: 60
+			anchors {
+				top: dialogRect.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
 			height: parent.height-100
 			width: parent.width-40
 			leftInset: 0
@@ -5827,10 +5848,11 @@ MuseScore {
 				leftMargin: 20;
 				top: parent.top;
 				topMargin: 20;
+				bottomMargin: 10;
 			}
 			text: "Options"
 			font.bold: true
-			font.pointSize: 18
+			font.pointSize: 16
 		}
 		
 		Rectangle {
