@@ -864,7 +864,8 @@ MuseScore {
 						}
 						
 						if (currTick != barEndTick) {
-							tickHasDynamic = false;
+							if (currTick != prevTick[currentTrack]) tickHasDynamic = false;
+							//logError ('tickHasDynamic = false');
 							if (isMelisma[currentTrack] && melismaEndTick[currentTrack] > 0) isMelisma[currentTrack] = currTick < melismaEndTick[currentTrack];
 							var annotations = currSeg.annotations;
 							var elem = cursor.element;
@@ -1113,6 +1114,8 @@ MuseScore {
 										var nextDynamicTick = p.tick;
 										if (currTick >= nextDynamicTick) {
 											checkTextObject(nextDynamic);
+											//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic);
+
 											currentDynamicNum ++;
 										}
 									}
@@ -1354,8 +1357,10 @@ MuseScore {
 								} else {
 								
 									// ************ CHECK DYNAMIC RESTATEMENT ************ //
-									if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic && !isGrandStaff[currentStaffNum] ) addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
-								
+									if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic && !isGrandStaff[currentStaffNum] ) {
+										addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
+										//logError (barsSincePrevNote +' tickHasDynamic is now '+tickHasDynamic);
+									}
 								}
 							}
 						}
@@ -2296,6 +2301,7 @@ MuseScore {
 		var flaggedMinNoteDistance = false;
 		var flaggedVerticalFrameBottomMargin = false;
 		var flaggedMultiRests = false;
+		var flaggedMultiRestsMinBars = false;
 		var flaggedMultiRestWidth = false;
 		var flaggedLastSystemFillLimit = false;
 		var flaggedPartNameStyle = false;
@@ -2375,7 +2381,6 @@ MuseScore {
 				}
 			}
 			
-			
 			// min note distance
 			if (!flaggedMinNoteDistance) {
 				var minNoteDistance = partStyle.value("minNoteDistance");
@@ -2390,6 +2395,15 @@ MuseScore {
 				var multirestsOn = partStyle.value("createMultiMeasureRests");
 				if (!multirestsOn) {	
 					styleComments.push("(Rests tab) Switch ‘Multibar rests’ on");
+					flaggedMultiRests = true;
+				}
+			}
+			
+			// set multirests to min 2 bars
+			if (!flaggedMultiRestsMinBars) {
+				var multirestsMinNumBars = partStyle.value("minEmptyMeasures");
+				if (multirestsMinNumBars != 2) {	
+					styleComments.push("(Rests tab) Set ‘Minimum number of empty bars’ to 2");
 					flaggedMultiRests = true;
 				}
 			}
@@ -2701,7 +2715,7 @@ MuseScore {
 			if (tupletsFontFace !== "Times New Roman" && tupletsFontStyle == 2) styleComments.push("(Text Styles→Tuplet) Use Times New Roman for tuplets");
 			if (tupletsFontFace === "Times New Roman" && tupletsFontStyle != 2) styleComments.push("(Text Styles→Tuplet) Use an italic font for tuplets");
 			if (tupletsFontSize < 9 || tupletsFontSize > 11) styleComments.push("(Text Styles→Tuplet) Set tuplet font size to between 9–11pt");
-			if (barNumberFontSize < 8.5 || barNumberFontSize > 11) styleComments.push("(Text Styles→Tuplet) Set bar number font size to between 8.5–11pt");
+			if (barNumberFontSize < 8.5 || barNumberFontSize > 11) styleComments.push("(Text Styles→Bar number) Set bar number font size to between 8.5–11pt");
 			if (pageNumberFontStyle != 0 && numPages > 1) {
 				var s = 'bold';
 				if (pageNumberFontStyle > 1) s = 'italics';
@@ -3875,9 +3889,10 @@ MuseScore {
 					//logError("styledText = "+styledText.replace(/</g,'≤')+"; lct = "+lowerCaseText+" objectIsDynamic = "+objectIsDynamic+"; includesADynamic = "+includesADynamic+"; stringIsDynamic = "+stringIsDynamic);
 					// **** CHECK REDUNDANT DYNAMIC **** //
 					if (includesADynamic || stringIsDynamic) {
-						
 						firstDynamic = true;
 						tickHasDynamic = true;
+						//logError ('dynamic here: tickHasDynamic = '+tickHasDynamic);
+
 						theDynamic = textObject;
 						lastDynamicTick = currTick;
 						setDynamicLevel (plainText);
