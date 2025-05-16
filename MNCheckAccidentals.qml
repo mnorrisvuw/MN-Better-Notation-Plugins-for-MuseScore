@@ -1086,7 +1086,7 @@ MuseScore {
 	function showAllErrors () {
 		var objectPageNum = 0;
 		var firstStaffNum = 0;
-		for (var i = 0; i < (curScore.nstaves-1) && curScore.staves[i].part.show; i++) firstStaffNum ++;
+		for (var i = 0; i < (curScore.nstaves-1) && !curScore.staves[i].part.show; i++) firstStaffNum ++;
 		var comments = [];
 		var commentPages = [];
 		var commentsDesiredPosX = [];
@@ -1224,7 +1224,7 @@ MuseScore {
 					commentsDesiredPosX.push (desiredPosX);
 					commentsDesiredPosY.push (desiredPosY);
 					
-					//logError ('Comment '+i+' created — '+theText.substring(0,20).replace(/</g,'≤'));
+					//logError ('Comment '+i+' created — '+theText.substring(0,20).replace(/</g,'≤')+' attached to staff '+staffNum+' at tick '+tick);
 				}
 			}
 		} // var i

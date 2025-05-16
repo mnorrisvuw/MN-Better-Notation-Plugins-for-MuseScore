@@ -492,7 +492,6 @@ MuseScore {
 		
 		// **** INITIALISE ALL ARRAYS **** //
 		for (var i = 0; i<numStaves; i++) {
-			slurs[i] = [];
 			pedals[i] = [];
 			hairpins[i] = [];
 			oneNoteTremolos[i] = [];
@@ -508,6 +507,7 @@ MuseScore {
 			}
 		}
 		for (var i = 0; i < numTracks; i++) {
+			slurs[i] = [];
 			articulations[i] = [];
 		}
 		
@@ -671,11 +671,11 @@ MuseScore {
 			currentSlurLength = 0;
 			prevSlurLength = 0;
 			
-			numSlurs = slurs[currentStaffNum].length;
+			numSlurs = slurs[currentStaffNum*4].length;
 			if (numSlurs == 0) {
 				nextSlurStart = 0;
 			} else {
-				var theSlur = slurs[currentStaffNum][0];
+				var theSlur = slurs[currentStaffNum*4][0];
 				if (theSlur == undefined) {
 					logError ("slur undefined!");
 				} else {
@@ -892,7 +892,7 @@ MuseScore {
 										currentSlurNum ++;
 										//logError ("Now at slur "+currentSlurNum);
 										if (currentSlurNum < numSlurs) {
-											var nextSlur = slurs[currentStaffNum][currentSlurNum];
+											var nextSlur = slurs[currentTrack][currentSlurNum];
 											if (currentSlur != null && nextSlur != null) {
 												nextSlurStart = nextSlur.spannerTick.ticks;
 												var nextSlurLength = nextSlur.spannerTicks.ticks;
@@ -919,7 +919,7 @@ MuseScore {
 									isSlurred = true;
 									lastArticulationTick = currTick;
 									//logError("Slur started: isSlurred = true");
-									currentSlur = slurs[currentStaffNum][currentSlurNum];
+									currentSlur = slurs[currentTrack][currentSlurNum];
 									
 									//logError ("Found a slur: pagePos = {"+Math.round(currentSlur.pagePos.x*100)/100.+","+Math.round(currentSlur.pagePos.y*100)/100.+"}\nParent system pagePos = {"+Math.round(currentSlur.parent.pagePos.x*100)/100.+","+Math.round(currentSlur.parent.pagePos.y*100)/100.+"}");
 									
@@ -937,7 +937,7 @@ MuseScore {
 									if (doCheckSlursAndTies && currentSlurNum > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
 
 									if (currentSlurNum < numSlurs - 1) {
-										nextSlurStart = slurs[currentStaffNum][currentSlurNum+1].spannerTick.ticks;
+										nextSlurStart = slurs[currentTrack][currentSlurNum+1].spannerTick.ticks;
 										//logError("Next slur starts at "+nextSlurStart);
 									} else {
 										nextSlurStart = 0;
@@ -1637,6 +1637,7 @@ MuseScore {
 			//}
 			//logError ("Found elem "+e.name);
 			var etype = e.type;
+			var etrack = e.track;
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
 			
@@ -1690,7 +1691,7 @@ MuseScore {
 				prevGlissandoSegment = e;
 			}
 			
-			if (etype == Element.SLUR) slurs[staffIdx].push(e);
+			if (etype == Element.SLUR) slurs[etrack].push(e);
 			if (etype == Element.SLUR_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
 				var sameSlur = false;
@@ -1699,7 +1700,7 @@ MuseScore {
 					if (sameLoc) sameSlur = !e.parent.is(prevSlurSegment.parent);
 				}
 				// only add it if it's not already added
-				if (!sameSlur) slurs[staffIdx].push(e);
+				if (!sameSlur)	slurs[etrack].push(e);
 				prevSlurSegment = e;
 			}
 			
@@ -5203,7 +5204,7 @@ MuseScore {
 	function showAllErrors () {
 		var objectPageNum = 0;
 		var firstStaffNum = 0;
-		for (var i = 0; i < (curScore.nstaves-1) && curScore.staves[i].part.show; i++) firstStaffNum ++;
+		for (var i = 0; i < (curScore.nstaves-1) && !curScore.staves[i].part.show; i++) firstStaffNum ++;
 		var comments = [];
 		var commentPages = [];
 		var commentsDesiredPosX = [];
@@ -5341,7 +5342,7 @@ MuseScore {
 					commentsDesiredPosX.push (desiredPosX);
 					commentsDesiredPosY.push (desiredPosY);
 					
-					//logError ('Comment '+i+' created — '+theText.substring(0,20).replace(/</g,'≤'));
+					//logError ('Comment '+i+' created — '+theText.substring(0,20).replace(/</g,'≤')+' attached to staff '+staffNum+' at tick '+tick);
 				}
 			}
 		} // var i
