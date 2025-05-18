@@ -169,6 +169,7 @@ MuseScore {
 	property var lastMetroSection: ''
 	property var numConsecutiveMusicBars: 0
 	property var currentStaffNum: 0
+	property var currentTrack: 0
 	property var currentTimeSig: null
 	property var prevTimeSig: ""
 	property var prevClefId: null
@@ -276,16 +277,12 @@ MuseScore {
 	property var flaggedSlurredRest: false
 	property var prevSlurNum: 0
 	property var prevSlurNumOnTrack: []
-	property var currentSlurNum: 0
 	property var currentSlurNumOnTrack: []
-	property var currentSlurStart: 0
-	property var currentSlurStartOnTrack: []
-	property var currentSlurEnd: 0
-	property var currentSlurEndOnTrack: []
-	property var currentSlurLength: 0
-	property var currentSlurLengthOnTrack: []
-	property var prevSlurLength: 0
-	property var prevSlurLengthOnTrack: []
+	property var nextSlurStartOnTrack: []
+	property var currentSlur: null
+	property var currentSlurLength: -1
+	property var currentSlurStart: -1
+	property var currentSlurEnd: -1
 	
 	// ** OTTAVAS ** //
 	property var ottavas: []
@@ -512,12 +509,9 @@ MuseScore {
 		for (var i = 0; i < numTracks; i++) {
 			slurs[i] = [];
 			articulations[i] = [];
-			currentSlurNumOnTrack[i] = 0;
-			prevSlurNumOnTrack[i] = 0;
-			currentSlurStartOnTrack[i] = 0;
-			currentSlurEndOnTrack[i] = 0;
-			currentSlurLengthOnTrack[i] = 0;
-			prevSlurLengthOnTrack[i] = 0;
+			currentSlurNumOnTrack[i] = -1;
+			prevSlurNumOnTrack[i] = -1;
+			nextSlurStartOnTrack[i] = -1;
 			isMelisma[i] = false;
 			melismaEndTick[i] = 0;
 			prevTick[i] = -1;
@@ -561,7 +555,7 @@ MuseScore {
 		var firstBarNum, firstSegmentInScore;
 		var prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
 		var includesTransposingInstruments = false;
-		var currentSlur, numSlurs, nextSlurStart, currentSlurEnd, prevSlurEnd;
+		var currentSlur, numSlurs, currentSlurEnd, prevSlurEnd;
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
 		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin;
@@ -613,7 +607,6 @@ MuseScore {
 			prevMultipleStop = null;
 			prevIsMultipleStop = false;
 			prevMultipleStopInterval = 0;
-			prevSlurLength = 0;
 			prevBeam = null;
 			currentMute = "senza";
 			currentPlayingTechnique = "arco";
@@ -668,8 +661,6 @@ MuseScore {
 			flaggedFlz = false;
 			flaggedPolyphony = false;
 			lastStemDirectionFlagBarNum = -1;
-			
-			
 			
 			// ** pedals
 			currentPedal = null;
@@ -810,7 +801,7 @@ MuseScore {
 					}
 				}
 				
-				for (var currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
+				for (currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					// **** UPDATE PROGRESS MESSAGE **** //
 					var numNotesInThisTrack = 0;
 					var numNoteRestsInThisTrack = 0;
@@ -826,32 +817,24 @@ MuseScore {
 					
 					// ** slurs
 					currentSlur = null;
+					currentSlurLength = -1;
+					currentSlurStart = -1;
+					currentSlurEnd = -1;
 					isSlurred = false;	
 					isStartOfSlur = false;	
 					isEndOfSlur = false;	
-					currentSlurNum = currentSlurNumOnTrack[currentTrack];
-					prevSlurNum = prevSlurNumOnTrack[currentTrack];
-					currentSlurStart = currentSlurStartOnTrack[currentTrack];
-					currentSlurEnd = currentSlurEndOnTrack[currentTrack];
-					currentSlurLength = currentSlurLengthOnTrack[currentTrack];
-					prevSlurLength = prevSlurLengthOnTrack[currentTrack];
-					tickHasDynamic = false;
 					
+					// ** load in the current slur settings from this track
 					numSlurs = slurs[currentTrack].length;
-					if (numSlurs == 0) {
-						nextSlurStart = -1;
-					} else {
-						nextSlurStart = -1;
-						for (currentSlurNum = 0; currentSlurNum < numSlurs && nextSlurStart >= barStartTick; currentSlurNum++) {
-							nextSlurStart = slurs[currentTrack][currentSlurNum].spannerTick.ticks;
-							if (nextSlurStart < barStartTick) {
-								currentSlurStart = nextSlurStart;
-								currentSlurLength = slurs[currentTrack][currentSlurNum].spannerTicks.ticks;
-								currentSlurEnd = currentSlurStart + currentSlurLength;
-							}
-						}
+					if (currentSlurNumOnTrack[currentTrack] > -1 && currentSlurNumOnTrack[currentTrack] < numSlurs) {
+						currentSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]];
+						currentSlurStart = currentSlur.spannerTick.ticks;
+						currentSlurLength = currentSlur.spannerTicks.ticks;
+						currentSlurEnd = currentSlurStart + currentSlurLength;
 					}
 					
+					tickHasDynamic = false;
+										
 					while (processingThisBar) {
 						isNote = false;
 						isRest = false;
@@ -898,23 +881,24 @@ MuseScore {
 							// ************ UNDER A SLUR? ************ //
 							var readyToGoToNextSlur = false;
 								
-							if (currentSlurNum < numSlurs) {
+							if (currentSlurNumOnTrack[currentTrack] < numSlurs) {
 								if (currentSlur == null) {
 									readyToGoToNextSlur = true;
 								} else {
-									
-										
 									if (currTick > currentSlurEnd) {
-										currentSlurNum ++;
-										//logError ("Now at slur "+currentSlurNum);
-										if (currentSlurNum < numSlurs) {
-											var nextSlur = slurs[currentTrack][currentSlurNum];
-											if (currentSlur != null && nextSlur != null) {
-												nextSlurStart = nextSlur.spannerTick.ticks;
+																				
+										// LOAD UP THE NEXT SLUR
+										if (currentSlurNumOnTrack[currentTrack] < numSlurs) {
+											var nextSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1];
+											
+											// PERHAPS REFACTOR THIS???
+											if (nextSlur != null) {
+												var nextSlurStart = nextSlur.spannerTick.ticks;
 												var nextSlurLength = nextSlur.spannerTicks.ticks;
+												nextSlurStartOnTrack[currentTrack] = nextSlurStart;
 												//logError ("currTick "+currTick+" currentSlurEnd "+currentSlurEnd+" nextSlurStart "+nextSlurStart+" hasGraceNotes "+hasGraceNotes);
-												if (nextSlurStart < currentSlurEnd && nextSlurLength > 0 && currentSlurLength > 0) {
-													var nextSlurNote = getNoteRestAtTick(nextSlurStart);
+												if (nextSlurStartOnTrack[currentTrack] < currentSlurEnd && nextSlurLength > 0 && currentSlurLength > 0) {
+													var nextSlurNote = getNoteRestAtTick(nextSlurStartOnTrack[currentTrack]);
 													if (nextSlurNote != null) {
 														if (nextSlurNote.graceNotes != null) {
 															//logError ("nextSlurNote.graceNotes.length "+(nextSlurNote.graceNotes.length > 0)+"; nextSlurLength = "+nextSlurLength);
@@ -931,32 +915,36 @@ MuseScore {
 								}
 							}
 							if (readyToGoToNextSlur) {
-								if (currTick >= nextSlurStart && nextSlurStart > -1) {
+								if (currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] > -1) {
+									
 									isSlurred = true;
 									lastArticulationTick = currTick;
-									logError("Slur started: isSlurred = true; nextSlurStart was "+nextSlurStart);
-									currentSlur = slurs[currentTrack][currentSlurNum];
+									//logError("Slur started: isSlurred = true; nextSlurStart was "+nextSlurStartOnTrack[currentTrack]);
+									
+									currentSlurNumOnTrack[currentTrack] ++;
+									//logError ("Slur num incremented; now at slur "+currentSlurNumOnTrack[currentTrack]);
+									currentSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]];
 									
 									//logError ("Found a slur: pagePos = {"+Math.round(currentSlur.pagePos.x*100)/100.+","+Math.round(currentSlur.pagePos.y*100)/100.+"}\nParent system pagePos = {"+Math.round(currentSlur.parent.pagePos.x*100)/100.+","+Math.round(currentSlur.parent.pagePos.y*100)/100.+"}");
 									
 									currentSlurStart = currentSlur.spannerTick.ticks;
+									currentSlurLength = currentSlur.spannerTicks.ticks;
+									currentSlurEnd = currentSlurStart + currentSlurLength;
 									prevSlurEnd = currentSlurEnd;
-									prevSlurLength = currentSlurLength;
 									currentSlurLength = currentSlur.spannerTicks.ticks
 									currentSlurEnd = currentSlurStart + currentSlurLength;
-									logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
-									//var off1 = currentSlur.slurUoff1 == undefined ? 0 : currentSlur.slurUoff1.x;
-									//var off2 = currentSlur.slurUoff2 == undefined ? 0 : currentSlur.slurUoff2.x;
-									///var off3 = currentSlur.slurUoff3 == undefined ? 0 : currentSlur.slurUoff3.x;
-									//var off4 = currentSlur.slurUoff4 == undefined ? 0 : currentSlur.slurUoff4.x;
-									//logError("Slur offs: "+currentSlur.posX+" "+currentSlur.offsetX+" "+off1+" "+off2+" "+off3+" "+off4); // ALWAYS RETURNS 0 0 0 0 0 0 :-(
-									if (doCheckSlursAndTies && currentSlurNum > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
+									//logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
+									
+									var prevSlurLength = 0;
+									if (currentSlurNumOnTrack[currentTrack] > 0) prevSlurLength = slurs[currentTrack][currentSlurNumOnTrack[currentTrack] - 1].spannerTicks.ticks;
+									if (doCheckSlursAndTies && currentSlurNumOnTrack[currentTrack] > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
 
-									if (currentSlurNum < numSlurs - 1) {
-										nextSlurStart = slurs[currentTrack][currentSlurNum+1].spannerTick.ticks;
+									if (currentSlurNumOnTrack[currentTrack] < numSlurs - 1) {
+										var nextSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1];
+										nextSlurStartOnTrack[currentTrack] = nextSlur.spannerTick.ticks;
 										//logError("Next slur starts at "+nextSlurStart);
 									} else {
-										nextSlurStart = -1;
+										nextSlurStartOnTrack[currentTrack] = -1;
 										//logError("This is the last slur in this staff ");
 									}
 								}
@@ -1399,7 +1387,7 @@ MuseScore {
 							prevNote = null;
 							prevNotes[currentTrack] = null;
 						}
-						prevSlurNum = currentSlurNum;
+						prevSlurNumOnTrack[currentTrack] = currentSlurNumOnTrack[currentTrack];
 						prevTick[currentTrack] = currTick;
 					} // end while processingThisBar
 					if (numNoteRestsInThisTrack > 0) {
@@ -1410,6 +1398,7 @@ MuseScore {
 					}
 					if (numNotesInThisTrack > 0) numTracksWithNotes ++;
 				} // end track loop
+			
 				
 				if (doCheckOrchestralSharedStaves && isWindOrBrassInstrument && isSharedStaff) {
 					if (numTracksWithNoteRests > 1 || isChord) {
@@ -1642,20 +1631,14 @@ MuseScore {
 		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
 		// **** THIS INCLUDES: HAIRPINS, OTTAVAS, TREMOLOS, SLURS, ARTICULATION, FERMATAS **** //
 		// **** GLISSES, PEDALS, TEMPO TEXT																								**** //
+		
 		var staves = curScore.staves;
 		var elems = curScore.selection.elements;
-		//logError ("Selected "+elems.length+" elems");
 		var prevSlurSegment = null, prevHairpinSegment = null, prevOttavaSegment = null, prevGlissSegment = null, prevPedalSegment = null;
 		var firstChord = null;
+		
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
-			
-			// check if elem is hidden
-			//if (e.parent == null) {
-			//	logError ('e.parent == null');
-			//	continue;
-			//}
-			//logError ("Found elem "+e.name);
 			var etype = e.type;
 			var etrack = e.track;
 			var staffIdx = 0;
@@ -1664,12 +1647,10 @@ MuseScore {
 
 			if (!staffVisible[staffIdx]) continue;
 			
-			
-			/*if (etype == Element.REHEARSAL_MARK) {
-				logError ("Checking rehearsal mark at start"); 
-				checkRehearsalMark(e);
-			}*/
+			// *** CHORD
 			if (firstChord == null && etype == Element.CHORD) firstChord = e;
+			
+			// *** HAIRPINS
 			if (etype == Element.HAIRPIN) {
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line") && e.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
@@ -1689,42 +1670,45 @@ MuseScore {
 				prevHairpinSegment = e;
 			}
 			
+			// *** OTTAVAS
 			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
-			if (etype == Element.OTTAVA_SEGMENT) {	// ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.OTTAVA_SEGMENT) {
 				var sameLoc = false;
 				var sameOttava = false;
 				if (prevOttavaSegment != null) {
 					sameLoc = (e.spannerTick.ticks == prevOttavaSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevOttavaSegment.spannerTicks.ticks);
 					if (sameLoc) sameOttava = !e.parent.is(prevOttavaSegment.parent);
 				}
-				// only add it if it's not already added
 				if (!sameOttava) ottavas[staffIdx].push(e);
 				prevOttavaSegment = e;
 			}
 			
+			// *** GLISSANDI
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
-			if (etype == Element.GLISSANDO_SEGMENT) {	// ONLY ADD THE EGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.GLISSANDO_SEGMENT) {
 				var sameLoc = false;
 				var sameGlissando = false;
 				if (prevGlissandoSegment != null) {
 					sameLoc = (e.spannerTick.ticks == prevGlissandoSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevGlissandoSegment.spannerTicks.ticks);
 					if (sameLoc) sameGlissando = !e.parent.is(prevGlissandoSegment.parent);
 				}
-				// only add it if it's not already added
 				if (!sameGlissando) glisses[staffIdx][e.spannerTick.ticks] = e;
 				prevGlissandoSegment = e;
 			}
 			
+			// *** SLURS
 			if (etype == Element.SLUR) slurs[etrack].push(e);
-			if (etype == Element.SLUR_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
+			if (etype == Element.SLUR_SEGMENT) {
 				var sameLoc = false;
 				var sameSlur = false;
 				if (prevSlurSegment != null && e.parent != null) {
 					sameLoc = (e.spannerTick.ticks == prevSlurSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevSlurSegment.spannerTicks.ticks);
 					if (sameLoc) sameSlur = !e.parent.is(prevSlurSegment.parent);
 				}
-				// only add it if it's not already added
-				if (!sameSlur)	slurs[etrack].push(e);
+				if (!sameSlur){
+					slurs[etrack].push(e);
+					if (slurs[etrack].length == 1) nextSlurStartOnTrack[etrack] = e.spannerTick.ticks;
+				}
 				prevSlurSegment = e;
 			}
 			
@@ -4746,7 +4730,7 @@ MuseScore {
 			// *** CHECK REPEATED NOTE UNDER A SLUR — ONLY STRINGS, WINDS OR BRASS *** //
 			if (isStringInstrument || isWindOrBrassInstrument) {
 				//logError ("isStartOfSlur "+isStartOfSlur+" prevNote "+(prevNote != null) + " prevSlurNum "+prevSlurNum+" currentSlurNum:"+currentSlurNum+" tieBack"+(noteRest.notes[0].tieBack == null));
-				if (!isStartOfSlur && prevNote != null && prevSlurNum == currentSlurNum && noteRest.notes[0].tieBack == null) {
+				if (!isStartOfSlur && prevNote != null && prevSlurNumOnTrack[currentTrack] == currentSlurNumOnTrack[currentTrack] && noteRest.notes[0].tieBack == null) {
 					var iterationArticulationArray = [kTenutoAbove,kTenutoBelow,
 						kStaccatissimoAbove, kStaccatissimoAbove+1,
 						kStaccatissimoStrokeAbove, kStaccatissimoStrokeAbove+1,
