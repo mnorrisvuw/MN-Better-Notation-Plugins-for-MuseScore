@@ -157,6 +157,8 @@ MuseScore {
 	property var tempomarkings: []
 	property var tempochangemarkings: []
 	property var instrumentranges: []
+	
+	// ** VARIOUS FLAGS AND NOTES ** //
 	property var lastTempoChangeMarkingBar: -1
 	property var tempoChangeMarkingEnd: -1
 	property var lastTempoChangeMarking: null
@@ -187,6 +189,7 @@ MuseScore {
 	property var errorStrings: []
 	property var errorObjects: []
 	property var prevBeam: null
+	property var wasHarmonic: false
 	
 	// ** INSTRUMENTS ** //
 	property var instrumentIds: []
@@ -619,6 +622,7 @@ MuseScore {
 			isSharedStaff = isSharedStaffArray[currentStaffNum];
 			isDiv = false;
 			firstDynamic = false;
+			wasHarmonic = false;
 			
 			lastMetroSection = '';
 			lastMetronomeMarkingBar = -1;
@@ -1213,7 +1217,7 @@ MuseScore {
 								}
 								
 								// ************ CHECK EXPRESSIVE DETAIL (DYNAMICS) ********** //
-								if (doCheckExpressiveDetail) {
+								if (doCheckExpressiveDetail && !isGrandStaff[currentStaffNum]) {
 									if (lastDynamicTick < currTick - division * 32 && numConsecutiveMusicBars >= 8 && isNote) {
 										lastDynamicTick = currTick + 1;
 										addError("This passage has had no dynamic markings for the last while\nConsider adding more dynamic detail to this passage.",noteRest);
@@ -1228,9 +1232,12 @@ MuseScore {
 								
 								} else {
 									numNotesInThisTrack ++;
-									isTied = noteRest.notes[0].tieBack != null;
+									var isTiedBack = noteRest.notes[0].tieBack != null;
+									var isTiedForward = noteRest.notes[0].tieForward != null;
+									isTied = isTiedBack || isTiedForward;
+
 									if (isNote && !isTrem) flzFound = false;
-									if (noteRest.notes[0].tieForward != null && !isLv) {
+									if (isTiedForward && !isLv) {
 										var nextChordRest = getNextChordRest(cursor);
 										if (nextChordRest != null) {
 											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest",noteRest);
@@ -1239,16 +1246,24 @@ MuseScore {
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
 									if (isTied && !isLv) {
+										var hasStaccato = false, hasHarmonic = false;
 										var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
 										if (theArticulationArray != null) {
-											var hasStaccato = false, hasHarmonic = false;
 											for (var i = 0; i < theArticulationArray.length; i++) {
 												if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 												if (theArticulationArray[i].symbol == kHarmonicCircle) hasHarmonic = true;
 											}
-											if (doCheckSlursAndTies && !hasStaccato && !hasHarmonic) addError("This note has articulation on it, but is tied.\nDid you mean that to be slurred instead?",noteRest);
+											if (isTiedBack && doCheckSlursAndTies && !hasStaccato && !hasHarmonic) addError("This note has articulation on it, but is tied.\nDid you mean that to be slurred instead?",noteRest);
 										}
+										if (!hasHarmonic && wasHarmonic && !isHorn) {
+											hasHarmonic = true;
+											addError ("Put harmonic circles on all notes in a tied harmonic.",noteRest);
+										}
+										wasHarmonic = isTiedForward ? hasHarmonic : false;
+									} else {
+										wasHarmonic = false;
 									}
+									
 															
 									// ************ CHECK LYRICS ************ //
 							
@@ -3778,6 +3793,7 @@ MuseScore {
 									// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
 									var metronomeDuration = division; // crotchet
 									var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
+									var hasParentheses = lowerCaseText.includes('(') && lowerCaseText.includes(')');
 									var metroStr = "crotchet/quarter note";
 									if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('\uECA7')) {
 										metronomeDuration = division / 2; // quaver
@@ -3802,6 +3818,9 @@ MuseScore {
 											if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
 											if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
 										}
+									}
+									if (isTempoMarking && hasParentheses) {
+										addError ('You don’t normally need brackets around metronome markings\nexcept for (e.g.) Tempo Primo/Tempo Secondo/a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
 									}
 									//logError ("Found a metronome marking: non bold text is "+nonBoldText);
 								}
