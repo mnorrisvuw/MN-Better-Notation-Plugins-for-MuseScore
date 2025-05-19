@@ -1551,19 +1551,14 @@ MuseScore {
 			return;
 		}
 		
-		if (isLastNoteInBeat && !isOnlyNoteInBeat) {
-			//logError(last note in beat");
-			
-		// Last note in a beat — anything except 1 or 2
+		if (isLastNoteInBeat && !isOnlyNoteInBeat) {			
+			// Last note in a beat — anything except 1 or 2
 			if (!hasBeam && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note and intervening rests (if any) to AUTO",noteRest);
 			return;
 		}
-		if (isLastRestsInBeat) {
-			//logError(last rests in beat");
-			
-			// Last rests in a beat — set to 0, 1 or 2
-			acceptableBeamSettings = [Beam.AUTO,Beam.NONE,Beam.BEGIN];
-		}
+		
+		// Last rests in a beat — set to 0, 1 or 2
+		if (isLastRestsInBeat) acceptableBeamSettings = [Beam.AUTO,Beam.NONE,Beam.BEGIN];
 		
 		var correctlyBeamed = false;
 		correctlyBeamed = acceptableBeamSettings.includes(currentBeamMode);

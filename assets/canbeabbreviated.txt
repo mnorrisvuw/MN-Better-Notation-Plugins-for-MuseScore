@@ -55,12 +55,12 @@ sim.
 espressivo
 espress.
 normal vib
-vibr. norm.
+vib. norm.
 normal vibr
-vibr. norm.
+vib. norm.
 normal vib.
-vibr. norm.
+vib. norm.
 normal vibr.
-vibr. norm.
+vib. norm.
 normal vibrato
-vibr. norm.
+vib. norm.

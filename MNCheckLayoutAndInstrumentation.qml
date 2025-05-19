@@ -3434,7 +3434,7 @@ MuseScore {
 		
 		if (!textObject.visible) return;
 		
-		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a 2","a 3","a 4","a 5","a 6","a 7","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
+		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a2", "a 2","a3", "a 3","a4", "a 4","a5", "a 5","a6", "a 6","a7","a 7","a8","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
 		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z","","p","","ppp","","pp","","mp","","mf","","f","","ff","","fff","","sf","","sfz","","sffz","","z","","n","&nbsp;"," "," "," "];
 		
 		var eType = textObject.type;
@@ -4120,11 +4120,17 @@ MuseScore {
 	}
 	
 	function checkBarlinesConnected (str) {
-		for (var s = 0; s < numStaves-1; s ++) {
-			var staff = curScore.staves[s];
-			if (staff.staffBarlineSpan == 0) {
-				addError ("The barlines should go through all of the staves for a "+str,"system1 1");
-				return;
+		var lastVisibleStaff = 0;
+		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) lastVisibleStaff = i;
+
+		for (var i = 0; i < lastVisibleStaff-1; i++) {
+			if (staffVisible[i]) {
+				var staff = curScore.staves[i];
+				//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
+				if (staff.staffBarlineSpan == 0) {
+					addError ("The barlines should go through all of the staves for a "+str,"system1 1");
+					return;
+				}
 			}
 		}
 	}
@@ -4971,6 +4977,79 @@ MuseScore {
 					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
 						addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’",noteRest);
 						lastStemDirectionFlagBarNum = currentBarNum;
+					}
+				}
+			}
+			if (noteRest.beam != null) {
+				// is this the start of the beam?
+				var currBeam = noteRest.beam;
+				if (!currBeam.is(prevBeam)) {
+					//var beamPosAsPoint = currBeam.beamPos as point;
+					//var beamPosY = beamPosAsPoint.y;
+					var beamPosY = parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
+					// unfortunately I can't figure out a way to access QPair in Qt
+					//logError ('beamPos = '+beamPosY);
+					//start of a new beam
+					// collate all beams into an array
+					prevBeam = currBeam;
+					var notesInBeamArray = [];
+					var currNote = noteRest;
+					while (currNote.beam != null) {
+						if (!currNote.beam.is(currBeam)) break;
+						notesInBeamArray.push(currNote);
+						currNote = getNextNoteRest (currNote);
+					}
+
+					var numNoteRests = notesInBeamArray.length;
+					logError ('Found '+numNoteRests+' in beam');
+					var numNotesAboveMiddleLine = 0;
+					var numNotesBelowMiddleLine = 0;
+					var preferUpOrDown = 0;
+					
+					if (numNoteRests > 1) {
+						var maxOffsetFromMiddleLine = 0;
+						for (var i = 0; i<numNoteRests; i++) {
+							var theNoteRest = notesInBeamArray[i];
+							var numNotes = theNoteRest.notes.length;
+							
+							var maxOffsetFromMiddleLineInChord = 0;
+							for (var j = 0; j < numNotes; j++) {
+								var note = theNoteRest.notes[j];
+								var offsetFromMiddleLine = 4 - note.line; // 0 = top line, 1 = top space, 2 = second top line, etc...
+								
+								if (Math.abs(offsetFromMiddleLine) > Math.abs(maxOffsetFromMiddleLineInChord)) maxOffsetFromMiddleLineInChord = offsetFromMiddleLine;
+							}
+							
+							if (maxOffsetFromMiddleLineInChord > 0) {
+								preferUpOrDown --;
+							} else {
+								preferUpOrDown ++;
+							}
+							if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) {
+								maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
+								preferUpOrDown = 0;
+							}
+							if (maxOffsetFromMiddleLineInChord < 0) numNotesBelowMiddleLine ++;
+							if (maxOffsetFromMiddleLineInChord > 0) numNotesAboveMiddleLine ++;
+						}
+						var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
+						// 1 is stems down; 2 is stems up
+						// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
+						var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
+						//logError ('I calculated direction as '+calcDir);
+						
+						if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
+							if (preferUpOrDown > 0) {
+								if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+							}
+						} else {
+							if (numNotesAboveMiddleLine > numNotesBelowMiddleLine) {
+								if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+							} else {
+								if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+							}
+						}
 					}
 				}
 			}
