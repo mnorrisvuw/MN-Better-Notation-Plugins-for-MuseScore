@@ -5150,7 +5150,9 @@ MuseScore {
 		if (currentBarNum < 2) addError ("Don’t put a rehearsal mark at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
 		var isNumeric = !isNaN(textObject.text) && !isNaN(parseFloat(textObject.text));
 		if (!isNumeric) {
-			if (textObject.text !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
+			var rehearsalMarkNoTags = textObject.text.replace(/<[^>]+>/g, "");
+			if (rehearsalMarkNoTags !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
+				//logError ('expectedRehearsalMark = '+expectedRehearsalMark);
 				flaggedRehearsalMarkError = true;
 				addError ("This is not the rehearsal mark I would expect.\nDid you miss rehearsal mark ‘"+expectedRehearsalMark+"’?", textObject);
 			}
