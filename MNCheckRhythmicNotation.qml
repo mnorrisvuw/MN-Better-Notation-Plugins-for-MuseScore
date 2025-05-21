@@ -1615,25 +1615,27 @@ MuseScore {
 	}
 	
 	function showAllErrors () {
+		
 		var objectPageNum = 0;
 		var firstStaffNum = 0;
-		for (var i = 0; i < (curScore.nstaves-1) && !curScore.staves[i].part.show; i++) firstStaffNum ++;
 		var comments = [];
 		var commentPages = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
+		for (var i = 0; i < (curScore.nstaves-1) && !curScore.staves[i].part.show; i++) firstStaffNum ++;
 		
 		// limit the number of errors shown to 100 to avoid a massive wait
 		var numErrors = (errorStrings.length > 100) ? 100 : errorStrings.length;
 		var desiredPosX, desiredPosY;
 		
-		// save state for undo
-		curScore.startCmd();
-		
 		// create new cursor to add the comments
 		var cursor = curScore.newCursor();
+		cursor.inputStateMode = Cursor.INPUT_STATE_SYNC_WITH_SCORE;
 		cursor.filter = Segment.All;
 		cursor.next();
+		
+		// save undo state
+		curScore.startCmd();
 	
 		for (var i = 0; i < numErrors; i++) {
 	
@@ -1722,6 +1724,7 @@ MuseScore {
 					// add a text object at the location where the element is
 					var comment = newElement(Element.STAFF_TEXT);
 					comment.text = theText;
+					
 					// style the text object
 					comment.frameType = 1;
 					comment.framePadding = 0.6;
@@ -1754,12 +1757,11 @@ MuseScore {
 					if (theLocation === "pagetopright" && commentPage != null) desiredPosX = commentPage.bbox.width - comment.bbox.width - 2.5;
 					commentsDesiredPosX.push (desiredPosX);
 					commentsDesiredPosY.push (desiredPosY);
-					
-					//logError ('Comment '+i+' created — '+theText.substring(0,20).replace(/</g,'≤')+' attached to staff '+staffNum+' at tick '+tick);
 				}
 			}
 		} // var i
-		
+		curScore.endCmd();
+	
 		// NOW TWEAK LOCATIONS OF COMMENTS
 		var offx = [];
 		var offy = [];
@@ -1782,14 +1784,10 @@ MuseScore {
 			theLocation = element;
 			var placedX = comment.pagePos.x;
 			var placedY = comment.pagePos.y;
-	
-			var et = comment.text.substring(0,5).replace(/<[^>]+>/g, "").replace(/</g,'≤');
 			if (desiredPosX != 0) offx[i] = desiredPosX - placedX;
 			if (desiredPosY != 0) offy[i] = desiredPosY - placedY;
 			if (placedX + offx[i] < 0) offx[i] = -placedX;
 			if (placedY + offy[i] < 0) offy[i] = -placedY;
-			//logError ('Comment '+i+'  = {'+(Math.round(placedX*10)/10.)+','+(Math.round(placedY*10)/10.)+','+(Math.round(commentWidth*10)/10.)+','+(Math.round(commentHeight*10)/10.)+'; desired = {'+(Math.round(desiredPosX*10)/10.)+','+(Math.round(desiredPosY*10)/10.)+'}; off = {'+(Math.round(offx[i]*10)/10.)+','+(Math.round(offy[i]*10)/10.)+'}');
-	
 			
 			var commentPage = comment.parent;
 			while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
@@ -1886,18 +1884,18 @@ MuseScore {
 					}
 					if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
 				} else {
-					logError ("parent parent parent parent was not a page — element = "+element.name);
+					//logError ("parent parent parent parent was not a page — element = "+element.name);
+					// this will fail if MMR
 				}
 			}
 		}
 		
 		// now reposition all the elements
-		
+		curScore.startCmd();
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
-			//logError ('Comment '+i+' at '+comment.pagePos.x+' '+comment.pagePos.y);
 		}
 		curScore.endCmd();
 	}
@@ -2027,10 +2025,7 @@ MuseScore {
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
 		curScore.startCmd();
-	
-		for (var i = 0; i < elementsToRemove.length; i++) {
-			removeElement(elementsToRemove[i]);
-		}
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
 		curScore.endCmd();
 	
 	}

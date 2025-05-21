@@ -32,14 +32,13 @@ MuseScore {
 		
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
 		curScore.startCmd();
-		cmd ("select-all");
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
+		
 		cmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
 		cmd ("title-text");
-		curScore.startCmd();
 		cmd ("select-similar");
-		curScore.endCmd();
 
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
@@ -48,11 +47,17 @@ MuseScore {
 			// style the element pink
 			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
 		}
-		if (vbox != null) removeElement (vbox);
+		if (vbox == null) {
+			logError ("deleteAllCommentsAndHighlights () — vbox was null");
+		} else {
+			curScore.startCmd();
+			removeElement (vbox);
+			curScore.endCmd();
+		}
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		cmd ("select-all");
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 
 		// **** GET ALL OTHER ITEMS **** //
@@ -88,15 +93,18 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
-		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
 		curScore.endCmd();
-
+		
+		// **** THE FOLLOWING FORCE A SCREEN REDRAW **** //
+		curScore.startCmd();
 		cmd ('escape');
 		cmd ('escape');
 		cmd ('concert-pitch');
 		cmd ('concert-pitch');
+		curScore.endCmd();
 	}
 	
 	function saveSelection () {
