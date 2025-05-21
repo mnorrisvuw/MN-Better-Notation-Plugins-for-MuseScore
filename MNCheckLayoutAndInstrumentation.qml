@@ -147,6 +147,7 @@ MuseScore {
 	property var scoreHasBrass: false
 	property var mmrNumber: 0
 	property var mmrs: []
+	property var hasMMRs: false;
 	property var firstMMRSystem: null
 	property var lastMMRSystem: null
 	
@@ -805,7 +806,7 @@ MuseScore {
 					var isMMR = mmrs[currentBarNum] != null;
 					if (stretch != 1 && doCheckBarStretches && !isMMR) {
 						addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
-						logError ('stretch != 1 — isMMR = '+isMMR+' because currentBar = '+currentBar+' parent = '+currentBar.parent);
+						//logError ('stretch != 1 — isMMR = '+isMMR+' because currentBar = '+currentBar+' parent = '+currentBar.parent);
 					}
 				}
 				var tempSystem = currentBar.parent;
@@ -1561,7 +1562,11 @@ MuseScore {
 					logError("Main loop — check spacing — BAR UNDEFINED");
 				} else {
 					if (noteCountInSys < minNoteCountPerSystem) {
-						addError("This system doesn’t have many notes in it, and may be quite spread out.\nTry including more bars in this system.",bar);
+						if (hasMMRs) {
+							addError("This system doesn’t have many notes in it and may be quite spread out.\nTry including more bars in this system.\n(Ignore if this system includes a multimeasure rest.)",bar);
+						} else {
+							addError("This system doesn’t have many notes in it and may be quite spread out.\nPerhaps try including more bars in this system.",bar);
+						}
 						continue;
 					}
 					if (noteCountInSys > maxNoteCountPerSystem) {
@@ -1569,7 +1574,11 @@ MuseScore {
 						continue;
 					}
 					if (numBeatsInSys < minBeatsPerSystem && noteCountInSys < mmin) {
-						addError("This system doesn’t have many bars in it and may be quite spread out.\nTry including more bars in this system.",bar);
+						if (hasMMRs) {
+							addError("This system doesn’t have many bars in it and may be quite spread out.\nTry including more bars in this system.\n(Ignore if this system includes a multimeasure rest.)",bar);
+						} else {
+							addError("This system doesn’t have many bars in it and may be quite spread out.\nPerhaps try including more bars in this system.",bar);
+						}
 						continue;
 					}
 					if (numBeatsInSys > maxBeatsPerSystem && noteCountInSys > mmax) {
@@ -1742,25 +1751,61 @@ MuseScore {
 		for (var i = 0; i<elems.length; i++) {
 			
 			var e = elems[i];
+			
+			// don't log if the element is not visible
+			if (!e.visible) continue;
+			
 			var etype = e.type;
 			//if (i < 100) logError ('ename = '+e.name);
 			var etrack = e.track;
 			var staffIdx = 0;
 			while (!staves[staffIdx].is(e.staff)) staffIdx++;
-			// ignore if staff is not visible
 			
+			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) {
+				var theText = '';
+				var theTick = 0;
+				if (etype == Element.GRADUAL_TEMPO_CHANGE) {
+					theText = e.beginText;
+					theTick = e.spannerTick.ticks;
+				} else {
+					theText = e.text;
+					theTick = e.parent.tick;
+				}
+				var foundObj = false;
+				for (var j = 0; j < tempoText.length && !foundObj; j ++) {
+					var compe = tempoText[j];
+					if (compe.type == etype) {
+						var compareText = '';
+						var compareTick = 0;
+						if (compe.type == Element.GRADUAL_TEMPO_CHANGE) {
+							compareText = compe.beginText;
+							compareTick = compe.spannerTick.ticks;
+						} else {
+							compareText = compe.text;
+							compareTick = compe.parent.tick;
+						}
+						if (compareText === theText && compareTick == theTick) foundObj = true;
+					}
+				}
+				if (!foundObj) tempoText.push(e);
+			}
+			
+			// ignore if staff is not visible
+			if (!staffVisible[staffIdx]) continue;
+
 			if (etype == Element.MMREST) {
 				//logError ('Found mmrest '+e+' on staff '+e.staff);
 				var startTick = e.parent.parent.firstSegment.tick;
 				var endTick = e.parent.parent.lastSegment.tick;
-				if (mmrBar) {
+				hasMMRs = true;
+				if (mmrBar != null) {
 					while (mmrBar.firstSegment.tick < startTick) {
 						mmrBar = mmrBar.nextMeasure;
 						mmrBarNum ++;
 						if (mmrBar == null) break;
 					}
 					if (mmrBar) {
-						if (e.staff.is(curScore.staves[0])) {
+						if (e.staff.is(curScore.staves[firstVisibleStaff])) {
 							while (mmrBar.firstSegment.tick >= startTick && mmrBar.lastSegment.tick <= endTick) {
 								mmrs[mmrBarNum] = e;
 								//logError ('Pushed mmrBar at '+mmrBarNum);
@@ -1773,13 +1818,10 @@ MuseScore {
 								if (mmrBar == null) break;
 
 							}
-							
 						}
 					}
 				}
 			}
-
-			if (!staffVisible[staffIdx]) continue;
 			
 			// *** CHORD
 			if (firstChord == null && etype == Element.CHORD) firstChord = e;
@@ -1868,34 +1910,7 @@ MuseScore {
 				var locArr = staffIdx+' '+theTick;
 				fermataLocs.push(locArr);
 			}
-			if (etype == Element.GRADUAL_TEMPO_CHANGE || etype == Element.TEMPO_TEXT || etype == Element.METRONOME) {
-				var theText = '';
-				var theTick = 0;
-				if (etype == Element.GRADUAL_TEMPO_CHANGE) {
-					theText = e.beginText;
-					theTick = e.spannerTick.ticks;
-				} else {
-					theText = e.text;
-					theTick = e.parent.tick;
-				}
-				var foundObj = false;
-				for (var j = 0; j < tempoText.length && !foundObj; j ++) {
-					var compe = tempoText[j];
-					if (compe.type == etype) {
-						var compareText = '';
-						var compareTick = 0;
-						if (compe.type == Element.GRADUAL_TEMPO_CHANGE) {
-							compareText = compe.beginText;
-							compareTick = compe.spannerTick.ticks;
-						} else {
-							compareText = compe.text;
-							compareTick = compe.parent.tick;
-						}
-						if (compareText === theText && compareTick == theTick) foundObj = true;
-					}
-				}
-				if (!foundObj) tempoText.push(e);
-			}
+			
 			if (etype == Element.DYNAMIC) {
 				//logError ('Found dynamic');
 				dynamics[staffIdx].push(e);
@@ -2966,7 +2981,7 @@ MuseScore {
 			if (currSystem != null) {
 				if (pageHeight == 0) {
 					pageHeight = currSystem.parent.bbox.height;
-					thresholdb = pageHeight * 0.9;
+					thresholdb = pageHeight * 0.8;
 				}
 				if (!currSystem.is(prevSystem)) {
 					// new system
@@ -3045,7 +3060,7 @@ MuseScore {
 		// **** Does the hairpin start under a rest? **** //
 		var noteAtHairpinStart = getNoteRestAtTick(hairpinStartTick);
 		var hairpinStartsOnRest = (noteAtHairpinStart == null) ? true : noteAtHairpinStart.type == Element.REST;
-		if (hairpinStartsOnRest) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);
+		if (hairpinStartsOnRest && !isGrandStaff[cursor.staffIdx]) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);
 		
 		
 		var startOffset = Math.abs(currentHairpin.offset.x);
@@ -3856,12 +3871,12 @@ MuseScore {
 				// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
 				if (currentBarNum > 0) {
 					
-					
 					// **** 	CHECK TEMPO MARKINGS, METRONOME MARKINGS & TEMPO CHANGE MARKINGS 	****
 					if (doCheckTempoMarkings) {
 
 						// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
-						if (!initialTempoExists && eType == Element.TEMPO_TEXT && currentBarNum == 1) initialTempoExists = true;
+						if (currentBarNum == 1) logError ('Element in bar 1 = '+textObject.subtypeName());
+						if (!initialTempoExists && (eType == Element.TEMPO_TEXT || eType == Element.METRONOME) && currentBarNum == 1) initialTempoExists = true;
 			
 						// **** IS THIS A TEMPO CHANGE MARKING??? **** //
 						var isTempoChangeMarking = eType == Element.GRADUAL_TEMPO_CHANGE;
@@ -4708,9 +4723,10 @@ MuseScore {
 		var celloStrings = [36,43,50,57];
 		var bassStrings = [28,33,38,43];
 		
-		isStringHarmonic = false;
 		
 		if (noteRest.notes[0].tieBack) return;
+		isStringHarmonic = false;
+
 		var nn = noteRest.notes.length;
 		//logError("CHECKING STRING HARMONIC — nn = "+nn);
 		if (nn == 2) {
@@ -4720,7 +4736,8 @@ MuseScore {
 			//logError("ns1 = "+noteheadStyle1+" vs "+NoteHeadGroup.HEAD_NORMAL+"); ns2 = "+noteheadStyle2+" vs "+NoteHeadGroup.HEAD_DIAMOND;
 			
 			// **** ARTIFICIAL HARMONICS **** //
-			if (noteheadStyle1 == NoteHeadGroup.HEAD_NORMAL && noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND) {
+			if (noteheadStyle1 == NoteHeadGroup.HEAD_NORMAL && (noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND_OLD)) {
+				//logError ('Found artificial harmonic — isStringHarmonic = true');
 				isStringHarmonic = true;
 				// we have a false harmonic
 				// are notes always in bottom-up order?
@@ -4734,11 +4751,9 @@ MuseScore {
 				if (interval != 5) addError("This looks like an artificial harmonic, but the interval between\nthe fingered and touched pitch is not a perfect fourth.",noteRest);
 				
 				// check override on the top note
-				if (noteRest.duration.ticks <= 2 * division) {
+				if (noteRest.duration.ticks < 2 * division) {
 					var noteheadType = topNote.headType;
-					if (noteheadType != NoteHeadType.HEAD_HALF) {
-						addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
-					}
+					if (noteheadType != NoteHeadType.HEAD_HALF) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
 				}
 				
 				// check register
@@ -4763,7 +4778,7 @@ MuseScore {
 					}
 				}
 			}
-			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND) {
+			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle == NoteHeadGroup.HEAD_DIAMOND_OLD) {
 				isStringHarmonic = true;
 				harmonicArray = diamondHarmonicIntervals;
 				// check override on the top note
@@ -5220,7 +5235,7 @@ MuseScore {
 								
 							}
 							
-							logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
+							//logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
 							
 							if (chordPreferUpOrDown != 0) {
 								if (chordPreferUpOrDown > 0) {
@@ -5233,14 +5248,14 @@ MuseScore {
 								}
 							}
 							if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
-							logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
+							//logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
 
 						}
 						var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
 						// 1 is stems down; 2 is stems up
 						// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
 						var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
-						logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
+						//logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
 						
 						if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
 							if (preferUpOrDown > 0 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
