@@ -3116,7 +3116,7 @@ MuseScore {
 		
 		if (isRest) {
 			for (var i = 0; i < techniques.length; i ++) {
-				if (lowerCaseText.includes(techniques[i])) {
+				if (lowerCaseText.includes(techniques[i]) && !(lowerCaseText.includes('senza sord') || lowerCaseText.includes('via sord'))) {
 					//logError ("textObj "+textObject.text);
 					addError("Avoid putting techniques over rests if possible, though\nthis may sometimes be needed to save space.\n(See ‘Behind Bars’, p. 492).",textObject);
 					break;
@@ -3875,7 +3875,7 @@ MuseScore {
 					if (doCheckTempoMarkings) {
 
 						// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
-						if (currentBarNum == 1) logError ('Element in bar 1 = '+textObject.subtypeName());
+						//if (currentBarNum == 1) logError ('Element in bar 1 = '+textObject.subtypeName());
 						if (!initialTempoExists && (eType == Element.TEMPO_TEXT || eType == Element.METRONOME) && currentBarNum == 1) initialTempoExists = true;
 			
 						// **** IS THIS A TEMPO CHANGE MARKING??? **** //
