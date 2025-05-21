@@ -5549,6 +5549,8 @@ MuseScore {
 		cursor.inputStateMode = Cursor.INPUT_STATE_SYNC_WITH_SCORE;
 		cursor.filter = Segment.All;
 		cursor.next();
+		
+		curScore.startCmd();
 
 		for (var i = 0; i < numErrors; i++) {
 
@@ -5654,9 +5656,7 @@ MuseScore {
 					cursor.rewindToTick(tick);
 					
 					// save state for undo
-					curScore.startCmd();
 					cursor.add(comment);
-					curScore.endCmd();
 					
 					comment.z = currentZ;
 					currentZ ++;
@@ -5679,7 +5679,8 @@ MuseScore {
 				}
 			}
 		} // var i
-		
+		curScore.endCmd();
+
 		// NOW TWEAK LOCATIONS OF COMMENTS
 		var offx = [];
 		var offy = [];
