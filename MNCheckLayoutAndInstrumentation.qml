@@ -493,10 +493,6 @@ MuseScore {
 			melismaEndTick[i] = 0;
 			prevTick[i] = -1;
 		}
-		
-		curScore.startCmd();
-		curScore.selection.clear();
-		curScore.endCmd();
 				
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
 		deleteAllCommentsAndHighlights();
@@ -868,6 +864,8 @@ MuseScore {
 						//lastTempoChangeMarkingBar = -1;
 					}
 				}
+				
+				// ********* COUNT HOW MANY VOICES THERE ARE IN THIS BAR ********* //
 				var voicesArray = [0,0,0,0];
 				for (var j = 0; j < currentBar.elements.length; j++) {
 					var e = currentBar.elements[j];
@@ -1302,7 +1300,7 @@ MuseScore {
 									isTied = isTiedBack || isTiedForward;
 
 									if (isNote && !isTrem) flzFound = false;
-									if (isTiedForward && !isLv) {
+									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
 										var nextChordRest = getNextChordRest(cursor);
 										if (nextChordRest != null) {
 											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest",noteRest);
@@ -1585,13 +1583,14 @@ MuseScore {
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
-		selectNone();
 				
 		// ** SHOW INFO DIALOG ** //
 		showFinalDialog();
 	}
 	
 	function showFinalDialog () {
+		selectNone();
+
 		var numErrors = errorStrings.length;
 		
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
@@ -5972,12 +5971,13 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
+		curScore.startCmd();
+
 		for (var i = 0; i < elementsToRemove.length; i++) {
-			curScore.startCmd();
 			removeElement(elementsToRemove[i]);
-			curScore.endCmd();
 		}
-		selectNone();
+		curScore.endCmd();
+
 	}
 	
 	StyledDialogView {

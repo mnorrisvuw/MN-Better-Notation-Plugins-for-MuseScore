@@ -165,7 +165,7 @@ MuseScore {
 		// **** EXTEND SELECTION? **** //
 		if (!curScore.selection.isRange) {
 			curScore.startCmd();
-			cmd ("select-all");
+			curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 			curScore.endCmd();
 		}
 		firstStaffNum = curScore.selection.startStaff;
@@ -1952,24 +1952,26 @@ MuseScore {
 	}
 	
 	function deleteAllCommentsAndHighlights () {
-
+	
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
-		
-		// ** SAVE CURRENT SELECTION ** //
-		saveSelection();
-		
+				
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
 		curScore.startCmd();
-		cmd ("select-all");
-		curScore.endCmd();
-		cmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		curScore.startCmd();
-		cmd ("select-similar");
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 		
+		// insert-box does not need startcmd
+		cmd ("insert-vbox");
+	
+		var vbox = curScore.selection.elements[0];
+		
+		// title-text does not need startcmd
+		cmd ("title-text");
+		
+		// select-similar does not need startcmd
+		cmd ("select-similar");
+	
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
@@ -1980,12 +1982,14 @@ MuseScore {
 		if (vbox == null) {
 			logError ("deleteAllCommentsAndHighlights () — vbox was null");
 		} else {
+			curScore.startCmd();
 			removeElement (vbox);
+			curScore.endCmd();
 		}
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		cmd ("select-all");
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
@@ -2021,11 +2025,14 @@ MuseScore {
 		}
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
-		curScore.startCmd();
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		curScore.startCmd();
+	
+		for (var i = 0; i < elementsToRemove.length; i++) {
+			removeElement(elementsToRemove[i]);
+		}
 		curScore.endCmd();
-		restoreSelection();
+	
 	}
 	
 	function getPreviousNoteRest (noteRest) {
