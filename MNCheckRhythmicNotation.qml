@@ -130,6 +130,10 @@ MuseScore {
 		
 		saveSelection();
 		
+		if (Qt.platform.os !== "osx") {
+			dialog.fontSize = 12;
+		}
+		
 		// **** INITIALISE VARIABLES **** //
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
@@ -2056,6 +2060,7 @@ MuseScore {
 		contentWidth: 505
 		property var msg: ""
 		property var titleText: ""
+		property var fontSize: 18
 
 		Text {
 			id: theText
@@ -2069,7 +2074,7 @@ MuseScore {
 
 			text: dialog.titleText
 			font.bold: true
-			font.pointSize: 16
+			font.pointSize: dialog.fontSize
 		}
 		
 		Rectangle {

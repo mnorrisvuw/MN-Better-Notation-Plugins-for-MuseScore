@@ -92,6 +92,11 @@ MuseScore {
 		
 		saveSelection();
 		
+		if (Qt.platform.os !== "osx") {
+			cmdKey = "ctrl";
+			dialog.fontSize = 12;
+		}
+		
 		setProgress (0);
 		
 		// **** GATHER VARIABLES **** //
@@ -870,7 +875,7 @@ MuseScore {
 
 					if (newNotePitch === "") errorMsg += ("\nCouldnt find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
 					newNoteLabel = newNotePitch+newNoteAccidental;
-					if (doShowError) addError("Avoid writing "+noteLabel+"s.\nConsider respelling as "+newNoteLabel,noteToHighlight);
+					if (doShowError) addError("In non-tonal music, avoid writing "+noteLabel+"s.\nIn tonal music, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better.",noteToHighlight);
 				} // end if (!doShowError && accVisible && isProblematic && !isMicrotonal)
 
 				if (chromaticInterval != 0) {
@@ -1399,6 +1404,7 @@ MuseScore {
 		margins: 10
 		property var msg: ""
 		property var titleText: ""
+		property var fontSize: 18
 
 		Text {
 			id: theText
@@ -1411,7 +1417,7 @@ MuseScore {
 			}
 			text: dialog.titleText
 			font.bold: true
-			font.pointSize: 16
+			font.pointSize: dialog.fontSize
 		}
 		
 		Rectangle {
