@@ -25,11 +25,26 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
     src="images/CheckRhythmicNotation.png"
     alt="Check Rhythmic Notation screenshot"
   >
+  <img
+    max-width="600"
+    width="75%"
+    src="images/MNCreateTitlePageScreenshot.png"
+    alt="Create Title Page screenshot"
+  >
 </div>
 
 
 ## <a id="includedplugins"></a>Included plug-ins
 
+* [**MN Check Rhythmic Notation**](#plugin1)
+* [**MN Check Layout and Instrumentation**](#plugin2)
+* [**MN Check Accidentals**](#plugin3)
+* [**MN Create Title Page**](#plugin4)
+* [**MN Make Recommended Layout Changes**](#plugin5)
+* **MN Delete Comments and Highlights**
+***
+
+<a id="plugin1"></a>
 ### <img width="200px" src="MNCheckRhythmicNotation.png" alt="Check Rhythmic Notation" style="vertical-align:top; margin-right:10px"> MN CHECK RHYTHMIC NOTATION
 
 * **MN Check Rhythmic Notation** checks for:
@@ -45,6 +60,8 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * Overly complex or misleading tuplets
 
 ***
+
+<a id="plugin2"></a>
 
 ### <img width="200px" src="MNCheckLayoutAndInstrumentation.png" alt="Check Layout and Instrumentation" style="vertical-align:top; margin-right:10px"> MN CHECK LAYOUT AND INSTRUMENTATION
 
@@ -66,6 +83,8 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * **Slurs**: slurs incorrectly begin/end on tied note, repeated notes under a slur without articulation, slur used instead of tie, accented notes in middle of a slur, slurs over rests, slurs within slurs, slurs attached to the same note, long passages without slurs or articulation, slurs entered manually rather than automatically, slurs dragged away from their automatic position, slurs missing from two-note tremolos
   * **Other**: fermatas inconsistent or missing across parts, tremolos incorrectly written, incorrect notation of grace notes, stems incorrectly flipped, note tied to different pitch, pickup bars with inconsistent rests, transposing score not switched on, unnecessarily complex key signatures, short key signature changes, redundant time signature changes, staccato on dotted notes, ties across rests, identical chords with some but not all notes tied, beams manually dragged away from default position, double staccatos, tremolos with staccatos, harmonics without harmonic circles on tied notes***
 
+<a id="plugin3"></a>
+
 ### <img width="200px" src="MNCheckAccidentals.png" alt="Check Accidentals" style="vertical-align:top; margin-right:10px"> MN CHECK ACCIDENTALS
 
 * **MN Check Accidentals** checks for: 
@@ -76,13 +95,37 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
   * **recommended courtesy accidentals**
   * **preferred chromatic ascent/descent spelling**
 
+***
+
+<a id="plugin4"></a>
+### <img width="200px" src="MNCreateTitlePage.png" alt="Create Title Page" style="vertical-align:top; margin-right:10px"> MN CREATE TITLE PAGE
+* **MN Create Title Page** automatically creates a professional-looking title page from the Title, Subtitle and Composer information entered on your score
+* It lets you choose from a number of different templates/styles, many of which have been loosely modelled on professional music publishers’ house styles.
+* **MN Create Title Page** will also, if required, automatically create a ‘front matter page’, with boilerplate text entered for you to populate (e.g. programme note, performance notes, instrumentation, etc.)
+* **NOTE**: the bundled templates require commonly available fonts. Many of these fonts come with Mac OS X and/or Windows, or are installed by Microsoft Office. Some may need to be manually installed. See below for links to font downloads.
+
+***
+
+<a id="plugin5"></a>
+### <img width="200px" src="MNMakeRecommendedLayoutChanges.png" alt="Check Make Recommended Layout Changes" style="vertical-align:top; margin-right:10px"> MN MAKE RECOMMENDED LAYOUT CHANGES
+
+* **MN Make Recommended Layout Changes** automatically applies some key layout settings, as recommended by composer Michael Norris, such as:
+  * **Spacing and layout**: staff size (based on the number of instruments), page margins, barline width, minimum bar width, spacing ratio, some style settings not optimal, bar number on first bar, staff spacing, system spacing, removes any manually added layout breaks, first system indentation
+  * **Parts**: staff size (based on the number of instruments), page margins, barline width, minimum bar width, spacing ratio, some style settings not optimal, bar number on first bar, staff spacing, system spacing, first system indentation, multimeasure rests, multirest width
+  * **Staff names and order**: Sets staff name visibility appropriate to ensemble size  * **Fonts**: sets music font to Bravura, sets all tuplet, bar number, technique, expression font to Times New Roman, part name frame and padding, page number style to plain
+  * **Other**: slur line width, title frame height and distance to music
+***
 
 ## <a id="installation"></a>Installation
 
-*MN Better Notation Plugins require MuseScore Studio 4.4 or later.*
+*MN Better Notation Plugins require MuseScore Studio 4.5.2 or later.*
+
+**YOUTUBE**: Watch [a YouTube video](https://youtu.be/qCZixnkVHZw) on how to install the plugins.
+
+**INSTRUCTIONS**:
 * **Download** the project as a zip file either from the green Code button above, or from the direct download link below.
 * **Extract it** using archive extraction software
-* **Move the entire folder** into MuseScore’s plugins folder, configurable at [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences). The default directories are:
+* **Copy and paste (or move) the entire folder** into MuseScore’s plugins folder, configurable at [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences). The default directories are:
     * **Mac OS**: ~/Documents/MuseScore4/Plugins/
     * **Windows**: C:\Users\YourUserName\Documents\MuseScore4\Plugins\
     * **Linux**: ~/Documents/MuseScore4/Plugins
@@ -91,30 +134,77 @@ A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that chec
 * For each of the four MN plugins, click on their icon and click ‘**Enable**’
 * The plugins should now be available from the **Plugins** menu
 
+**INSTALLING FONTS FOR MN CREATE TITLE PAGE**:
+The title page templates in the MN Create Title Page plugin make use of the following commonly available fonts. Many of these fonts come bundled with the Windows and/or Mac OS operating systems, with Microsoft Office, or as a free download.
+
+Depending on your particular combination of OS and other software, you may or may not already have them installed. If you need to install them, below is a list of download links:
+* **Academy Engraved LET**: bundled with Mac OS X; available for download [here](https://fontsgeek.com/fonts/Academy-Engraved-LET-Plain)
+* **Alegreya Sans**: available for download [here](https://fonts.google.com/specimen/Alegreya+Sans)
+* **Amulya**: available for download [here](https://www.fontshare.com/fonts/amulya)
+* **Aptos**: bundled with Windows and Microsoft products; the latest available for download [here](https://www.microsoft.com/en-us/download/details.aspx?id=106087)
+* **Archivo**: available for download [here](https://www.fontshare.com/fonts/archivo)
+* **Avenir**: bundled with Mac OS X; available for download [here](https://www.dafontfree.io/avenir-font/)
+* **Baskerville**: bundled with Mac OS X; Libre Baskerville, a very similar font, is available for download [here](https://fonts.google.com/specimen/Libre+Baskerville) — you will need to manually set the fonts to Libre Baskerville.
+* **Bitter**: available for download [here](https://fonts.google.com/specimen/Bitter)
+* **Bodoni Moda**: available for download [here](https://fonts.google.com/specimen/Bodoni+Moda)
+* **Century Schoolbook**: bundled with Mac OS X; available for download [here](https://www.dafontfree.io/download/century-schoolbook/)
+* **Chaparral Pro**: available for download [here](https://font.download/font/chaparral-pro)
+* **Clash Display**: available for download [here](https://www.fontshare.com/fonts/clash-display)
+* **Crimson Pro**: available for download [here](https://www.fontshare.com/fonts/crimson-pro)
+* **EB Garamond**: available for download [here](https://fonts.google.com/specimen/EB+Garamond)
+* **Fanwood Text**: available for download [here](https://www.theleagueofmoveabletype.com/fanwood)
+* **Futura**: bundled with Mac OS X; available for download [here](https://www.dafontfree.io/futura-font-free/)
+* **Gill Sans**: bundled with Max OS X and Windows 11; available for download [here](https://font.download/font/gill-sans-2)
+* **Goudy Old Style**: bundled with Microsoft Office; available for download [here](https://font.download/font/goudy-old-style)
+* **Helvetica Neue**: bundled with Mac OS X; available for download [here](https://font.download/font/helvetica-neue-5)
+* **Linden Hill**: available for download [here](https://www.theleagueofmoveabletype.com/linden-hill)
+* **Literata**: available for download [here](https://www.fontshare.com/fonts/literata)
+* **Lucida Bright**: bundled with Microsoft Office; available for download [here](https://fontsgeek.com/fonts/Lucida-Bright-Regular)
+* **Lulo Clean**: available for download [here](https://www.fontshmonts.com/display-fonts/lulo-clean/)
+* **Optima**: bundled with Mac OS X; available for download [here](https://www.dafontfree.io/optima-font/)
+* **Palatino**: bundled with Mac OS X and Windows 11
+* **Proxima Nova**: bundled with Mac OS X; available for download [here](https://www.dafontfree.io/proxima-nova-font-free/)
+* **Rockwell**: bundled with Mac OS X; available for download [here](https://freefontsfamily.org/rockwell-font-free/)
+* **Satoshi**: available for download [here](https://www.fontshare.com/fonts/satoshi)
+* **Supreme**: available for download [here](https://www.fontshare.com/fonts/supreme)
+* **U001Con**: available for download [here](https://fontlibrary.org/en/font/u001)
+* **Work Sans**: available for download [here](https://open-foundry.com/fonts/work_sans_light)
+
+
 ### Direct Download
 
 Direct downloads of the Zip file can be found on the [releases page](https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases).
 
 ## <a id="use"></a>How to use
-* Select the passage you wish to check for errors, or, to check the whole score, either select all or have nothing selected. Then  select the name of the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
+* **MN Create Title Page**: 
+    * Before running this plug-in, make sure you have the default box (‘vertical frame’) at the top of your first page of music with the correct title, subtitle (e.g. ‘for string quartet’) and your/the composer’s name. The plug-in will use this information to create a new, styled title page.
+    * Adding an image can be another nice touch. Once you’ve created your title page, right-click anywhere in the title page frame and choose Add→Image, then select an image from your hard-drive. Once added, you’ll need to resize the image (in Properties) and drag it into the correct location.
 
-* Note that the *Check Layout and Instrumentation* plugin **always** checks the entire score, regardless of the current selection.
+* **MN Make Recommended Layout Changes**:
+    * You can run this plug-in at any time; however, it’s recommended that you have added all of the instruments you will need, and have at least two systems of music entered.
+    
+* **MN Check Rhythmic Notation**,
+**MN Check Layout and Instrumentation**,
+**MN Check Accidentals**:
+    * Select the passage you wish to check for errors, or, to check the whole score, either select all or have nothing selected. Then  select the name of the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
 
-* The plugin will go through the selection/score looking for relevant issues. When it finds one, it will add a **yellow text box comment** on the score (somewhere close to the error), and will highlight the relevant notation object in pink. Once it has finished, it will present a dialog box telling you how many errors it found.
-
-* **Note that the plugins do not fix the error themselves: that is up to you.**
-
-* Sometimes these comments might be more of a suggestion rather than a hard-and-fast typesetting rule: you should therefore consider each comment carefully before remedying.
-
-* It can be a good idea to delete each comment box as you fix the relevant issue to keep track of what you have done.
-
-* If there are a lot of comments, sometimes a comment box can end up some distance away from the object it is referring to. If you can’t work out what a comment is referring to, click and drag the box around a bit: you will see an ‘attachment line’ that shows the location of the object to which it is referring.
-
-* Each time you run a plugin, it will remove any previous comments or highlights.
-
-* To manually remove all comments and highlights from a score, please run the ‘MN Delete Comments and Highlights’ plugin
-
-* Some comments refer to a specific page in [*Behind Bars* by Elaine Gould](https://www.amazon.com.au/dp/0571514561). This is simply to provide a level of evidence behind some of my comments, in case you think them overly pedantic or plain wrong! 😄
+    * Note that the *Check Layout and Instrumentation* plugin **always** checks the entire score, regardless of the current selection.
+    
+    * The plugin will go through the selection/score looking for relevant issues. When it finds one, it will add a **yellow text box comment** on the score (somewhere close to the error), and will highlight the relevant notation object in pink. Once it has finished, it will present a dialog box telling you how many errors it found.
+    
+    * **Note that the plugins do not fix the error themselves: that is up to you.**
+    
+    * Sometimes these comments might be more of a suggestion rather than a hard-and-fast typesetting rule: you should therefore consider each comment carefully before remedying.
+    
+    * It can be a good idea to delete each comment box as you fix the relevant issue to keep track of what you have done.
+    
+    * If there are a lot of comments, sometimes a comment box can end up some distance away from the object it is referring to. If you can’t work out what a comment is referring to, click and drag the box around a bit: you will see an ‘attachment line’ that shows the location of the object to which it is referring.
+    
+    * Each time you run a plugin, it will remove any previous comments or highlights.
+    
+    * To manually remove all comments and highlights from a score, please run the ‘MN Delete Comments and Highlights’ plugin
+    
+    * Some comments refer to a specific page in [*Behind Bars* by Elaine Gould](https://www.amazon.com.au/dp/0571514561). This is simply to provide a level of evidence behind some of my comments, in case you think them overly pedantic or plain wrong! 😄
 
 
 ## Warning about usage
