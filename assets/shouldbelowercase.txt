@@ -1,18 +1,20 @@
 con 
-sul 
+sul
 senza 
 espr.
 espressivo
-col 
+col
 ord.
 pizz
 arco
 div.
 legato
-bow
-bridge
 flautando
 flaut.
 flz.
 vib.
-sempre 
+sempre
+una corda
+sostenuto
+molto
+poco

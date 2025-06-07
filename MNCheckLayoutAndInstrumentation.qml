@@ -7,6 +7,7 @@
 
 import MuseScore 3.0
 import QtQuick 2.9
+import QtQml.Models 2.2
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import Muse.UiComponents 1.0
@@ -107,12 +108,6 @@ MuseScore {
 	property var numBars: 0
 	property var firstPageHeight: 0
 	property var hasFooter: false
-	property var firstWindPart: 0
-	property var firstBrassPart: 0
-	property var firstStringPart: 0
-	property var lastWindPart: 0
-	property var lastBrassPart: 0
-	property var lastStringPart: 0
 		
 	// ** FLAGS ** //
 	property var flaggedWeKnowWhosPlaying: false
@@ -185,7 +180,9 @@ MuseScore {
 	property var currentStaffNum: 0
 	property var currentTrack: 0
 	property var currentTimeSig: null
-	property var currentClefNum: null
+	property var currentClef: null
+	property var currentClefNum: 0
+	property var numClefs: 0
 	property var prevTimeSig: ""
 	property var prevClefId: null
 	property var prevDynamic: ""
@@ -225,11 +222,14 @@ MuseScore {
 	property var isPercussionInstrument: false
 	property var isKeyboardInstrument: false
 	property var isPedalInstrument: false
+	property var isVibraphone: false
+	property var isMarimba: false
 	property var isVoice: false
 	property var isSoloScore: false
 	property var currentMute: ""
 	property var currentPlayingTechnique: ""
 	property var currentContactPoint: ""
+	property var currentVibrato: ""
 	property var maxLedgerLines: []
 	property var minLedgerLines: []
 	property var maxLLSinceLastRest: 0
@@ -238,6 +238,7 @@ MuseScore {
 	property var firstBarInScore: null
 	property var lastBarInScore: null
 	property var firstBarInSecondSystem: null
+	property var endOfScoreTick: 0
 	property var firstPageNum: 0
 	property var lastPageNum: 0
 	property var numPages: 0
@@ -262,6 +263,7 @@ MuseScore {
 	
 	// ** CLEFS ** //
 	property var clefs: []
+	property var nextClefTick: 0
 		
 	// ** FERMATAS ** //
 	property var fermatas: []
@@ -377,7 +379,6 @@ MuseScore {
 		
 		// ** SET DIALOG HEADER ** //
 		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
-
 		
 		// **** VERSION CHECK **** //
 		var versionafter450 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5 || (mscoreMinorVersion == 5 && mscoreUpdateVersion > 0);
@@ -392,9 +393,8 @@ MuseScore {
 		numStaves = curScore.nstaves;
 		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
-		//logError ('firstBarInScore = '+firstBarInScore+' '+firstBarInScore.subtypeName());
 		lastBarInScore = curScore.lastMeasure;		
-
+		endOfScoreTick = curScore.lastSegment.tick+1;
 		
 		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI; // NB spatium value is given in MuseScore's DPI setting
 		pageWidth = Math.round(curScore.style.value("pageWidth")*inchesToMM);
@@ -420,8 +420,8 @@ MuseScore {
 			dialog.show();
 			return;
 		}
-		
-		// ************  	GET USER-SELECTED OPTIONS 	************ //
+		// ************  	GET USER-SELECT OPTIONS 	************ //
+
 		doCheckScoreStyle = options.scoreStyle;
 		doCheckPartStyle = options.partStyle;
 		doCheckPageSettings = options.pageSettings;
@@ -451,13 +451,18 @@ MuseScore {
 		doCheckStrings = options.strings;
 		doCheckBarStretches = options.barStretches;
 		
-		// ************  	CLOSE THE OPTIONS WINDOW 	************ //
+		//logError (doCheckScoreStyle+' '+doCheckPartStyle+' '+doCheckTempoMarkings+' '+doCheckDynamics);
+		
 		options.close();
 		
 		// ************  	INITIALISE VARIABLES 	************ //
+
 		var cursor = curScore.newCursor();
 		var cursor2 = curScore.newCursor();
+
 		var prevTick = [];
+		var endOfPieceTick = curScore.selection;
+		
 		parts = curScore.parts;
 		
 		// ** calculate number of parts, but ignore hidden ones
@@ -501,7 +506,7 @@ MuseScore {
 				
 		// ************  				SELECT AND PRE-PROCESS ENTIRE SCORE			************ //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		setProgress (1);
@@ -513,6 +518,7 @@ MuseScore {
 		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, SLURS, OTTAVAS, ETC) 	************ //
 		analyseSpanners();
 		setProgress (2);
+		
 		
 		// WORK OUT THE MEASURE THAT STARTS THE SECOND SYSTEM
 		
@@ -555,14 +561,16 @@ MuseScore {
 				}
 			}
 		}
-		
 		var firstPage = firstSystem.parent;
 		var lastPage = lastSystem.parent;
 		firstPageNum = firstPage.pagenumber;
 		lastPageNum = lastPage.pagenumber;
 		numPages = lastPageNum - firstPageNum + 1;
+		
 		firstPageHeight = firstPage.bbox.height;
 		var viewHeight = Math.round(firstPageHeight*spatium);
+		
+		
 
 		// ************  				CHECK SCORE & PAGE SETTINGS 				************ // 
 		checkScoreAndPageSettings();
@@ -576,30 +584,30 @@ MuseScore {
 		// ************  					CHECK TITLE PAGE EXISTS 				************ // 
 		if (doCheckTitleAndSubtitle && lastPageNum > 1 && firstPageNum == 0) addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
 		
-		// ************		CHECK TITLE TEXT AND STAFF TEXT OBJECTS FOR ERRORS		************ //
+		// ************  				CHECK TITLE TEXT AND STAFF TEXT OBJECTS FOR ERRORS 					************ //
 		if (doCheckTitleAndSubtitle) checkScoreText();
 		
-		// ************					CHECK TIME SIGNATURES						************ //
+		// ************ 								CHECK TIME SIGNATURES								************ //
 		if (doCheckTimeSignatures) checkTimeSignatures();
 		
-		// ************					CHECK FOR STAFF ORDER ISSUES				************ //
+		// ************ 							CHECK FOR STAFF ORDER ISSUES 							************ //
 		if (doCheckStaffNamesAndOrder) checkStaffOrder();
 		
-		// ************					CHECK STAFF NAMES ISSUES					************ // 
+		// ************  							CHECK STAFF NAMES ISSUES 								************ // 
 		if (doCheckStaffNamesAndOrder) checkStaffNames();
 		
-		// ************					CHECK LOCATION OF FINAL BAR					************ // 
+		// ************  							CHECK LOCATION OF FINAL BAR								************ // 
 		checkLocationOfFinalBar();
 		
-		// ************			CHECK LOCATIONS OF BOTTOM SYSTEMS ON EACH PAGE		************ // 
+		// ************  					CHECK LOCATIONS OF BOTTOM SYSTEMS ON EACH PAGE 					************ // 
 		if (numPages > 1) checkLocationsOfBottomSystems();
 		
-		// ************					CHECK FOR FERMATA ISSUES					************ ///
+		// ************ 								CHECK FOR FERMATA ISSUES 							************ ///
 		if (!isSoloScore && numStaves > 2) checkFermatas();
 		
 		setProgress (3);
 		
-		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE			************ //
+		// ************ 			PREP FOR A FULL LOOP THROUGH THE SCORE 				************ //
 		var currentBar, prevBarNum, numBarsProcessed, wasTied, isFirstNote;
 		var firstBarNum, firstSegmentInScore;
 		var prevDisplayDur, tiedSoundingDur, tiedDisplayDur, tieStartedOnBeat, isTied, tieIndex, tieIsSameTuplet;
@@ -608,15 +616,13 @@ MuseScore {
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
 		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin;
+		var firstClefNumInBar, prevClefNumInBar;
 		var numSystems, currentSystem, currentSystemNum, numNoteRestsInThisSystem, numBeatsInThisSystem, noteCountInSystem, beatCountInSystem;
 		var maxNoteCountPerSystem, minNoteCountPerSystem, maxBeatsPerSystem, minBeatsPerSystem, actualStaffSize;
-		var isSharedStaff, prevCheckedClef;
+		var isSharedStaff;
 		var loop = 0;
 		
-		firstBarInScore = curScore.firstMeasure;
-		
-		//logError ("Trying bracket: "+curScore.systemBracket+" "+firstBarInScore.systemBracket+" "+firstBarInScore.parent.systemBracket);
-		
+		firstBarInScore = curScore.firstMeasure;		
 		currentBar = firstBarInScore;
 		lastBarInScore = curScore.lastMeasure;
 		numBars = curScore.nmeasures;
@@ -636,7 +642,8 @@ MuseScore {
 		// ************ 					START LOOP THROUGH WHOLE SCORE 						************ //
 		// change back to numStaves
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
-			
+			currentDisplayBarNum = 0;
+
 			//don't process if this part is hidden
 			if (!staffVisible[currentStaffNum]) {
 				loop += numBars * 4;
@@ -645,8 +652,6 @@ MuseScore {
 			//logError("top = "+isTopOfGrandStaff[currentStaffNum]);
 			
 			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
-			currentBarNum = 1;
-			currentDisplayBarNum = 1;
 			prevKeySigSharps = -99; // placeholder/dummy variable
 			prevKeySigBarNum = 0;
 			prevBarNum = 0;
@@ -655,7 +660,6 @@ MuseScore {
 			prevDynamicBarNum = 0;
 			prevDynamicDisplayBarNum = 0;
 			prevClefId = null;
-			currentClefNum = 0;
 			prevMultipleStop = null;
 			prevIsMultipleStop = false;
 			prevMultipleStopInterval = 0;
@@ -684,7 +688,6 @@ MuseScore {
 			lastTempoMarking = null;
 			lastTempoMarkingBar = -1;
 			
-			prevCheckedClef = null;
 			lastArticulationTick = -1;
 			lastDynamicTick = -1;
 			numConsecutiveMusicBars = 0;
@@ -745,9 +748,13 @@ MuseScore {
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
 			currentInstrumentName = instrumentNames[currentStaffNum];
 			currentInstrumentId = instrumentIds[currentStaffNum];
-			// NB sometimes the instrument id is vague (e.g. 'strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — the calcIds are figured out in the analyseInstrumentsAndStaves routine
+			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — the calcIds are figured out in the analyseInstrumentsAndStaves routine
 			currentInstrumentCalcId = instrumentCalcIds[currentStaffNum];
-			setInstrumentVariables();			
+			setInstrumentVariables();
+			
+			// ** clefs
+			numClefs = clefs[currentStaffNum].length;
+			currentClefNum = -1;
 			cursor.filter = Segment.HeaderClef;
 			cursor.staffIdx = currentStaffNum;
 			cursor.voice = 0;
@@ -758,30 +765,35 @@ MuseScore {
 			currentSystemNum = 0;
 			numNoteRestsInThisSystem = 0;
 			numBeatsInThisSystem = 0;
-			var clef = cursor.element;
+			var headerClef = cursor.element;
+			currentClef = headerClef;
 			// call checkClef AFTER the currentInstrumentName/Id setup and AFTER set InstrumentVariables
-			if (clef != null) checkClef(clef);
+			if (currentClef != null) {
+				//logError ('*** FOUND headerClef:');
+				checkClef(currentClef, true);
+				prevClefNumInBar = -1;
+				//logError ('*** prevClefNumInBar '+prevClefNumInBar);
+
+				nextClefTick = (numClefs > 0) ? clefs[currentStaffNum][0].parent.tick : endOfScoreTick;
+				//logError ('*** next clef tick is at '+nextClefTick);
+
+			}
 			
 			prevTimeSig = currentBar.timesigNominal.str;
 			
 			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRAND STAFF **** //
 			if (currentInstrumentId.includes('vibraphone') && isTopOfGrandStaff[currentStaffNum]) addError('Vibraphones are normally notated on a single treble staff,\nrather than a grand staff.','system1 '+currentStaffNum);
 									
-			currentDisplayBarNum = 0;
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
-				
-				if (currentStaffNum == 3 && currentBarNum == 1) {
-					var elems = currentBar.elements;
-					for (var x= 0; x<elems.length; x++) {
-						if (elems[x].type == Element.CLEF) logError ('Found clef: '+elems[x].subtypeName());
-					}
-				}
-				
 				if (!currentBar.irregular) currentDisplayBarNum ++;
 				
 				barStartTick = currentBar.firstSegment.tick;
 				barEndTick = currentBar.lastSegment.tick;
 				barLength = barEndTick - barStartTick;
+				firstClefNumInBar = prevClefNumInBar;
+				currentClefNum = firstClefNumInBar;
+				//logError ('firstClefNumInBar = '+firstClefNumInBar);
+				var firstClefIdInBar = currentClef.subtypeName();
 				var startTrack = currentStaffNum * 4;
 				var goneToNextBar = false;
 				var firstNoteInThisBar = null;
@@ -895,6 +907,23 @@ MuseScore {
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
 					
+					// ** clef
+					if (firstClefNumInBar != currentClefNum) {
+						//logError ('*** RESET clef num other voice from '+currentClefNum+' back to '+firstClefNumInBar);
+
+						currentClefNum = firstClefNumInBar;
+						if (currentClefNum == -1) {
+							currentClef = headerClef;
+						} else {
+							currentClef = clefs[currentStaffNum][currentClefNum];
+						}
+						setClef(currentClef);
+						nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
+						//logError ('Next clef is at tick '+nextClefTick);
+						prevClefId = firstClefIdInBar;
+						//logError ('prevClefId is now '+prevClefId);
+					}
+					
 					// ** slurs
 					currentSlur = null;
 					currentSlurLength = -1;
@@ -996,17 +1025,13 @@ MuseScore {
 							}
 							if (readyToGoToNextSlur) {
 								if (currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] > -1) {
-									
 									isSlurred = true;
 									lastArticulationTick = currTick;
 									//logError("Slur started: isSlurred = true; nextSlurStart was "+nextSlurStartOnTrack[currentTrack]);
-									
 									currentSlurNumOnTrack[currentTrack] ++;
 									//logError ("Slur num incremented; now at slur "+currentSlurNumOnTrack[currentTrack]);
 									currentSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]];
-									
 									//logError ("Found a slur: pagePos = {"+Math.round(currentSlur.pagePos.x*100)/100.+","+Math.round(currentSlur.pagePos.y*100)/100.+"}\nParent system pagePos = {"+Math.round(currentSlur.parent.pagePos.x*100)/100.+","+Math.round(currentSlur.parent.pagePos.y*100)/100.+"}");
-									
 									currentSlurStart = currentSlur.spannerTick.ticks;
 									currentSlurLength = currentSlur.spannerTicks.ticks;
 									currentSlurEnd = currentSlurStart + currentSlurLength;
@@ -1014,7 +1039,6 @@ MuseScore {
 									currentSlurLength = currentSlur.spannerTicks.ticks
 									currentSlurEnd = currentSlurStart + currentSlurLength;
 									//logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
-									
 									var prevSlurLength = 0;
 									if (currentSlurNumOnTrack[currentTrack] > 0) prevSlurLength = slurs[currentTrack][currentSlurNumOnTrack[currentTrack] - 1].spannerTicks.ticks;
 									if (doCheckSlursAndTies && currentSlurNumOnTrack[currentTrack] > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
@@ -1205,16 +1229,34 @@ MuseScore {
 								}
 							}
 						
-							// ************ FOUND A CLEF ************ //
-							if (currentClefNum < clefs[currentStaffNum].length) {
-								var clefToCheck = clefs[currentStaffNum][currentClefNum];
-								if (currTick >= clefToCheck.parent.tick) {
-									if (!clefToCheck.is(prevCheckedClef)) {
-										//logError ("Check non-header clef "+clefToCheck.subtypeName());
-										checkClef(clefToCheck);
-										prevCheckedClef = clefToCheck;
+							// ************ CLEF ************ //
+							if (numClefs > 0) {
+								if (currTick >= nextClefTick) {
+									//logError ('>= nextClefTick');
+									while (currentClefNum < numClefs - 1) {
+ 										if (clefs[currentStaffNum][currentClefNum+1].parent.tick <= currTick) {
+											currentClefNum ++;
+										} else {
+											break;
+										}
 									}
-									currentClefNum ++;
+									var currentClefTick = clefs[currentStaffNum][currentClefNum].parent.tick;
+									if (currentClefTick <= currTick) {
+										currentClef = clefs[currentStaffNum][currentClefNum];
+										if (currentTrack == startTrack && currentClefTick == currTick) {
+											//logError ('*** FOUND clef on starttrack:');
+											checkClef(currentClef,false);
+											nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
+											//logError ('Next clef is at tick '+nextClefTick);
+											prevClefNumInBar = currentClefNum;
+											//logError ('prevClefNumInBar '+prevClefNumInBar);
+										} else {
+											//logError ('*** FOUND clef on other track or previously noted:');
+											setClef (currentClef);
+											nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
+											//logError ('Next clef is at tick '+nextClefTick);
+										}
+									}
 								}
 							}
 							
@@ -1266,8 +1308,13 @@ MuseScore {
 									}
 								}
 							}
-											
-							// ************ FOUND A CHORD OR REST ************ //
+							
+							// ************************************************ //
+							// **											 **	//
+							// ************ FOUND A CHORD OR REST ************* //
+							// **											 ** //
+							// ************************************************ //
+
 							if (isNote || isRest) {
 								numNoteRestsInThisTrack ++;
 								numNoteRestsInThisSystem ++;
@@ -1293,15 +1340,21 @@ MuseScore {
 									}
 								}
 								
-								
-							
-								// ************ CHECK DYNAMICS UNDER RESTS ********** //
-
 								if (isRest) {
+									
+									// ************ CHECK DYNAMICS UNDER RESTS ********** //
+
 									if (doCheckDynamics && tickHasDynamic && !isGrandStaff[currentStaffNum]) addError ("In general, you shouldn’t put dynamic markings under rests.", theDynamic);
 									maxLLSinceLastRest = 0;
 								
 								} else {
+									
+									// ************************************************ //
+									// **											 **	//
+									// ************** FOUND A NOTE/CHORD ************** //
+									// **											 ** //
+									// ************************************************ //
+									
 									numNotesInThisTrack ++;
 									var isTiedBack = noteRest.notes[0].tieBack != null;
 									var isTiedForward = noteRest.notes[0].tieForward != null;
@@ -1380,8 +1433,6 @@ MuseScore {
 										addError ('This is a chord in a monophonic instrument.\nIf this is not a multiphonic, is this an error?',noteRest);
 										flaggedPolyphony = true;
 									}
-									
-									
 									
 									// ************ CHECK WHETHER CHORD NOTES ARE TIED ************ //
 									if (doCheckSlursAndTies && isChord) checkChordNotesTied(noteRest);
@@ -1522,11 +1573,7 @@ MuseScore {
 				}
 				
 				if (currentBar) currentBar = currentBar.nextMeasure;
-				if (numTracksWithNotes > 0) {
-					numConsecutiveMusicBars ++;
-				} else {
-					numConsecutiveMusicBars = 0;
-				}
+				numConsecutiveMusicBars = (numTracksWithNotes > 0) ? numConsecutiveMusicBars + 1 : 0;
 				numBarsProcessed ++;
 			}// end currentBar num
 			
@@ -1918,7 +1965,11 @@ MuseScore {
 				fermataLocs.push(locArr);
 			}
 			
-			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e);
+			if (etype == Element.DYNAMIC) {
+				//logError ('Found dynamic');
+				dynamics[staffIdx].push(e);
+			}
+			if (etype == Element.CLEF) clefs[staffIdx].push(e);
 			if (etype == Element.LAISSEZ_VIB) {
 				lv[staffIdx][e.spannerTick.ticks] = e;
 				prevLV = e;
@@ -1950,19 +2001,6 @@ MuseScore {
 		
 		// sort the tempo text array
 		tempoText.sort( orderTempoText );
-		
-		var cursor2 = curScore.newCursor();
-		for (var i = 0; i < curScore.nstaves; i++) {
-			if (!staffVisible[i]) continue;
-			cursor2.staffIdx = i;
-			cursor2.rewind(Cursor.SCORE_START);
-			cursor2.filter = Segment.Clef;
-			//logError ('Found clef staff '+i+' at tick '+cursor2.tick);
-			while (cursor2.next()) {
-				//logError ('Found clef staff '+i+' at tick '+cursor2.tick);
-				clefs[i].push (cursor2.element);
-			}
-		}
 		
 		// do special articulation hack, because select all doesn't select articulation on grace notes
 		// once MuseScore has fixed this, this can be deleted
@@ -2118,12 +2156,8 @@ MuseScore {
 	}
 	
 	function checkStaffOrder () {
-		
-		logError ('checking staff order');
-		
 		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
-		// **** ALSO NOTE ANY GRAND STAVES			  				 **** //
-		// **** AND CHECK BARLINES ARE CONNECTED PROPERLY 			**** //
+		// **** ALSO NOTE ANY GRAND STAVES														 **** //
 		
 		// ** FIRST CHECK THE ORDER OF STAVES IF ONE OF THE INSTRUMENTS IS A GRAND STAFF ** //
 		if (numGrandStaves > 0) {
@@ -2149,10 +2183,6 @@ MuseScore {
 				}
 			}
 		}
-		
-		// we don't need to check solos, duos or trios
-		if (numParts < 4) return;
-		
 		var numFl = 0;
 		var numOb = 0;
 		var numCl = 0;
@@ -2165,128 +2195,100 @@ MuseScore {
 		var numVa = 0;
 		var numVc = 0;
 		var numDb = 0;
-		var numWinds = 0;
-		var numBrass = 0;
-		var numStrings = 0;
 		var flStaff, obStaff, clStaff, bsnStaff, hnStaff;
 		var tpt1Staff, tpt2Staff, tbnStaff, tbaStaff;
 	
 		// Check Quintets
-		for (var i = 0; i < numStaves; i ++) {
-			if (staffVisible[i]) {
-				var id = instrumentIds[i];
-				
-				// **** CHECK WINDS **** //
-				if (id.includes("wind")) {
-					numWinds++;
-					if (numWinds == 1) firstWindPart = i;
-					lastWindPart = i;
+		if (numParts > 3 && numParts < 6) {
+			for (var i = 0; i < numStaves; i ++) {
+				if (staffVisible[i]) {
+					var id = instrumentIds[i];
+					if (id.includes("wind.flutes.flute")) {
+						numFl ++;
+						flStaff = i;
+					}
+					if (id.includes("wind.reed.oboe") || id.includes("wind.reed.english-horn")) {
+						numOb ++;
+						obStaff = i;
+					}
+					if (id.includes("wind.reed.clarinet")) {
+						numCl ++;
+						clStaff = i;
+					}
+					if (id.includes("wind.reed.bassoon") || id.includes("wind.reed.contrabassoon")) {
+						numBsn ++;
+						bsnStaff = i;
+					}
+					if (id.includes( "brass.french-horn")) {
+						numHn ++;
+						hnStaff = i;
+					}
+					if (id.includes( "brass.trumpet")) {
+						numTpt ++;
+						if (numTpt == 1) tpt1Staff = i;
+						if (numTpt == 2) tpt2Staff = i;
+					}
+					if (id.includes("brass.trombone")) {
+						numTbn ++;
+						tbnStaff = i;
+					}
+					if (id.includes ("brass.tuba")) {
+						numTba ++;
+						tbaStaff = i;
+					}
+					
+					if (id.includes ("strings.violin")) numVn ++;
+					if (id.includes ("strings.viola")) numVa ++;
+					if (id.includes ("strings.cello")) numVc ++;
+					if (id.includes ("strings.contrasbass")) numDb ++;
+					
 				}
-				if (id.includes("wind.flutes.flute")) {
-					numFl ++;
-					flStaff = i;
-				}
-				if (id.includes("wind.reed.oboe") || id.includes("wind.reed.english-horn")) {
-					numOb ++;
-					obStaff = i;
-				}
-				if (id.includes("wind.reed.clarinet")) {
-					numCl ++;
-					clStaff = i;
-				}
-				if (id.includes("wind.reed.bassoon") || id.includes("wind.reed.contrabassoon")) {
-					numBsn ++;
-					bsnStaff = i;
-				}
-				
-				// **** CHECK BRASS **** //
-				if (id.includes("brass")) {
-					numBrass ++;
-					if (numBrass == 1) firstBrassPart = i;
-					lastBrassPart = i;
-				}
-				if (id.includes( "brass.french-horn")) {
-					numHn ++;
-					hnStaff = i;
-				}
-				if (id.includes( "brass.trumpet")) {
-					numTpt ++;
-					if (numTpt == 1) tpt1Staff = i;
-					if (numTpt == 2) tpt2Staff = i;
-				}
-				if (id.includes("brass.trombone")) {
-					numTbn ++;
-					tbnStaff = i;
-				}
-				if (id.includes ("brass.tuba")) {
-					numTba ++;
-					tbaStaff = i;
-				}
-				
-				// **** CHECK STRINGS **** //
-				if (id.includes ("strings")) {
-					numStrings ++;
-					if (numStrings == 1) firstStringPart = i;
-					lastStringPart = i;
-				}
-				if (id.includes ("strings.violin")) numVn ++;
-				if (id.includes ("strings.viola")) numVa ++;
-				if (id.includes ("strings.cello")) numVc ++;
-				if (id.includes ("strings.contrabass")) numDb ++;
-				
 			}
-		}
-			
-		// **** CHECK WIND QUINTET STAFF ORDER **** //
-		if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
-			checkBarlinesConnected("wind quintet");
-			if (flStaff != 0) {
-				addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Instruments tab.","topfunction ");
-			} else {
-				if (obStaff != 1) {
-					addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.\nReorder using the Instruments tab.","pagetop");
+			// **** CHECK WIND QUINTET STAFF ORDER **** //
+			if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
+				checkBarlinesConnected("wind quintet");
+				if (flStaff != 0) {
+					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Instruments tab.","topfunction ");
 				} else {
-					if (clStaff != 2) {
-						addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.\nReorder using the Instruments tab.","pagetop");
+					if (obStaff != 1) {
+						addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.\nReorder using the Instruments tab.","pagetop");
 					} else {
-						if (hnStaff != 3) {
-							addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.\nReorder using the Instruments tab.","pagetop");
+						if (clStaff != 2) {
+							addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.\nReorder using the Instruments tab.","pagetop");
 						} else {
-							if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.\nReorder using the Instruments tab.","pagetop");
+							if (hnStaff != 3) {
+								addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.\nReorder using the Instruments tab.","pagetop");
+							} else {
+								if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.\nReorder using the Instruments tab.","pagetop");
+							}
 						}
 					}
 				}
 			}
-		}
-	
-		// **** CHECK BRASS QUINTET STAFF ORDER **** //
-		if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
-			checkBarlinesConnected("brass quintet");
-			if (tpt1Staff != 0) {
-				addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
-			} else {
-				if (tpt2Staff != 1) {
-					addError("You appear to be composing a brass quintet\nbut the second trumpet should be the second staff.","pagetop");
+		
+			// **** CHECK BRASS QUINTET STAFF ORDER **** //
+			if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
+				checkBarlinesConnected("brass quintet");
+				if (tpt1Staff != 0) {
+					addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
 				} else {
-					if (hnStaff != 2) {
-						addError("You appear to be composing a brass quintet\nbut the horn should be the third staff.","pagetop");
+					if (tpt2Staff != 1) {
+						addError("You appear to be composing a brass quintet\nbut the second trumpet should be the second staff.","pagetop");
 					} else {
-						if (tbnStaff != 3) {
-							addError("You appear to be composing a brass quintet\nbut the trombone should be the fourth staff.","pagetop");
+						if (hnStaff != 2) {
+							addError("You appear to be composing a brass quintet\nbut the horn should be the third staff.","pagetop");
 						} else {
-							if (tbaStaff != 4) addError("You appear to be composing a brass quintet\nbut the tuba should be the bottom staff.","pagetop");
+							if (tbnStaff != 3) {
+								addError("You appear to be composing a brass quintet\nbut the trombone should be the fourth staff.","pagetop");
+							} else {
+								if (tbaStaff != 4) addError("You appear to be composing a brass quintet\nbut the tuba should be the bottom staff.","pagetop");
+							}
 						}
 					}
 				}
 			}
-		}
-		if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) checkBarlinesConnected("string quartet");
-		if (numParts == 5 && numVn == 2 && numVa > 0 && numVa < 3 && numVc > 0 && numVc < 3 && numDb < 2) checkBarlinesConnected("string quintet");
-		if (numParts > 6 && numWinds > 1 && numBrass > 1 && numStrings > 1) {
-			if (firstWindPart != 0) addError("In general, wind parts should appear at the top of a large ensemble/orchestral work.","system1 1");
-			if (firstBrassPart < lastWindPart) addError ("in general, brass parts should appear below winds in a large ensemble/orchestral work.","system1 "+firstBrassPart);
-			
-			checkBarlinesConnected("orchestra");
+			if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) checkBarlinesConnected("string quartet");
+			if (numParts == 5 && numVn == 2 && numVa > 0 && numVa < 3 && numVc > 0 && numVc < 3 && numDb < 2) checkBarlinesConnected("string quintet");
 		}
 	}
 	
@@ -2391,6 +2393,8 @@ MuseScore {
 			isPercussionInstrument = isPitchedPercussionInstrument || isUnpitchedPercussionInstrument;
 			isKeyboardInstrument = currentInstrumentId.includes("keyboard");
 			isPedalInstrument = currentInstrumentId.includes("piano") || currentInstrumentId.includes("vibraphone");
+			isVibraphone = currentInstrumentId.includes("vibraphone");
+			isMarimba = currentInstrumentId.includes('marimba');
 			isWindInstrument = currentInstrumentId.includes("wind.");
 			isBrassInstrument = currentInstrumentId.includes("brass.");
 			isWindOrBrassInstrument = isWindInstrument || isBrassInstrument;
@@ -2409,6 +2413,7 @@ MuseScore {
 			//logError("Inst check id "+currentInstrumentId+" isString "+isStringInstrument+" isVoice "+isVoice);
 			// WINDS
 			if (currentInstrumentId.includes("wind.")) {
+				currentVibrato = currentInstrumentId.includes('clarinet') ? 'senza' : 'con';
 				// Bassoon is the only wind instrument that reads bass and tenor clef
 				if (currentInstrumentCalcId.includes("bassoon")) {
 					readsTreble = false;
@@ -2421,6 +2426,7 @@ MuseScore {
 			}
 			// BRASS
 			if (currentInstrumentId.includes("brass.")) {
+				currentVibrato = 'senza';
 				if (currentInstrumentCalcId.includes("french-horn")) {
 					readsBass = true;
 					checkInstrumentClefs = true;
@@ -2457,6 +2463,7 @@ MuseScore {
 			stringsArray = [];
 			stringNames = [];
 			if (currentInstrumentId.includes("strings.")) {
+				currentVibrato = 'con';
 				if (currentInstrumentCalcId.includes("violin")) {
 					checkInstrumentClefs = true;
 					reads8va = true;
@@ -3176,6 +3183,44 @@ MuseScore {
 			}
 		}
 		
+		if (lowerCaseText.includes('vib.') || lowerCaseText.includes('vibr.')) {
+			if (isWindOrBrassInstrument || isStringInstrument) {
+				if ((isWindOrBrassInstrument && doCheckWindsAndBrass) || (isStringInstrument && doCheckStrings)) {
+					if (lowerCaseText.includes ('con vib') || lowerCaseText.includes ('norm')) {
+						if (currentVibrato === 'con') {
+							addError ('This instrument already appears to be con vib?',textObject);
+						} else {
+							currentVibrato = 'con';
+						}
+					}
+					if (lowerCaseText.includes ('senza vib')) {
+						if (currentVibrato === 'senza') {
+							addError ('This instrument already appears to be senza vib?',textObject);
+						} else {
+							currentVibrato = 'senza';
+						}
+					}
+					if (lowerCaseText.includes ('molto vib')) {
+						if (currentVibrato === 'molto') {
+							addError ('This instrument already appears to be molto vib?',textObject);
+						} else {
+							currentVibrato = 'molto';
+						}
+					}
+					if (lowerCaseText.includes ('slow vib') || lowerCaseText.includes ('wide vib')) {
+						if (currentVibrato === 'wide') {
+							addError ('This instrument already appears to be '+lowerCaseText+'?',textObject);
+						} else {
+							currentVibrato = 'wide';
+						}
+					}
+				}
+				
+			} else {
+				if (!isVibraphone) addError ("I’m not sure if this instrument can do vibrato.", textObject);
+			}
+		}
+		
 		if (isWindOrBrassInstrument && doCheckWindsAndBrass) {
 			if (lowerCaseText.includes("tutti")) addError("Don’t use ‘Tutti’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
 			if (lowerCaseText.includes("unis.")) addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
@@ -3212,7 +3257,11 @@ MuseScore {
 			}
 			if (lowerCaseText.substring(0,4) === "ord." || lowerCaseText === "pos. nat.") {
 				if (currentContactPoint === "ord" && (currentPlayingTechnique === "arco" || currentPlayingTechnique === "pizz")) {
-					addError("Instrument is already playing ord?",textObject);
+					if (currentVibrato != 'con') {
+						addError("Instrument is already playing ord?\nIs that meant to refer to the vibrato (i.e. vib. norm.?)",textObject);
+					} else {
+						addError("Instrument is already playing ord?",textObject);
+					}
 				} else {
 					currentContactPoint = "ord";
 				}
@@ -3436,16 +3485,39 @@ MuseScore {
 				}
 			}
 		}
-
 	}
 	
-	function checkClef (clef) {
+	function checkClef (clef, isHeaderClef) {
 		if (clef == null) {
 			logError("checkClef() — clef is null!");
 			return;
 		}
 		var clefId = clef.subtypeName();
+		if (clefId === prevClefId) {
+			addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
+			//logError ('clefId and prevClefId are the same: '+clefId);
+		}
 		//logError("Checking clef — "+clefId+" prevClefId is "+prevClefId);
+		setClef (clef);
+		
+		// **** CHECK FOR INAPPROPRIATE CLEFS **** //
+		if (checkInstrumentClefs) {
+			if (isBassClef && clefIs8ba) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
+			if (isTrombone && isTrebleClef) {
+				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.",clef);
+			} else {
+				if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef",clef);
+				if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef",clef);
+				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef",clef);
+				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef",clef);
+			}
+			if (!isHeaderClef && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nSee if you can move some material to another staff to avoid clef changes.",clef);
+		}
+	}
+	
+	function setClef (clef) {
+		var clefId = clef.subtypeName();
+		//logError ('Clef id is '+clefId+'; prevClefId is '+prevClefId);
 		isTrebleClef = clefId.includes("Treble clef");
 		isAltoClef = clefId === "Alto clef";
 		isTenorClef = clefId === "Tenor clef";
@@ -3455,29 +3527,14 @@ MuseScore {
 		clefIs15ma = clefId.includes("15ma alta");
 		clefIs8ba = clefId.includes("8va bassa");
 		diatonicPitchOfMiddleLine = 41; // B4 = 41 in diatonic pitch notation (where C4 = 35)
-		if (isBassClef && clefIs8ba) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
 		if (isAltoClef) diatonicPitchOfMiddleLine = 35; // C4 = 35
 		if (isTenorClef) diatonicPitchOfMiddleLine = 33; // A3 = 33
 		if (isBassClef) diatonicPitchOfMiddleLine = 29; // D3 = 29
 		if (clefIs8va) diatonicPitchOfMiddleLine += 7;
 		if (clefIs15ma) diatonicPitchOfMiddleLine += 14;
 		if (clefIs8ba) diatonicPitchOfMiddleLine -= 7;
-		
-		// **** CHECK FOR INAPPROPRIATE CLEFS **** //
-		if (checkInstrumentClefs) {
-			if (isTrombone && isTrebleClef) {
-				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.",clef);
-			} else {
-				if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef",clef);
-				if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef",clef);
-				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef",clef);
-				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef",clef);
-			}
-		}
-		
-		// **** CHECK FOR REDUNDANT CLEFS **** //
-		if (clefId === prevClefId) addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
 		prevClefId = clefId;
+		//logError ('prevClefId is now '+prevClefId);
 	}
 	
 	function checkOttava (noteRest,ottava) {
@@ -3609,7 +3666,7 @@ MuseScore {
 		var textToCheck = [];
 		
 		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		// insert vbox does not need a cmd apparently
@@ -3665,7 +3722,7 @@ MuseScore {
 		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		
 		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
 		curScore.endCmd();
 
 	}
@@ -3825,8 +3882,8 @@ MuseScore {
 							var r = new RegExp ('\\b'+lowercaseMarking+'\\b','g');
 							
 							if (lowerCaseText.match(r) != null) {
-								if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) {
-									addError("‘"+plainText+"’ should not have a capital first letter.",textObject);
+								if (plainText.replace(r,lowercaseMarking) !== plainText) {
+									addError("‘"+lowercaseMarking+"’ should not have a capital first letter.",textObject);
 									return;
 								}
 								break;
@@ -3862,6 +3919,18 @@ MuseScore {
 					}
 					if (lowerCaseText === "unmuted" || lowerCaseText === "no mute" || lowerCaseText === "remove mute" || lowerCaseText === "take off mute" || lowerCaseText === "take mute off") {
 						addError( "This is best written as ‘senza sord.’",textObject);
+						return;
+					}
+					if (lowerCaseText === "with vibrato") {
+						addError( "This can be abbreviated to ‘con vib.’",textObject);
+						return;
+					}
+					if (lowerCaseText === "no vibrato") {
+						addError( "This can be abbreviated to ‘senza vib.’",textObject);
+						return;
+					}
+					if (lowerCaseText === "much vibrato" || lowerCaseText === "a lot of vibrato") {
+						addError( "This can be abbreviated to ‘molto vib.’",textObject);
 						return;
 					}
 					if (lowerCaseText.substring(0,5) === "arco.") {
@@ -4047,7 +4116,7 @@ MuseScore {
 										}
 									}
 									if (isTempoMarking && hasParentheses) {
-										addError ('You don’t normally need brackets around metronome markings\nexcept for Tempo Primo, Tempo Secondo, a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
+										addError ('You don’t normally need brackets around metronome markings\nexcept for (e.g.) Tempo Primo/Tempo Secondo/a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
 									}
 									//logError ("Found a metronome marking: non bold text is "+nonBoldText);
 								}
@@ -4144,6 +4213,7 @@ MuseScore {
 							}
 						}
 					}
+					
 					
 					
 					
@@ -4371,70 +4441,16 @@ MuseScore {
 	}
 	
 	function checkBarlinesConnected (str) {
-		//logError ('checking barlines connected');
-		
 		var lastVisibleStaff = 0;
-		var flaggedWindsThrough = false;
-		var flaggedWindsBroken = false;
-		var flaggedBrassThrough = false;
-		var flaggedBrassBroken = false;
-		var flaggedStringsThrough = false;
-
 		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) lastVisibleStaff = i;
-		
-		if (str === "orchestra") {
-			
-			//logError ('checking orchestra');
-			for (var i = 0; i < numStaves; i ++) {
-				if (staffVisible[i]) {
-					var staff = curScore.staves[i];
 
-					if (i < lastWindPart) {
-						
-						if (staff.staffBarlineSpan == 0 && !flaggedWindsThrough) {
-							addError ("The barlines should go through all of the staves of the woodwind section","system1 "+i);
-							flaggedWindsThrough = true;
-						}
-					}
-					if (i == lastWindPart) {
-						if (staff.staffBarlineSpan != 0 && !flaggedWindsBroken) {
-							addError ("The barlines should be broken at the end of the woodwind section","system1 "+i);
-							flaggedWindsBroken = true;
-						}
-					}
-					if (i >= firstBrassPart && i < lastBrassPart) {
-						
-						if (staff.staffBarlineSpan == 0 && !flaggedBrassThrough) {
-							addError ("The barlines should go through all of the staves of the brass section","system1 "+i);
-							flaggedBrassThrough = true;
-						}
-					}
-					if (i == lastBrassPart) {
-						if (staff.staffBarlineSpan != 0 && !flaggedBrassBroken) {
-							addError ("The barlines should be broken at the end of the brass section","system1 "+i);
-							flaggedBrassBroken = true;
-						}
-					}
-					if (i >= firstStringPart && i < lastStringPart) {
-
-						if (staff.staffBarlineSpan == 0 && !flaggedStringsThrough) {
-							addError ("The barlines should go through all of the staves of the string section","system1 "+i);
-							flaggedStringsThrough = true;
-						}
-					}
-				}
-			}
-					
-		} else {
-			
-			for (var i = 0; i < lastVisibleStaff-1; i++) {
-				if (staffVisible[i]) {
-					var staff = curScore.staves[i];
-					//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
-					if (staff.staffBarlineSpan == 0) {
-						addError ("The barlines should go through all of the staves for a "+str,"system1 1");
-						return;
-					}
+		for (var i = 0; i < lastVisibleStaff-1; i++) {
+			if (staffVisible[i]) {
+				var staff = curScore.staves[i];
+				//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
+				if (staff.staffBarlineSpan == 0) {
+					addError ("The barlines should go through all of the staves for a "+str,"system1 1");
+					return;
 				}
 			}
 		}
@@ -4485,18 +4501,18 @@ MuseScore {
 	
 	function checkStaccatoIssues (noteRest) {
 		if (noteRest.duration.ticks >= division * 2) {
-			addError ("Don’t put staccato dots on long notes",noteRest);
+			addError ("Don’t put staccato dots on long notes, unless the tempo is very fast",noteRest);
 			return;
 		}		
 		if (isDotted(noteRest) && noteRest.duration.ticks >= (division * 0.5)) {
-			addError ("Don’t put staccato dots on dotted notes",noteRest);
+			addError ("Putting staccato dots on dotted notes may be ambiguous",noteRest);
 			return;
 		}
 		if (noteRest.notes[0].tieForward != null) {
 			addError ("Don’t put staccato dots on tied notes",noteRest);
 			return;
 		}
-		if (isSlurred && !isEndOfSlur && flaggedSlurredStaccatoBar < currentBarNum - 4 && isStringInstrument) {
+		if (isSlurred && !isEndOfSlur && flaggedSlurredStaccatoBar < currentBarNum - 4 && (isStringInstrument || isHarp || isPercussionInstrument)) {
 			var prev = getPreviousNoteRest(noteRest);
 			var next = getNextNoteRest(noteRest);
 			if (noteRest.notes.length > 0) {
@@ -4513,10 +4529,16 @@ MuseScore {
 					}
 				}
 				if (!isEndOfSlur) {
-					var portatoOK = (pitch == prevPitch || pitch == nextPitch);
-					if (!portatoOK) {
-						addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
-						flaggedSlurredStaccatoBar = currentBarNum;
+					if (isStringInstrument) {
+						var portatoOK = (pitch == prevPitch || pitch == nextPitch);
+						if (!portatoOK) {
+							addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
+							flaggedSlurredStaccatoBar = currentBarNum;
+						}
+					} else {
+						if (isHarp || isPercussion) {
+							addError ('Slurred staccatos don’t really make sense for '+currentInstrumentName.toLowerCase()+'.\nConsider removing the staccato articulations.',noteRest);
+						}
 					}
 				}
 			}
@@ -5016,10 +5038,10 @@ MuseScore {
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur) {
 			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
-				addError ("This slur looks like it has been dragged\naway from its correct position.",currentSlur);
+				addError ("This slur looks like it has been dragged\naway from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R",currentSlur);
 			} else {
-				if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged\nvertically away from its correct position.",currentSlur);
-				if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.",currentSlur);
+				if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged\nvertically away from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R",currentSlur);
+				if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R",currentSlur);
 			}
 		//	var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.posX,currentSlur.posY,currentSlur.pagePos.x,currentSlur.pagePos.y,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
 			//logError (t);
@@ -5259,6 +5281,12 @@ MuseScore {
 				prevBeam = theBeam;
 			}
 		}*/
+		for (var i = 0; i < noteRest.notes.length; i ++) {
+			var theNote = noteRest.notes[i];
+			if (theNote.direction != 0) {
+				addError ('This notehead has been put in a manual position, rather than automatic.\nThis may result in an unusual looking placement.\nYou can revert to automatic by selecting the notehead,\nand choosing Properties→Note→Head→Show more→Note direction→Auto.',theNote);
+			}
+		}
 		if (noteRest.stem) {
 			var stemDir = noteRest.stem.stemDirection;
 			if (stemDir > 0) {
@@ -6047,7 +6075,7 @@ MuseScore {
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
@@ -6275,8 +6303,6 @@ MuseScore {
 		property var windsAndBrass: true
 		property var pianoHarpAndPercussion: true
 		property var strings: true
-		
-		
 	
 		Text {
 			id: styleText
@@ -6468,7 +6494,7 @@ MuseScore {
 				}
 			}
 			CheckBox {
-				text: "Check stems & beams"
+				text: "Check stems, noteheads & beams"
 				checked: options.stemsAndBeams
 				onClicked: {
 					checked = !checked
@@ -6633,11 +6659,12 @@ MuseScore {
 		}
 		
 		ButtonBox {
-			width: parent.width-40;
+			width: parent.width-185;
 			anchors {
-				left: rect.left;
+				left: parent.left;
 				bottom: parent.bottom;
-				bottomMargin: 10;
+				leftMargin: 20;
+				bottomMargin: 20;
 			}
 			FlatButton {
 				text: 'Tick all'
@@ -6671,14 +6698,51 @@ MuseScore {
 					}
 				}
 			}
-			buttons : [ButtonBoxModel.Cancel, ButtonBoxModel.Ok]
-
-			navigationPanel.section: options.navigationSection
-			onStandardButtonClicked: function(buttonId) {
-				if (buttonId === ButtonBoxModel.Cancel) {
-					options.close();
+			FlatButton {
+				text: "Cancel"
+				width: 50
+				buttonRole: ButtonBoxModel.ApplyRole
+				buttonId: ButtonBoxModel.Cancel
+				onClicked: {
+					options.close()
 				}
-				if (buttonId === ButtonBoxModel.Ok) {
+			}
+			//buttons : [ButtonBoxModel.Cancel]
+			
+			
+		}
+		ButtonBox {
+			
+			anchors {
+				right: parent.right;
+				bottom: parent.bottom;
+				rightMargin: 20;
+				bottomMargin: 20;
+			}
+			navigationPanel.section: options.navigationSection;
+			
+			//buttons : [ButtonBoxModel.Cancel]
+			
+			/*FlatButton {
+				text: "Cancel"
+				buttonRole: ButtonBoxModel.RejectRole
+				buttonId: ButtonBoxModel.Cancel
+				isClickOnKeyNavTriggered: false
+				onClicked: {
+					options.close()
+				}
+			}*/
+			
+			FlatButton {
+				text: "OK"
+				enabled: true
+				visible: true
+				width: 50
+				buttonRole: ButtonBoxModel.AcceptRole
+				buttonId: ButtonBoxModel.Ok
+				isClickOnKeyNavTriggered: true
+				accentButton: true
+				onClicked: {
 					var c = grid.children;
 					options.numOptionsChecked = 0;
 					for (var i = 0; i < c.length; i++) {
@@ -6687,6 +6751,11 @@ MuseScore {
 					checkScore();
 				}
 			}
+			//onStandardButtonClicked: function(buttonId) {
+				//if (buttonId === ButtonBoxModel.Cancel) {
+					//options.close();
+				//}
+			//}
 		}
 	}
 }

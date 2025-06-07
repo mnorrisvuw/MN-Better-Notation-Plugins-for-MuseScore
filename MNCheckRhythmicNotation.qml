@@ -1630,7 +1630,6 @@ MuseScore {
 		
 		// create new cursor to add the comments
 		var cursor = curScore.newCursor();
-		cursor.inputStateMode = Cursor.INPUT_STATE_SYNC_WITH_SCORE;
 		cursor.filter = Segment.All;
 		cursor.next();
 		
