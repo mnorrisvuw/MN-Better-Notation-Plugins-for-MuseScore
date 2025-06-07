@@ -1,0 +1,896 @@
+{
+	"titlepages": [
+		{
+			"label": "Classic (Edwin)",
+			"thumbnail": "classic",
+			"composer": {
+				"fontsize": 36,
+				"offsety": -60,
+				"case" : "UPPER"
+			},
+			"title": {
+				"fontstyle": "ITALIC",
+				"fontsize": 28,
+				"offsety" : -5
+			},
+			"subtitle": {
+				"fontsize": 18,
+				"offsety": 10
+			},
+			"line": {
+				"offsety": -30
+			}
+		},
+		{
+			"label": "Academy Engraved",
+			"thumbnail": "academy",
+			"composer": {
+				"font": "Academy Engraved LET",
+				"fontsize": 46,
+				"align": "HCENTER",
+				"offsety": 30,
+				"case": "UPPER"
+			},
+			"title": {
+				"fontstyle": "ITALIC",
+				"fontsize": 32,
+				"offsety": -40
+			},
+			"subtitle": {
+				"fontsize": 18,
+				"offsety": -25
+			},
+			"line": {
+				"align": "HCENTER",
+				"offsety": 50
+			},
+			"os" : "mac",
+			"fonturl" : "https://fontsgeek.com/fonts/Academy-Engraved-LET-Plain"
+		},
+		{
+			"label": "Alegreya Sans",
+			"thumbnail": "alegreyasans",
+			"composer": {
+				"font": "Alegreya Sans",
+				"fontsize": 36,
+				"offsety" : 40,
+				"align" : "RIGHT"
+			},
+			"title": {
+				"font": "Alegreya Sans",
+				"fontstyle" : "BOLD",
+				"fontsize": 32,
+				"offsety" : 70,
+				"case" : "UPPER",
+				"align" : "RIGHT"
+			},
+			"subtitle": {
+				"font": "Alegreya Sans",
+				"fontsize": 12,
+				"offsety" : 85,
+				"align" : "RIGHT"
+			},
+			"line" : {
+				"fontsize" : 24,
+				"fontstyle" : "BOLD", 
+				"align" : "RIGHT",
+				"offsety" : 60,
+				"repeats" : 18
+			},
+			"fonturl" : "https://fonts.google.com/specimen/Alegreya+Sans"
+		},
+		
+		{
+			"label": "Amulya",
+			"thumbnail": "amulya",
+			"composer": {
+				"font": "Amulya",
+				"fontsize": 28,
+				"offsetx" : 20,
+				"offsety": 60,
+				"align" : "LEFT"
+			},
+			"title": {
+				"font": "Amulya",
+				"fontsize": 26,
+				"offsetx" : 20,
+				"offsety": 85,
+				"align" : "LEFT"
+			},
+			"subtitle": {
+				"font": "Amulya",
+				"fontsize": 14,
+				"offsetx" : 20,
+				"offsety": 100,
+				"align" : "LEFT"
+			},
+			"fonturl" : "https://www.fontshare.com/fonts/amulya"
+		},
+		
+		{
+			"label" : "Aptos & Palatino",
+			"thumbnail" : "aptospalatino",
+			"composer" : {
+				"font" : "Aptos",
+				"fontsize" : 30,
+				"align" : "HCENTER",
+				"offsety" : 40,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Palatino",
+				"fontsize": 54,
+				"fontstyle" : "ITALIC",
+				"offsety" : -40
+			},
+			"subtitle": {
+				"font": "Aptos",
+				"fontsize" : 14,
+				"offsety" : -20,
+				"case" : "UPPER"
+			},
+			"line": {
+				"font" : "Aptos",
+				"char" : "\u2550",
+				"align" : "HCENTER"
+			},
+			"line2": {
+				"font" : "Aptos",
+				"char" : "\u2550",
+				"align" : "HCENTER BOTTOM"
+			},
+			"frontmatterfont" : "Palatino",
+			"fonturl" : "https://learn.microsoft.com/en-us/typography/font-list/aptos"
+		},
+		
+		{
+			"label": "Archivo",
+			"thumbnail": "archivo",
+			"composer": {
+				"font": "Archivo",
+				"fontstyle" : "BOLD",
+				"fontsize": 36,
+				"offsety": 40,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "Archivo",
+				"fontsize": 32,
+				"offsety": 60,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "Archivo",
+				"fontsize": 14,
+				"offsety": 75,
+				"align" : "HCENTER"
+			},
+			"fonturl" : "https://fonts.google.com/specimen/Archivo"
+		},
+		
+		{
+			"label": "Avenir",
+			"thumbnail": "avenir",
+			"composer": {
+				"font" : "Avenir",
+				"fontsize" : 26,
+				"offsety" : 50,
+				"align" : "HCENTER",
+				"case" : "UPPER",
+				"space" : true
+			},
+			"title": {
+				"font" : "Avenir",
+				"fontsize" : 24,
+				"align" : "HCENTER",
+				"offsety" : 75,
+				"case" : "UPPER",
+				"space" : true
+			},
+			"subtitle": {
+				"font": "Avenir",
+				"fontsize": 12,
+				"align": "HCENTER",
+				"offsety": 90
+			},
+			"line": {
+				"align": "HCENTER",
+				"offsety": 65,
+				"repeats" : 12
+			},
+			"os" : "mac",
+			"fonturl" : "https://www.dafontfree.io/avenir-font/"
+		},
+		{
+			"label": "Baskerville",
+			"thumbnail": "baskerville",
+			"composer": {
+				"font": "Baskerville",
+				"fontsize": 32,
+				"offsety": -90,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Baskerville",
+				"fontsize": 56,
+				"fontstyle" : "ITALIC",
+				"offsety": -50
+			},
+			"subtitle": {
+				"font": "Baskerville",
+				"fontsize": 16,
+				"offsety": -30
+			},
+			"line": {
+				"offsety" : -74,
+				"repeats" : 15,
+				"char" : "\u2501"
+			},
+			"frontmatterfont" : "Baskerville",
+			"os" : "mac",
+			"fonturl" : "https://fonts.google.com/specimen/Libre+Baskerville"
+		},
+		
+		{
+			"label": "Bitter",
+			"thumbnail": "bitter",
+			"composer": {
+				"font": "Bitter",
+				"fontstyle" : "BOLD",
+				"fontsize": 28,
+				"offsety" : 20,
+				"offsetx" : -10,
+				"align" : "RIGHT"
+			},
+			"title": {
+				"font": "Bitter",
+				"fontstyle" : "ITALIC",
+				"fontsize": 26,
+				"offsety" : 45,
+				"offsetx" : -10,
+				"align" : "RIGHT"
+			},
+			"subtitle": {
+				"font": "Bitter",
+				"fontsize": 14,
+				"offsety" : 60,
+				"offsetx" : -10,
+				"align" : "RIGHT"
+			},
+			"fonturl" : "https://fonts.google.com/specimen/Bitter"
+		},
+		
+		{
+			"label": "Bodoni Moda",
+			"thumbnail": "bodonimoda",
+			"composer": {
+				"font": "Bodoni Moda 9pt",
+				"fontsize": 18,
+				"offsety": 40,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "Bodoni Moda 9pt",
+				"fontsize" : 24,
+				"fontstyle" : "BOLD",
+				"offsety" : 70,
+				"align" : "HCENTER",
+				"case" : "UPPER"
+			},
+			"subtitle": {
+				"font": "Bodoni Moda 9pt",
+				"fontsize": 10,
+				"offsety": 80,
+				"align" : "HCENTER"
+			},
+			"fonturl" : "https://fonts.google.com/specimen/Bodoni+Moda"
+		},
+		
+		{
+			"label": "Century Schoolbook",
+			"thumbnail": "centuryschoolbook",
+			"composer": {
+				"font": "Century Schoolbook",
+				"fontsize": 42,
+				"offsety": -50,
+				"case": "UPPER"
+			},
+			"title": {
+				"font": "Century Schoolbook",
+				"fontstyle": "ITALIC",
+				"fontsize": 36,
+				"offsety": -20
+			},
+			"subtitle": {
+				"font": "Century Schoolbook",
+				"fontsize": 22,
+				"offsety": -5
+			},
+			"line": {
+				"offsety" : -35
+			},
+			"frontmatterfont" : "Century Schoolbook",
+			"os" : "mac",
+			"fonturl" : "https://www.dafontfree.io/download/century-schoolbook/"
+		},
+		
+		{
+			"label": "Clash Display",
+			"thumbnail": "clashdisplay",
+			"composer": {
+				"font": "Clash Display",
+				"fontstyle" : "BOLD",
+				"fontsize": 36,
+				"offsety": -65,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Clash Display",
+				"fontsize": 32,
+				"offsety": -45,
+				"case" : "UPPER"
+			},
+			"subtitle": {
+				"font": "Clash Display",
+				"fontsize": 14,
+				"offsety": -30
+			},
+			"line" : {
+				"fontsize" : 22,
+				"fontstyle" : "BOLD",
+				"offsety" : -90,
+				"repeats" : 15
+			},
+			"line2" : {
+				"fontsize" : 22,
+				"fontstyle" : "BOLD",
+				"offsety" : -9,
+				"repeats" : 15
+			},
+			"fonturl" : "https://www.fontshare.com/fonts/clash-display"
+		},
+		
+		{
+			"label": "Crimson Pro",
+			"thumbnail": "crimsonpro",
+			"composer": {
+				"font": "Crimson Pro",
+				"fontstyle" : "BOLD",
+				"fontsize": 36,
+				"offsety": 20,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "Crimson Pro",
+				"fontsize": 32,
+				"offsety": 42,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "Crimson Pro",
+				"fontsize": 16,
+				"fontstyle" : "ITALIC",
+				"offsety": 55,
+				"align" : "HCENTER"
+			},
+			"line" : {
+				"fontsize" : 22,
+				"fontstyle" : "BOLD",
+				"offsety" : 35,
+				"repeats" : 11,
+				"align" : "HCENTER"
+			},
+			"frontmatterfont" : "Crimson Pro",
+			"fonturl" : "https://www.fontshare.com/fonts/crimson-pro"
+		},
+		
+		{
+			"label": "EB Garamond",
+			"thumbnail": "ebgaramond",
+			"composer": {
+				"font": "EB Garamond",
+				"fontsize": 30,
+				"align": "HCENTER",
+				"offsety": 40
+			},
+			"title": {
+				"font" : "EB Garamond",
+				"fontsize": 32,
+				"offsety": 66,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font" : "EB Garamond",
+				"fontsize": 14,
+				"offsety": 80,
+				"align": "HCENTER"
+			},
+			"line": {
+				"align": "HCENTER",
+				"offsety": 58,
+				"fontsize" : 10,
+				"repeats" : 50
+			},
+			"os" : "mac",
+			"fonturl" : "https://fonts.google.com/specimen/EB+Garamond"
+		},
+		
+		{
+			"label": "Fanwood Text",
+			"thumbnail": "fanwoodtext",
+			"composer": {
+				"font": "Fanwood Text",
+				"fontsize": 42,
+				"offsety": -55,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Fanwood Text",
+				"fontsize": 28,
+				"fontstyle" : "ITALIC",
+				"offsety": -18
+			},
+			"subtitle": {
+				"font": "Fanwood Text",
+				"fontsize": 22,
+				"offsety" : -5
+			},
+			"line" : {
+				"char" : "\u2619",
+				"repeats" : 1,
+				"fontsize" : 32,
+				"offsety" : -35
+			},
+			"fonturl" : "https://www.theleagueofmoveabletype.com/fanwood"
+		},
+		
+		{
+			"label": "Futura",
+			"thumbnail": "futura",
+			"composer": {
+				"font": "Futura",
+				"fontstyle" : "BOLD",
+				"fontsize": 26,
+				"offsety": -70,
+				"align" : "RIGHT VCENTER"
+			},
+			"title": {
+				"font": "Futura",
+				"fontsize": 28,
+				"offsety": -40,
+				"align" : "RIGHT VCENTER"
+			},
+			"subtitle": {
+				"font": "Futura",
+				"fontsize": 16,
+				"align" : "RIGHT VCENTER"
+			},
+			"os" : "mac",
+			"fonturl" : "https://www.dafontfree.io/futura-font-free/"
+		},
+		
+		{
+			"label": "Gill Sans",
+			"thumbnail": "gillsans",
+			"composer": {
+				"font": "Gill Sans",
+				"fontsize": 28,
+				"offsety": -80,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Gill Sans",
+				"fontsize": 24,
+				"offsety": -65,
+				"case" : "UPPER"
+			},
+			"subtitle": {
+				"font": "Gill Sans",
+				"fontsize": 10,
+				"offsety": -45,
+				"case" : "UPPER"
+			},
+			"os" : "mac",
+			"fonturl" : "https://font.download/font/gill-sans-2"
+		},
+		
+		{
+			"label": "Goudy Old Style",
+			"thumbnail": "goudyoldstyle",
+			"composer": {
+				"font": "Goudy Old Style",
+				"fontsize": 28,
+				"offsety" : -80,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Goudy Old Style",
+				"fontsize": 28,
+				"offsety" : -40,
+				"case" : "UPPER"
+			},
+			"subtitle": {
+				"font": "Goudy Old Style",
+				"fontsize": 22,
+				"offsety" : -25
+			},
+			"line": {
+				"char" : "\u2550",
+				"align" : "HCENTER"
+			},
+			"line2": {
+				"char" : "\u2550",
+				"align" : "HCENTER BOTTOM"
+			},
+			"frontmatterfont" : "Goudy Old Style",
+			"os" : "mac",
+			"fonturl" : "https://font.download/font/goudy-old-style"
+		},
+		
+		{
+			"label": "Helvetica Neue",
+			"thumbnail": "helveticaneue",
+			"composer": {
+				"font": "Helvetica Neue",
+				"fontsize": 26,
+				"offsety": 40,
+				"align" : "RIGHT"
+			},
+			"title": {
+				"font": "Helvetica Neue",
+				"fontsize" : 24,
+				"fontstyle" : "BOLD",
+				"offsety" : 70,
+				"align" : "RIGHT"
+			},
+			"subtitle": {
+				"font": "Helvetica Neue",
+				"fontsize": 12,
+				"offsety": 80,
+				"align" : "RIGHT"
+			},
+			"os" : "mac",
+			"fonturl" : "https://font.download/font/helvetica-neue-5"
+		},
+		
+		
+		{
+			"label": "Linden Hill",
+			"thumbnail": "lindenhill",
+			"composer": {
+				"font": "Linden Hill",
+				"fontsize": 32,
+				"offsety": 60,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "Linden Hill",
+				"fontsize": 32,
+				"fontstyle" : "ITALIC",
+				"offsety": 90,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "Linden Hill",
+				"fontsize": 12,
+				"offsety" : 105,
+				"align" : "HCENTER"
+			},
+			"line" : {
+				"char" : "\u2756",
+				"repeats" : 1,
+				"fontsize" : 16,
+				"offsety" : 77,
+				"align" : "HCENTER"
+			},
+			"fonturl" : "https://www.theleagueofmoveabletype.com/linden-hill"
+		},
+		
+		
+		
+		{
+			"label": "Literata",
+			"thumbnail": "literata",
+			"composer": {
+				"font": "Literata",
+				"fontstyle" : "BOLD",
+				"fontsize": 28,
+				"offsety": 60,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "Literata",
+				"fontstyle" : "ITALIC",
+				"fontsize": 26,
+				"offsety": 80,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "Literata",
+				"fontsize" : 14,
+				"offsety": 95,
+				"align" : "HCENTER"
+			},
+			"line" : {
+				"align" : "HCENTER",
+				"repeats" : 12,
+				"offsety" : 40
+			},
+			"line2" : {
+				"align" : "HCENTER",
+				"repeats" : 12,
+				"offsety" : 115
+			},
+			"fonturl" : "https://www.fontshare.com/fonts/literata"
+		},
+		
+		{
+			"label": "Lucida Bright",
+			"thumbnail": "lucidabright",
+			"composer": {
+				"font": "Lucida Bright",
+				"align" : "HCENTER",
+				"fontsize": 36,
+				"offsety": 20
+			},
+			"title": {
+				"font": "Lucida Bright",
+				"align": "HCENTER",
+				"fontsize": 36,
+				"offsety": 50
+			},
+			"subtitle": {
+				"font": "Lucida Bright",
+				"align" : "HCENTER",
+				"fontsize": 18,
+				"offsety": 70
+			},
+			"line": {
+				"align" : "HCENTER",
+				"offsety" : 37
+			},
+			"line2": {
+				"align" : "HCENTER",
+				"offsety" : 65
+			},
+			"fonturl" : "https://fontsgeek.com/fonts/Lucida-Bright-Regular"
+		},
+		{
+			"label": "Lulo Clean",
+			"thumbnail": "luloclean",
+			"composer": {
+				"font": "LuloCleanOne",
+				"fontsize": 24,
+				"offsety": 40,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "LuloCleanOne",
+				"fontsize" : 20,
+				"offsety" : 66,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "LuloCleanOne",
+				"fontsize": 10,
+				"offsety": 77,
+				"align" : "HCENTER"
+			},
+			"line" : {
+				"align": "HCENTER",
+				"fontsize" : 12,
+				"offsety" : 56,
+				"repeats" : 18
+			},
+			"fonturl" : "https://www.fontshmonts.com/display-fonts/lulo-clean/"
+		},
+		
+		{
+			"label" : "Optima",
+			"thumbnail" : "optima",
+			"composer" : {
+				"font" : "Optima",
+				"fontsize" : 32,
+				"offsety" : -90,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Optima",
+				"fontsize": 48,
+				"offsety" : -60,
+				"case" : "UPPER"
+			},
+			"subtitle": {
+				"font": "Optima",
+				"fontsize" : 16,
+				"offsety" : 70
+			},
+			"line": {
+				"font" : "Optima",
+				"char" : "\u2550",
+				"align" : "HCENTER"
+			},
+			"line2": {
+				"font" : "Optima",
+				"char" : "\u2550",
+				"align" : "HCENTER BOTTOM"
+			}
+		},
+		
+		{
+			"label": "Proxima Nova",
+			"thumbnail": "proximanova",
+			"composer": {
+				"font": "Proxima Nova",
+				"align" : "RIGHT",
+				"fontsize": 28,
+				"offsety": 20
+			},
+			"title": {
+				"font": "Proxima Nova",
+				"fontstyle": "BOLD",
+				"fontsize": 36,
+				"offsety": 50,
+				"align": "LEFT"
+			},
+			"subtitle": {
+				"font": "Proxima Nova",
+				"fontsize": 20,
+				"offsety": 70,
+				"align" : "LEFT"
+			},
+			"line": {
+				"align" : "HCENTER"
+			},
+			"line2": {
+				"align" : "HCENTER BOTTOM"
+			}
+		},
+		
+		{
+			"label": "Rockwell",
+			"thumbnail": "rockwell",
+			"composer": {
+				"font": "Rockwell",
+				"fontsize": 50,
+				"offsetx": 10,
+				"offsety": 30,
+				"align": "LEFT"
+			},
+			"title": {
+				"font": "Rockwell",
+				"fontsize": 42,
+				"offsetx": 10,
+				"offsety": -40,
+				"align": "LEFT VCENTER"
+			},
+			"subtitle": {
+				"font": "Rockwell",
+				"fontsize": 20,
+				"offsetx": 10,
+				"offsety": -25,
+				"align": "LEFT VCENTER"
+			},
+			"line": {
+				"align": "HCENTER"
+			}
+		},
+		{
+			"label": "Satoshi",
+			"thumbnail": "satoshi",
+			"composer": {
+				"font": "Satoshi",
+				"fontstyle" : "BOLD",
+				"fontsize": 36,
+				"offsety": 40,
+				"align" : "HCENTER",
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Satoshi",
+				"fontsize": 28,
+				"fontstyle" : "ITALIC",
+				"offsety": 70,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "Satoshi",
+				"fontsize": 14,
+				"offsety": 85,
+				"align" : "HCENTER",
+				"case" : "UPPER"
+			},
+			"line" : {
+				"align": "HCENTER",
+				"offsety" : 60
+			},
+			"fonturl" : "https://www.fontshare.com/fonts/satoshi"
+		},
+		
+		{
+			"label": "Supreme",
+			"thumbnail": "supreme",
+			"composer": {
+				"font": "Supreme",
+				"fontsize": 36,
+				"fontstyle" : "BOLD",
+				"offsety": 20,
+				"align": "RIGHT"
+			},
+			"title": {
+				"font": "Supreme",
+				"fontsize": 32,
+				"offsety": 40,
+				"align": "RIGHT"
+			},
+			"subtitle": {
+				"font": "Supreme",
+				"fontsize": 14,
+				"offsety": 55,
+				"align": "RIGHT"
+			},
+			"fonturl" : "https://www.fontshare.com/fonts/supreme"
+		},
+		
+		{
+			"label": "U001Con",
+			"thumbnail": "u001con",
+			"composer": {
+				"font": "U001Con",
+				"fontstyle" : "BOLD",
+				"fontsize": 32,
+				"offsety": 40,
+				"align" : "HCENTER"
+			},
+			"title": {
+				"font": "U001Con",
+				"fontstyle" : "BOLD",
+				"fontsize": 32,
+				"offsety": 66,
+				"align" : "HCENTER"
+			},
+			"subtitle": {
+				"font": "U001Con",
+				"fontsize": 17,
+				"offsety": 80,
+				"align" : "HCENTER"
+			},
+			"line" : {
+				"align": "HCENTER",
+				"fontsize" : 36,
+				"fontstyle" : "BOLD",
+				"offsety" : 56,
+				"repeats" : 8
+			},
+			"fonturl" : "https://fontlibrary.org/en/font/u001"
+		},
+		{
+			"label": "Work Sans",
+			"thumbnail": "worksans",
+			"composer": {
+				"font": "Work Sans",
+				"fontstyle" : "BOLD",
+				"fontsize": 36,
+				"offsety": -60,
+				"case" : "UPPER"
+			},
+			"title": {
+				"font": "Work Sans",
+				"fontsize": 28,
+				"offsety": -40,
+				"case" : "UPPER"
+			},
+			"subtitle": {
+				"font": "Work Sans",
+				"fontsize": 14,
+				"offsety": 40
+			},
+			"line": {
+				"offsety" : -48,
+				"repeats" : 15,
+				"char" : "\u2501"
+			},
+			"fonturl" : "https://fonts.google.com/specimen/Work+Sans"
+		}
+	]
+}

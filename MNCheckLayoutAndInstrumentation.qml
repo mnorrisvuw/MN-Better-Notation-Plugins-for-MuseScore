@@ -790,15 +790,18 @@ MuseScore {
 				barStartTick = currentBar.firstSegment.tick;
 				barEndTick = currentBar.lastSegment.tick;
 				barLength = barEndTick - barStartTick;
+				
+				// reset clef from the previous bar
 				firstClefNumInBar = prevClefNumInBar;
 				currentClefNum = firstClefNumInBar;
+				currentClef = currentClefNum == -1 ? headerClef : clefs[currentStaffNum][currentClefNum];
 				//logError ('firstClefNumInBar = '+firstClefNumInBar);
 				var firstClefIdInBar = currentClef.subtypeName();
+				prevClefId = firstClefIdInBar;
 				var startTrack = currentStaffNum * 4;
 				var goneToNextBar = false;
 				var firstNoteInThisBar = null;
 				var stretch = currentBar.userStretch;
-				//logError("\nb. "+currentBarNum);
 				currentTimeSig = currentBar.timesigNominal;
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
@@ -1377,7 +1380,7 @@ MuseScore {
 												if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 												if (theArticulationArray[i].symbol == kHarmonicCircle) hasHarmonic = true;
 											}
-											if (isTiedBack && doCheckSlursAndTies && !hasStaccato && !hasHarmonic) addError("This note has articulation on it, but is tied.\nDid you mean that to be slurred instead?",noteRest);
+											if (isTiedBack && doCheckSlursAndTies && !hasStaccato && !hasHarmonic) addError("This note has articulation in the middle of a tie.\nDid you mean that to be slurred instead?",noteRest);
 										}
 										if (!hasHarmonic && wasHarmonic && !isHorn) {
 											hasHarmonic = true;
