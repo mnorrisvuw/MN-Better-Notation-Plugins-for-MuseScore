@@ -809,13 +809,7 @@ MuseScore {
 				var isCompound = !(timeSigNum % 3);
 				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
 				if (isCompound && timeSigDenom >= 8) beatLength = (division * 12) / timeSigDenom;
-				virtualBeatLength = beatLength;
-				if (isCompound) {
-					virtualBeatLength = (division * 12) / timeSigDenom;
-				} else {
-					virtualBeatLength = (division * 4) / timeSigDenom;
-				}
-				//logError ("Time sig is "+currentTimeSig.str+"; virtual beat length = "+virtualBeatLength);
+				virtualBeatLength = division * (isCompound ? 12 : 4) / timeSigDenom;
 				if (currentStaffNum == 0) {
 					var numBeats = currentTimeSig.numerator;
 					if (currentTimeSig.denominator > 8) numBeats /= 2;
@@ -913,13 +907,8 @@ MuseScore {
 					// ** clef
 					if (firstClefNumInBar != currentClefNum) {
 						//logError ('*** RESET clef num other voice from '+currentClefNum+' back to '+firstClefNumInBar);
-
 						currentClefNum = firstClefNumInBar;
-						if (currentClefNum == -1) {
-							currentClef = headerClef;
-						} else {
-							currentClef = clefs[currentStaffNum][currentClefNum];
-						}
+						currentClef = (currentClefNum == -1) ? headerClef : clefs[currentStaffNum][currentClefNum];
 						setClef(currentClef);
 						nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
 						//logError ('Next clef is at tick '+nextClefTick);
@@ -1095,13 +1084,7 @@ MuseScore {
 											flaggedPedalIssue = true;
 										}
 									}
-									if (currentPedalNum < numPedals - 1) {
-										nextPedalStart = pedals[currentStaffNum][currentPedalNum+1].spannerTick.ticks;
-										//logError("Next pedal starts at "+nextPedalStart);
-									} else {
-										nextPedalStart = 0;
-										//logError("This is the last pedal in this staff ");
-									}
+									nextPedalStart = (currentPedalNum < numPedals - 1) ? pedals[currentStaffNum][currentPedalNum+1].spannerTick.ticks : 0;
 								}
 							}
 						
@@ -1444,7 +1427,7 @@ MuseScore {
 									if (doCheckOttavas && isOttava) checkOttava(noteRest,currentOttava);
 								
 									// ************ CHECK STEM DIRECTION && BEAM TWEAKS ************ //
-									if (doCheckStemsAndBeams && numVoicesInThisBar == 1) checkStemsAndBeams(noteRest);
+									if (doCheckStemsAndBeams) checkStemsAndBeams(noteRest);
 								
 									// ************ CHECK LEDGER LINES ************ //
 									if (doCheckRangeRegister) checkInstrumentalRanges(noteRest);
@@ -1529,16 +1512,12 @@ MuseScore {
 							tempoChangeMarkingEnd = -1;
 						}
 						
-						if (cursor.next()) {
-							processingThisBar = cursor.measure.is(currentBar);
-						} else {
-							processingThisBar = false;
-						}
+						processingThisBar = cursor.next() ? cursor.measure.is(currentBar) : false;
+
 						if (isNote) {
 							prevNote = noteRest;
 							prevNotes[currentTrack] = noteRest;
-						}
-						if (isRest) {
+						} else {
 							prevNote = null;
 							prevNotes[currentTrack] = null;
 						}
@@ -1582,18 +1561,9 @@ MuseScore {
 			
 			if (currentStaffNum == 0) beatCountInSystem.push(numBeatsInThisSystem);
 			if (noteCountInSystem[currentSystemNum] == undefined) {
-				if (numNoteRestsInThisSystem > numBeatsInThisSystem) {
-					noteCountInSystem[currentSystemNum] = numNoteRestsInThisSystem;
-					//logError("Pushed noteCountInSystem["+currentSystemNum+"] = "+numNoteRestsInThisSystem);
-				} else {
-					noteCountInSystem[currentSystemNum] = numBeatsInThisSystem;
-					//logError("Pushed noteCountInSystem["+currentSystemNum+"] = "+numBeatsInThisSystem);
-				}
+				noteCountInSystem[currentSystemNum] = (numNoteRestsInThisSystem > numBeatsInThisSystem) ? numNoteRestsInThisSystem : numBeatsInThisSystem;
 			} else {
-				if (numNoteRestsInThisSystem > noteCountInSystem[currentSystemNum]) {
-					noteCountInSystem[currentSystemNum] = numNoteRestsInThisSystem;
-					//logError("Expanded noteCountInSystem["+currentSystemNum+"] = "+numNoteRestsInThisSystem);
-				}
+				if (numNoteRestsInThisSystem > noteCountInSystem[currentSystemNum]) noteCountInSystem[currentSystemNum] = numNoteRestsInThisSystem;
 			}
 		} // end staffnum loop
 	
@@ -2989,6 +2959,7 @@ MuseScore {
 		
 		if (styleComments.length + pageSettingsComments.length > 0) {
 			var errorStr = ["SCORE SETTINGS",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
+			errorStr += "\n\nNOTE: the MN Make Recommended Layout Changes plugin can automatically change these settings for you."
 			addError(errorStr,"pagetop");
 		}
 	}
@@ -3839,13 +3810,7 @@ MuseScore {
 							isSpellingError = true;
 							var correctSpelling = spellingerrorsatstart[i*2+1];
 							var diff = plainText.length-spellingError.length;
-							var correctText = '';
-							if (diff > 0) {
-								correctText = correctSpelling+plainText.substring(spellingError.length);
-							} else {
-								correctText = correctSpelling;
-							}
-							//logError("styledText = "+styledText+" plainText = "+plainText);
+							var correctText = (diff > 0) ? correctSpelling+plainText.substring(spellingError.length) : correctSpelling;
 							addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
 							return;
 						}
@@ -4427,14 +4392,7 @@ MuseScore {
 			var errStr = "";
 			if (sharps > 6) errStr = "This key signature has "+sharps+" sharps,\nand would be easier to read if rescored as "+(12-sharps)+" flats.";
 			if (sharps < -6) errStr = "This key signature has "+Math.abs(sharps)+" flats,\nand would be easier to read if rescored as "+(12+sharps)+" sharps.";
-			if (currentBarNum - prevKeySigBarNum  < 16) {
-				if (errStr !== "") {
-					errStr += "\nAlso, this";
-				} else {
-					errStr = "This";
-				}
-				errStr += " key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps one of them could be avoided by using accidentals instead?";
-			}
+			if (currentBarNum - prevKeySigBarNum  < 16) errStr = ((errStr !== "") ? errStr + "\nAlso, this" : "This") + " key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps one of them could be avoided by using accidentals instead?";
 			if (errStr !== "") addError(errStr,keySig);
 			prevKeySigSharps = sharps;
 			prevKeySigBarNum = currentBarNum;
@@ -5167,7 +5125,6 @@ MuseScore {
 	
 	function checkHarpIssues (currentBar, staffNum) {
 		
-		
 		var cursor = curScore.newCursor();
 
 		// collate all the notes in this bar
@@ -5193,11 +5150,7 @@ MuseScore {
 						if (allNotes[theTick] == undefined) allNotes[theTick] = [];
 						for (var  i = 0; i < nNotes; i++) allNotes[theTick].push(theNotes[i]);
 					}
-					if (cursor.next()) {
-						processingThisBar = cursor.measure.is(currentBar);
-					} else {
-						processingThisBar = false;
-					}
+					processingThisBar = cursor.next() ? cursor.measure.is(currentBar) : false;
 				}
 			}
 		}
@@ -5286,13 +5239,14 @@ MuseScore {
 		}*/
 		for (var i = 0; i < noteRest.notes.length; i ++) {
 			var theNote = noteRest.notes[i];
-			if (theNote.direction != 0) {
-				addError ('This notehead has been put in a manual position, rather than automatic.\nThis may result in an unusual looking placement.\nYou can revert to automatic by selecting the notehead,\nand choosing Properties→Note→Head→Show more→Note direction→Auto.',theNote);
+			//logError ('theNote.mirrorHead = '+theNote.mirrorHead);
+			if (theNote.mirrorHead != DirectionH.AUTO) {
+				addError ('This notehead has been given a manual positioning, which may look irregular.\nYou can revert to automatic placement by selecting the notehead,\nand choosing Properties→Note→Head→Show more→Note direction→Auto.',theNote);
 			}
 		}
 		if (noteRest.stem) {
 			var stemDir = noteRest.stem.stemDirection;
-			if (stemDir > 0) {
+			if (stemDir != Direction.AUTO) {
 				if (noteRest.beam == null) {
 					//calc dir
 					var calcDir = 0;
@@ -5318,90 +5272,88 @@ MuseScore {
 					}
 				}
 			}
-			if (noteRest.beam != null) {
-				// is this the start of the beam?
-				var currBeam = noteRest.beam;
-				if (!currBeam.is(prevBeam)) {
-					//var beamPosAsPoint = currBeam.beamPos as point;
-					//var beamPosY = beamPosAsPoint.y;
-					var beamPosY = parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
-					// unfortunately I can't figure out a way to access QPair in Qt
-					//logError ('beamPos = '+beamPosY);
-					//start of a new beam
-					// collate all beams into an array
-					prevBeam = currBeam;
-					var notesInBeamArray = [];
-					var currNote = noteRest;
-					while (currNote.beam != null) {
-						if (!currNote.beam.is(currBeam)) break;
-						notesInBeamArray.push(currNote);
-						currNote = getNextNoteRest (currNote);
-					}
-
-					var numNoteRests = notesInBeamArray.length;
-					//logError ('Found '+numNoteRests+' in beam');
-					var numNotesAboveMiddleLine = 0;
-					var numNotesBelowMiddleLine = 0;
-					var preferUpOrDown = 0;
-					
-					if (numNoteRests > 1) {
-						var maxOffsetFromMiddleLine = 0;
-						for (var i = 0; i<numNoteRests; i++) {
-							var theNoteRest = notesInBeamArray[i];
-							var numNotes = theNoteRest.notes.length;
-							
-							var maxOffsetFromMiddleLineInChord = 0;
-							var chordPreferUpOrDown = 0;
-							
-							// Go through notes in the chord
-							for (var j = 0; j < numNotes; j++) {
-								var note = theNoteRest.notes[j];
-								var offsetFromMiddleLine = 4 - note.line; // 0 = top line, 1 = top space, 2 = second top line, etc...
-								if (offsetFromMiddleLine != 0) {
-									if (Math.abs(offsetFromMiddleLine) > Math.abs(maxOffsetFromMiddleLineInChord)) {
-										maxOffsetFromMiddleLineInChord = offsetFromMiddleLine;
-										chordPreferUpOrDown = (offsetFromMiddleLine > 0) ? -1 : 1;
-									} else {
-										if (offsetFromMiddleLine > 0) {
-											chordPreferUpOrDown --;
+			if (numVoicesInThisBar == 1) {
+				if (noteRest.beam != null) {
+					// is this the start of the beam?
+					var currBeam = noteRest.beam;
+					if (!currBeam.is(prevBeam)) {
+						//var beamPosAsPoint = currBeam.beamPos as point;
+						//var beamPosY = beamPosAsPoint.y;
+						var beamPosY = parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
+						// unfortunately I can't figure out a way to access QPair in Qt
+						//logError ('beamPos = '+beamPosY);
+						//start of a new beam
+						// collate all beams into an array
+						prevBeam = currBeam;
+						var notesInBeamArray = [];
+						var currNote = noteRest;
+						while (currNote.beam != null) {
+							if (!currNote.beam.is(currBeam)) break;
+							notesInBeamArray.push(currNote);
+							currNote = getNextNoteRest (currNote);
+						}
+	
+						var numNoteRests = notesInBeamArray.length;
+						//logError ('Found '+numNoteRests+' in beam');
+						var numNotesAboveMiddleLine = 0;
+						var numNotesBelowMiddleLine = 0;
+						var preferUpOrDown = 0;
+						
+						if (numNoteRests > 1) {
+							var maxOffsetFromMiddleLine = 0;
+							for (var i = 0; i<numNoteRests; i++) {
+								var theNoteRest = notesInBeamArray[i];
+								var numNotes = theNoteRest.notes.length;
+								
+								var maxOffsetFromMiddleLineInChord = 0;
+								var chordPreferUpOrDown = 0;
+								
+								// Go through notes in the chord
+								for (var j = 0; j < numNotes; j++) {
+									var note = theNoteRest.notes[j];
+									var offsetFromMiddleLine = 4 - note.line; // 0 = top line, 1 = top space, 2 = second top line, etc...
+									if (offsetFromMiddleLine != 0) {
+										if (Math.abs(offsetFromMiddleLine) > Math.abs(maxOffsetFromMiddleLineInChord)) {
+											maxOffsetFromMiddleLineInChord = offsetFromMiddleLine;
+											chordPreferUpOrDown = (offsetFromMiddleLine > 0) ? -1 : 1;
 										} else {
-											chordPreferUpOrDown ++;
+											chordPreferUpOrDown = chordPreferUpOrDown + (offsetFromMiddleLine > 0) ? -1 : 1; 
 										}
 									}
+									
 								}
 								
-							}
-							
-							//logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
-							
-							if (chordPreferUpOrDown != 0) {
-								if (chordPreferUpOrDown > 0) {
-									preferUpOrDown ++;
-									numNotesBelowMiddleLine ++;
+								//logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
+								
+								if (chordPreferUpOrDown != 0) {
+									if (chordPreferUpOrDown > 0) {
+										preferUpOrDown ++;
+										numNotesBelowMiddleLine ++;
+									}
+									if (chordPreferUpOrDown < 0) {
+										preferUpOrDown --;
+										numNotesAboveMiddleLine ++;
+									}
 								}
-								if (chordPreferUpOrDown < 0) {
-									preferUpOrDown --;
-									numNotesAboveMiddleLine ++;
-								}
+								if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
+								//logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
+	
 							}
-							if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
-							//logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
-
-						}
-						var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
-						// 1 is stems down; 2 is stems up
-						// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
-						var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
-						//logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
-						
-						if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
-							if (preferUpOrDown > 0 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-							if (preferUpOrDown < 0 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-						} else {
-							if (numNotesAboveMiddleLine > numNotesBelowMiddleLine) {
-								if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+							var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
+							// 1 is stems down; 2 is stems up
+							// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
+							var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
+							//logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
+							
+							if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
+								if (preferUpOrDown > 0 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								if (preferUpOrDown < 0 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
 							} else {
-								if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								if (numNotesAboveMiddleLine > numNotesBelowMiddleLine) {
+									if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								} else {
+									if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								}
 							}
 						}
 					}
@@ -5449,15 +5401,8 @@ MuseScore {
 	function getArticulationArray (noteRest) {
 		// I WISH: you could just get the articulations of a note instead of having to do this hack
 		// I WISH: you could get the staffidx of a note/staff
-		var theTick;
-		if (noteRest.parent.type == Element.CHORD) {
-			theTick = noteRest.parent.parent.tick;
-		} else {
-			theTick = noteRest.parent.tick;
-		}
-		var theTrack = noteRest.track;
-		//logError("Getting artic at tick = "+theTick);
-		
+		var theTick = (noteRest.parent.type == Element.CHORD) ? noteRest.parent.parent.tick : noteRest.parent.tick;
+		var theTrack = noteRest.track;		
 		if (theTick == undefined || theTick == null) {
 			logError("getArticulationArray() — couldn’t get articulation tick for this item = "+theTick);
 		} else {
@@ -5534,18 +5479,11 @@ MuseScore {
 		if (tremolo == null || tremolo == undefined) logError("checkOneNoteTremolo() — tremolo is "+tremolo);
 		lastArticulationTick = currTick;
 		var tremDescription = tremolo.subtypeName();
-		var tremSubdiv;
-		if (tremDescription.includes("eighth")) {
-			tremSubdiv = 8;
-		} else {
-			var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
-		}
+		var tremSubdiv = (tremDescription.includes("eighth")) ? 8 : parseInt(tremDescription.match(/\d+/)[0]);
 		var strokesArray = [0,8,16,32,64];
 		var numStrokes = strokesArray.indexOf(tremSubdiv);
-		//logError("TREMOLO: parent parent tick is "+tremolo.parent.parent.tick);
-		//logError("TREMOLO: bbox height is "+tremolo.bbox.height+" elements is "+tremolo.elements);
 		var dur = parseFloat(noteRest.duration.ticks) / division;
-		//logError(" TREMOLO HAS "+numStrokes+" strokes); dur is "+dur;
+		
 		switch (numStrokes) {
 			case 0:
 				logError("checkOneNoteTremolo() — Couldn’t calculate number of strokes");
@@ -5565,7 +5503,6 @@ MuseScore {
 				addError("You don’t need more than 3 strokes for an unmeasured tremolo.",noteRest);
 				break;
 		}
-		//logError ("isStringInstrument: "+isStringInstrument+"; isSlurred: "+isSlurred);
 		if (isSlurred) addError("You shouldn’t slur over a tremolo.",noteRest);
 		if (isWindOrBrassInstrument && !flzFound && !flaggedFlz) {
 			addError ("I couldn't find an associated ‘flzg.’\nmarking for this fluttertongue note.",noteRest);

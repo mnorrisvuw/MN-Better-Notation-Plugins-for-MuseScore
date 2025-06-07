@@ -504,7 +504,7 @@ MuseScore {
 				currPCAccs[diatonicPitchClass] = acc;
 				wasGraceNote[diatonicPitchClass] = isGraceNote;
 				
-				if (accVisible && !accInKeySig) barAlteredPC[diatonicPitchClass] = currentBarNum;
+				if (accVisible) barAlteredPC[diatonicPitchClass] = currentBarNum;
 				barAltered[diatonicPitch] = currentBarNum;
 				
 				var alterationLabel = "";
