@@ -1,6 +1,6 @@
 # MN Better Notation Plugins for MuseScore
 
-A set of plug-ins for [MuseScore Studio 4.4](https://musescore.org/en) that check your scores for common notation and layout issues.
+A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that check your scores for common notation and layout issues.
 
   <p>
     <a href="#includedplugins">Included plug-ins</a> •
