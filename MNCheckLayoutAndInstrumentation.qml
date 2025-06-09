@@ -199,6 +199,7 @@ MuseScore {
 	property var errorObjects: []
 	property var prevBeam: null
 	property var wasHarmonic: false
+	property var isArco: false
 	
 	// ** INSTRUMENTS ** //
 	property var instrumentIds: []
@@ -220,6 +221,8 @@ MuseScore {
 	property var isPitchedPercussionInstrument: false
 	property var isUnpitchedPercussionInstrument: false
 	property var isPercussionInstrument: false
+	property var isShortDecayInstrument: false
+	property var isDecayInstrument: false
 	property var isKeyboardInstrument: false
 	property var isPedalInstrument: false
 	property var isVibraphone: false
@@ -274,7 +277,12 @@ MuseScore {
 	property var isHairpin: false
 	property var currentHairpin: null
 	property var currentHairpinEnd: 0
-	property var prevWasStartOfSlur: false
+	
+	// ** TRILLS ** //
+	property var trills: []
+	property var isTrill: false
+	property var currentTrill: null
+	property var currentTrillEnd: 0
 	
 	// ** PEDALS ** //
 	property var pedals: []
@@ -292,6 +300,7 @@ MuseScore {
 	property var flaggedSlurredRest: false
 	property var prevSlurNum: 0
 	property var prevSlurNumOnTrack: []
+	property var prevWasStartOfSlur: false
 	property var currentSlurNumOnTrack: []
 	property var nextSlurStartOnTrack: []
 	property var currentSlur: null
@@ -342,7 +351,7 @@ MuseScore {
 	property var prevNote: null
 	property var prevNotes: []
 	property var selectionArray: []
-	property var isTrem: false
+	property var isTremolo: false
 	property var prevWasGraceNote: false
 	property var firstDynamic: false
 	property var progressShowing: false
@@ -482,6 +491,7 @@ MuseScore {
 		for (var i = 0; i<numStaves; i++) {
 			pedals[i] = [];
 			hairpins[i] = [];
+			trills[i] = [];
 			oneNoteTremolos[i] = [];
 			twoNoteTremolos[i] = [];
 			glisses[i] = [];
@@ -515,7 +525,7 @@ MuseScore {
 		// ************		WE DO THIS FIRST, BECAUSE IT MARKS WHICH STAVES ARE VISIBLE ********* //
 		analyseInstrumentsAndStaves();
 		
-		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, SLURS, OTTAVAS, ETC) 	************ //
+		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, TRILLS, SLURS, OTTAVAS, ETC) 	************ //
 		analyseSpanners();
 		setProgress (2);
 		
@@ -616,6 +626,7 @@ MuseScore {
 		var currentPedal, currentPedalNum, numPedals, nextPedalStart, currentPedalEnd, flaggedPedalLocation;
 		var currentOttavaNum, numOttavas, nextOttavaStart, currentOttavaEnd;
 		var currentHairpinNum, numHairpins, nextHairpinStart, nextHairpin;
+		var currentTrillNum, numTrills, nextTrillStart, nextTrill;
 		var firstClefNumInBar, prevClefNumInBar;
 		var numSystems, currentSystem, currentSystemNum, numNoteRestsInThisSystem, numBeatsInThisSystem, noteCountInSystem, beatCountInSystem;
 		var maxNoteCountPerSystem, minNoteCountPerSystem, maxBeatsPerSystem, minBeatsPerSystem, actualStaffSize;
@@ -675,6 +686,7 @@ MuseScore {
 			isDiv = false;
 			firstDynamic = false;
 			wasHarmonic = false;
+			isArco = false;
 			
 			lastMetroSection = '';
 			lastMetronomeMarkingBar = -1;
@@ -735,6 +747,15 @@ MuseScore {
 			nextHairpin = (numHairpins == 0) ? null : hairpins[currentStaffNum][0];
 			nextHairpinStart = (numHairpins == 0) ? 0 : nextHairpin.spannerTick.ticks;
 			expressiveSwell = 0;
+			
+			// ** trills
+			currentTrill = null;
+			isTrill = false;
+			currentTrillNum = 0;
+			currentTrillEnd = 0;
+			numTrills = trills[currentStaffNum].length;
+			nextTrill = (numTrills == 0) ? null : trills[currentStaffNum][0];
+			nextTrillStart = (numTrills == 0) ? 0 : nextTrill.spannerTick.ticks;
 			
 			// ** ottavas
 			currentOttava = null;
@@ -1156,9 +1177,7 @@ MuseScore {
 										lastDynamicTick = currTick;
 										//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
 										
-									
 										currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
-	
 										var hairpinStartTick = currentHairpin.spannerTick.ticks;
 										var hairpinDur = currentHairpin.spannerTicks.ticks;
 										var nextHairpinDur;
@@ -1179,6 +1198,9 @@ MuseScore {
 										checkHairpins(cursor);
 										if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
 										//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
+										
+										// ———— CAN THIS BE DELETED???? ———— //
+										
 										if (currentHairpinNum < numHairpins - 1) {
 											nextHairpin = hairpins[currentStaffNum][currentHairpinNum+1];
 											nextHairpinStart = nextHairpin.spannerTick.ticks;
@@ -1188,6 +1210,51 @@ MuseScore {
 											nextHairpinStart = 0;
 											//logError("This is the last slur in this staff ");
 										}
+									}
+								}
+							}
+							
+							// ************ UNDER A TRILL? ************ //
+							var readyToGoToNextTrill = false;
+							if (currentTrillNum < numTrills) {
+								if (currentTrill == null) {
+									readyToGoToNextTrill = true;
+								} else {
+									if (currTick >= currentTrillEnd) {
+										currentTrill = null;
+										isTrill = false;
+										currentTrillNum ++;
+										if (currentTrillNum < numTrills) {
+											nextTrill = trills[currentStaffNum][currentTrillNum];
+											nextTrillStart = nextTrill.spannerTick.ticks;
+											readyToGoToNextTrill = true;
+											//logError("nextHairpin num = "+currentHairpinNum+" "+nextHairpin.hairpinType);
+										}
+									}
+								}
+							}
+							if (readyToGoToNextTrill) {
+								//logError("Next trill start = "+nextTrillStart+" currTick = "+currTick);
+							
+								if (currTick >= nextTrillStart) {
+									isTrill = true;
+									//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
+									
+									currentTrill = trills[currentStaffNum][currentTrillNum];
+									var trillStartTick = currentTrill.spannerTick.ticks;
+									var trillDur = currentTrill.spannerTicks.ticks;
+									var nextTrillDur;
+									//logError("found hairpin of type"+currentHairpin.hairpinType+", length "+hairpinDur);
+							
+									currentTrillEnd = trillStartTick + trillDur;
+									if (currentTrillNum == trills[currentStaffNum].length - 1){
+										nextTrill = null;
+										nextTrillStart = -1;
+										nextTrillDur = 0;
+									} else {
+										nextTrill = trills[currentStaffNum][currentTrillNum+1];
+										nextTrillStart = nextTrill.spannerTick.ticks;
+										nextTrillDur = nextTrill.spannerTicks.ticks;
 									}
 								}
 							}
@@ -1250,7 +1317,7 @@ MuseScore {
 							if (eType == Element.KEYSIG && currentStaffNum == 0) checkKeySignature(elem,cursor.keySignature);
 						
 							// ************ CHECK TREMOLO ************ //
-							isTrem = (oneNoteTremolos[currentStaffNum][currTick] != null);
+							isTremolo = (oneNoteTremolos[currentStaffNum][currTick] != null) || (twoNoteTremolos[currentStaffNum][currTick] != null);
 							
 							/*
 							for (var i = 0; i < tempoText.length; i++) {
@@ -1346,7 +1413,7 @@ MuseScore {
 									var isTiedForward = noteRest.notes[0].tieForward != null;
 									isTied = isTiedBack || isTiedForward;
 
-									if (isNote && !isTrem) flzFound = false;
+									if (isNote && !isTremolo) flzFound = false;
 									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
 										var nextChordRest = getNextChordRest(cursor);
 										if (nextChordRest != null) {
@@ -1376,7 +1443,6 @@ MuseScore {
 									
 															
 									// ************ CHECK LYRICS ************ //
-							
 									if (doCheckVoice && isVoice) checkLyrics(noteRest);
 								
 									// ************ CHECK GRACE NOTES ************ //
@@ -1390,7 +1456,6 @@ MuseScore {
 																
 									// ************ CHECK STACCATO ISSUES ************ //
 									var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
-									
 									if (theArticulationArray) {
 										lastArticulationTick = currTick;
 										var numStaccatos = 0;
@@ -1433,7 +1498,6 @@ MuseScore {
 									if (doCheckRangeRegister) checkInstrumentalRanges(noteRest);
 								
 									// ************ CHECK STRING ISSUES ************ //
-									
 									if (doCheckStrings && isStringInstrument) {
 									
 										// ************ CHECK STRING HARMONIC ************ //
@@ -1453,9 +1517,10 @@ MuseScore {
 										}
 									
 									} // end isStringInstrument
-								
-								
-								
+									
+									// ************ CHECK SHORT DECAY INSTRUMENT ISSUES ************ //
+									if (doCheckPianoHarpAndPercussion && (isDecayInstrument || isShortDecayInstrument)) checkDecayInstrumentIssues(noteRest);
+																
 									// ************ CHECK FLUTE HARMONIC ************ //
 									if (doCheckWindsAndBrass && isFlute) checkFluteHarmonic(noteRest);
 								
@@ -1767,7 +1832,7 @@ MuseScore {
 		var s = curScore.selection;
 		//logError ('Selection is: '+s.startStaff+' '+s.endStaff+' '+s.startSegment.tick);
 		//logError ('Elems length = '+elems.length);
-		var prevSlurSegment = null, prevHairpinSegment = null, prevOttavaSegment = null, prevGlissSegment = null, prevPedalSegment = null, prevLV = null;
+		var prevSlurSegment = null, prevHairpinSegment = null, prevTrillSegment = null, prevOttavaSegment = null, prevGlissSegment = null, prevPedalSegment = null, prevLV = null;
 		var firstChord = null;
 		if (elems.length == 0) {
 			addError ('analyseSpanners() — elems.length was 0');
@@ -1875,6 +1940,21 @@ MuseScore {
 				prevHairpinSegment = e;
 			}
 			
+			// *** TRILLS *** //
+			if (etype == Element.TRILL) trills[staffIdx].push(e);
+			if (etype == Element.TRILL_SEGMENT) {
+				//logError ('found hairpin');
+				var sameLoc = false;
+				var sameTrill = false;
+				if (prevTrillSegment != null) {
+					sameLoc = (e.spannerTick.ticks == prevTrillSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevTrillSegment.spannerTicks.ticks);
+					if (sameLoc) sameTrill = !e.parent.is(prevTrillSegment.parent);
+				}
+				// only add it if it's not already added
+				if (!sameTrill) trills[staffIdx].push(e);
+				prevTrillSegment = e;
+			}
+			
 			// *** OTTAVAS
 			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
 			if (etype == Element.OTTAVA_SEGMENT) {
@@ -1888,7 +1968,7 @@ MuseScore {
 				prevOttavaSegment = e;
 			}
 			
-			// *** GLISSANDI
+			// *** GLISSANDI *** //
 			if (etype == Element.GLISSANDO) glisses[staffIdx][e.parent.parent.parent.tick] = e;
 			if (etype == Element.GLISSANDO_SEGMENT) {
 				var sameLoc = false;
@@ -1901,7 +1981,7 @@ MuseScore {
 				prevGlissandoSegment = e;
 			}
 			
-			// *** SLURS
+			// *** SLURS *** //
 			if (etype == Element.SLUR) slurs[etrack].push(e);
 			if (etype == Element.SLUR_SEGMENT) {
 				var sameLoc = false;
@@ -1917,6 +1997,7 @@ MuseScore {
 				prevSlurSegment = e;
 			}
 			
+			// *** PEDAL MARKINGS *** //
 			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
 			if (etype == Element.PEDAL_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
 				var sameLoc = false;
@@ -1929,8 +2010,12 @@ MuseScore {
 				if (!samePedal) pedals[staffIdx].push(e);
 				prevPedalSegment = e;
 			}
+			
+			// *** TREMOLOS *** //
 			if (etype == Element.TREMOLO_SINGLECHORD) oneNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
+			
+			// *** FERMATAS *** //
 			if (etype == Element.FERMATA) {
 				var theTick = e.parent.tick;
 				fermatas.push(e);
@@ -1938,15 +2023,14 @@ MuseScore {
 				fermataLocs.push(locArr);
 			}
 			
-			if (etype == Element.DYNAMIC) {
-				//logError ('Found dynamic');
-				dynamics[staffIdx].push(e);
-			}
+			// *** DYNAMICS & CLEFS *** //
+			if (etype == Element.DYNAMIC) dynamics[staffIdx].push(e);
 			if (etype == Element.CLEF) clefs[staffIdx].push(e);
+			
+			// *** L.Vs *** //
 			if (etype == Element.LAISSEZ_VIB) {
 				lv[staffIdx][e.spannerTick.ticks] = e;
 				prevLV = e;
-				//logError ('Found LV');
 			}
 			if (etype == Element.LAISSEZ_VIB_SEGMENT) {
 				//logError ('Found LV');
@@ -1962,7 +2046,7 @@ MuseScore {
 				prevLV = e;
 			}
 			
-			// this doesn't get articulation grace notes unfortunately
+			// *** ARTICULATION *** //
 			if (etype == Element.ARTICULATION) {
 				var theTick = (e.parent.parent.type == Element.CHORD) ? e.parent.parent.parent.tick : e.parent.parent.tick;
 				var theTrack = e.track;
@@ -2355,6 +2439,7 @@ MuseScore {
 		var celloStringNames = ["C","G","D","A"];
 		var bassStrings = [28,33,38,43];
 		var bassStringNames = ["E","A","D","G"];
+		var shortDecayInstruments = ["xylophone","drum.","brake-drum"];
 		
 		if (currentInstrumentId != "") {
 			isStringInstrument = currentInstrumentId.includes("strings.");
@@ -2364,6 +2449,8 @@ MuseScore {
 			isUnpitchedPercussionInstrument = false;
 			if (!isPitchedPercussionInstrument) isUnpitchedPercussionInstrument = currentInstrumentId.includes("drum.") || currentInstrumentId.includes("effect.") || currentInstrumentId.includes("metal.") || currentInstrumentId.includes("wood.");
 			isPercussionInstrument = isPitchedPercussionInstrument || isUnpitchedPercussionInstrument;
+			isShortDecayInstrument = false;
+			for (var i = 0; i < shortDecayInstruments.length && !isShortDecayInstrument; i++) if (currentInstrumentId.includes(shortDecayInstruments[i])) isShortDecayInstrument = true;
 			isKeyboardInstrument = currentInstrumentId.includes("keyboard");
 			isPedalInstrument = currentInstrumentId.includes("piano") || currentInstrumentId.includes("vibraphone");
 			isVibraphone = currentInstrumentId.includes("vibraphone");
@@ -2376,6 +2463,7 @@ MuseScore {
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
 			isCello = currentInstrumentId.includes("cello");
+			isDecayInstrument = isPercussionInstrument || isHarp || isPiano;
 			checkInstrumentClefs = false;
 			reads8va = false;
 			readsTreble = true;
@@ -3203,9 +3291,12 @@ MuseScore {
 			if (lowerCaseText.substring(0,3) === "flz") {
 				// check trem
 				flzFound = true;
-				if (!isTrem) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
+				if (!isTremolo) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
 			}
 		}
+		if (lowerCaseText === "arco") isArco = true;
+		if (lowerCaseText === "ord." || lowerCaseText.includes("sticks") || lowerCaseText.includes("mallet")) isArco = false;
+		
 		if (isStringInstrument && doCheckStrings) {
 			
 			if (lowerCaseText === "détaché" || lowerCaseText === "detaché" || lowerCaseText === "detache") addError ("You don’t need to write ‘détaché’ here.\nA passage without slurs will be played détaché by default.",textObject);
@@ -5121,6 +5212,23 @@ MuseScore {
 			if (slurDurInSecs > maxSlurDuration) addError ("This slur/bow mark may be too long at the stated dynamic.\nCheck with a performer whether a shorter one would be more appropriate.",currentSlur);
 		}
 		
+	}
+	
+	function checkDecayInstrumentIssues(noteRest) {
+		var dur = noteRest.duration.ticks;
+		if (isArco) return;
+		var n = noteRest.notes[0];
+		var isTied = n.tieBack != null || n.tieForward != null;
+		//logError ('dur = '+dur+'; isTremolo = '+isTremolo+'; isTrill = '+isTrill+' isTied = '+isTied);
+		if (isShortDecayInstrument) {
+			if ((dur > division * 2 || (dur > division && isTied)) && !isTremolo && !isTrill) {
+				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has no sustain.\nConsider shortening to one beat.",noteRest);
+			}
+		} else {
+			if ((dur > division * 4 || (dur > division * 2 && isTied)) && !isTremolo && !isTrill) {
+				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has relatively short sustain.\nConsider shortening to one beat.",noteRest);
+			}
+		}
 	}
 	
 	function checkHarpIssues (currentBar, staffNum) {
