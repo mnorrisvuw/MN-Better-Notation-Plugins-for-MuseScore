@@ -3,7 +3,7 @@
  *
  */
 
-// this version requires MuseScore Studio 4.4 or later
+// this version requires MuseScore Studio 4.5.1 or later
 
 import MuseScore 3.0
 import QtQuick 2.9
@@ -41,6 +41,7 @@ MuseScore {
 	property var currentZ: 16384
 	property var numLogs: 0
 	property var versionNumber: ''
+	property var version46: false
 	
 	// ** OPTIONS **
 	property var doCheckScoreStyle: true
@@ -399,6 +400,7 @@ MuseScore {
 			dialog.show();
 			return;
 		}
+		version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
 		
 		// **** INITIALISE MAIN VARIABLES **** //
 		var staves = curScore.staves;
@@ -775,7 +777,7 @@ MuseScore {
 			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
-			currentInstrumentId = currentStaff.part.instrumentId;
+			currentInstrumentId = version46 ? currentStaff.part.musicXmlId : currentStaff.part.instrumentId;
 			currentInstrumentName = currentStaff.part.longName;
 			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — this routine does that
 			calculateCalcId();
@@ -1329,7 +1331,7 @@ MuseScore {
 								var nextInstrumentChangeTick = instrumentChanges[currentStaffNum][currentInstrumentNum].parent.tick;
 								if (currTick >= nextInstrumentChangeTick) {
 									var newInstrument = curScore.staves[currentStaffNum].part.instrumentAtTick(currTick);
-									currentInstrumentId = newInstrument.instrumentId;
+									currentInstrumentId = version46 ? newInstrument.musicXmlId : newInstrument.instrumentId;
 									calculateCalcId();
 									currentInstrumentName = newInstrument.longName;
 									
@@ -2141,7 +2143,7 @@ MuseScore {
 				visiblePartFound = true;
 				firstVisibleStaff = i;
 			}
-			currentInstrumentId = part.instrumentId;
+			currentInstrumentId = version46 ? part.musicXmlId : part.instrumentId;
 			logError ('Staff '+i+' is '+currentInstrumentId+' '+currentInstrumentId.length+' '+currentInstrumentId.replace(/</g,"≤"));
 
 			calculateCalcId();
@@ -2258,7 +2260,7 @@ MuseScore {
 			// CHECK ALL SEXTETS, OR SEPTETS AND LARGER THAT DON"T MIX WINDS & STRINGS
 			for (var i = 0; i < numStaves; i++) {
 				if (staffVisible[i]) {
-					var instrumentType = curScore.staves[i].part.instrumentId;
+					var instrumentType = version46? curScore.staves[i].part.musicXmlId : curScore.staves[i].part.instrumentId;
 					if (instrumentType.includes("strings.")) scoreHasStrings = true;
 					if (instrumentType.includes("wind.")) scoreHasWinds = true;
 					if (instrumentType.includes("brass.")) scoreHasBrass = true;
@@ -2296,7 +2298,7 @@ MuseScore {
 		if (numParts > 3 && numParts < 6) {
 			for (var i = 0; i < numStaves; i ++) {
 				if (staffVisible[i]) {
-					var id = curScore.staves[i].part.instrumentId;
+					var id = version46 ? curScore.staves[i].part.musicXmlId : curScore.staves[i].part.instrumentId;
 					if (id.includes("wind.flutes.flute")) {
 						numFl ++;
 						flStaff = i;
