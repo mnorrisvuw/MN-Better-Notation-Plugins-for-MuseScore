@@ -72,23 +72,29 @@ MuseScore {
 		removeManualTextFormattingOption = options.removeManualFormatting;
 		
 		options.close();
-		
+	
 		numStaves = curScore.nstaves;
 		
+		// *** REMOVE ANY COMMENTS AND HIGHLIGHTS THAT MIGHT BE LEFT OVER FROM OTHER PLUGINS ***
+		deleteAllCommentsAndHighlights();
+		
 		var finalMsg = '';
-		// get some variables
+		
+		// calculate the spatium
 		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI;
 		
+		// *** ANALYSE ALL INSTRUMENTS AND STAVES *** //
 		analyseInstrumentsAndStaves();
 
-
+		// *** SELECT ALL *** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		firstMeasure = curScore.firstMeasure;
 		var visibleParts = [];
-		// ** calculate number of parts, but ignore hidden ones
+		
+		// *** Calculate number of parts, but ignore hidden ones *** //
 		for (var i = 0; i < curScore.parts.length; i++) if (curScore.parts[i].show) visibleParts.push(curScore.parts[i]);
 		numParts = visibleParts.length;
 		isSoloScore = numParts == 1;
@@ -96,26 +102,26 @@ MuseScore {
 		numExcerpts = excerpts.length;
 		if (numParts > 1 && numExcerpts < numParts) finalMsg = "<b>NOTE</b>: Parts for this score have not yet been created/opened, so I wasn’t able to change the part layout settings.\nYou can create them by clicking ‘Parts’, then ’Open All’. Once you have created and opened the parts, please run this plug-in again on the score to change the part layout settings. (Ignore this if you do not plan to create parts.)";
 		
-		// REMOVE LAYOUT BREAKS
+		// *** REMOVE LAYOUT BREAKS *** //
 		if (removeLayoutBreaksOption || removeStretchesOption) removeLayoutBreaksAndStretches();
 		
-		// SET ALL THE SPACING-RELATED SETTINGS
+		// *** SET ALL THE SPACING-RELATED SETTINGS *** //
 		if (setSpacingOption) setSpacing();
 		
-		// SET ALL THE OTHER STYLE SETTINGS
+		// *** SET ALL THE OTHER STYLE SETTINGS *** //
 		if (setOtherStyleSettings) setOtherStyleSettings();
 		
-		// FONT SETTINGS
+		// *** FONT SETTINGS *** //
 		if (setTimesOption) setTimes();
 		if (setBravuraOption) setBravura();
 		if (setFontSizesOption) setFontSizes();
 		if (formatTempoMarkingsOption) formatTempoMarkings();
 		if (removeManualTextFormattingOption) removeManualTextFormatting();
 		
-		// LAYOUT THE TITLE FRAME ON p. 1
+		// *** LAYOUT THE TITLE FRAME ON p. 1 *** //
 		if (setTitleFrameOption) setTitleFrame();
 		
-		// SET PART SETTINGS
+		// *** SET PART SETTINGS
 		if (setPartsOption) setPartSettings();
 		
 		if (connectBarlinesOption) doConnectBarlines();
@@ -124,7 +130,7 @@ MuseScore {
 		// CHANGE INSTRUMENT NAMES
 		//changeInstrumentNames();
 		
-		// SELECT NONE
+		// *** SELECT NONE AND FORCE REDRAW *** //
 		
 		curScore.startCmd();
 		cmd ('escape');
@@ -132,6 +138,7 @@ MuseScore {
 		cmd ('concert-pitch');
 		cmd ('concert-pitch');
 		curScore.endCmd();
+		
 		var dialogMsg = '';
 		if (amendedParts) {
 			dialogMsg = '<p>Changes to the layout of the score and parts were made successfully.</p><p><b>NOTE</b>: If your parts were open, you may need to close and re-open them if the layout changes have not been updated.</p><p>Note that some changes may not be optimal, and further tweaks are likely to be required.</p>';
@@ -433,8 +440,6 @@ MuseScore {
 		}*/
 	}
 	
-	
-	
 	function setSpacing() {
 
 		// change staff spacing
@@ -494,27 +499,1796 @@ MuseScore {
 	
 	function setOtherStyleSettings() {
 		
-		curScore.startCmd();
+		//MARK: TOP OF STYLE SETTINGS
 		
-		// BAR SETTINGS
-		setSetting ("minMeasureWidth", isSoloScore ? 14.0 : 16.0);
-		setSetting ("measureSpacing",1.5);
-		setSetting ("barWidth",0.16);
-		setSetting ("showMeasureNumberOne", 0);
-		setSetting ("minNoteDistance", isSoloScore ? 1.1 : 0.6);
-		setSetting ("staffDistance", 5);
-		setSetting ("barNoteDistance",1.4);
-		setSetting ("barAccidentalDistance",0.8);
-
-		// SLUR SETTINGS
-		setSetting ("slurEndWidth",0.06);
-		setSetting ("slurMidWidth",0.16);
-	
-		setSetting ("lastSystemFillLimit", 0);
-		setSetting ("crossMeasureValues",0);
-		setSetting ("tempoFontStyle", 1);
-		setSetting ("metronomeFontStyle", 0);
-		setSetting ("staffLineWidth",0.1);
+		// HERE IS THE COMPLETE LIST OF STYLE IDs
+		// SOME OF THEM HAVE BEEN SET IN PREVIOUS ROUTINES
+		curScore.startCmd();
+		var completeDefaultSettings = [		
+		"staffUpperBorder","",
+		"staffLowerBorder","",
+		"staffHeaderFooterPadding","",
+		"staffDistance", 5, // ????
+		"instrumentNameOffset","",
+		"akkoladeDistance","",
+		"minSystemDistance","",
+		"maxSystemDistance","",
+		"alignSystemToMargin","",
+		
+		"enableVerticalSpread","",
+		"spreadSystem","",
+		"spreadSquareBracket","",
+		"spreadCurlyBracket","",
+		"minSystemSpread","", // set previously
+		"maxSystemSpread","", // set previously
+		"minStaffSpread","", // set previously
+		"maxStaffSpread","", // set previously
+		"maxAkkoladeDistance","",
+		"maxPageFillSpread","",
+		
+		"lyricsPlacement", 1, // Lyrics → Position
+		"lyricsPosAbove", -2, // Lyrics → Offset above
+		"lyricsPosBelow", 3, // Lyrics → Position
+		"lyricsMinTopDistance", 1, // Lyrics → Min. margin to current stave
+		"lyricsMinBottomDistance", 1.5, // Lyrics → Min. margin to other staves
+		"lyricsMinDistance", 0.25, // Lyrics → Min. gap between lyrics
+		"lyricsLineHeight","",
+		"lyricsDashMinLength","",
+		"lyricsDashMaxLength","",
+		"lyricsDashMaxDistance","",
+		"lyricsDashForce","",
+		"lyricsDashFirstAndLastGapAreHalf","",
+		"lyricsAlignVerseNumber","",
+		"lyricsLineThickness","",
+		"lyricsMelismaAlign","",
+		"lyricsMelismaPad","",
+		"lyricsDashPad","",
+		"lyricsDashLineThickness","",
+		"lyricsDashYposRatio","",
+		
+		"lyricsShowDashIfSyllableOnFirstNote","",
+		"lyricsMelismaForce","",
+		"lyricsMelismaMinLength","",
+		"lyricsDashPosAtStartOfSystem","",
+		"lyricsAvoidBarlines","",
+		"lyricsLimitDashCount","",
+		"lyricsMaxDashCount","",
+		"lyricsCenterDashedSyllables","",
+		
+		"lyricsOddFontFace","",
+		"lyricsOddFontSize","",
+		"lyricsOddLineSpacing","",
+		"lyricsOddFontSpatiumDependent","",
+		"lyricsOddFontStyle","",
+		"lyricsOddColor","",
+		"lyricsOddAlign","",
+		"lyricsOddFrameType","",
+		"lyricsOddFramePadding","",
+		"lyricsOddFrameWidth","",
+		"lyricsOddFrameRound","",
+		"lyricsOddFrameFgColor","",
+		"lyricsOddFrameBgColor","",
+		
+		"lyricsEvenFontFace","",
+		"lyricsEvenFontSize","",
+		"lyricsEvenLineSpacing","",
+		"lyricsEvenFontSpatiumDependent","",
+		"lyricsEvenFontStyle","",
+		"lyricsEvenColor","",
+		"lyricsEvenAlign","",
+		"lyricsEvenFrameType","",
+		"lyricsEvenFramePadding","",
+		"lyricsEvenFrameWidth","",
+		"lyricsEvenFrameRound","",
+		"lyricsEvenFrameFgColor","",
+		"lyricsEvenFrameBgColor","",
+		
+		"figuredBassFontFamily","",
+		"//      figuredBassFontSize","",
+		"figuredBassYOffset","",
+		"figuredBassLineHeight","",
+		"figuredBassAlignment","",
+		"figuredBassStyle","",
+		"systemFrameDistance","",
+		"frameSystemDistance","",
+		"minMeasureWidth", isSoloScore ? 14.0 : 16.0, // Bars → Minimum Bar Width
+		
+		"barWidth", 0.16, // Barlines → Thin Barline Thickness
+		"doubleBarWidth","",
+		"endBarWidth","",
+		"doubleBarDistance","",
+		"endBarDistance","",
+		"repeatBarlineDotSeparation","",
+		"repeatBarTips","",
+		"startBarlineSingle","",
+		"startBarlineMultiple","",
+		"maskBarlinesForText","",
+		
+		"bracketWidth","",
+		"bracketDistance","",
+		"akkoladeWidth","",
+		"akkoladeBarDistance","",
+		"dividerLeft","",
+		"dividerLeftSym","",
+		"dividerLeftX","",
+		"dividerLeftY","",
+		"dividerRight","",
+		"dividerRightSym","",
+		"dividerRightX","",
+		"dividerRightY","",
+		
+		"clefLeftMargin","",
+		"keysigLeftMargin","",
+		"ambitusMargin","",
+		"timesigLeftMargin","",
+		
+		"midClefKeyRightMargin","",
+		"clefKeyRightMargin","",
+		"clefKeyDistance","",
+		"clefTimesigDistance","",
+		"keyTimesigDistance","",
+		"keyBarlineDistance","",
+		"systemHeaderDistance","",
+		"systemHeaderTimeSigDistance","",
+		"systemHeaderMinStartOfSystemDistance","",
+		"systemTrailerRightMargin","",
+		
+		"clefBarlineDistance","",
+		"timesigBarlineDistance","",
+		
+		"timeSigPlacement","",
+		
+		"timeSigCenterOnBarline","",
+		"timeSigVSMarginCentered","",
+		"timeSigVSMarginNonCentered","",
+		"timeSigCenterAcrossStaveGroup","",
+		
+		"timeSigNormalStyle","",
+		"timeSigNormalScale","",
+		"timeSigNormalScaleLock","",
+		"timeSigNormalNumDist","",
+		"timeSigNormalY","",
+		"timeSigAboveStyle","",
+		"timeSigAboveScale","",
+		"timeSigAboveScaleLock","",
+		"timeSigAboveNumDist","",
+		"timeSigAboveY","",
+		"timeSigAcrossStyle","",
+		"timeSigAcrossScale","",
+		"timeSigAcrossScaleLock","",
+		"timeSigAcrossNumDist","",
+		"timeSigAcrossY","",
+		
+		"useStraightNoteFlags", 0, // Notes → Flag Style (0 = Traditional, 1 = Straight)
+		"stemWidth", 0.1, // Notes → Stem thickness
+		"shortenStem", 1, // Notes → Shorten Stems
+		"stemLength","",
+		"stemLengthSmall","",
+		"shortStemStartLocation","",
+		"shortestStem", 2.75, // Notes → Shortest Stem
+		"combineVoice","",
+		"beginRepeatLeftMargin","",
+		"minNoteDistance", isSoloScore ? 1.1 : 0.6, // Bars → Minimum Note Distance
+		"barNoteDistance", 1.4, // Bars → Padding → Barline to note
+		"barAccidentalDistance", 0.8, // Bars → Padding → Barline to accidental
+		"noteBarDistance","",
+		
+		"measureSpacing", 1.5, // Bars → Spacing ratio
+		"measureRepeatNumberPos","",
+		"mrNumberSeries","",
+		"mrNumberEveryXMeasures","",
+		"mrNumberSeriesWithParentheses","",
+		"oneMeasureRepeatShow1","",
+		"fourMeasureRepeatShowExtenders","",
+		"staffLineWidth", 0.1, // Score → Stave line thickness
+		"ledgerLineWidth","",
+		"ledgerLineLength","",
+		"stemSlashPosition","",
+		"stemSlashAngle","",
+		"stemSlashThickness","",
+		"accidentalDistance","",
+		"accidentalNoteDistance","",
+		"bracketedAccidentalPadding","",
+		"alignAccidentalsLeft","",
+		"accidentalOrderFollowsNoteDisplacement","",
+		"alignAccidentalOctavesAcrossSubChords","",
+		"keepAccidentalSecondsTogether","",
+		"alignOffsetOctaveAccidentals","",
+		"keysigAccidentalDistance","",
+		"keysigNaturalDistance","",
+		"beamWidth","",
+		"useWideBeams","",
+		"beamMinLen","",
+		"beamNoSlope","",
+		"snapCustomBeamsToGrid","",
+		"frenchStyleBeams","",
+		
+		"dotMag","",
+		"dotNoteDistance","",
+		"dotRestDistance","",
+		"dotDotDistance","",
+		"propertyDistanceHead","",
+		"propertyDistanceStem","",
+		"propertyDistance","",
+		"articulationMag","",
+		"articulationPosAbove","",
+		"articulationAnchorDefault","",
+		"articulationAnchorLuteFingering","",
+		"articulationAnchorOther","",
+		"articulationStemHAlign","",
+		"articulationKeepTogether","",
+		"trillAlwaysShowCueNote","",
+		"lastSystemFillLimit", 0, // Page → Last system fill threshold
+		
+		"hairpinPlacement","",
+		"hairpinPosAbove","",
+		"hairpinPosBelow","",
+		"hairpinLinePosAbove","",
+		"hairpinLinePosBelow","",
+		"hairpinHeight","",
+		"hairpinContHeight","",
+		"hairpinLineWidth","",
+		"hairpinFontFace","",
+		"hairpinFontSize","",
+		"hairpinLineSpacing","",
+		"hairpinFontSpatiumDependent","",
+		"hairpinFontStyle","",
+		"hairpinColor","",
+		"hairpinTextAlign","",
+		"hairpinFrameType","",
+		"hairpinFramePadding","",
+		"hairpinFrameWidth","",
+		"hairpinFrameRound","",
+		"hairpinFrameFgColor","",
+		"hairpinFrameBgColor","",
+		"hairpinText","",
+		"hairpinCrescText","",
+		"hairpinDecrescText","",
+		"hairpinCrescContText","",
+		"hairpinDecrescContText","",
+		"hairpinLineStyle","",
+		"hairpinDashLineLen","",
+		"hairpinDashGapLen","",
+		"hairpinLineLineStyle","",
+		"hairpinLineDashLineLen","",
+		"hairpinLineDashGapLen","",
+		
+		"pedalPlacement","",
+		"pedalPosAbove","",
+		"pedalPosBelow","",
+		"pedalLineWidth","",
+		"pedalLineStyle","",
+		"pedalDashLineLen","",
+		"pedalDashGapLen","",
+		"pedalHookHeight","",
+		"pedalFontFace","",
+		"pedalFontSize","",
+		"pedalLineSpacing","",
+		"pedalFontSpatiumDependent","",
+		"pedalMusicalSymbolsScale","",
+		"pedalFontStyle","",
+		"pedalColor","",
+		"pedalTextAlign","",
+		"pedalFrameType","",
+		"pedalFramePadding","",
+		"pedalFrameWidth","",
+		"pedalFrameRound","",
+		"pedalFrameFgColor","",
+		"pedalFrameBgColor","",
+		"pedalText","",
+		"pedalHookText","",
+		"pedalContinueText","",
+		"pedalContinueHookText","",
+		"pedalEndText","",
+		"pedalRosetteEndText","",
+		
+		"trillPlacement","",
+		"trillPosAbove","",
+		"trillPosBelow","",
+		
+		"vibratoPlacement","",
+		"vibratoPosAbove","",
+		"vibratoPosBelow","",
+		
+		"harmonyFretDist","",
+		"minHarmonyDistance","",
+		"maxHarmonyBarDistance","",
+		"maxChordShiftAbove","",
+		"maxChordShiftBelow","",
+		
+		"harmonyPlacement","",
+		"romanNumeralPlacement","",
+		"nashvilleNumberPlacement","",
+		"harmonyVoiceLiteral","",
+		"harmonyVoicing","",
+		"harmonyDuration","",
+		
+		"chordSymbolAPosAbove","",
+		"chordSymbolAPosBelow","",
+		
+		"chordSymbolBPosAbove","",
+		"chordSymbolBPosBelow","",
+		
+		"romanNumeralPosAbove","",
+		"romanNumeralPosBelow","",
+		
+		"nashvilleNumberPosAbove","",
+		"nashvilleNumberPosBelow","",
+		
+		"chordSymbolAFontFace","",
+		"chordSymbolAFontSize","",
+		"chordSymbolALineSpacing","",
+		"chordSymbolAFontSpatiumDependent","",
+		"chordSymbolAFontStyle","",
+		"chordSymbolAColor","",
+		"chordSymbolAAlign","",
+		"chordSymbolAFrameType","",
+		"chordSymbolAFramePadding","",
+		"chordSymbolAFrameWidth","",
+		"chordSymbolAFrameRound","",
+		"chordSymbolAFrameFgColor","",
+		"chordSymbolAFrameBgColor","",
+		
+		"chordSymbolBFontFace","",
+		"chordSymbolBFontSize","",
+		"chordSymbolBLineSpacing","",
+		"chordSymbolBFontSpatiumDependent","",
+		"chordSymbolBFontStyle","",
+		"chordSymbolBColor","",
+		"chordSymbolBAlign","",
+		"chordSymbolBFrameType","",
+		"chordSymbolBFramePadding","",
+		"chordSymbolBFrameWidth","",
+		"chordSymbolBFrameRound","",
+		"chordSymbolBFrameFgColor","",
+		"chordSymbolBFrameBgColor","",
+		
+		"romanNumeralFontFace","",
+		"romanNumeralFontSize","",
+		"romanNumeralLineSpacing","",
+		"romanNumeralFontSpatiumDependent","",
+		"romanNumeralFontStyle","",
+		"romanNumeralColor","",
+		"romanNumeralAlign","",
+		"romanNumeralFrameType","",
+		"romanNumeralFramePadding","",
+		"romanNumeralFrameWidth","",
+		"romanNumeralFrameRound","",
+		"romanNumeralFrameFgColor","",
+		"romanNumeralFrameBgColor","",
+		
+		"nashvilleNumberFontFace","",
+		"nashvilleNumberFontSize","",
+		"nashvilleNumberLineSpacing","",
+		"nashvilleNumberFontSpatiumDependent","",
+		"nashvilleNumberFontStyle","",
+		"nashvilleNumberColor","",
+		"nashvilleNumberAlign","",
+		"nashvilleNumberFrameType","",
+		"nashvilleNumberFramePadding","",
+		"nashvilleNumberFrameWidth","",
+		"nashvilleNumberFrameRound","",
+		"nashvilleNumberFrameFgColor","",
+		"nashvilleNumberFrameBgColor","",
+		
+		"capoPosition","",
+		"fretNumMag","",
+		"fretNumPos","",
+		"fretY","",
+		"fretMinDistance","",
+		"fretMag","",
+		"fretPlacement","",
+		"fretStrings","",
+		"fretFrets","",
+		"fretNut","",
+		"fretDotSize","",
+		"fretDotSpatiumSize","",
+		"fretStringSpacing","",
+		"fretFretSpacing","",
+		"fretOrientation","",
+		"maxFretShiftAbove","",
+		"maxFretShiftBelow","",
+		"fretNutThickness","",
+		"fretUseCustomSuffix","",
+		"fretCustomSuffix","",
+		"barreAppearanceSlur","",
+		"barreLineWidth","",
+		"fretShowFingerings","",
+		"fretStyleExtended","",
+		
+		"showPageNumber","",
+		"showPageNumberOne","",
+		"pageNumberOddEven","",
+		"showMeasureNumber","",
+		"showMeasureNumberOne", 0, // Bar numbers → Show first
+		"measureNumberInterval","",
+		"measureNumberSystem","",
+		"measureNumberAllStaves","",
+		
+		"smallNoteMag","",
+		"scaleRythmicSpacingForSmallNotes","",
+		"graceNoteMag","",
+		"graceToMainNoteDist","",
+		"graceToGraceNoteDist","",
+		"smallStaffMag","",
+		"smallClefMag","",
+		"genClef","",
+		"hideTabClefAfterFirst","",
+		"genKeysig","",
+		"genCourtesyTimesig","",
+		"genCourtesyKeysig","",
+		"genCourtesyClef","",
+		
+		"keySigCourtesyBarlineMode","",
+		"timeSigCourtesyBarlineMode","",
+		
+		"barlineBeforeSigChange","",
+		"doubleBarlineBeforeKeySig","",
+		"doubleBarlineBeforeTimeSig","",
+		
+		"swingRatio","",
+		"swingUnit","",
+		
+		"useStandardNoteNames","",
+		"useGermanNoteNames","",
+		"useFullGermanNoteNames","",
+		"useSolfeggioNoteNames","",
+		"useFrenchNoteNames","",
+		"automaticCapitalization","",
+		"lowerCaseMinorChords","",
+		"lowerCaseBassNotes","",
+		"allCapsNoteNames","",
+		"chordStyle","",
+		"chordsXmlFile","",
+		"chordDescriptionFile","",
+		"chordExtensionMag","",
+		"chordExtensionAdjust","",
+		"chordModifierMag","",
+		"chordModifierAdjust","",
+		"concertPitch","",
+		"multiVoiceRestTwoSpaceOffset","",
+		"mergeMatchingRests","",
+		"createMultiMeasureRests","",
+		"minEmptyMeasures","",
+		"singleMeasureMMRestUseNormalRest","",
+		"singleMeasureMMRestShowNumber","",
+		"minMMRestWidth","",
+		"mmRestConstantWidth","",
+		"mmRestReferenceWidth","",
+		"mmRestMaxWidthIncrease","",
+		"mmRestNumberPos","",
+		"mmRestBetweenStaves","",
+		"mmRestNumberMaskHBar","",
+		"multiMeasureRestMargin","",
+		"mmRestHBarThickness","",
+		"mmRestHBarVStrokeThickness","",
+		"mmRestHBarVStrokeHeight","",
+		"oldStyleMultiMeasureRests","",
+		"mmRestOldStyleMaxMeasures","",
+		"mmRestOldStyleSpacing","",
+		"hideEmptyStaves","",
+		"dontHideStavesInFirstSystem","",
+		"enableIndentationOnFirstSystem","",
+		"firstSystemIndentationValue","",
+		"alwaysShowBracketsWhenEmptyStavesAreHidden","",
+		"alwaysShowSquareBracketsWhenEmptyStavesAreHidden","",
+		"hideInstrumentNameIfOneInstrument","",
+		"firstSystemInstNameVisibility","",
+		"subsSystemInstNameVisibility","",
+		"gateTime","",
+		"tenutoGateTime","",
+		"staccatoGateTime","",
+		"slurGateTime","",
+		
+		"arpeggioNoteDistance","",
+		"arpeggioAccidentalDistance","",
+		"arpeggioAccidentalDistanceMin","",
+		"arpeggioLineWidth","",
+		"arpeggioHookLen","",
+		"arpeggioHiddenInStdIfTab","",
+		
+		"slurEndWidth", 0.06, // Slurs & Ties → Slurs → Line thickness at end
+		"slurMidWidth", 0.16, // Slurs & Ties → Slurs → Line thickness middle
+		"slurDottedWidth", 0.1, // Slurs & Ties → Slurs → Dotted line thickness
+		"tieEndWidth", 0.06, // Slurs & Ties → Ties → Line thickness at end
+		"tieMidWidth", 0.16, // Slurs & Ties → Ties → Line thickness middle
+		"tieDottedWidth", 0.1, // Slurs & Ties → Ties → Dotted line thickness
+		"minTieLength","",
+		"minHangingTieLength","",
+		"minStraightGlissandoLength","",
+		"minWigglyGlissandoLength","",
+		"slurMinDistance","",
+		"tieMinDistance","",
+		"laissezVibMinDistance","",
+		"headerToLineStartDistance", "",   // determines start point of "dangling" lines (ties, gliss","",
+		"lineEndToBarlineDistance", "", // determines end point of "dangling" lines (ties, gliss","",
+		
+		"tiePlacementSingleNote","",
+		"tiePlacementChord","",
+		"tieDotsPlacement","",
+		"tieMinShoulderHeight","",
+		"tieMaxShoulderHeight","",
+		
+		"minLaissezVibLength","",
+		"laissezVibUseSmuflSym","",
+		
+		"sectionPause","",
+		"musicalSymbolFont","",
+		"musicalTextFont","",
+		
+		"showHeader","",
+		"headerFirstPage","",
+		"headerOddEven","",
+		"evenHeaderL","",
+		"evenHeaderC","",
+		"evenHeaderR","",
+		"oddHeaderL","",
+		"oddHeaderC","",
+		"oddHeaderR","",
+		
+		"showFooter","",
+		"footerFirstPage","",
+		"footerOddEven","",
+		"evenFooterL","",
+		"evenFooterC","",
+		"evenFooterR","",
+		"oddFooterL","",
+		"oddFooterC","",
+		"oddFooterR","",
+		
+		"voltaPosAbove","",
+		"voltaHook","",
+		"voltaLineWidth","",
+		"voltaLineStyle","",
+		"voltaDashLineLen","",
+		"voltaDashGapLen","",
+		"voltaFontFace","",
+		"voltaFontSize","",
+		"voltaLineSpacing","",
+		"voltaFontSpatiumDependent","",
+		"voltaFontStyle","",
+		"voltaColor","",
+		"voltaAlign","",
+		"voltaOffset","",
+		"voltaFrameType","",
+		"voltaFramePadding","",
+		"voltaFrameWidth","",
+		"voltaFrameRound","",
+		"voltaFrameFgColor","",
+		"voltaFrameBgColor","",
+		
+		"ottava8VAPlacement","",
+		"ottava8VBPlacement","",
+		"ottava15MAPlacement","",
+		"ottava15MBPlacement","",
+		"ottava22MAPlacement","",
+		"ottava22MBPlacement","",
+		
+		"ottava8VAText","",
+		"ottava8VAContinueText","",
+		"ottava8VBText","",
+		"ottava8VBContinueText","",
+		"ottava15MAText","",
+		"ottava15MAContinueText","",
+		"ottava15MBText","",
+		"ottava15MBContinueText","",
+		"ottava22MAText","",
+		"ottava22MAContinueText","",
+		"ottava22MBText","",
+		"ottava22MBContinueText","",
+		
+		"ottava8VAnoText","",
+		"ottava8VAnoContinueText","",
+		"ottava8VBnoText","",
+		"ottava8VBnoContinueText","",
+		"ottava15MAnoText","",
+		"ottava15MAnoContinueText","",
+		"ottava15MBnoText","",
+		"ottava15MBnoContinueText","",
+		"ottava22MAnoText","",
+		"ottava22MAnoContinueText","",
+		"ottava22MBnoText","",
+		"ottava22MBnoContinueText","",
+		
+		"ottavaPosAbove","",
+		"ottavaPosBelow","",
+		"ottavaHookAbove","",
+		"ottavaHookBelow","",
+		"ottavaLineWidth","",
+		"ottavaLineStyle","",
+		"ottavaDashLineLen","",
+		"ottavaDashGapLen","",
+		"ottavaNumbersOnly","",
+		"ottavaFontFace","",
+		"ottavaFontSize","",
+		"ottavaLineSpacing","",
+		"ottavaFontSpatiumDependent","",
+		"ottavaMusicalSymbolsScale","",
+		"ottavaFontStyle","",
+		"ottavaColor","",
+		"ottavaTextAlignAbove","",
+		"ottavaTextAlignBelow","",
+		"ottavaFrameType","",
+		"ottavaFramePadding","",
+		"ottavaFrameWidth","",
+		"ottavaFrameRound","",
+		"ottavaFrameFgColor","",
+		"ottavaFrameBgColor","",
+		
+		"tabClef","",
+		
+		"tremoloWidth","",
+		"tremoloBoxHeight","",
+		"tremoloLineWidth","",
+		"tremoloDistance","",
+		"tremoloStyle","",
+		"tremoloStrokeLengthMultiplier","",
+		"tremoloNoteSidePadding","",
+		"tremoloOutSidePadding","",
+		"// TODO tremoloMaxBeamLength","",
+		
+		"linearStretch","",
+		"crossMeasureValues", 0, // Score → display note values across bar boundaries
+		"keySigNaturals","",
+		
+		"tupletMaxSlope","",
+		"tupletOutOfStaff","",
+		"tupletVHeadDistance","",
+		"tupletVStemDistance","",
+		"tupletStemLeftDistance","",
+		"tupletStemRightDistance","",
+		"tupletNoteLeftDistance","",
+		"tupletNoteRightDistance","",
+		"tupletBracketWidth","",
+		"tupletDirection","",
+		"tupletNumberType","",
+		"tupletBracketType","",
+		"tupletFontFace","",
+		"tupletFontSize","",
+		"tupletLineSpacing","",
+		"tupletFontSpatiumDependent","",
+		"tupletMusicalSymbolsScale","",
+		"tupletFontStyle","",
+		"tupletColor","",
+		"tupletAlign","",
+		"tupletUseSymbols","",
+		"tupletBracketHookHeight","",
+		"tupletOffset","",
+		"tupletFrameType","",
+		"tupletFramePadding","",
+		"tupletFrameWidth","",
+		"tupletFrameRound","",
+		"tupletFrameFgColor","",
+		"tupletFrameBgColor","",
+		
+		"scaleBarlines","",
+		"barGraceDistance","",
+		
+		"minVerticalDistance","",
+		"skylineMinHorizontalClearance","",
+		"ornamentStyle","",
+		"spatium","",
+		
+		"autoplaceHairpinDynamicsDistance","",
+		
+		"dynamicsHairpinVoiceBasedPlacement","",
+		"dynamicsHairpinsAutoCenterOnGrandStaff","",
+		"dynamicsHairpinsAboveForVocalStaves","",
+		
+		"dynamicsOverrideFont","",
+		"dynamicsFont","",
+		"dynamicsSize","",
+		"dynamicsPlacement","",
+		"dynamicsPosAbove","",
+		"dynamicsPosBelow","",
+		"avoidBarLines","",
+		"snapToDynamics","",
+		"centerOnNotehead","",
+		"dynamicsMinDistance","",
+		"autoplaceVerticalAlignRange","",
+		
+		"textLinePlacement","",
+		"textLinePosAbove","",
+		"textLinePosBelow","",
+		"textLineLineWidth","",
+		"textLineLineStyle","",
+		"textLineDashLineLen","",
+		"textLineDashGapLen","",
+		"textLineHookHeight","",
+		"textLineFrameType","",
+		"textLineFramePadding","",
+		"textLineFrameWidth","",
+		"textLineFrameRound","",
+		"textLineFrameFgColor","",
+		"textLineFrameBgColor","",
+		
+		"systemTextLinePlacement","",
+		"systemTextLinePosAbove","",
+		"systemTextLinePosBelow","",
+		"systemTextLineLineWidth","",
+		"systemTextLineLineStyle","",
+		"systemTextLineDashLineLen","",
+		"systemTextLineDashGapLen","",
+		"systemTextLineHookHeight","",
+		"systemTextLineFrameType","",
+		"systemTextLineFramePadding","",
+		"systemTextLineFrameWidth","",
+		"systemTextLineFrameRound","",
+		"systemTextLineFrameFgColor","",
+		"systemTextLineFrameBgColor","",
+		
+		"tremoloBarLineWidth","",
+		"jumpPosAbove","",
+		"markerPosAbove","",
+		
+		"defaultFontFace","",
+		"defaultFontSize","",
+		"defaultLineSpacing","",
+		"defaultFontSpatiumDependent","",
+		"defaultFontStyle","",
+		"defaultColor","",
+		"defaultAlign","",
+		"defaultFrameType","",
+		"defaultFramePadding","",
+		"defaultFrameWidth","",
+		"defaultFrameRound","",
+		"defaultFrameFgColor","",
+		"defaultFrameBgColor","",
+		"defaultOffset","",
+		"defaultOffsetType","",
+		"defaultSystemFlag","",
+		"defaultText","",
+		
+		"titleFontFace","",
+		"titleFontSize","",
+		"titleLineSpacing","",
+		"titleFontSpatiumDependent","",
+		"titleFontStyle","",
+		"titleColor","",
+		"titleAlign","",
+		"titleOffset","",
+		"titleOffsetType","",
+		"titleFrameType","",
+		"titleFramePadding","",
+		"titleFrameWidth","",
+		"titleFrameRound","",
+		"titleFrameFgColor","",
+		"titleFrameBgColor","",
+		
+		"subTitleFontFace","",
+		"subTitleFontSize","",
+		"subTitleLineSpacing","",
+		"subTitleFontSpatiumDependent","",
+		"subTitleFontStyle","",
+		"subTitleColor","",
+		"subTitleAlign","",
+		"subTitleOffset","",
+		"subTitleOffsetType","",
+		"subTitleFrameType","",
+		"subTitleFramePadding","",
+		"subTitleFrameWidth","",
+		"subTitleFrameRound","",
+		"subTitleFrameFgColor","",
+		"subTitleFrameBgColor","",
+		
+		"composerFontFace","",
+		"composerFontSize","",
+		"composerLineSpacing","",
+		"composerFontSpatiumDependent","",
+		"composerFontStyle","",
+		"composerColor","",
+		"composerAlign","",
+		"composerOffset","",
+		"composerOffsetType","",
+		"composerFrameType","",
+		"composerFramePadding","",
+		"composerFrameWidth","",
+		"composerFrameRound","",
+		"composerFrameFgColor","",
+		"composerFrameBgColor","",
+		
+		"lyricistFontFace","",
+		"lyricistFontSize","",
+		"lyricistLineSpacing","",
+		"lyricistFontSpatiumDependent","",
+		"lyricistFontStyle","",
+		"lyricistColor","",
+		"lyricistAlign","",
+		"lyricistOffset","",
+		"lyricistOffsetType","",
+		"lyricistFrameType","",
+		"lyricistFramePadding","",
+		"lyricistFrameWidth","",
+		"lyricistFrameRound","",
+		"lyricistFrameFgColor","",
+		"lyricistFrameBgColor","",
+		
+		"fingeringFontFace","",
+		"fingeringFontSize","",
+		"fingeringLineSpacing","",
+		"fingeringFontSpatiumDependent","",
+		"fingeringFontStyle","",
+		"fingeringColor","",
+		"fingeringAlign","",
+		"fingeringFrameType","",
+		"fingeringFramePadding","",
+		"fingeringFrameWidth","",
+		"fingeringFrameRound","",
+		"fingeringFrameFgColor","",
+		"fingeringFrameBgColor","",
+		"fingeringOffset","",
+		
+		"lhGuitarFingeringFontFace","",
+		"lhGuitarFingeringFontSize","",
+		"lhGuitarFingeringLineSpacing","",
+		"lhGuitarFingeringFontSpatiumDependent","",
+		"lhGuitarFingeringFontStyle","",
+		"lhGuitarFingeringColor","",
+		"lhGuitarFingeringAlign","",
+		"lhGuitarFingeringFrameType","",
+		"lhGuitarFingeringFramePadding","",
+		"lhGuitarFingeringFrameWidth","",
+		"lhGuitarFingeringFrameRound","",
+		"lhGuitarFingeringFrameFgColor","",
+		"lhGuitarFingeringFrameBgColor","",
+		"lhGuitarFingeringOffset","",
+		
+		"rhGuitarFingeringFontFace","",
+		"rhGuitarFingeringFontSize","",
+		"rhGuitarFingeringLineSpacing","",
+		"rhGuitarFingeringFontSpatiumDependent","",
+		"rhGuitarFingeringFontStyle","",
+		"rhGuitarFingeringColor","",
+		"rhGuitarFingeringAlign","",
+		"rhGuitarFingeringFrameType","",
+		"rhGuitarFingeringFramePadding","",
+		"rhGuitarFingeringFrameWidth","",
+		"rhGuitarFingeringFrameRound","",
+		"rhGuitarFingeringFrameFgColor","",
+		"rhGuitarFingeringFrameBgColor","",
+		"rhGuitarFingeringOffset","",
+		
+		"hammerOnPullOffTappingFontFace","",
+		"hammerOnPullOffTappingFontSize","",
+		"hammerOnPullOffTappingLineSpacing","",
+		"hammerOnPullOffTappingFontSpatiumDependent","",
+		"hammerOnPullOffTappingFontStyle","",
+		"hammerOnPullOffTappingColor","",
+		"hammerOnPullOffTappingAlign","",
+		"hammerOnPullOffTappingFrameType","",
+		"hammerOnPullOffTappingFramePadding","",
+		"hammerOnPullOffTappingFrameWidth","",
+		"hammerOnPullOffTappingFrameRound","",
+		"hammerOnPullOffTappingFrameFgColor","",
+		"hammerOnPullOffTappingFrameBgColor","",
+		"hammerOnPullOffTappingOffset","",
+		
+		"hopoShowOnStandardStaves","",
+		"hopoShowOnTabStaves","",
+		"hopoUpperCase","",
+		"hopoShowAll","",
+		
+		"stringNumberFontFace","",
+		"stringNumberFontSize","",
+		"stringNumberLineSpacing","",
+		"stringNumberFontSpatiumDependent","",
+		"stringNumberFontStyle","",
+		"stringNumberColor","",
+		"stringNumberAlign","",
+		"stringNumberFrameType","",
+		"stringNumberFramePadding","",
+		"stringNumberFrameWidth","",
+		"stringNumberFrameRound","",
+		"stringNumberFrameFgColor","",
+		"stringNumberFrameBgColor","",
+		"stringNumberOffset","",
+		"preferSameStringForTranspose","",
+		
+		"stringTuningsFontSize","",
+		
+		"harpPedalDiagramFontFace","",
+		"harpPedalDiagramFontSize","",
+		"harpPedalDiagramLineSpacing","",
+		"harpPedalDiagramFontSpatiumDependent","",
+		"harpPedalDiagramMusicalSymbolsScale","",
+		"harpPedalDiagramFontStyle","",
+		"harpPedalDiagramColor","",
+		"harpPedalDiagramAlign","",
+		"harpPedalDiagramFrameType","",
+		"harpPedalDiagramFramePadding","",
+		"harpPedalDiagramFrameWidth","",
+		"harpPedalDiagramFrameRound","",
+		"harpPedalDiagramFrameFgColor","",
+		"harpPedalDiagramFrameBgColor","",
+		"harpPedalDiagramOffset","",
+		"harpPedalDiagramPlacement","",
+		"harpPedalDiagramPosAbove","",
+		"harpPedalDiagramPosBelow","",
+		"harpPedalDiagramMinDistance","",
+		
+		"harpPedalTextDiagramFontFace","",
+		"harpPedalTextDiagramFontSize","",
+		"harpPedalTextDiagramLineSpacing","",
+		"harpPedalTextDiagramFontSpatiumDependent","",
+		"harpPedalTextDiagramFontStyle","",
+		"harpPedalTextDiagramColor","",
+		"harpPedalTextDiagramAlign","",
+		"harpPedalTextDiagramFrameType","",
+		"harpPedalTextDiagramFramePadding","",
+		"harpPedalTextDiagramFrameWidth","",
+		"harpPedalTextDiagramFrameRound","",
+		"harpPedalTextDiagramFrameFgColor","",
+		"harpPedalTextDiagramFrameBgColor","",
+		"harpPedalTextDiagramOffset","",
+		"harpPedalTextDiagramPlacement","",
+		"harpPedalTextDiagramPosAbove","",
+		"harpPedalTextDiagramPosBelow","",
+		"harpPedalTextDiagramMinDistance","",
+		
+		"longInstrumentFontFace","",
+		"longInstrumentFontSize","",
+		"longInstrumentLineSpacing","",
+		"longInstrumentFontSpatiumDependent","",
+		"longInstrumentFontStyle","",
+		"longInstrumentColor","",
+		"longInstrumentAlign","",
+		"longInstrumentOffset","",
+		"longInstrumentFrameType","",
+		"longInstrumentFramePadding","",
+		"longInstrumentFrameWidth","",
+		"longInstrumentFrameRound","",
+		"longInstrumentFrameFgColor","",
+		"longInstrumentFrameBgColor","",
+		
+		"shortInstrumentFontFace","",
+		"shortInstrumentFontSize","",
+		"shortInstrumentLineSpacing","",
+		"shortInstrumentFontSpatiumDependent","",
+		"shortInstrumentFontStyle","",
+		"shortInstrumentColor","",
+		"shortInstrumentAlign","",
+		"shortInstrumentOffset","",
+		"shortInstrumentFrameType","",
+		"shortInstrumentFramePadding","",
+		"shortInstrumentFrameWidth","",
+		"shortInstrumentFrameRound","",
+		"shortInstrumentFrameFgColor","",
+		"shortInstrumentFrameBgColor","",
+		
+		"partInstrumentFontFace","",
+		"partInstrumentFontSize","",
+		"partInstrumentLineSpacing","",
+		"partInstrumentFontSpatiumDependent","",
+		"partInstrumentFontStyle","",
+		"partInstrumentColor","",
+		"partInstrumentAlign","",
+		"partInstrumentOffset","",
+		"partInstrumentFrameType","",
+		"partInstrumentFramePadding","",
+		"partInstrumentFrameWidth","",
+		"partInstrumentFrameRound","",
+		"partInstrumentFrameFgColor","",
+		"partInstrumentFrameBgColor","",
+		
+		"dynamicsFontFace","",
+		"dynamicsFontSize","",
+		"dynamicsLineSpacing","",
+		"dynamicsFontSpatiumDependent","",
+		"dynamicsFontStyle","",
+		"dynamicsColor","",
+		"dynamicsAlign","",
+		"dynamicsFrameType","",
+		"dynamicsFramePadding","",
+		"dynamicsFrameWidth","",
+		"dynamicsFrameRound","",
+		"dynamicsFrameFgColor","",
+		"dynamicsFrameBgColor","",
+		
+		"expressionFontFace","",
+		"expressionFontSize","",
+		"expressionLineSpacing","",
+		"expressionFontSpatiumDependent","",
+		"expressionFontStyle","",
+		"expressionColor","",
+		"expressionAlign","",
+		"expressionPlacement","",
+		"expressionOffset","",
+		"expressionPosAbove","",
+		"expressionPosBelow","",
+		"expressionFrameType","",
+		"expressionFramePadding","",
+		"expressionFrameWidth","",
+		"expressionFrameRound","",
+		"expressionFrameFgColor","",
+		"expressionFrameBgColor","",
+		"expressionMinDistance","",
+		
+		"tempoFontFace","",
+		"tempoFontSize","",
+		"tempoLineSpacing","",
+		"tempoFontSpatiumDependent","",
+		"tempoFontStyle",1,
+		"tempoColor","",
+		"tempoAlign","",
+		"tempoSystemFlag","",
+		"tempoPlacement","",
+		"tempoPosAbove","",
+		"tempoPosBelow","",
+		"tempoMinDistance","",
+		"tempoFrameType","",
+		"tempoFramePadding","",
+		"tempoFrameWidth","",
+		"tempoFrameRound","",
+		"tempoFrameFgColor","",
+		"tempoFrameBgColor","",
+		
+		"tempoChangeFontFace","",
+		"tempoChangeFontSize","",
+		"tempoChangeLineSpacing","",
+		"tempoChangeFontSpatiumDependent","",
+		"tempoChangeFontStyle",1,
+		"tempoChangeColor","",
+		"tempoChangeAlign","",
+		"tempoChangeSystemFlag","",
+		"tempoChangePlacement","",
+		"tempoChangePosAbove","",
+		"tempoChangePosBelow","",
+		"tempoChangeMinDistance","",
+		"tempoChangeFrameType","",
+		"tempoChangeFramePadding","",
+		"tempoChangeFrameWidth","",
+		"tempoChangeFrameRound","",
+		"tempoChangeFrameFgColor","",
+		"tempoChangeFrameBgColor","",
+		"tempoChangeLineWidth","",
+		"tempoChangeLineStyle","",
+		"tempoChangeDashLineLen","",
+		"tempoChangeDashGapLen","",
+		
+		"metronomeFontFace","",
+		"metronomeFontSize","",
+		"metronomeLineSpacing","",
+		"metronomeFontSpatiumDependent","",
+		"metronomeFontStyle",0,
+		"metronomeColor","",
+		"metronomePlacement","",
+		"metronomeAlign","",
+		"metronomeOffset","",
+		"metronomeFrameType","",
+		"metronomeFramePadding","",
+		"metronomeFrameWidth","",
+		"metronomeFrameRound","",
+		"metronomeFrameFgColor","",
+		"metronomeFrameBgColor","",
+		
+		"measureNumberFontFace","",
+		"measureNumberFontSize","",
+		"measureNumberLineSpacing","",
+		"measureNumberFontSpatiumDependent","",
+		"measureNumberFontStyle","",
+		"measureNumberColor","",
+		"measureNumberPosAbove","",
+		"measureNumberPosBelow","",
+		"measureNumberOffsetType","",
+		"measureNumberVPlacement","",
+		"measureNumberHPlacement","",
+		"measureNumberMinDistance","",
+		"measureNumberAlign","",
+		"measureNumberFrameType","",
+		"measureNumberFramePadding","",
+		"measureNumberFrameWidth","",
+		"measureNumberFrameRound","",
+		"measureNumberFrameFgColor","",
+		"measureNumberFrameBgColor","",
+		
+		"mmRestShowMeasureNumberRange","",
+		"mmRestRangeBracketType","",
+		
+		"mmRestRangeFontFace","",
+		"mmRestRangeFontSize","",
+		"mmRestRangeFontSpatiumDependent","",
+		"mmRestRangeFontStyle","",
+		"mmRestRangeColor","",
+		"mmRestRangePosAbove","",
+		"mmRestRangePosBelow","",
+		"mmRestRangeOffsetType","",
+		"mmRestRangeVPlacement","",
+		"mmRestRangeHPlacement","",
+		"mmRestRangeAlign","",
+		"mmRestRangeFrameType","",
+		"mmRestRangeFramePadding","",
+		"mmRestRangeFrameWidth","",
+		"mmRestRangeFrameRound","",
+		"mmRestRangeFrameFgColor","",
+		"mmRestRangeFrameBgColor","",
+		"mmRestRangeMinDistance","",
+		
+		"translatorFontFace","",
+		"translatorFontSize","",
+		"translatorLineSpacing","",
+		"translatorFontSpatiumDependent","",
+		"translatorFontStyle","",
+		"translatorColor","",
+		"translatorAlign","",
+		"translatorOffset","",
+		"translatorFrameType","",
+		"translatorFramePadding","",
+		"translatorFrameWidth","",
+		"translatorFrameRound","",
+		"translatorFrameFgColor","",
+		"translatorFrameBgColor","",
+		
+		"systemTextFontFace","",
+		"systemTextFontSize","",
+		"systemTextLineSpacing","",
+		"systemTextFontSpatiumDependent","",
+		"systemTextFontStyle","",
+		"systemTextColor","",
+		"systemTextAlign","",
+		"systemTextOffsetType","",
+		"systemTextPlacement","",
+		"systemTextPosAbove","",
+		"systemTextPosBelow","",
+		"systemTextMinDistance","",
+		"systemTextFrameType","",
+		"systemTextFramePadding","",
+		"systemTextFrameWidth","",
+		"systemTextFrameRound","",
+		"systemTextFrameFgColor","",
+		"systemTextFrameBgColor","",
+		
+		"staffTextFontFace","",
+		"staffTextFontSize","",
+		"staffTextLineSpacing","",
+		"staffTextFontSpatiumDependent","",
+		"staffTextFontStyle","",
+		"staffTextColor","",
+		"staffTextAlign","",
+		"staffTextOffsetType","",
+		"staffTextPlacement","",
+		"staffTextPosAbove","",
+		"staffTextPosBelow","",
+		"staffTextMinDistance","",
+		"staffTextFrameType","",
+		"staffTextFramePadding","",
+		"staffTextFrameWidth","",
+		"staffTextFrameRound","",
+		"staffTextFrameFgColor","",
+		"staffTextFrameBgColor","",
+		
+		"fretDiagramFingeringFontFace","",
+		"fretDiagramFingeringFontSize","",
+		"fretDiagramFingeringLineSpacing","",
+		"fretDiagramFingeringFontSpatiumDependent","",
+		"fretDiagramFingeringFontStyle","",
+		"fretDiagramFingeringColor","",
+		"fretDiagramFingeringAlign","",
+		"fretDiagramFingeringPosAbove","",
+		"fretDiagramFingeringFrameType","",
+		"fretDiagramFingeringFramePadding","",
+		"fretDiagramFingeringFrameWidth","",
+		"fretDiagramFingeringFrameRound","",
+		"fretDiagramFingeringFrameFgColor","",
+		"fretDiagramFingeringFrameBgColor","",
+		
+		"fretDiagramFretNumberFontFace","",
+		"fretDiagramFretNumberFontSize","",
+		"fretDiagramFretNumberLineSpacing","",
+		"fretDiagramFretNumberFontSpatiumDependent","",
+		"fretDiagramFretNumberFontStyle","",
+		"fretDiagramFretNumberColor","",
+		"fretDiagramFretNumberAlign","",
+		"fretDiagramFretNumberPosAbove","",
+		"fretDiagramFretNumberFrameType","",
+		"fretDiagramFretNumberFramePadding","",
+		"fretDiagramFretNumberFrameWidth","",
+		"fretDiagramFretNumberFrameRound","",
+		"fretDiagramFretNumberFrameFgColor","",
+		"fretDiagramFretNumberFrameBgColor","",
+		
+		"rehearsalMarkFontFace","",
+		"rehearsalMarkFontSize","",
+		"rehearsalMarkLineSpacing","",
+		"rehearsalMarkFontSpatiumDependent","",
+		"rehearsalMarkFontStyle","",
+		"rehearsalMarkColor","",
+		"rehearsalMarkAlign","",
+		"rehearsalMarkFrameType","",
+		"rehearsalMarkFramePadding","",
+		"rehearsalMarkFrameWidth","",
+		"rehearsalMarkFrameRound","",
+		"rehearsalMarkFrameFgColor","",
+		"rehearsalMarkFrameBgColor","",
+		"rehearsalMarkPlacement","",
+		"rehearsalMarkPosAbove","",
+		"rehearsalMarkPosBelow","",
+		"rehearsalMarkMinDistance","",
+		
+		"repeatLeftFontFace","",
+		"repeatLeftFontSize","",
+		"repeatLeftLineSpacing","",
+		"repeatLeftFontSpatiumDependent","",
+		"repeatLeftFontStyle","",
+		"repeatLeftColor","",
+		"repeatLeftAlign","",
+		"repeatLeftPlacement","",
+		"repeatLeftFrameType","",
+		"repeatLeftFramePadding","",
+		"repeatLeftFrameWidth","",
+		"repeatLeftFrameRound","",
+		"repeatLeftFrameFgColor","",
+		"repeatLeftFrameBgColor","",
+		
+		"repeatRightFontFace","",
+		"repeatRightFontSize","",
+		"repeatRightLineSpacing","",
+		"repeatRightFontSpatiumDependent","",
+		"repeatRightFontStyle","",
+		"repeatRightColor","",
+		"repeatRightAlign","",
+		"repeatRightPlacement","",
+		"repeatRightFrameType","",
+		"repeatRightFramePadding","",
+		"repeatRightFrameWidth","",
+		"repeatRightFrameRound","",
+		"repeatRightFrameFgColor","",
+		"repeatRightFrameBgColor","",
+		
+		"frameFontFace","",
+		"frameFontSize","",
+		"frameLineSpacing","",
+		"frameFontSpatiumDependent","",
+		"frameFontStyle","",
+		"frameColor","",
+		"frameAlign","",
+		"frameOffset","",
+		"frameFrameType","",
+		"frameFramePadding","",
+		"frameFrameWidth","",
+		"frameFrameRound","",
+		"frameFrameFgColor","",
+		"frameFrameBgColor","",
+		
+		"textLineFontFace","",
+		"textLineFontSize","",
+		"textLineLineSpacing","",
+		"textLineFontSpatiumDependent","",
+		"textLineFontStyle","",
+		"textLineColor","",
+		"textLineTextAlign","",
+		"textLineSystemFlag","",
+		
+		"systemTextLineFontFace","",
+		"systemTextLineFontSize","",
+		"systemTextLineFontSpatiumDependent","",
+		"systemTextLineFontStyle","",
+		"systemTextLineColor","",
+		"systemTextLineTextAlign","",
+		"systemTextLineSystemFlag","",
+		
+		"noteLinePlacement","",
+		"noteLineFontFace","",
+		"noteLineFontSize","",
+		"noteLineLineSpacing","",
+		"noteLineFontSpatiumDependent","",
+		"noteLineFontStyle","",
+		"noteLineColor","",
+		"noteLineAlign","",
+		"noteLineOffset","",
+		"noteLineFrameType","",
+		"noteLineFramePadding","",
+		"noteLineFrameWidth","",
+		"noteLineFrameRound","",
+		"noteLineFrameFgColor","",
+		"noteLineFrameBgColor","",
+		
+		"noteLineWidth","",
+		"noteLineStyle","",
+		"noteLineDashLineLen","",
+		"noteLineDashGapLen","",
+		
+		"glissandoFontFace","",
+		"glissandoFontSize","",
+		"glissandoLineSpacing","",
+		"glissandoFontSpatiumDependent","",
+		"glissandoFontStyle","",
+		"glissandoColor","",
+		"glissandoAlign","",
+		"glissandoOffset","",
+		"glissandoFrameType","",
+		"glissandoFramePadding","",
+		"glissandoFrameWidth","",
+		"glissandoFrameRound","",
+		"glissandoFrameFgColor","",
+		"glissandoFrameBgColor","",
+		"glissandoLineWidth","",
+		"glissandoText","",
+		"glissandoStyle","",
+		"glissandoStyleHarp","",
+		
+		"glissandoType","",
+		"glissandoLineStyle","",
+		"glissandoDashLineLen","",
+		"glissandoDashGapLen","",
+		"glissandoShowText","",
+		
+		"bendFontFace","",
+		"bendFontSize","",
+		"bendLineSpacing","",
+		"bendFontSpatiumDependent","",
+		"bendFontStyle","",
+		"bendColor","",
+		"bendAlign","",
+		"bendOffset","",
+		"bendFrameType","",
+		"bendFramePadding","",
+		"bendFrameWidth","",
+		"bendFrameRound","",
+		"bendFrameFgColor","",
+		"bendFrameBgColor","",
+		"bendLineWidth","",
+		"bendArrowWidth","",
+		
+		"guitarBendLineWidth","",
+		"guitarBendLineWidthTab","",
+		"guitarBendHeightAboveTABStaff","",
+		"guitarBendPartialBendHeight","",
+		"guitarBendUseFull","",
+		"guitarBendArrowWidth","",
+		"guitarBendArrowHeight","",
+		"useCueSizeFretForGraceBends","",
+		
+		"headerFontFace","",
+		"headerFontSize","",
+		"headerLineSpacing","",
+		"headerFontSpatiumDependent","",
+		"headerFontStyle","",
+		"headerColor","",
+		"headerAlign","",
+		"headerOffset","",
+		"headerFrameType","",
+		"headerFramePadding","",
+		"headerFrameWidth","",
+		"headerFrameRound","",
+		"headerFrameFgColor","",
+		"headerFrameBgColor","",
+		
+		"footerFontFace","",
+		"footerFontSize","",
+		"footerLineSpacing","",
+		"footerFontSpatiumDependent","",
+		"footerFontStyle","",
+		"footerColor","",
+		"footerAlign","",
+		"footerOffset","",
+		"footerFrameType","",
+		"footerFramePadding","",
+		"footerFrameWidth","",
+		"footerFrameRound","",
+		"footerFrameFgColor","",
+		"footerFrameBgColor","",
+		
+		"copyrightFontFace","",
+		"copyrightFontSize","",
+		"copyrightLineSpacing","",
+		"copyrightFontSpatiumDependent","",
+		"copyrightFontStyle","",
+		"copyrightColor","",
+		"copyrightAlign","",
+		"copyrightOffset","",
+		"copyrightFrameType","",
+		"copyrightFramePadding","",
+		"copyrightFrameWidth","",
+		"copyrightFrameRound","",
+		"copyrightFrameFgColor","",
+		"copyrightFrameBgColor","",
+		
+		"pageNumberFontFace","",
+		"pageNumberFontSize","",
+		"pageNumberLineSpacing","",
+		"pageNumberFontSpatiumDependent","",
+		"pageNumberFontStyle","",
+		"pageNumberColor","",
+		"pageNumberAlign","",
+		"pageNumberOffset","",
+		"pageNumberFrameType","",
+		"pageNumberFramePadding","",
+		"pageNumberFrameWidth","",
+		"pageNumberFrameRound","",
+		"pageNumberFrameFgColor","",
+		"pageNumberFrameBgColor","",
+		
+		"instrumentChangeFontFace","",
+		"instrumentChangeFontSize","",
+		"instrumentChangeLineSpacing","",
+		"instrumentChangeFontSpatiumDependent","",
+		"instrumentChangeFontStyle","",
+		"instrumentChangeColor","",
+		"instrumentChangeAlign","",
+		"instrumentChangeOffset","",
+		"instrumentChangePlacement","",
+		"instrumentChangePosAbove","",
+		"instrumentChangePosBelow","",
+		"instrumentChangeMinDistance","",
+		"instrumentChangeFrameType","",
+		"instrumentChangeFramePadding","",
+		"instrumentChangeFrameWidth","",
+		"instrumentChangeFrameRound","",
+		"instrumentChangeFrameFgColor","",
+		"instrumentChangeFrameBgColor","",
+		
+		"stickingFontFace","",
+		"stickingFontSize","",
+		"stickingLineSpacing","",
+		"stickingFontSpatiumDependent","",
+		"stickingFontStyle","",
+		"stickingColor","",
+		"stickingAlign","",
+		"stickingOffset","",
+		"stickingPlacement","",
+		"stickingPosAbove","",
+		"stickingPosBelow","",
+		"stickingMinDistance","",
+		"stickingFrameType","",
+		"stickingFramePadding","",
+		"stickingFrameWidth","",
+		"stickingFrameRound","",
+		"stickingFrameFgColor","",
+		"stickingFrameBgColor","",
+		
+		"figuredBassFontFace","",
+		"figuredBassFontSize","",
+		"figuredBassLineSpacing","",
+		"figuredBassFontSpatiumDependent","",
+		"figuredBassFontStyle","",
+		"figuredBassColor","",
+		
+		"user1Name","",
+		"user1FontFace","",
+		"user1FontSize","",
+		"user1LineSpacing","",
+		"user1FontSpatiumDependent","",
+		"user1FontStyle","",
+		"user1Color","",
+		"user1Align","",
+		"user1Offset","",
+		"user1OffsetType","",
+		"user1FrameType","",
+		"user1FramePadding","",
+		"user1FrameWidth","",
+		"user1FrameRound","",
+		"user1FrameFgColor","",
+		"user1FrameBgColor","",
+		
+		"user2Name","",
+		"user2FontFace","",
+		"user2FontSize","",
+		"user2LineSpacing","",
+		"user2FontSpatiumDependent","",
+		"user2FontStyle","",
+		"user2Color","",
+		"user2Align","",
+		"user2Offset","",
+		"user2OffsetType","",
+		"user2FrameType","",
+		"user2FramePadding","",
+		"user2FrameWidth","",
+		"user2FrameRound","",
+		"user2FrameFgColor","",
+		"user2FrameBgColor","",
+		
+		"user3Name","",
+		"user3FontFace","",
+		"user3FontSize","",
+		"user3LineSpacing","",
+		"user3FontSpatiumDependent","",
+		"user3FontStyle","",
+		"user3Color","",
+		"user3Align","",
+		"user3Offset","",
+		"user3OffsetType","",
+		"user3FrameType","",
+		"user3FramePadding","",
+		"user3FrameWidth","",
+		"user3FrameRound","",
+		"user3FrameFgColor","",
+		"user3FrameBgColor","",
+		
+		"user4Name","",
+		"user4FontFace","",
+		"user4FontSize","",
+		"user4LineSpacing","",
+		"user4FontSpatiumDependent","",
+		"user4FontStyle","",
+		"user4Color","",
+		"user4Align","",
+		"user4Offset","",
+		"user4OffsetType","",
+		"user4FrameType","",
+		"user4FramePadding","",
+		"user4FrameWidth","",
+		"user4FrameRound","",
+		"user4FrameFgColor","",
+		"user4FrameBgColor","",
+		
+		"user5Name","",
+		"user5FontFace","",
+		"user5FontSize","",
+		"user5LineSpacing","",
+		"user5FontSpatiumDependent","",
+		"user5FontStyle","",
+		"user5Color","",
+		"user5Align","",
+		"user5Offset","",
+		"user5OffsetType","",
+		"user5FrameType","",
+		"user5FramePadding","",
+		"user5FrameWidth","",
+		"user5FrameRound","",
+		"user5FrameFgColor","",
+		"user5FrameBgColor","",
+		
+		"user6Name","",
+		"user6FontFace","",
+		"user6FontSize","",
+		"user6LineSpacing","",
+		"user6FontSpatiumDependent","",
+		"user6FontStyle","",
+		"user6Color","",
+		"user6Align","",
+		"user6Offset","",
+		"user6OffsetType","",
+		"user6FrameType","",
+		"user6FramePadding","",
+		"user6FrameWidth","",
+		"user6FrameRound","",
+		"user6FrameFgColor","",
+		"user6FrameBgColor","",
+		
+		"user7Name","",
+		"user7FontFace","",
+		"user7FontSize","",
+		"user7LineSpacing","",
+		"user7FontSpatiumDependent","",
+		"user7FontStyle","",
+		"user7Color","",
+		"user7Align","",
+		"user7Offset","",
+		"user7OffsetType","",
+		"user7FrameType","",
+		"user7FramePadding","",
+		"user7FrameWidth","",
+		"user7FrameRound","",
+		"user7FrameFgColor","",
+		"user7FrameBgColor","",
+		
+		"user8Name","",
+		"user8FontFace","",
+		"user8FontSize","",
+		"user8LineSpacing","",
+		"user8FontSpatiumDependent","",
+		"user8FontStyle","",
+		"user8Color","",
+		"user8Align","",
+		"user8Offset","",
+		"user8OffsetType","",
+		"user8FrameType","",
+		"user8FramePadding","",
+		"user8FrameWidth","",
+		"user8FrameRound","",
+		"user8FrameFgColor","",
+		"user8FrameBgColor","",
+		
+		"user9Name","",
+		"user9FontFace","",
+		"user9FontSize","",
+		"user9LineSpacing","",
+		"user9FontSpatiumDependent","",
+		"user9FontStyle","",
+		"user9Color","",
+		"user9Align","",
+		"user9Offset","",
+		"user9OffsetType","",
+		"user9FrameType","",
+		"user9FramePadding","",
+		"user9FrameWidth","",
+		"user9FrameRound","",
+		"user9FrameFgColor","",
+		"user9FrameBgColor","",
+		
+		"user10Name","",
+		"user10FontFace","",
+		"user10FontSize","",
+		"user10LineSpacing","",
+		"user10FontSpatiumDependent","",
+		"user10FontStyle","",
+		"user10Color","",
+		"user10Align","",
+		"user10Offset","",
+		"user10OffsetType","",
+		"user10FrameType","",
+		"user10FramePadding","",
+		"user10FrameWidth","",
+		"user10FrameRound","",
+		"user10FrameFgColor","",
+		"user10FrameBgColor","",
+		
+		"user11Name","",
+		"user11FontFace","",
+		"user11FontSize","",
+		"user11LineSpacing","",
+		"user11FontSpatiumDependent","",
+		"user11FontStyle","",
+		"user11Color","",
+		"user11Align","",
+		"user11Offset","",
+		"user11OffsetType","",
+		"user11FrameType","",
+		"user11FramePadding","",
+		"user11FrameWidth","",
+		"user11FrameRound","",
+		"user11FrameFgColor","",
+		"user11FrameBgColor","",
+		
+		"user12Name","",
+		"user12FontFace","",
+		"user12FontSize","",
+		"user12LineSpacing","",
+		"user12FontSpatiumDependent","",
+		"user12FontStyle","",
+		"user12Color","",
+		"user12Align","",
+		"user12Offset","",
+		"user12OffsetType","",
+		"user12FrameType","",
+		"user12FramePadding","",
+		"user12FrameWidth","",
+		"user12FrameRound","",
+		"user12FrameFgColor","",
+		"user12FrameBgColor","",
+		
+		"letRingFontFace","",
+		"letRingFontSize","",
+		"letRingLineSpacing","",
+		"letRingFontSpatiumDependent","",
+		"letRingFontStyle","",
+		"letRingColor","",
+		"letRingTextAlign","",
+		"letRingHookHeight","",
+		"letRingPlacement","",
+		"letRingPosAbove","",
+		"letRingPosBelow","",
+		"letRingLineWidth","",
+		"letRingLineStyle","",
+		"letRingDashLineLen","",
+		"letRingDashGapLen","",
+		"letRingText","",
+		"letRingFrameType","",
+		"letRingFramePadding","",
+		"letRingFrameWidth","",
+		"letRingFrameRound","",
+		"letRingFrameFgColor","",
+		"letRingFrameBgColor","",
+		"letRingEndHookType","",
+		
+		"palmMuteFontFace","",
+		"palmMuteFontSize","",
+		"palmMuteLineSpacing","",
+		"palmMuteFontSpatiumDependent","",
+		"palmMuteFontStyle","",
+		"palmMuteColor","",
+		"palmMuteTextAlign","",
+		"palmMuteHookHeight","",
+		"palmMutePlacement","",
+		"palmMutePosAbove","",
+		"palmMutePosBelow","",
+		"palmMuteLineWidth","",
+		"palmMuteLineStyle","",
+		"palmMuteDashLineLen","",
+		"palmMuteDashGapLen","",
+		"palmMuteText","",
+		"palmMuteFrameType","",
+		"palmMuteFramePadding","",
+		"palmMuteFrameWidth","",
+		"palmMuteFrameRound","",
+		"palmMuteFrameFgColor","",
+		"palmMuteFrameBgColor","",
+		"palmMuteEndHookType","",
+		
+		"fermataPosAbove","",
+		"fermataPosBelow","",
+		"fermataMinDistance","",
+		
+		"fingeringPlacement","",
+		
+		"articulationMinDistance","",
+		"fingeringMinDistance","",
+		"hairpinMinDistance","",
+		"letRingMinDistance","",
+		"ottavaMinDistance","",
+		"palmMuteMinDistance","",
+		"pedalMinDistance","",
+		"repeatMinDistance","",
+		"textLineMinDistance","",
+		"systemTextLineMinDistance","",
+		"trillMinDistance","",
+		"vibratoMinDistance","",
+		"voltaMinDistance","",
+		"figuredBassMinDistance","",
+		"tupletMinDistance","",
+		
+		/// Display options for tab elements (simple and common styles)
+		
+		"slurShowTabSimple","",
+		"slurShowTabCommon","",
+		"fermataShowTabSimple","",
+		"fermataShowTabCommon","",
+		"dynamicsShowTabSimple","",
+		"dynamicsShowTabCommon","",
+		"hairpinShowTabSimple","",
+		"hairpinShowTabCommon","",
+		"accentShowTabSimple","",
+		"accentShowTabCommon","",
+		"staccatoShowTabSimple","",
+		"staccatoShowTabCommon","",
+		"harmonicMarkShowTabSimple","",
+		"harmonicMarkShowTabCommon","",
+		"letRingShowTabSimple","",
+		"letRingShowTabCommon","",
+		"palmMuteShowTabSimple","",
+		"palmMuteShowTabCommon","",
+		"rasgueadoShowTabSimple","",
+		"rasgueadoShowTabCommon","",
+		"mordentShowTabSimple","",
+		"mordentShowTabCommon","",
+		"turnShowTabSimple","",
+		"turnShowTabCommon","",
+		"wahShowTabSimple","",
+		"wahShowTabCommon","",
+		"golpeShowTabSimple","",
+		"golpeShowTabCommon","",
+		
+		"tabShowTiedFret","",
+		"tabParenthesizeTiedFret","",
+		"parenthesizeTiedFretIfArticulation","",
+		
+		"tabFretPadding","",
+		
+		"chordlineThickness","",
+		
+		"dummyMusicalSymbolsScale","",
+		
+		"autoplaceEnabled","",
+		"defaultsVersion","",
+		
+		"changesBeforeBarlineRepeats","",
+		"changesBeforeBarlineOtherJumps","",
+		
+		"placeClefsBeforeRepeats","",
+		"changesBetweenEndStartRepeat","",
+		
+		"showCourtesiesRepeats","",
+		"useParensRepeatCourtesies","",
+		
+		"showCourtesiesOtherJumps","",
+		"useParensOtherJumpCourtesies","",
+		
+		"showCourtesiesAfterCancellingRepeats","",
+		"useParensRepeatCourtesiesAfterCancelling","",
+		
+		"showCourtesiesAfterCancellingOtherJumps","",
+		"useParensOtherJumpCourtesiesAfterCancelling","",
+		
+		"smallParens",""];
+		
+		// GO THROUGH ALL THE DEFAULT SETTINGS
+		for (var i = 0; i < completeDefaultSettings.length; i += 2) {
+			var settingName = completeDefaultSettings[i];
+			var settingValue = completeDefaultSettings[i+1];
+			if (settingValue !== "") setSetting (settingName, settingValue);
+		}
+		
+		//MARK: SETTINGS
 		
 		curScore.endCmd();
 	}
@@ -607,8 +2381,8 @@ MuseScore {
 	}
 	
 	function setBravura () {
+		
 		curScore.startCmd();
-
 		setSetting ("musicalSymbolFont", "Bravura");
 		setSetting ("musicalTextFont", "Bravura Text");
 		curScore.endCmd();
@@ -616,9 +2390,9 @@ MuseScore {
 	}
 	
 	function setTimes () {
-		curScore.startCmd();
-
 		var fontsToTimes = ["tuplet", "lyricsOdd", "lyricsEven", "hairpin", "romanNumeral", "volta", "stringNumber","expression", "tempo", "tempoChange", "metronome", "measureNumber", "mmRestRange", "systemText", "staffText", "pageNumber"];
+
+		curScore.startCmd();
 		for (var i = 0; i < fontsToTimes.length; i++) setSetting (fontsToTimes[i]+"FontFace", "Times New Roman");
 		var fontsToTimes = ["longInstrument", "shortInstrument", "instrumentChange"];
 		for (var i = 0; i < fontsToTimes.length; i++) setSetting (fontsToTimes[i]+"FontFace", "Times New Roman Accidentals");
@@ -630,6 +2404,7 @@ MuseScore {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
+		
 		cmd ("insert-vbox");
 		var vbox = curScore.selection.elements[0];
 		cmd ("title-text");
@@ -673,11 +2448,8 @@ MuseScore {
 			curScore.endCmd();
 		}
 		if (topbox != null) {
-			
-			//curScore.startCmd ();
 			topbox.autoscale = 0;
 			topbox.boxHeight = 15;
-			//curScore.endCmd ();
 		}
 	}
 	
@@ -685,11 +2457,12 @@ MuseScore {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
+		
 		var elems = curScore.selection.elements;
 		var r = new RegExp('(.*?)(<sym>metNoteQuarterUp<\/sym>|<sym>metNoteHalfUp<\/sym>|<sym>metNote8thUp<\/sym>|\\uECA5|\\uECA7|\\uECA3)(.*?)( |\\u00A0|\\u2009)=( |\\u00A0|\\u2009)');
 		var f = new RegExp('<\/?font.*?>','g');
+		
 		curScore.startCmd();
-
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			if (e.type == Element.TEMPO_TEXT) {
@@ -767,6 +2540,88 @@ MuseScore {
 			return 0;
 		}
 	}
+	
+	function deleteAllCommentsAndHighlights () {
+	
+		var elementsToRemove = [];
+		var elementsToRecolor = [];
+				
+		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
+		curScore.startCmd();
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.endCmd();
+		
+		// insert-box does not need startcmd
+		cmd ("insert-vbox");
+	
+		var vbox = curScore.selection.elements[0];
+		
+		// title-text does not need startcmd
+		cmd ("title-text");
+		
+		// select-similar does not need startcmd
+		cmd ("select-similar");
+	
+		var elems = curScore.selection.elements;
+		for (var i = 0; i<elems.length; i++) {
+			var e = elems[i];
+			var c = e.color;	
+			// style the element pink
+			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+		}
+		if (vbox == null) {
+			logError ("deleteAllCommentsAndHighlights () — vbox was null");
+		} else {
+			curScore.startCmd();
+			removeElement (vbox);
+			curScore.endCmd();
+		}
+		
+		// **** SELECT ALL **** //
+		curScore.startCmd();
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
+		curScore.endCmd();
+		
+		// **** GET ALL OTHER ITEMS **** //
+		var elems = curScore.selection.elements;
+		
+		// **** LOOP THROUGH ALL ITEMS AND ADD THEM TO AN ARRAY IF THEY MATCH **** //
+		for (var i = 0; i < elems.length; i++) {
+			var e = elems[i];
+			var t = e.type;
+			var c = e.color;	
+			// style the element
+			if (Qt.colorEqual(c,"hotpink")) {
+				elementsToRecolor.push(e);
+			} else {
+				if (t == Element.STAFF_TEXT) {
+					if (Qt.colorEqual(e.frameBgColor,"yellow") && Qt.colorEqual(e.frameFgColor,"black")) elementsToRemove.push(e);
+				}
+			}
+		}
+		
+		var segment = curScore.firstSegment();
+		while (segment) {
+			if (segment.segmentType == Segment.TimeSig) {
+				for (var i = 0; i < curScore.nstaves; i++) {
+					var theTimeSig = segment.elementAt(i*4);
+					if (theTimeSig.type == Element.TIMESIG) {
+						var c = theTimeSig.color;
+						if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(theTimeSig);
+					}
+				}
+			}
+			segment = segment.next;
+		}
+		
+		// **** DELETE EVERYTHING IN THE ARRAY **** //
+		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
+		curScore.startCmd();
+		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
+		curScore.endCmd();
+	
+	}
+
 	
 	StyledDialogView {
 		id: dialog
