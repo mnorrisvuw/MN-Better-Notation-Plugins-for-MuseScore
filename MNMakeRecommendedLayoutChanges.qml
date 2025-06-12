@@ -50,10 +50,14 @@ MuseScore {
 	property var instrumentIds: []
 	property var instrumentCalcIds: []
 	property var firstVisibleStaff: 0
+	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 	
 	onRun: {
 		if (!curScore) return;
 		
+		var versionNumber = versionnumberfile.read().trim();
+		dialog.titleText = 'MN MAKE RECOMMENDED LAYOUT CHANGES '+versionNumber;
+		if (Qt.platform.os !== "osx") dialog.fontSize = 12;
 		// Show the options window
 		options.open();		
 	}
@@ -269,6 +273,9 @@ MuseScore {
 		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
 		// **** ALSO NOTE ANY GRAND STAVES			  				 **** //
 		// **** AND CHECK BARLINES ARE CONNECTED PROPERLY 			**** //
+		var scoreHasStrings = false;
+		var scoreHasWinds = false;
+		var scoreHasBrass = false;
 		
 		// ** FIRST CHECK THE ORDER OF STAVES IF ONE OF THE INSTRUMENTS IS A GRAND STAFF ** //
 		if (numGrandStaves > 0) {
@@ -315,6 +322,8 @@ MuseScore {
 		var numStrings = 0;
 		var flStaff, obStaff, clStaff, bsnStaff, hnStaff;
 		var tpt1Staff, tpt2Staff, tbnStaff, tbaStaff;
+		var firstStringPart = 0, firstWindPart = 0, firstBrassPart = 0;
+		var lastStringPart = 0, lastWindPart = 0, lastBrassPart = 0;
 		
 		// Check Quintets
 		for (var i = 0; i < numStaves; i ++) {
@@ -1686,8 +1695,8 @@ MuseScore {
 		"fretDiagramFretNumberFrameFgColor","",
 		"fretDiagramFretNumberFrameBgColor","",
 		
-		"rehearsalMarkFontFace","",
-		"rehearsalMarkFontSize","",
+		"rehearsalMarkFontFace","", // this is done elsewhere
+		"rehearsalMarkFontSize", "", // this is done elsewhere
 		"rehearsalMarkLineSpacing","",
 		"rehearsalMarkFontSpatiumDependent","",
 		"rehearsalMarkFontStyle","",
@@ -1902,7 +1911,7 @@ MuseScore {
 		"instrumentChangeFontSize","",
 		"instrumentChangeLineSpacing","",
 		"instrumentChangeFontSpatiumDependent","",
-		"instrumentChangeFontStyle","",
+		"instrumentChangeFontStyle",0, // Text Styles → Instrument Change → Style
 		"instrumentChangeColor","",
 		"instrumentChangeAlign","",
 		"instrumentChangeOffset","",
@@ -1910,8 +1919,8 @@ MuseScore {
 		"instrumentChangePosAbove","",
 		"instrumentChangePosBelow","",
 		"instrumentChangeMinDistance","",
-		"instrumentChangeFrameType","",
-		"instrumentChangeFramePadding","",
+		"instrumentChangeFrameType",1, // Text Styles → Instrument Change → Frame (Rectangle)
+		"instrumentChangeFramePadding", 0.4, // Text Styles → Instrument Change → Frame
 		"instrumentChangeFrameWidth","",
 		"instrumentChangeFrameRound","",
 		"instrumentChangeFrameFgColor","",
@@ -1942,210 +1951,6 @@ MuseScore {
 		"figuredBassFontSpatiumDependent","",
 		"figuredBassFontStyle","",
 		"figuredBassColor","",
-		
-		"user1Name","",
-		"user1FontFace","",
-		"user1FontSize","",
-		"user1LineSpacing","",
-		"user1FontSpatiumDependent","",
-		"user1FontStyle","",
-		"user1Color","",
-		"user1Align","",
-		"user1Offset","",
-		"user1OffsetType","",
-		"user1FrameType","",
-		"user1FramePadding","",
-		"user1FrameWidth","",
-		"user1FrameRound","",
-		"user1FrameFgColor","",
-		"user1FrameBgColor","",
-		
-		"user2Name","",
-		"user2FontFace","",
-		"user2FontSize","",
-		"user2LineSpacing","",
-		"user2FontSpatiumDependent","",
-		"user2FontStyle","",
-		"user2Color","",
-		"user2Align","",
-		"user2Offset","",
-		"user2OffsetType","",
-		"user2FrameType","",
-		"user2FramePadding","",
-		"user2FrameWidth","",
-		"user2FrameRound","",
-		"user2FrameFgColor","",
-		"user2FrameBgColor","",
-		
-		"user3Name","",
-		"user3FontFace","",
-		"user3FontSize","",
-		"user3LineSpacing","",
-		"user3FontSpatiumDependent","",
-		"user3FontStyle","",
-		"user3Color","",
-		"user3Align","",
-		"user3Offset","",
-		"user3OffsetType","",
-		"user3FrameType","",
-		"user3FramePadding","",
-		"user3FrameWidth","",
-		"user3FrameRound","",
-		"user3FrameFgColor","",
-		"user3FrameBgColor","",
-		
-		"user4Name","",
-		"user4FontFace","",
-		"user4FontSize","",
-		"user4LineSpacing","",
-		"user4FontSpatiumDependent","",
-		"user4FontStyle","",
-		"user4Color","",
-		"user4Align","",
-		"user4Offset","",
-		"user4OffsetType","",
-		"user4FrameType","",
-		"user4FramePadding","",
-		"user4FrameWidth","",
-		"user4FrameRound","",
-		"user4FrameFgColor","",
-		"user4FrameBgColor","",
-		
-		"user5Name","",
-		"user5FontFace","",
-		"user5FontSize","",
-		"user5LineSpacing","",
-		"user5FontSpatiumDependent","",
-		"user5FontStyle","",
-		"user5Color","",
-		"user5Align","",
-		"user5Offset","",
-		"user5OffsetType","",
-		"user5FrameType","",
-		"user5FramePadding","",
-		"user5FrameWidth","",
-		"user5FrameRound","",
-		"user5FrameFgColor","",
-		"user5FrameBgColor","",
-		
-		"user6Name","",
-		"user6FontFace","",
-		"user6FontSize","",
-		"user6LineSpacing","",
-		"user6FontSpatiumDependent","",
-		"user6FontStyle","",
-		"user6Color","",
-		"user6Align","",
-		"user6Offset","",
-		"user6OffsetType","",
-		"user6FrameType","",
-		"user6FramePadding","",
-		"user6FrameWidth","",
-		"user6FrameRound","",
-		"user6FrameFgColor","",
-		"user6FrameBgColor","",
-		
-		"user7Name","",
-		"user7FontFace","",
-		"user7FontSize","",
-		"user7LineSpacing","",
-		"user7FontSpatiumDependent","",
-		"user7FontStyle","",
-		"user7Color","",
-		"user7Align","",
-		"user7Offset","",
-		"user7OffsetType","",
-		"user7FrameType","",
-		"user7FramePadding","",
-		"user7FrameWidth","",
-		"user7FrameRound","",
-		"user7FrameFgColor","",
-		"user7FrameBgColor","",
-		
-		"user8Name","",
-		"user8FontFace","",
-		"user8FontSize","",
-		"user8LineSpacing","",
-		"user8FontSpatiumDependent","",
-		"user8FontStyle","",
-		"user8Color","",
-		"user8Align","",
-		"user8Offset","",
-		"user8OffsetType","",
-		"user8FrameType","",
-		"user8FramePadding","",
-		"user8FrameWidth","",
-		"user8FrameRound","",
-		"user8FrameFgColor","",
-		"user8FrameBgColor","",
-		
-		"user9Name","",
-		"user9FontFace","",
-		"user9FontSize","",
-		"user9LineSpacing","",
-		"user9FontSpatiumDependent","",
-		"user9FontStyle","",
-		"user9Color","",
-		"user9Align","",
-		"user9Offset","",
-		"user9OffsetType","",
-		"user9FrameType","",
-		"user9FramePadding","",
-		"user9FrameWidth","",
-		"user9FrameRound","",
-		"user9FrameFgColor","",
-		"user9FrameBgColor","",
-		
-		"user10Name","",
-		"user10FontFace","",
-		"user10FontSize","",
-		"user10LineSpacing","",
-		"user10FontSpatiumDependent","",
-		"user10FontStyle","",
-		"user10Color","",
-		"user10Align","",
-		"user10Offset","",
-		"user10OffsetType","",
-		"user10FrameType","",
-		"user10FramePadding","",
-		"user10FrameWidth","",
-		"user10FrameRound","",
-		"user10FrameFgColor","",
-		"user10FrameBgColor","",
-		
-		"user11Name","",
-		"user11FontFace","",
-		"user11FontSize","",
-		"user11LineSpacing","",
-		"user11FontSpatiumDependent","",
-		"user11FontStyle","",
-		"user11Color","",
-		"user11Align","",
-		"user11Offset","",
-		"user11OffsetType","",
-		"user11FrameType","",
-		"user11FramePadding","",
-		"user11FrameWidth","",
-		"user11FrameRound","",
-		"user11FrameFgColor","",
-		"user11FrameBgColor","",
-		
-		"user12Name","",
-		"user12FontFace","",
-		"user12FontSize","",
-		"user12LineSpacing","",
-		"user12FontSpatiumDependent","",
-		"user12FontStyle","",
-		"user12Color","",
-		"user12Align","",
-		"user12Offset","",
-		"user12OffsetType","",
-		"user12FrameType","",
-		"user12FramePadding","",
-		"user12FrameWidth","",
-		"user12FrameRound","",
-		"user12FrameFgColor","",
-		"user12FrameBgColor","",
 		
 		"letRingFontFace","",
 		"letRingFontSize","",
@@ -2285,7 +2090,7 @@ MuseScore {
 		for (var i = 0; i < completeDefaultSettings.length; i += 2) {
 			var settingName = completeDefaultSettings[i];
 			var settingValue = completeDefaultSettings[i+1];
-			if (settingValue !== "") setSetting (settingName, settingValue);
+			if (settingName !== "" && settingValue !== "") setSetting (settingName, settingValue);
 		}
 		
 		//MARK: SETTINGS
@@ -2323,7 +2128,8 @@ MuseScore {
 					setPartSetting (thePart, "tupletFontSize", 11);
 					setPartSetting (thePart, "measureNumberFontSize", 8.5);
 					setPartSetting (thePart, "pageNumberFontStyle",0);
-					var fontsToTwelvePoint = ["longInstrument", "shortInstrument", "partInstrument", "tempo", "tempoChange", "metronome", "pageNumber", "expression", "staffText", "systemText", "rehearsalMark"];
+					setPartSetting (thePart, "rehearsalMarkFontSize",14);
+					var fontsToTwelvePoint = ["longInstrument", "shortInstrument", "partInstrument", "tempo", "tempoChange", "metronome", "pageNumber", "expression", "staffText", "systemText"];
 					for (var j = 0; j < fontsToTwelvePoint.length; j++) setPartSetting (thePart, fontsToTwelvePoint[j]+"FontSize", 12);
 				}
 				
@@ -2364,6 +2170,8 @@ MuseScore {
 		setSetting ("titleFontSize", 24);
 		setSetting ("subTitleFontSize", 13);
 		setSetting ("composerFontSize", 10);
+		setSetting ("rehearsalMarkFontSize", 14);
+
 		setSetting ("partInstrumentFrameType", 1);
 		setSetting ("partInstrumentFramePadding", 0.8);
 		
@@ -2375,7 +2183,7 @@ MuseScore {
 			setSetting ("tempoChangeFontSize", 13);
 		}
 		
-		var fontsToTwelvePoint = ["longInstrument", "shortInstrument", "partInstrument", "metronome", "pageNumber", "expression", "staffText", "systemText", "rehearsalMark"];
+		var fontsToTwelvePoint = ["longInstrument", "shortInstrument", "partInstrument", "metronome", "pageNumber", "expression", "staffText", "systemText"];
 		for (var i = 0; i < fontsToTwelvePoint.length; i++) setSetting (fontsToTwelvePoint[i]+"FontSize", 12);
 		curScore.endCmd();
 	}
@@ -2516,7 +2324,9 @@ MuseScore {
 	}
 	
 	function setSetting (theSetting, theValue) {
-		if (curScore.style.value(theSetting) == theValue) return;
+		if (theSetting == null || theSetting == undefined) return;
+		if (theValue == null || theValue == undefined) return;
+		if (theSetting == theValue) return;
 		curScore.style.setValue(theSetting,theValue);
 	}
 	
@@ -2579,7 +2389,7 @@ MuseScore {
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
@@ -2627,8 +2437,10 @@ MuseScore {
 		id: dialog
 		title: "CHECK COMPLETED"
 		contentHeight: 300
-		contentWidth: 500
+		contentWidth: 550
 		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
 	
 		Text {
 			id: theText
@@ -2636,9 +2448,9 @@ MuseScore {
 			x: 20
 			y: 20
 	
-			text: "MN MAKE RECOMMENDED LAYOUT CHANGES"
+			text: dialog.titleText
 			font.bold: true
-			font.pointSize: 18
+			font.pointSize: dialog.fontSize
 		}
 		
 		Rectangle {

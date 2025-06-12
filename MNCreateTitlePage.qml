@@ -30,12 +30,17 @@ MuseScore {
 	property var titlePageHeight: 0
 	property var inchesToMM: 25.4
 	property var isMac: false
-	property var frontMatterText: "INSTRUMENTATION\n\nFor ensemble and orchestral works, list the instruments required here in score order,\nincluding all doubling instruments and lists of percussion instruments.\n\n\n\nPERFORMANCE INSTRUCTIONS\n\nInclude a list of any unconventional notation used and their meanings,\nand/or any required instrument preparations or other special aspects\nof the piece that can’t be explained on the score.\n\n\n\nDEDICATION\n\nDedicated to ....?\n\n\n\nDURATION\n\nApprox. duration: x mins\n\n\n\n(Delete one) Transposed score / Score in C\n\n\n\nPROGRAMME NOTE\n\nInclude a short programme note here\n\n\n\n© Composer Name, 20xx"
+	property var frontMatterText: "INSTRUMENTATION\n\nFor ensemble and orchestral works, list the instruments required here in score order,\nincluding all doubling instruments and lists of percussion instruments.\n\n\n\nPERFORMANCE INSTRUCTIONS\n\nInclude a list of any unconventional notation used and their meanings,\nand/or any required instrument preparations or other special aspects\nof the piece that can’t be explained on the score.\n\n\n\nDEDICATION\n\nDedicated to ....\n\n\n\nDURATION\n\nApprox. duration: x mins\n\n\n\n(Delete one) Transposed score / Score in C\n\n\n\nPROGRAMME NOTE\n\nInclude a short programme note here\n\n\n\n© Composer Name, 20xx"
 	
 	FileIO { id: stylesfile;
 		source: Qt.resolvedUrl("./assets/styles.json").toString().slice(8);
 		onError: { console.log(msg); }
 	}
+	FileIO { id: versionnumberfile;
+		source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8);
+		onError: { console.log(msg); }
+	}
+
 
   onRun: {
 		if (!curScore) return;
@@ -43,6 +48,9 @@ MuseScore {
 		spatium = curScore.style.value('spatium')*25.4/mscoreDPI;
 		
 		isMac = Qt.platform.os === 'osx';
+		var versionNumber = versionnumberfile.read().trim();
+		dialog.titleText = 'MN CREATE TITLE PAGE '+versionNumber;
+		if (!isMac) dialog.fontSize = 12;
 		
 		// ** CHECK THERE ISN’T ALREADY A TITLE PAGE ** //
 		var firstBarInScore = curScore.firstMeasure;
@@ -375,6 +383,8 @@ MuseScore {
 		contentHeight: 282
 		contentWidth: 466
 		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
 	
 		Text {
 			id: theText
@@ -382,9 +392,9 @@ MuseScore {
 			x: 20
 			y: 20
 	
-			text: "MN CREATE TITLE PAGE"
+			text: dialog.titleText
 			font.bold: true
-			font.pointSize: 18
+			font.pointSize: dialog.fontSize
 		}
 		
 		Rectangle {

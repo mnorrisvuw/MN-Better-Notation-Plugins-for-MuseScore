@@ -5,6 +5,7 @@ A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that chec
   <p>
     <a href="#includedplugins">Included plug-ins</a> •
     <a href="#installation">Installation</a> •
+    <a href="#fonts">Fonts</a> •
     <a href="#use">How to use</a> •
     <a href="#feedback">Feedback, requests and bug reports</a> •
     <a href="#knownbugs">Known bugs and limitations</a> •
@@ -134,8 +135,8 @@ A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that chec
 * For each of the four MN plugins, click on their icon and click ‘**Enable**’
 * The plugins should now be available from the **Plugins** menu
 
-**INSTALLING FONTS FOR MN CREATE TITLE PAGE**:
-The title page templates in the MN Create Title Page plugin make use of the following commonly available fonts. Many of these fonts come bundled with the Windows and/or Mac OS operating systems, with Microsoft Office, or as a free download.
+## <a id="fonts"></a>Installing fonts:
+The templates in the **MN Create Title Page** plugin use the following freely available fonts. Many of these fonts come bundled with the Windows and/or Mac OS operating systems; all are available as a free download.
 
 Depending on your particular combination of OS and other software, you may or may not already have them installed. If you need to install them, below is a list of download links:
 * **Academy Engraved LET**: bundled with Mac OS X; available for download [here](https://fontsgeek.com/fonts/Academy-Engraved-LET-Plain)
