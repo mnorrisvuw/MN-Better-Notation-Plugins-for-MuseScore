@@ -5796,7 +5796,7 @@ MuseScore {
 		var strokesArray = [0,8,16,32,64];
 		var numStrokes = strokesArray.indexOf(tremSubdiv);
 		var dur = 2 * parseFloat(noteRest.duration.ticks) / division;
-		logError("TWO-NOTE TREMOLO HAS "+numStrokes+" strokes; dur is "+dur+"; isSlurred = "+isSlurred+"; isPitchedPercussionInstrument = "+isPitchedPercussionInstrument);
+		//logError("TWO-NOTE TREMOLO HAS "+numStrokes+" strokes; dur is "+dur+"; isSlurred = "+isSlurred+"; isPitchedPercussionInstrument = "+isPitchedPercussionInstrument);
 		if (!isSlurred) {
 			if (isStringInstrument) {
 				addError("Fingered tremolos for strings should always be slurred.",noteRest);
