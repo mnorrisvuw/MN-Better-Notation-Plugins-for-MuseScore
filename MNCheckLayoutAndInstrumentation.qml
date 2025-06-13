@@ -120,7 +120,7 @@ MuseScore {
 	property var flaggedClefTooHigh: false
 	property var flaggedOttavaTooLow: false
 	property var flaggedOttavaTooHigh: false
-	
+	property var flaggedStaccatoOnShortDecayInstrumentBarNum: 0
 	property var flaggedClefTooLowBarNum: 0
 	property var flaggedClefTooHighBarNum: 0
 	property var flaggedOttavaTooLowBarNum: 0
@@ -740,6 +740,7 @@ MuseScore {
 			flaggedClefTooHighBarNum = 0;
 			flaggedOttavaTooLowBarNum = 0;
 			flaggedOttavaTooHighBarNum = 0;
+			flaggedStaccatoOnShortDecayInstrumentBarNum = 0;
 			flaggedDivError = false;
 			flaggedWeKnowWhosPlaying = false;
 			flaggedPedalLocation = false;
@@ -858,7 +859,11 @@ MuseScore {
 				var isCompound = !(timeSigNum % 3);
 				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
 				if (isCompound && timeSigDenom >= 8) beatLength = (division * 12) / timeSigDenom;
-				virtualBeatLength = division * (isCompound ? 12 : 4) / timeSigDenom;
+				if (timeSigDenom == 4) {
+					virtualBeatLength = division;
+				} else {
+					virtualBeatLength = division * (isCompound ? 12 : 4) / timeSigDenom;
+				}
 				if (currentStaffNum == 0) {
 					var numBeats = currentTimeSig.numerator;
 					if (currentTimeSig.denominator > 8) numBeats /= 2;
@@ -1066,6 +1071,7 @@ MuseScore {
 							}
 							if (readyToGoToNextSlur) {
 								if (currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] > -1) {
+									prevSlurEnd = currentSlurEnd;
 									isSlurred = true;
 									lastArticulationTick = currTick;
 									//logError("Slur started: isSlurred = true; nextSlurStart was "+nextSlurStartOnTrack[currentTrack]);
@@ -1076,13 +1082,13 @@ MuseScore {
 									currentSlurStart = currentSlur.spannerTick.ticks;
 									currentSlurLength = currentSlur.spannerTicks.ticks;
 									currentSlurEnd = currentSlurStart + currentSlurLength;
-									prevSlurEnd = currentSlurEnd;
 									currentSlurLength = currentSlur.spannerTicks.ticks
 									currentSlurEnd = currentSlurStart + currentSlurLength;
 									//logError("currTick = "+currTick+" — Slur started at "+currentSlurStart+" & ends at "+currentSlurEnd);
 									var prevSlurLength = 0;
 									if (currentSlurNumOnTrack[currentTrack] > 0) prevSlurLength = slurs[currentTrack][currentSlurNumOnTrack[currentTrack] - 1].spannerTicks.ticks;
-									if (doCheckSlursAndTies && currentSlurNumOnTrack[currentTrack] > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
+									//logError ("Slur check: "+currentSlurNumOnTrack[currentTrack]+" "+currentSlurStart+" "+prevSlurEnd+" "+currentSlurLength+" "+prevSlurLength);
+									if (doCheckSlursAndTies && currentSlurNumOnTrack[currentTrack] > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0 && !prevWasGraceNote) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
 
 									if (currentSlurNumOnTrack[currentTrack] < numSlurs - 1) {
 										var nextSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1];
@@ -1463,7 +1469,7 @@ MuseScore {
 									
 									// ************ CHECK DYNAMICS UNDER RESTS ********** //
 									if (doCheckDynamics && tickHasDynamic && !isGrandStaff[currentStaffNum]) {
-										if (allTracksHaveRestsAtCurrTick()) addError ("In general, you shouldn’t put dynamic markings under rests.", theDynamic);
+										if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
 									}
 									maxLLSinceLastRest = 0;
 								
@@ -1522,6 +1528,7 @@ MuseScore {
 									}
 																
 									// ************ CHECK STACCATO ISSUES ************ //
+									if (flaggedStaccatoOnShortDecayInstrumentBarNum > 0 && flaggedStaccatoOnShortDecayInstrumentBarNum < currentBarNum - 4) flaggedStaccatoOnShortDecayInstrumentBarNum = 0;
 									var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
 									if (theArticulationArray) {
 										lastArticulationTick = currTick;
@@ -2091,7 +2098,9 @@ MuseScore {
 			
 			// *** ARPEGGIOS *** //
 			if (etype == Element.ARPEGGIO && doCheckArpeggios) {
-				if (e.subtypeName() === "Up arpeggio") addError ("Arpeggios are played upwards by default.\nOnly use an up arrow to contrast with downwards ones,\notherwise, replace with a standard arpeggio symbol",e);
+				//logError ("Arpeggio found, type "+e.subtype);
+				// Versions prior to MuseScore 4.6 reported the subtype as 'undefined', so we had to use the subtypeName instead
+				if (e.subtype == 1 || e.subtypeName() === "Up arpeggio") addError ("Arpeggios are played upwards by default.\nOnly use an up arrow to contrast with downwards ones,\notherwise, replace with a standard arpeggio symbol",e);
 			}
 			
 			// *** FERMATAS *** //
@@ -2852,7 +2861,6 @@ MuseScore {
 		var style = curScore.style;
 		tempoFontStyle = style.value("tempoFontStyle");
 		metronomeFontStyle = style.value("metronomeFontStyle");
-		
 		if (!doCheckPageSettings && !doCheckScoreStyle) return;
 		
 		// ** CHECK FOR PAGE SETTING ISSUES ** //
@@ -4295,10 +4303,10 @@ MuseScore {
 								var metroIsPlain = nonBoldText.includes('=');
 								//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
 								if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
-									addError ('It is recommended to have metronome markings in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject)
+									addError ('It is recommended to have metronome markings in a plain font style,\nrather than bold. (See, for instance, ‘Behind Bars’ p. 183)',textObject)
 								}
 								if (isTempoMarking && !metroIsPlain) {
-									addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, not bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
+									addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, rather than bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
 								}
 								var metroSection = styledTextWithoutTags.split('=')[1];
 								if (metroSection === lastMetroSection) {
@@ -4694,6 +4702,10 @@ MuseScore {
 		if (noteRest.notes[0].tieForward != null) {
 			addError ("Don’t put staccato dots on tied notes",noteRest);
 			return;
+		}
+		if (isShortDecayInstrument && flaggedStaccatoOnShortDecayInstrumentBarNum == 0) {
+			addError ("Staccato dots may be meaningless for this short decay instrument.",noteRest);
+			flaggedStaccatoOnShortDecayInstrumentBarNum = currentBarNum;
 		}
 		if (isSlurred && !isEndOfSlur && flaggedSlurredStaccatoBar < currentBarNum - 4 && (isStringInstrument || isHarp || isPercussionInstrument)) {
 			var prev = getPreviousNoteRest(noteRest);
@@ -5185,7 +5197,7 @@ MuseScore {
 		
 		// check tied pizz
 		if (noteRest.notes[0].tieForward && !isLv) {
-			addError("In general, you shouldn’t need to tie pizzicato notes.\nPerhaps this is supposed to be arco?",noteRest);
+			addError("In general, don’t tie pizzicato notes.\nPerhaps this is supposed to be arco?",noteRest);
 			lastPizzIssueBar = currentBarNum;
 			lastPizzIssueStaff = currentStaffNum;
 			return;
@@ -5193,7 +5205,7 @@ MuseScore {
 		
 		// check slurred pizz
 		if (isSlurred) {
-			addError("In general, you shouldn’t slur pizzicato notes unless you\nspecifically want the slurred notes not to be replucked", noteRest);
+			addError("In general, don’t slur pizzicato notes unless you\nspecifically want the slurred notes not to be replucked", noteRest);
 			lastPizzIssueBar = currentBarNum;
 			lastPizzIssueStaff = currentStaffNum;
 			return;
@@ -5761,7 +5773,7 @@ MuseScore {
 				addError("You don’t need more than 3 strokes for an unmeasured tremolo.",noteRest);
 				break;
 		}
-		if (isSlurred) addError("You shouldn’t slur over a tremolo.",noteRest);
+		if (isSlurred) addError("In general, don’t slur a tremolo.",noteRest);
 		if (isWindOrBrassInstrument && !flzFound && !flaggedFlz) {
 			addError ("I couldn't find an associated ‘flzg.’\nmarking for this fluttertongue note.",noteRest);
 			flaggedFlz = true;
@@ -6435,7 +6447,7 @@ MuseScore {
 	StyledDialogView {
 		id: options
 		title: "MN CHECK LAYOUT & INSTRUMENTATION"
-		contentHeight: 520
+		contentHeight: 525
 		contentWidth: 740
 		property color backgroundColor: ui.theme.backgroundSecondaryColor
 		
