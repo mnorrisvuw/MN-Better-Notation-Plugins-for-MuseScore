@@ -439,8 +439,11 @@ MuseScore {
 				if (accType == Accidental.NATURAL) accInKeySig = (accOrder + 1) > Math.abs(currentKeySig);
 			}
 			//errorMsg += "accInKeySig = "+accInKeySig+"; accType = "+accType+";";
+			
+			if (note.tieBack) {
+				if (accVisible) addError ("Don’t show accidentals in the middle of a tie",accObject);
+			} else {
 
-			if (!note.tieBack) {
 				var noteLabel = pitchLabels[diatonicPitchClass]+accidentals[acc+2];
 				isBadAcc = false;
 	

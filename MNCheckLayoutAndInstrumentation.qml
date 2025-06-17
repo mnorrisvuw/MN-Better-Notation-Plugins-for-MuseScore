@@ -131,6 +131,8 @@ MuseScore {
 	property var flaggedWrittenStaccato: false
 	property var flaggedFastMultipleStops: false
 	property var flaggedOneStrokeTrem: false
+	property var flaggedManualSlurBarNum: -1
+
 	property var firstVisibleStaff: 0
 	property var staffVisible: []
 	property var haveHadPlayingIndication: false
@@ -752,6 +754,7 @@ MuseScore {
 			flaggedWrittenStaccato = false;
 			flaggedFastMultipleStops = false;
 			flaggedOneStrokeTrem = false;
+			flaggedManualSlurBarNum = -1;
 			haveHadPlayingIndication = false;
 			flaggedSlurredStaccatoBar = -10;
 			flaggedUnterminatedTempoChange = false;
@@ -1133,9 +1136,9 @@ MuseScore {
 										//logError ("endHookType = "+prevPedal.endHookType+"; beginHookType = "+currentPedal.beginHookType);
 										if (prevPedal.endHookType != 2 && currentPedal.beginHookType != 2) {
 											if (currentPedal.beginText !== "") {
-												addError ("The previous pedal ended just before this one. It is therefore\nbest to use a pedal retake instead of a new Ped. marking.\nIn Properties, set the previous pedal to an angled end hook,\nset this pedal to an angled start hook, and delete the ‘Ped.’ text.", currentPedal); 
+												addError ("The previous pedal ended just before this one. It is therefore\nbest to use a pedal ‘retake’ instead of a new Ped. marking.\nIn Properties, set the previous pedal to an angled end hook,\nset this pedal to an angled start hook, delete the ‘Ped.’ text,\nand align the end and beginning to form the retake.", currentPedal); 
 											} else {
-												addError ("The previous pedal ended just before this one. It is therefore\nbest to use a pedal retake instead of a new Ped. marking.\nIn Properties, set the previous pedal to an angled end hook,\nset this pedal to an angled start hook.", currentPedal);
+												addError ("The previous pedal ended just before this one. It is therefore\nbest to use a pedal ‘retake’ instead of a new Ped. marking.\nIn Properties, set the previous pedal to an angled end hook,\nset this pedal to an angled start hook, and\nalign the end and beginning to form the retake.", currentPedal);
 											}
 										}
 									}
@@ -1145,11 +1148,11 @@ MuseScore {
 									if (isPedalInstrument) {
 										if (isTopOfGrandStaff[currentStaffNum] && !flaggedPedalLocation) {
 											flaggedPedalLocation = true;
-											addError("Pedal markings should go below the bottom staff of a grand staff",currentPedal);
+											addError("Pedal markings should go below the bottom staff of a grand staff.",currentPedal);
 										}
 									} else {
 										if (!flaggedPedalIssue) {
-											addError("This instrument does not have a sustain pedal",currentPedal);
+											addError("This instrument does not have a sustain pedal.",currentPedal);
 											flaggedPedalIssue = true;
 										}
 									}
@@ -1490,7 +1493,7 @@ MuseScore {
 									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
 										var nextChordRest = getNextChordRest(cursor);
 										if (nextChordRest != null) {
-											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest",noteRest);
+											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest.",noteRest);
 										}
 									}
 									
@@ -1545,7 +1548,7 @@ MuseScore {
 											if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
 												if (isStringInstrument || isWindOrBrassInstrument) {
 													lastArticulationTick = currTick + 1;
-													addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage",noteRest);
+													addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage.",noteRest);
 												}
 											}
 										}
@@ -1709,7 +1712,7 @@ MuseScore {
 		// mop up any last tests
 		
 		// ** CHECK FOR OMITTED INITIAL TEMPO ** //
-		if (doCheckTempoMarkings && !initialTempoExists) addError("I couldn’t find an initial tempo marking","top");
+		if (doCheckTempoMarkings && !initialTempoExists) addError("I couldn’t find an initial tempo marking.","top");
 		
 		// ** CHECK REHEARSAL MARKS ** //
 		if (doCheckRehearsalMarks && numBars > 30 && numStaves > 3 && !isSoloScore) checkRehearsalMarks();
@@ -2100,7 +2103,7 @@ MuseScore {
 			if (etype == Element.ARPEGGIO && doCheckArpeggios) {
 				//logError ("Arpeggio found, type "+e.subtype);
 				// Versions prior to MuseScore 4.6 reported the subtype as 'undefined', so we had to use the subtypeName instead
-				if (e.subtype == 1 || e.subtypeName() === "Up arpeggio") addError ("Arpeggios are played upwards by default.\nOnly use an up arrow to contrast with downwards ones,\notherwise, replace with a standard arpeggio symbol",e);
+				if (e.subtype == 1 || e.subtypeName() === "Up arpeggio") addError ("Arpeggios are played upwards by default.\nOnly use an up arrow to contrast with downwards ones,\notherwise, replace with a standard arpeggio symbol.",e);
 			}
 			
 			// *** FERMATAS *** //
@@ -3228,7 +3231,7 @@ MuseScore {
 						if (prevSystem != null) {
 							// we check the *previous* system and *previous* page, which, because we have now gone to a new page, will be the last system on the previous page
 							var checkThisSystem = prevPage.is(page1) ? !hasFooter : true;
-							if (checkThisSystem) if (prevSystem.pagePos.y + prevSystem.bbox.height < thresholdb) addError ("This system should ideally be justified to the bottom of the page",prevFirstMeasure);
+							if (checkThisSystem) if (prevSystem.pagePos.y + prevSystem.bbox.height < thresholdb) addError ("This system should ideally be justified to the bottom of the page.",prevFirstMeasure);
 						}
 						prevPage = currPage;
 					}
@@ -3400,8 +3403,8 @@ MuseScore {
 		}
 		
 		if (isWindOrBrassInstrument && doCheckWindsAndBrass) {
-			if (lowerCaseText.includes("tutti")) addError("Don’t use ‘Tutti’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
-			if (lowerCaseText.includes("unis.")) addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead",textObject);
+			if (lowerCaseText.includes("tutti")) addError("Don’t use ‘Tutti’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead.",textObject);
+			if (lowerCaseText.includes("unis.")) addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead.",textObject);
 			if (lowerCaseText.includes("div.")) addError("Don’t use ‘div.’ for winds and brass.",textObject);
 			
 			if (lowerCaseText.substring(0,3) === "flz") {
@@ -3420,7 +3423,7 @@ MuseScore {
 			//errorMsg += "IsString: checking "+lowerCaseText;
 			// **** CHECK INCORRECT 'A 2 / A 3' MARKINGS **** //
 			if (lowerCaseText === "a 2" || lowerCaseText === "a 3") {
-				addError("Don’t use ‘"+lowerCaseText+"’ for strings; write ‘unis.’ etc. instead",textObject);
+				addError("Don’t use ‘"+lowerCaseText+"’ for strings; write ‘unis.’ etc. instead.",textObject);
 				return;
 			}
 			
@@ -3434,7 +3437,7 @@ MuseScore {
 			
 			// **** CHECK ALREADY PLAYING ORD. **** .//
 			if (lowerCaseText.substring(0,5) === "(ord." ) {
-				if (currentContactPoint != "ord") addError ("This looks like it’s an indication to change to ord.\nIf so, you don’t need the parentheses",textObject)
+				if (currentContactPoint != "ord") addError ("This looks like it’s an indication to change to ord.\nIf so, you don’t need the parentheses.",textObject)
 			}
 			if (lowerCaseText.substring(0,4) === "ord." || lowerCaseText === "pos. nat.") {
 				if (currentContactPoint === "ord" && (currentPlayingTechnique === "arco" || currentPlayingTechnique === "pizz")) {
@@ -3608,7 +3611,7 @@ MuseScore {
 							haveHadPlayingIndication = true;
 						}
 					} else {
-						addError("You should specify if this is\ncol legno batt. or col legno tratto",textObject);
+						addError("You should specify if this is\ncol legno batt. or col legno tratto.",textObject);
 						currentPlayingTechnique = "cl";
 						return;
 					}
@@ -3675,7 +3678,7 @@ MuseScore {
 		}
 		var clefId = clef.subtypeName();
 		if (clefId === prevClefId) {
-			addError("This clef is redundant: already was "+clefId.toLowerCase()+"\nIt can be safely deleted",clef);
+			addError("This clef is redundant: already was "+clefId.toLowerCase()+".\nIt can be safely deleted.",clef);
 			//logError ('clefId and prevClefId are the same: '+clefId);
 		}
 		//logError("Checking clef — "+clefId+" prevClefId is "+prevClefId);
@@ -3687,10 +3690,10 @@ MuseScore {
 			if (isTrombone && isTrebleClef) {
 				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.",clef);
 			} else {
-				if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef",clef);
-				if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef",clef);
-				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef",clef);
-				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef",clef);
+				if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef.",clef);
+				if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef.",clef);
+				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef.",clef);
+				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef.",clef);
 			}
 			if (!isHeaderClef && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nIf possible, move this material to the other staff to avoid clef changes.",clef);
 		}
@@ -3971,16 +3974,16 @@ MuseScore {
 				var isVisible = textObject.visible;
 				
 				// ** CHECK TITLE ** //
-				if (eSubtype === "Title" && plainText === 'Untitled score') addError( "You have not changed the default title text",textObject);
+				if (eSubtype === "Title" && plainText === 'Untitled score') addError( "You have not changed the default title text.",textObject);
 				
 				// ** CHECK SUBTITLE ** //
 				if (eSubtype === "Subtitle") {
-					if (plainText === 'Subtitle') addError( "You have not changed the default subtitle text",textObject);
-					if (plainText.substring(0,4) === 'For ' || plainText.includes ('\nFor')) addError( "In the subtitle, make the ‘f’ in ‘for’ lower-case",textObject);
+					if (plainText === 'Subtitle') addError( "You have not changed the default subtitle text.",textObject);
+					if (plainText.substring(0,4) === 'For ' || plainText.includes ('\nFor')) addError( "In the subtitle, make the ‘f’ in ‘for’ lower-case.",textObject);
 				}
 				
 				// ** CHECK COMPOSER ** //
-				if (eSubtype === "Composer" && plainText === 'Composer / arranger') addError( "You have not changed the default composer text",textObject);
+				if (eSubtype === "Composer" && plainText === 'Composer / arranger') addError( "You have not changed the default composer text.",textObject);
 			
 			
 				// **** CHECK IF THIS IS A WOODWIND OR BRASS MARKING **** //
@@ -4018,7 +4021,11 @@ MuseScore {
 							var correctSpelling = spellingerrorsatstart[i*2+1];
 							var diff = plainText.length-spellingError.length;
 							var correctText = (diff > 0) ? correctSpelling+plainText.substring(spellingError.length) : correctSpelling;
-							addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
+							if (plainText.length > 50) {
+								addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.",textObject);
+							} else {
+								addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.",textObject);
+							}
 							return;
 						}
 					}
@@ -4033,7 +4040,13 @@ MuseScore {
 								correctText = correctText.replace(spellingError,correctSpelling);
 							}
 						}
-						if (isSpellingError) addError("‘"+plainText+"’ is misspelled;\nit should be ‘"+correctText+"’.",textObject);
+						if (isSpellingError) {
+							if (plainText.length > 50) {
+								addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.",textObject);
+							} else {
+								addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.",textObject);
+							}
+						}
 					}
 					
 					// **** CHECK Brass, Strings, Winds, Percussion **** //
@@ -4259,7 +4272,7 @@ MuseScore {
 								//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
 								if (styledTextWithoutTags.includes(metronomemarkings[j])) {
 									isMetronomeMarking = true;
-									if (textObject.offsetX < -4.5) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature or first note.\n(See Behind Bars, p. 183)", textObject);
+									if (textObject.offsetX < -4.5) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
 
 									// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
 									var metronomeDuration = division; // crotchet
@@ -4360,12 +4373,12 @@ MuseScore {
 						}
 						
 						if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
-							addError ("Change this to ‘poco sul tasto’",textObject);
+							addError ("Change this to ‘poco sul tasto’.",textObject);
 							return;
 						}
 						
 						if (lowerCaseText === "sul tasto molto") {
-							addError ("Change this to ‘molto sul tasto’",textObject);
+							addError ("Change this to ‘molto sul tasto’.",textObject);
 							return;
 						}
 						
@@ -4383,7 +4396,7 @@ MuseScore {
 						var strings = ["I","II","III","IV"];
 						for (var i = 0; i < 4; i++) {
 							if (lowerCaseText === "sul "+strings[i]) {
-								addError ( "You don’t need ‘sul’ here;\nyou can just write the string number", textObject);
+								addError ( "You don’t need ‘sul’ here;\nyou can just write the string number.", textObject);
 								return;
 							}
 						}
@@ -4455,7 +4468,7 @@ MuseScore {
 				
 					// **** CHECK FOR DYNAMIC ENTERED AS EXPRESSION (OR OTHER) TEXT **** //
 					if (doCheckDynamics && !objectIsDynamic && (includesADynamic || stringIsDynamic)) {
-						addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette",textObject);
+						addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette.",textObject);
 						return;
 					}
 			
@@ -4545,7 +4558,7 @@ MuseScore {
 				}
 			}
 			if (isSlurred & !isMelisma[theTrack]) {
-				if (currTick < currentSlur.spannerTick.ticks + currentSlur.spannerTicks.ticks) addError ("This note is slurred, but is not a melisma",noteRest);
+				if (currTick < currentSlur.spannerTick.ticks + currentSlur.spannerTicks.ticks) addError ("This note is slurred, but is not a melisma.",noteRest);
 			}
 		} else {
 			if (isMelisma[theTrack]) {
@@ -4659,8 +4672,8 @@ MuseScore {
 						if (theTimeSigStr === prevTimeSig) addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",theTimeSig);
 						prevTimeSig = theTimeSigStr;
 						var n = theTimeSig.subtypeName();
-						if (n.includes("Common")) addError ("The ‘Common time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 4/4",theTimeSig);
-						if (n.includes("Cut")) addError ("The ‘Cut time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 2/2",theTimeSig);
+						if (n.includes("Common")) addError ("The ‘Common time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 4/4.",theTimeSig);
+						if (n.includes("Cut")) addError ("The ‘Cut time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 2/2.",theTimeSig);
 					}
 				}
 			}
@@ -4692,15 +4705,15 @@ MuseScore {
 	
 	function checkStaccatoIssues (noteRest) {
 		if (noteRest.duration.ticks >= division * 2) {
-			addError ("Don’t put staccato dots on long notes, unless the tempo is very fast",noteRest);
+			addError ("Don’t put staccato dots on long notes, unless the tempo is very fast.",noteRest);
 			return;
 		}		
 		if (isDotted(noteRest) && noteRest.duration.ticks >= (division * 0.5)) {
-			addError ("Putting staccato dots on dotted notes may be ambiguous",noteRest);
+			addError ("Putting staccato dots on dotted notes may be ambiguous.",noteRest);
 			return;
 		}
 		if (noteRest.notes[0].tieForward != null) {
-			addError ("Don’t put staccato dots on tied notes",noteRest);
+			addError ("Don’t put staccato dots on tied notes.",noteRest);
 			return;
 		}
 		if (isShortDecayInstrument && flaggedStaccatoOnShortDecayInstrumentBarNum == 0) {
@@ -4760,12 +4773,12 @@ MuseScore {
 		if (isHorn) {
 			//logError ("Checking horn note — "+noteRest.notes[0].pitch+" b "+isBassClef+" t "+isTrebleClef);
 			if (isBassClef && noteRest.notes[0].pitch > 40 && !flaggedClefTooHigh) {
-				addError ("This horn note/passage is too high for bass clef;\nit would be better in treble clef", noteRest);
+				addError ("This horn note/passage is too high for bass clef;\nit would be better in treble clef.", noteRest);
 				flaggedClefTooHigh = true;
 				flaggedClefTooHighBarNum = currentBarNum;
 			}
 			if (isTrebleClef && noteRest.notes[0].pitch < 41 && !flaggedClefTooLow) {
-				addError ("This horn note/passage is too low for treble clef;\nit would be better in bass clef", noteRest);
+				addError ("This horn note/passage is too low for treble clef;\nit would be better in bass clef.", noteRest);
 				flaggedClefTooLow = true;
 				flaggedClefTooLowBarNum = currentBarNum;
 			}
@@ -4773,27 +4786,27 @@ MuseScore {
 		if (maxNumLedgerLines > 3 && minNumLedgerLines > 0 && !flaggedClefTooHigh) {
 			if (isBassClef && readsBass && readsTenor) {
 				if (!readsTreble) {
-					addError("This passage is very high for bass clef;\nit may be better in tenor clef",noteRest);
+					addError("This passage is very high for bass clef;\nit may be better in tenor clef.",noteRest);
 				} else {
-					addError("This passage is very high for bass clef;\nit may be better in tenor or treble clef",noteRest);
+					addError("This passage is very high for bass clef;\nit may be better in tenor or treble clef.",noteRest);
 				}
 				flaggedClefTooHigh = true;
 				flaggedClefTooHighBarNum = currentBarNum;
 			}
 			if (isTenorClef && readsTenor && readsTreble) {
-				addError("This passage is very high for tenor clef;\nit may be better in treble clef",noteRest);
+				addError("This passage is very high for tenor clef;\nit may be better in treble clef.",noteRest);
 				flaggedClefTooHigh = true;
 				flaggedClefTooHighBarNum = currentBarNum;
 			}
 			if (isAltoClef && readsAlto && readsTreble) {
-				addError("This passage is very high for alto clef;\nit may be better in treble clef",noteRest);
+				addError("This passage is very high for alto clef;\nit may be better in treble clef.",noteRest);
 				flaggedClefTooHigh = true;
 				flaggedClefTooHighBarNum = currentBarNum;
 			}
 		}
 		if (maxNumLedgerLines > 5 && minNumLedgerLines > 2 && !flaggedClefTooHigh) {
 			if (isTrebleClef && readsTreble && reads8va && !isOttava) {
-				addError("This passage is very high for treble clef;\nit may be better with an 8va symbol",noteRest);
+				addError("This passage is very high for treble clef;\nit may be better with an 8va symbol.",noteRest);
 				flaggedClefTooHigh = true;
 				flaggedClefTooHighBarNum = currentBarNum;
 			}
@@ -4801,17 +4814,17 @@ MuseScore {
 		if (maxNumLedgerLines < 0 && minNumLedgerLines <= 0 && !flaggedClefTooLow) {
 			if (isTrebleClef && readsTreble) {
 				if (readsTenor) {
-					addError("This passage is very low for treble clef;\nit may be better in tenor or bass clef",noteRest);
+					addError("This passage is very low for treble clef;\nit may be better in tenor or bass clef.",noteRest);
 					flaggedClefTooLow = true;
 					flaggedClefTooLowBarNum = currentBarNum;
 				} else {
 					if (maxNumLedgerLines < -3 && readsBass) {
-						addError("This passage is very low for treble clef;\nit may be better in bass clef",noteRest);
+						addError("This passage is very low for treble clef;\nit may be better in bass clef.",noteRest);
 						flaggedClefTooLow = true;
 						flaggedClefTooLowBarNum = currentBarNum;
 					} else {
 						if (readsAlto) {
-							addError("This passage is very low for treble clef;\nit may be better in alto clef",noteRest);
+							addError("This passage is very low for treble clef;\nit may be better in alto clef.",noteRest);
 							flaggedClefTooLow = true;
 							flaggedClefTooLowBarNum = currentBarNum;
 						}
@@ -4819,12 +4832,12 @@ MuseScore {
 				}
 			}
 			if (isTenorClef && readsTenor && readsBass && maxNumLedgerLines < 0 && minNumLedgerLines <= 0) {
-				addError("This passage is very low for tenor clef;\nit may be better in bass clef",noteRest);
+				addError("This passage is very low for tenor clef;\nit may be better in bass clef.",noteRest);
 				flaggedClefTooLow = true;
 				flaggedClefTooLowBarNum = currentBarNum;
 			}
-			if (isBassClef && readsBass && reads8va && !isOttava && maxNumLedgerLines < -3 && minNumLedgerLines < -2) {
-				addError("This passage is very low for bass clef;\nit may be better with an 8ba",noteRest);
+			if (isBassClef && readsBass && reads8va && !isOttava && maxNumLedgerLines < -5 && minNumLedgerLines < -2) {
+				addError("This note/passage is very low for bass clef;\nit may be better with an 8ba.",noteRest);
 				flaggedClefTooLow = true;
 				flaggedClefTooLowBarNum = currentBarNum;
 			}
@@ -4840,14 +4853,14 @@ MuseScore {
 				//logError("Testing 8va Here — currentOttava.ottavaType = "+currentOttava.ottavaType+"); averageNumLedgerLines "+averageNumLedgerLines+" maxLLSinceLastRest="+maxLLSinceLastRest;
 				if (currentOttava.ottavaType == 0 || currentOttava.ottavaType == 2) {
 					if (averageMaxNumLedgerLines < 2 && averageMinNumLedgerLines >= 0 && maxLLSinceLastRest < 2 && !flaggedOttavaTooLow) {
-						addError("This passage is quite low for "+ottavaStr+" line:\nyou should be able to safely write this at pitch",currentOttava);
+						addError("This passage is quite low for "+ottavaStr+" line:\nyou should be able to safely write this at pitch.",currentOttava);
 						flaggedOttavaTooLow = true;
 						flaggedOttavaTooLowBarNum = currentBarNum;
 						return;
 					}
 				} else {
 					if (averageMaxNumLedgerLines > -2 && averageMinNumLedgerLines <= 0 && maxLLSinceLastRest < 2 && !flaggedOttavaTooHigh) {
-						addError("This passage is quite high for "+ottavaStr+" line:\nyou should be able to safely write this at pitch",currentOttava);
+						addError("This passage is quite high for "+ottavaStr+" line:\nyou should be able to safely write this at pitch.",currentOttava);
 						flaggedOttavaTooHigh = true;
 						flaggedOttavaTooHighBarNum = currentBarNum;
 						return;
@@ -4857,17 +4870,17 @@ MuseScore {
 			if (isBassClef) {
 				//trace(averageNumLedgerLines);
 				if (readsTenor && averageMaxNumLedgerLines >= 3 && averageMinNumLedgerLines > 1 && !flaggedClefTooHigh) {
-					addError("This passage is quite high;\nit may be better in tenor or treble clef",noteRest);
+					addError("This passage is quite high;\nit may be better in tenor or treble clef.",noteRest);
 					flaggedClefTooHigh = true;
 					flaggedClefTooHighBarNum = currentBarNum;
 				} else {
 					if (readsTreble && averageMaxNumLedgerLines >= 3 && averageMinNumLedgerLines > 2 && !flaggedClefTooHigh) {
-						addError("This passage is very high;\nit may be better in treble clef",noteRest);
+						addError("This passage is very high;\nit may be better in treble clef.",noteRest);
 						flaggedClefTooHigh = true;
 						flaggedClefTooHighBarNum = currentBarNum;
 					} else {
 						if (reads8va && averageMaxNumLedgerLines < -4 && averageMinNumLedgerLines < -2 && !isOttava && !flaggedClefTooLow) {
-							addError("This passage is very low;\nit may be better with an 8ba",noteRest);
+							addError("This passage is very low;\nit may be better with an 8ba.",noteRest);
 							flaggedClefTooLow = true;
 							flaggedClefTooLowBarNum = currentBarNum;
 						}
@@ -4877,12 +4890,12 @@ MuseScore {
 
 			if (isTenorClef) {
 				if (readsTreble && averageMaxNumLedgerLines > 2 && averageMinNumLedgerLines > 1 && !flaggedClefTooHigh) {
-					addError("This passage is quite high;\nit may be better in treble clef",noteRest);
+					addError("This passage is quite high;\nit may be better in treble clef.",noteRest);
 					flaggedClefTooHigh = true;
 					flaggedClefTooHighBarNum = currentBarNum;
 				} else {
 					if (readsBass && averageMaxNumLedgerLines < -1  && averageMinNumLedgerLines <= 0 && !flaggedClefToolow) {
-						addError("This passage is quite low;\nit may be better in bass clef",noteRest);
+						addError("This passage is quite low;\nit may be better in bass clef.",noteRest);
 						flaggedClefTooLow = true;
 						flaggedClefTooLowBarNum = currentBarNum;
 
@@ -4891,17 +4904,17 @@ MuseScore {
 			}
 			if (isTrebleClef) {
 				if (reads8va && averageMaxNumLedgerLines > 4 && averageMinNumLedgerLines > 2 && !isOttava && !flaggedOttavaTooHigh) {
-					addError("This passage is very high;\nit may be better with an 8va",noteRest);
+					addError("This passage is very high;\nit may be better with an 8va.",noteRest);
 					flaggedOttavaTooHigh = true;
 					flaggedOttavaTooHighBarNum = currentBarNum;
 				} else {
 					if (readsTenor && averageMaxNumLedgerLines < -1 && averageMinNumLedgerLines <= 0 && !flaggedOttavaTooLow) {
-						addError("This passage is quite low;\nit may be better in tenor clef",noteRest);
+						addError("This passage is quite low;\nit may be better in tenor clef.",noteRest);
 						flaggedOttavaTooLow = true;
 						flaggedOttavaTooLowBarNum = currentBarNum;
 					} else {
 						if (readsBass && averageMaxNumLedgerLines < -2 && averageMinNumLedgerLines <= 0 && !flaggedClefToolow) {
-							addError("This passage is quite low;\nit may be better in bass clef",noteRest);
+							addError("This passage is quite low;\nit may be better in bass clef.",noteRest);
 							flaggedClefToolow = true;
 							flaggedOttavaTooLowBarNum = currentBarNum;
 						}
@@ -4953,7 +4966,7 @@ MuseScore {
 		var prevIsChord = (prevNoteRest == null) ? false : (prevNoteRest.type == Element.CHORD);
 		
 		if (numNotes > 4) {
-			addError ("This multiple stop has more than 4 notes in it",chord);
+			addError ("This multiple stop has more than 4 notes in it.",chord);
 			return;
 		}
 		
@@ -5071,6 +5084,8 @@ MuseScore {
 		
 		if (noteRest.notes[0].tieBack) return;
 		isStringHarmonic = false;
+		
+		var theArticulationArray = getArticulationArray(noteRest, staffNum);
 
 		var nn = noteRest.notes.length;
 		//logError("CHECKING STRING HARMONIC — nn = "+nn);
@@ -5101,8 +5116,18 @@ MuseScore {
 					if (noteheadType != NoteHeadType.HEAD_HALF) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
 				}
 				
+				// check artificial harmonic with a harmonic circle above it
+				if (theArticulationArray) {
+					for (var i = 0; i < theArticulationArray.length; i++) {
+						if (theArticulationArray[i].symbol == kHarmonicCircle) {
+							addError ("Artificial harmonics don’t require a harmonic circle.",theArticulationArray[i]);
+							break;
+						}
+					}
+				}
+				
 				// check register
-				if (bottomNote.pitch > stringsArray[3]+10) addError ("This artificial harmonic looks too high to be effective.\nConsider putting it down an octave",noteRest);
+				if (bottomNote.pitch > stringsArray[3]+10) addError ("This artificial harmonic looks too high to be effective.\nConsider putting it down an octave.",noteRest);
 			}
 		}
 		
@@ -5111,7 +5136,6 @@ MuseScore {
 			var noteheadStyle = noteRest.notes[0].headGroup;
 
 			if (typeof staffNum !== 'number') logError("Artic error in checkStringHarmonic nn1");
-			var theArticulationArray = getArticulationArray(noteRest, staffNum);
 			//logError("The artic sym = "+theArticulation.symbol.toString());
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
 			if (theArticulationArray) {
@@ -5124,7 +5148,11 @@ MuseScore {
 				}
 			}
 			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle == NoteHeadGroup.HEAD_DIAMOND_OLD) {
-				isStringHarmonic = true;
+				if (isStringHarmonic) {
+					addError ("This harmonic has both a diamond notehead and a harmonic circle.\nYou should choose one or the other, but not both.", noteRest);
+				} else {
+					isStringHarmonic = true;
+				}
 				harmonicArray = diamondHarmonicIntervals;
 				// check override on the top note
 				if (noteRest.duration.ticks < 2 * division) {
@@ -5205,7 +5233,7 @@ MuseScore {
 		
 		// check slurred pizz
 		if (isSlurred) {
-			addError("In general, don’t slur pizzicato notes unless you\nspecifically want the slurred notes not to be replucked", noteRest);
+			addError("In general, don’t slur pizzicato notes unless you\nspecifically want the slurred notes not to be replucked.", noteRest);
 			lastPizzIssueBar = currentBarNum;
 			lastPizzIssueStaff = currentStaffNum;
 			return;
@@ -5251,16 +5279,26 @@ MuseScore {
 		if (isStartOfSlur && isStringInstrument && currentSlurLength > division * 8) addError("Consider whether this slur is longer than one bow stroke\nand should be broken into multiple slurs.",currentSlur);
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
-		if (isStartOfSlur) {
+		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 4)) {
 			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
-				addError ("This slur looks like it has been dragged\naway from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R",currentSlur);
+				addError ("This slur looks like it has been dragged\naway from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R.",currentSlur);
+				flaggedManualSlurBarNum = currentBarNum;
 			} else {
-				if (currentSlur.offsetY != 0) addError ("This slur looks like it has been dragged\nvertically away from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R",currentSlur);
-				if (currentSlur.offsetX != 0) addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R",currentSlur);
+				if (currentSlur.offsetY != 0) {
+					addError ("This slur looks like it has been dragged\nvertically away from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R.",currentSlur);
+					flaggedManualSlurBarNum = currentBarNum;
+				}
+				if (currentSlur.offsetX != 0) {
+					addError ("This slur looks like it has been dragged\nhorizontally away from its correct position.\nIf this was not deliberate, you can reset its position by selecting the slur\nand pressing "+cmdKey+"-R.",currentSlur);
+					flaggedManualSlurBarNum = currentBarNum;
+				}
 			}
 		//	var t = [currentSlur.offsetX,currentSlur.offsetY,currentSlur.posX,currentSlur.posY,currentSlur.pagePos.x,currentSlur.pagePos.y,currentSlur.offset.x,currentSlur.offset.y,currentSlur.slurUoff1.x,currentSlur.slurUoff1.y,currentSlur.slurUoff2.x,currentSlur.slurUoff2.y,currentSlur.slurUoff3.x,currentSlur.slurUoff3.y,currentSlur.slurUoff4.x,currentSlur.slurUoff4.y].join(' ');
 			//logError (t);
-			if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
+			if (Math.abs(currentSlur.slurUoff1.x) > 0.5 || Math.abs(currentSlur.slurUoff4.x) > 0.5) {
+				addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
+				flaggedManualSlurBarNum = currentBarNum;
+			}
 		}
 		
 		// **** CHECK SLUR GOING OVER A REST FOR STRINGS, WINDS & BRASS **** //
@@ -5290,11 +5328,14 @@ MuseScore {
 					if (noteRest.notes.length == prevNote.notes.length) {
 						var numNotes = noteRest.notes.length;
 						var numPrevNotes = prevNote.notes.length;
+						
+						// does it have the same number of notes?
 						var chordMatches = numNotes == numPrevNotes;
-						//logError ("numNotes matches = "+chordMatches);
+						
+						// are the pitches identical?
 						if (chordMatches) for (var i = 0; i < numNotes && chordMatches; i++) if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
-						//logError ("chordMatches "+chordMatches);
-						if (chordMatches && noteheadStyle != NoteHeadGroup.HEAD_DIAMOND && prevNoteheadStyle != NoteHeadGroup.HEAD_DIAMOND) {
+
+						if (chordMatches && noteheadStyle == prevNoteheadStyle) {
 							//logError ("here1");
 							if (getArticulationArray(noteRest,staffNum) == null) {
 								//logError ("here2");
@@ -5321,11 +5362,11 @@ MuseScore {
 			if (isEndOfSlur) {
 				//logError("Slur started — mid = "+isMiddleOfTie+"); start = "+isStartOfTie);
 				if (isMiddleOfTie) {
-					addError("Don’t end a slur in the middle of a tied note.\nExtend the slur to the end of the tie",currentSlur);
+					addError("Don’t end a slur in the middle of a tied note.\nExtend the slur to the end of the tie.",currentSlur);
 					return;
 				}
 				if (isStartOfTie && !prevWasGraceNote && !isLv) {
-					addError("Don’t end a slur at the beginning of a tied note.\nInclude the full duration of tied note in the slur",currentSlur);
+					addError("Don’t end a slur at the beginning of a tied note.\nInclude the full duration of tied note in the slur.",currentSlur);
 					return;
 				}
 			}
@@ -5349,11 +5390,11 @@ MuseScore {
 			if (isStartOfSlur) {
 				//logError("Slur started — mid = "+isMiddleOfTie+"); end = "+isEndOfTie;
 				if (isMiddleOfTie) {
-					addError("Don’t begin a slur in the middle of a tied note.\nExtend the slur back to the start of the tie",currentSlur);
+					addError("Don’t begin a slur in the middle of a tied note.\nExtend the slur back to the start of the tie.",currentSlur);
 					return;
 				}
 				if (isEndOfTie) {
-					addError("Don’t begin a slur at the end of a tied note.\nStart the slur at the beginning of the next note",currentSlur);
+					addError("Don’t begin a slur at the end of a tied note.\nStart the slur at the beginning of the next note.",currentSlur);
 					return;
 				}
 			}
@@ -5438,11 +5479,11 @@ MuseScore {
 					var tpc = theNotes[j].tpc;
 					var theTick = theNotes[j].parent.tick;
 					if (tpc < 6) {
-						addError ("You can’t use double flats in harp parts", nn[i]);
+						addError ("You can’t use double flats in harp parts.", nn[i]);
 						continue;
 					}
 					if (tpc > 26) {
-						addError ("You can’t use double sharps in harp parts", nn[i]);
+						addError ("You can’t use double sharps in harp parts.", nn[i]);
 						continue;
 					}
 					var pedalSetting = parseInt((tpc - 6) / 7);
@@ -5537,7 +5578,7 @@ MuseScore {
 						if (Math.abs(minL) < Math.abs(maxL)) calcDir = 1;
 					}
 					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
-						addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’",noteRest);
+						addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’.",noteRest);
 						lastStemDirectionFlagBarNum = currentBarNum;
 					}
 				}
@@ -5664,7 +5705,7 @@ MuseScore {
 				}
 			}
 			var gnIsTied = graceNotes[0].notes[0].tieForward != null || graceNotes[0].notes[0].tieBack != null ;
-			if (!hasArtic && !gnIsTied) addError("In general, grace-notes should always be slurred to the main note,\nunless you add staccatos or accents to them",graceNotes[0]);
+			if (!hasArtic && !gnIsTied) addError("In general, grace-notes should always be slurred to the main note,\nunless you add staccatos or accents to them.",graceNotes[0]);
 		}
 	}
 	
@@ -5748,6 +5789,7 @@ MuseScore {
 	function checkOneNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) logError("checkOneNoteTremolo() — tremolo is "+tremolo);
 		lastArticulationTick = currTick;
+		logError ('Tremolo type = '+tremolo.subtype);
 		var tremDescription = tremolo.subtypeName();
 		var tremSubdiv = (tremDescription.includes("eighth")) ? 8 : parseInt(tremDescription.match(/\d+/)[0]);
 		var strokesArray = [0,8,16,32,64];
@@ -5785,7 +5827,7 @@ MuseScore {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 			}
 		}
-		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo",noteRest);
+		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo.",noteRest);
 	}
 	
 	function checkTwoNoteTremolo (noteRest, tremolo) {
@@ -5837,7 +5879,7 @@ MuseScore {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 			}
 		}
-		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo",noteRest);
+		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo.",noteRest);
 	}
 	
 	function checkGliss (noteRest, gliss) {
@@ -5854,14 +5896,14 @@ MuseScore {
 					var p2 = nextNoteRest.notes[0].pitch;
 					var interval = Math.abs (p2 - p1);
 					if (isWindInstrument) {
-						if (interval > 4) addError ("This gliss. may be too wide to perform smoothly\nand may be better notated as a wavy gliss.\nCheck with a performer", gliss);
+						if (interval > 4) addError ("This gliss. may be too wide to perform smoothly\nand may be better notated as a wavy gliss.\nCheck with a performer.", gliss);
 					}
 					if (isTrombone) {
 						if (interval > 6 && interval < 12) addError ("This gliss. is too wide to be a slide gliss\nand too narrow to be a rip.\nPerhaps reconsider or check with a performer.", gliss);
 						if (p1 < 54 && p2 < 54) {
 							var h1 = Math.floor((p1 - 40) / 6);
 							var h2 = Math.floor((p2 - 40) / 6);
-							if (h1 != h2) addError ("This gliss. is not possible on the tenor trombone.\nYou might want to reconsider", gliss);
+							if (h1 != h2) addError ("This gliss. is not possible on the tenor trombone.\nYou might want to reconsider.", gliss);
 						}
 					}
 				}

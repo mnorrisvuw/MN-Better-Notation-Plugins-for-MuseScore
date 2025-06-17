@@ -1,6 +1,6 @@
 # MN Better Notation Plugins for MuseScore
 
-A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that check your scores for common notation and layout issues.
+A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that assists in the creation of beautiful, player-friendly scores by providing over 160 different checks for common notation and layout issues, and providing easy ways to create title pages and automatically tweak your scores to look fantastic.
 
   <p>
     <a href="#includedplugins">Included plug-ins</a> •
@@ -66,7 +66,7 @@ A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that chec
 
 ### <img width="200px" src="MNCheckLayoutAndInstrumentation.png" alt="Check Layout and Instrumentation" style="vertical-align:top; margin-right:10px"> MN CHECK LAYOUT AND INSTRUMENTATION
 
-* **MN Check Layout & Instrumentation** checks for over 130 different layout, notation and instrumentation problems, such as:
+* **MN Check Layout & Instrumentation** checks for over 145 different layout, notation and instrumentation problems, such as:
   * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio, note spacing too wide or narrow, some style settings not optimal, bar number on first bar, staff spacing not optimal, system spacing not optimal, page size not A3 or A4, last system not finishing in bottom right-hand corner of page, barlines not going through all staves of standard small ensemble, stretch factors applied inappropriately, no title page for work longer than 2 pages, name of work missing from first page of music, subtitle missing for solo works, non-optimal page layout settings for the parts
   * **Staff names and order**: non-standard staff names, missing staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font, non-optimal page number font, tempo size too small 
   * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest, ‘dim.’/‘cresc.’ used instead of hairpins, long passages without dynamics, dynamics or hairpins placed under a rest, hairpins dragged away from their correct location
