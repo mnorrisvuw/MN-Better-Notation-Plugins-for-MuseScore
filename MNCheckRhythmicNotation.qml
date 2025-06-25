@@ -981,18 +981,18 @@ MuseScore {
 	
 	function checkOnbeatRestSpelling (noteRest) {
 		if (timeSigStr == "3/8" && displayDur == crotchet) {
-			addError ("It is recommend to spell crotchet rests in 3/8 as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
+			addError ("It is recommended to spell crotchet rests in 3/8 as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
 			return;
 		}
 	}
 	
 	function checkOffbeatRestSpelling (noteRest) {
 		if (timeSigDenom < 8 && noteStartFrac == semiquaver && displayDur == dottedquaver) {
-			addError ("It is recommend to spell offbeat dotted quaver rests as\na semiquaver rest followed by a quaver rest\n(See ‘Behind Bars’ p. 162)",noteRest);
+			addError ("It is recommended to spell offbeat dotted quaver rests as\na semiquaver rest followed by a quaver rest\n(See ‘Behind Bars’ p. 162)",noteRest);
 			return;
 		}
 		if (isCompound && noteStartFrac == quaver && displayDur == crotchet) {
-			addError ("It is recommend to spell offbeat crotchet rests in\ncompound time as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
+			addError ("It is recommended to spell offbeat crotchet rests in\ncompound time as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
 			return;
 		}
 	}
@@ -1216,10 +1216,10 @@ MuseScore {
 						}
 						// respell as two quavers if we're in a compound time signature
 						if (restDisplayDur == crotchet && isCompound) {
-							if (theArray[0].displayDur != quaver) addError('Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+							if (tempDisplayDur != quaver) addError('Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 							return;
 						}
-						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and choosing Tools→Regroup rhythms.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 					}
 				} else {
 					var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
@@ -1235,7 +1235,7 @@ MuseScore {
 					if (p == dottedquaver && (lastRestDur != quaver || totalNumRests > 2)) {
 						addError ('Spell as a semiquaver followed by a quaver.',theArray);
 					} else {
-						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and pressing ‘delete’.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them and choosing Tools→Regroup rhythms.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
 					}
 				}
 			}

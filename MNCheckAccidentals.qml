@@ -374,6 +374,7 @@ MuseScore {
 		var notes = chord.notes;
 		var numNotes = notes.length;
 		var numAccidentals = 0;
+		var newNoteLabel = '';
 
 		prevPrevNoteHighlighted = prevNoteHighlighted;
 		prevNoteHighlighted = thisNoteHighlighted;
@@ -443,7 +444,7 @@ MuseScore {
 			if (note.tieBack) {
 				if (accVisible) addError ("Don’t show accidentals in the middle of a tie",accObject);
 			} else {
-
+				
 				var noteLabel = pitchLabels[diatonicPitchClass]+accidentals[acc+2];
 				isBadAcc = false;
 	
@@ -490,7 +491,7 @@ MuseScore {
 						if (!accVisible && currentBarNum != prevBarNumAnyOctave && currentBarNum - prevBarNumAnyOctave < 2) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
-							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" in the previous bar.",note);
+							addError("Consider adding a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" in the previous bar.",note);
 						}
 						
 						// SITUATION 2
@@ -796,19 +797,18 @@ MuseScore {
 									break;
 							}
 							//if (newNotePitch === "") logError(Couldnt find new note pitch");
-							var newNoteLabel = newNotePitch+newNoteAccidental;
+							newNoteLabel = newNotePitch+newNoteAccidental;
 							var changeIsBad = newNoteAccidental === "bb" || newNoteAccidental === "x";
 							if (!changeIsBad) {
 								if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
 								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
 							}
+							
 							if (doShowError && !changeIsBad) {
 								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press "+cmdKey+"-J until you get this note)";
 								if (weightingIsClose && scalarIntervalAbs != 0) t = "Note: The current spelling may be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.\n[SUGGESTION] "+t;
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
-							} else {
-								//logError(Did not show error cos doShowError="+doShowError+" & changeIsBad="+changeIsBad);
 							}
 										
 						} // end if doShowError
@@ -829,12 +829,13 @@ MuseScore {
 					thePitchClassToChange = diatonicPitchClass;
 					noteToHighlight = note;
 					newNotePitch = "";
+					var j = 0;
+					
 					switch (theAccToChange) {
 						case -2:
-							i = thePitchClassToChange - 1;
-							if (i < 0) i = i + 7;
-							newNotePitch = pitchLabels[i];
-							//errorMsg += "newNotePitch: "+newNotePitch+"; i="+i;
+							j = thePitchClassToChange - 1;
+							if (j < 0) j = j + 7;
+							newNotePitch = pitchLabels[j];
 							if (newNotePitch === "B" || newNotePitch === "E") {
 								newNoteAccidental = kFlatStr;
 							} else {
@@ -842,10 +843,9 @@ MuseScore {
 							}
 							break;
 						case -1:
-							i = thePitchClassToChange - 1;
-							if (i < 0) i += 7;
-							newNotePitch = pitchLabels[i];
-							//errorMsg += "newNotePitch: "+newNotePitch+"; i="+i;
+							j = thePitchClassToChange - 1;
+							if (j < 0) i += 7;
+							newNotePitch = pitchLabels[j];
 							if (newNotePitch === "B" || newNotePitch === "E") {
 								newNoteAccidental = kNaturalStr;
 							} else {
@@ -854,9 +854,8 @@ MuseScore {
 							break;
 			
 						case 1:
-							i = (thePitchClassToChange + 1) % 7;
-							newNotePitch = pitchLabels[i];
-							//errorMsg += "newNotePitch: "+newNotePitch+"; i="+i;
+							j = (thePitchClassToChange + 1) % 7;
+							newNotePitch = pitchLabels[j];
 							if (newNotePitch === "F" || newNotePitch === "C") {
 								newNoteAccidental = kNaturalStr;
 							} else {
@@ -865,9 +864,8 @@ MuseScore {
 							break;
 			
 						case 2:
-							i = (thePitchClassToChange + 1) % 7;
-							newNotePitch = pitchLabels[i];
-							//errorMsg += "newNotePitch: "+newNotePitch+"; i="+i;
+							j = (thePitchClassToChange + 1) % 7;
+							newNotePitch = pitchLabels[j];
 							if (newNotePitch === "F" || newNotePitch === "C") {
 								newNoteAccidental = kSharpStr;
 							} else {
@@ -875,10 +873,18 @@ MuseScore {
 							}
 							break;
 					} // end switch TeAccToChange
-
-					if (newNotePitch === "") errorMsg += ("\nCouldnt find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
-					newNoteLabel = newNotePitch+newNoteAccidental;
-					if (doShowError) addError("In non-tonal music, avoid writing "+noteLabel+"s.\nIn tonal music, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better.",noteToHighlight);
+					
+					if (newNotePitch === "") {
+						logError("Couldn’t find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
+					}
+					newNoteLabel = newNotePitch + newNoteAccidental;
+					if (doShowError){
+						if (noteToHighlight == null) {
+							logError ('noteToHighlight = null');
+						} else {
+							addError("In non-tonal music, avoid writing "+noteLabel+"s.\nIn tonal music, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better.",noteToHighlight);
+						}
+					}
 				} // end if (!doShowError && accVisible && isProblematic && !isMicrotonal)
 
 				if (chromaticInterval != 0) {

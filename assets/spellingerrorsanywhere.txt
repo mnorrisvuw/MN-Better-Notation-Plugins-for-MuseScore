@@ -14,12 +14,14 @@ modere
 modéré
 cedez
 cédez
-piu 
-più 
- tres 
- très 
-trés 
-très 
+piu
+più
+piú
+più
+tres
+très
+trés
+très
 pedel
 pedal
 cantabele
@@ -51,22 +53,22 @@ ad lib
 vib. ord.
 vib. norm.
 senza div
-unis
+unis.
 pui 
 più
 crecendo
 crescendo
 accellarando
 accelerando
-battuto.
-battuto
- lengo
- legno
+lengo
+legno
 pos nat
-pos. nat
-Bela 
-Béla 
+pos. nat.
+Bela
+Béla
 Bartok
+Bartók
+Bartock
 Bartók
 Riguadon
 Rigaudon
@@ -74,7 +76,11 @@ lourdeúr
 lourdeur
 lourduer
 lourdeur
- pue
- peu
-u movt
-u mouvt
+pue
+peu
+au movt
+au mouvt
+jété
+jeté
+jete
+jeté

@@ -1,18 +1,20 @@
 con 
 sul
 senza 
-espr.
+espr
 espressivo
 col
-ord.
+ord
 pizz
 arco
-div.
+div
 legato
 flautando
-flaut.
-flz.
-vib.
+flaut
+flz
+flzg
+vib
+vibr
 sempre
 una corda
 sostenuto
