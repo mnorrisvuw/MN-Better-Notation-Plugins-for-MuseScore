@@ -40,6 +40,7 @@ MuseScore {
 	property var barAlteredPC: []
 	property var errorStrings: []
 	property var errorObjects: []
+	property var clefs: []
 	property var prevMIDIPitch: -1
 	property var prevPrevMIDIPitch: -1
 	property var prevDiatonicPitch: 0
@@ -65,7 +66,6 @@ MuseScore {
 	property var kFlatStr: 'b'
 	property var kNaturalStr: '♮'
 	property var kSharpStr: '#'
-	property var progressShowing: false
 	property var progressStartTime: 0
 	property var currentBarNum: 0
 	property var currentStaffNum: 0
@@ -105,18 +105,42 @@ MuseScore {
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		var versionNumber = versionnumberfile.read().trim();
 
-		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
+		// ************ DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS ************ //
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
-		if (!curScore.selection.isRange) {
-			
-			curScore.startCmd();
-			cmd ("select-all");
-			curScore.endCmd();
+		curScore.startCmd();
+		cmd ("select-all");
+		curScore.endCmd();
 
-			var startStaff = curScore.selection.startStaff;
-			var endStaff = curScore.selection.endStaff;
+		var startStaff = curScore.selection.startStaff;
+		var endStaff = curScore.selection.endStaff;
+		var elems = curScore.selection.elements;
+		if (elems.length == 0) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> There were no elements in the score.</p> ";
+			dialog.show();
+			return;
+		}
+		var cursor = curScore.newCursor();
+		cursor.filter = Segment.HeaderClef;
+		
+		// GET THE CLEFS
+		for (var i = 0; i < numStaves; i++) {
+			clefs[i] = [];
+			cursor.staffIdx = currentStaffNum;
+			cursor.voice = 0;
+			cursor.rewind(Cursor.SCORE_START);
+			if (cursor.element == null) cursor.next();
+			var headerClef = cursor.element;
+			clefs[i].push (headerClef);
+		}
+		for (var i = 0; i < elems.length; i++) {
+			var e = elems[i];
+			if (!e.visible) continue;	
+			var etype = e.type;
+			var etrack = e.track;
+			var staffIdx = etrack / 4;
+			if (etype == Element.CLEF) clefs[staffIdx].push(e);
 		}
 		
 		// **** INITIALIZE VARIABLES **** //
@@ -130,6 +154,7 @@ MuseScore {
 		var cursor = curScore.newCursor();
 		var firstBarInScore, firstBarInSelection, firstTickInSelection;
 		var lastBarInScore, lastBarInSelection, lastTickInSelection;
+		
 		// start
 		firstBarInScore = curScore.firstMeasure;
 		cursor.rewind(Cursor.SELECTION_START);
@@ -311,7 +336,7 @@ MuseScore {
 			errorMsg += "<p>NOTE: This score included a harp part. Due to the idiosyncracies of harp accidental spelling, I did not check this part.</p>";
 			h += 40;
 		}
-		if (progressShowing) progress.close();
+		progress.close();
 		
 		dialog.height = h;
 		dialog.contentHeight = h;
@@ -321,6 +346,7 @@ MuseScore {
 	}
 	
 	function checkClef () {
+		
 		var clefId = currentClef.subtypeName();
 		//logError(Checking clef — "+clefId+" "+currentInstrumentName);
 		var isTrebleClef = clefId.includes("Treble clef");
@@ -361,7 +387,7 @@ MuseScore {
 	function checkChord (chord,theSegment,isGraceNote) {
 		//logError("checking chord");
 		var defaultChromaticInterval = [0,2,4,5,7,9,11];
-		var accTypes = [Accidental.FLAT2, Accidental.FLAT, Accidental.NATURAL, Accidental.SHARP, Accidental.SHARP2];
+		var accTypes = [Accidental.FLAT3, Accidental.FLAT2, Accidental.FLAT, Accidental.NATURAL, Accidental.SHARP, Accidental.SHARP2, Accidental.SHARP3];
 		var pitchLabels = ["C","D","E","F","G","A","B"];
 		var intervalNames = ["unison","second","third","fourth","fifth","sixth","seventh","octave","ninth","tenth","eleventh","twelfth","thirteenth","fourteenth","fifteenth","sixteenth"];
 		var majorIntervalAlts = ["double diminished","diminished","minor","major","augmented","double augmented"];
@@ -380,27 +406,34 @@ MuseScore {
 		prevNoteHighlighted = thisNoteHighlighted;
 		thisNoteHighlighted = false;
 		
+		var currTick = theSegment.tick;
+		var measure = theSegment.parent;
+		var staff = theSegment.staff;
+		var staffIdx = Math.trunc (chord.track / 4);
+		var currClef = clefAtTick(staffIdx, currTick);
+		checkClef (currClef);
+		
 		for (var i = 0; i < numNotes; i ++) {				
 			var note = notes[i];
-			var currTick = theSegment.tick;
-			var measure = theSegment.parent
 
-			/// ** GET INFO ON THE NOTE ** //
-			var accObject, accOrder, acc;
+			/// ** GET INFO ON EACH NOTE IN THE CHORD  ** //
+			var accObject, accOrder, accType;
+			var acc = 0;
 			var accVisible = false;
-			var accType;
+			var isDoubleAcc = false;
+			
+			var MIDIPitch = note.pitch;
 			var tpc = note.tpc;
 
 			if (note.accidental == null) {
-				accType = accTypes[parseInt((tpc+1)/7)];
+				accType = accTypes[tpc2alter(tpc)+3];
 			} else {
-				accObject = note.accidental;
-				accVisible = accObject.visible;
-				accType = note.accidentalType;
+				accObject = note.accidental; // accObject is the Accidental Object itself
+				accVisible = accObject.visible; // accVisible is whether the accidental is visible
+				accType = note.accidentalType; // this is an int from the Accidental enum
 				if (accVisible) lastAccidentalBarNum = currentBarNum;
 			}
-			acc = 0;
-			var isDoubleAcc = false;
+			
 			switch (accType) {
 				case Accidental.FLAT2:
 					acc = -2;
@@ -417,12 +450,13 @@ MuseScore {
 					isDoubleAcc = true;
 					break;
 			}
-			var MIDIPitch = note.pitch;
-			var l = note.line; // 0 is F5, 1 is E5, 2 is D5, 3 is C5
-			var octave = Math.floor((3-l+clefOffset)/7)+6; // lowest possible note needs to be octave 0 — i.e. C-1 (midiPitch 0) will be octave 0; therefore C4 will be octave 5
-			var diatonicPitchClass = (((tpc+1)%7)*4+3) % 7;
-			var diatonicPitch = diatonicPitchClass+octave*7; // diatonic pitch is where 
-			//logError(\nline="+note.line+" octave="+octave+"\ndiatonicPitch="+diatonicPitch+" prevDiatonicPitch="+prevDiatonicPitch+" diatonicPitchClass="+diatonicPitchClass);
+			
+			// ***** CALCULATE THE PITCH INFORMATION ***** //
+			var dpArray = pitch2absStepByKey (MIDIPitch, tpc, currentKeySig);
+			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, octave, alteration
+			var diatonicPitchClass = diatonicPitch % 7; // step from 0 (C) to 6 (B)
+			
+			//if (currentStaffNum == 3 && currentBarNum > 60 && currentBarNum < 70) logError('staffIdx='+staffIdx+'; MIDIPitch='+MIDIPitch+'; dp='+diatonicPitch+'; pdp='+prevDiatonicPitch+'; dpc='+diatonicPitchClass);
 
 			var accInKeySig = false;
 			if (currentKeySig == 0 && accType == Accidental.NATURAL) accInKeySig = true;
@@ -458,45 +492,51 @@ MuseScore {
 				// **** First we check when this pitch (any octave) was last altered **** //
 				var prevBarNumSameOctave = barAltered[diatonicPitch];
 				var prevBarNumAnyOctave = barAlteredPC[diatonicPitchClass];
-
-				// **** 1. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS SET IN THIS OCTAVE ALREADY AND THERE IS NO OTHER CONFLICTING SETTINGS
-				var situation1 = currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && currentBarNum == prevBarNumSameOctave && accVisible;
 				
-				// **** 2. THIS ACCIDENTAL WAS SET IN THIS SPECIFIC OCTAVE EARLIER IN THE BAR
-				//var situation2 = false; //currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && currentBarNum == prevBarNum && accVisible;
+				// NOTE WE DEFINITELY NEED ONE TO CANCEL ACCIDENTALS IN THIS BAR
+				var definitelyNeedAccidental = currAccs[diatonicPitch] != acc && currentBarNum == prevBarNumSameOctave && accVisible;
 				
-				// **** 3. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THE PREVIOUS ACCIDENTAL OF THIS NOTE (IN ANY OCTAVE) WAS AT LEAST 2 BARS AGO
-				var situation2 = accInKeySig && currentBarNum > prevBarNumAnyOctave + 2 && accVisible;
-				
-				// **** 4. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THIS WAS ALSO THE LAST ACCIDENTAL OF THIS NOTE IN ANY OCTAVE
-				var situation3 = accInKeySig && currPCAccs[diatonicPitchClass] == acc && accVisible;
-				
-				// **** Also, only flag if:
-				// **** 	a) the accidental is visible
-				// ****		b) if the previous accidental was not a grace note
-				// ****		c) the accidental does not have a bracket around it
-				var otherAccFlags = accVisible && !wasGraceNote[diatonicPitchClass] && accObject.accidentalBracket == 0;
-				if ((situation1 || situation2 || situation3 ) && otherAccFlags) addError("This was already a "+accidentalNames[acc+2]+".",note);
+				if (!definitelyNeedAccidental) {
+	
+					// **** 1. WE  DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS SET IN THIS OCTAVE ALREADY IN THIS BAR AND IS NOT BEING USED TO CANCEL THE SAME ACCIDENTAL ELSEWHERE
+					var situation1 = currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && currentBarNum == prevBarNumSameOctave && accVisible;
+					
+					// **** 2. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THE PREVIOUS ACCIDENTAL OF THIS NOTE (IN ANY OCTAVE) WAS AT LEAST 2 BARS AGO
+					var situation2 = accInKeySig && currentBarNum > prevBarNumAnyOctave + 2 && accVisible;
+					
+					// **** 3. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THIS WAS ALSO THE LAST ACCIDENTAL OF THIS NOTE
+					var situation3 = accInKeySig && currPCAccs[diatonicPitchClass] == acc && currentBarNum != prevBarNumAnyOctave && accVisible;
+					
+					// **** Also, only flag if:
+					// **** 	a) the accidental is visible
+					// ****		b) if the previous accidental was not a grace note
+					// ****		c) the accidental does not have a bracket around it
+					var otherAccFlags = accVisible && !wasGraceNote[diatonicPitchClass] && accObject.accidentalBracket == 0;
+					if ((situation1 || situation2 || situation3 ) && otherAccFlags) {
+						addError("This was already a "+accidentalNames[acc+2]+".",note);
+						//logError (situation1+' '+situation2+' '+situation3+' '+otherAccFlags);
+					}
+				}
 				
 				// **** CHECK NOTES NEEDING COURTESY ACCIDENTALS **** //
 
-				//logError (acc+" "+currAccs[diatonicPitch]+" "+currPCAccs[diatonicPitchClass]+" "+prevBarNum+" "+prevBarNumPC);
-				if (currAccs[diatonicPitch] != acc || currPCAccs[diatonicPitchClass] != acc) {
-					
+				if (currPCAccs[diatonicPitchClass] != acc) {
+
 					// **** For courtesy accidentals, we can check when this ** pitch class ** was last altered **** //
 
-					if (prevBarNumSameOctave > 0 || prevBarNumAnyOctave != 0) {
+					if (prevBarNumAnyOctave > 0) {
 						// SITUATION 1
-						// An accidental in any octave in prev bar
-						if (!accVisible && currentBarNum != prevBarNumAnyOctave && currentBarNum - prevBarNumAnyOctave < 2) {
+						// The previous alteration of this pitch class is different, and it occurred within the last two bars
+						if (!accVisible && currentBarNum != prevBarNumAnyOctave && currentBarNum - prevBarNumAnyOctave < 3) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
+							//logError ('acc='+acc+'; currAccs[diatonicPitch]='+currAccs[diatonicPitch]+'; currPCAccs[diatonicPitchClass]='+currPCAccs[diatonicPitchClass]);
 							addError("Consider adding a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" in the previous bar.",note);
 						}
 						
 						// SITUATION 2
 						// An accidental in any octave in this bar
-						if (!accVisible && currentBarNum != prevBarNumSameOctave && currentBarNum == prevBarNumAnyOctave && currPCAccs[diatonicPitchClass] != acc) {
+						if (!accVisible && currentBarNum != prevBarNumSameOctave && currentBarNum == prevBarNumAnyOctave) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
 							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" earlier in the bar.",note);
@@ -528,7 +568,7 @@ MuseScore {
 					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
 					chromaticInterval = MIDIPitch - prevMIDIPitch;
-					//logError(scalarInterval="+scalarInterval+" chromaticInterval="+chromaticInterval);
+					//logError('scalarInterval='+scalarInterval+'; chromaticInterval='+chromaticInterval);
 					if (chromaticInterval != 0) {
 						if (scalarInterval < 0) {
 							direction = -1;
@@ -546,7 +586,7 @@ MuseScore {
 						scalarIntervalClass = scalarIntervalAbs % 7;
 						chromaticIntervalAbs = Math.abs(chromaticInterval);
 						chromaticIntervalClass = chromaticIntervalAbs % 12;
-						//logError(scalarIntervalAbs="+scalarIntervalAbs+"); scalarIntervalClass="+scalarIntervalClass+"\nchromaticIntervalAbs="+chromaticIntervalAbs+"; chromaticIntervalClass="+chromaticIntervalClass;
+						
 						
 						if (scalarIntervalAbs == 7 && chromaticIntervalClass > 9) chromaticIntervalClass = chromaticIntervalClass - 12;
 						var dci = defaultChromaticInterval[scalarIntervalClass];
@@ -651,7 +691,6 @@ MuseScore {
 								var maxWeightingDist = Math.max (w1dist, w2dist, w3dist);
 								weightingIsClose = maxWeightingDist < 5;
 								//logError("w1dist: "+w1dist+"); w2dist: "+w2dist+"; w3dist: "+w3dist);
-								
 							} // if !foundNote
 						} // if doshowerror
 						
@@ -659,11 +698,13 @@ MuseScore {
 						if (prevShowError && (whichNoteToRewrite == prevWhichNoteToRewrite - 1)) doShowError = false;
 						
 						if (doShowError) {
-							//logError("***** SHOW ERROR because isAugDim is "+isAugDim+" prevIsAugDim = "+prevIsAugDim+" chromaticIntervalClass = "+chromaticIntervalClass+" and prevChromaticIntervalClass = "+prevChromaticIntervalClass);								
+							
+							//logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+' tpc='+tpc+'; prevMIDIPitch='+prevMIDIPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
+															
 							// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 							scalarIntervalLabel = intervalNames[scalarIntervalAbs];
-
-							//logError(scalarIntervalAbs = "+scalarIntervalAbs+"); scalarIntervalLabel="+scalarIntervalLabel;
+							//logError('scalarIntervalAbs='+scalarIntervalAbs+'); scalarIntervalClass='+scalarIntervalClass+'\nchromaticIntervalAbs='+chromaticIntervalAbs+'; chromaticIntervalClass='+chromaticIntervalClass);
+							//logError('scalarIntervalAbs = '+scalarIntervalAbs+'); scalarIntervalLabel='+scalarIntervalLabel);
 							article = (alterationLabel === "augmented") ? "an" : "a";
 							noteToHighlight = note;
 							thisNoteHighlighted = true;
@@ -699,7 +740,7 @@ MuseScore {
 								} else {
 									prevNext = "next note";
 								}
-								//logError(Choosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange);
+								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
 							if (whichNoteToRewrite == 0) {
 								theAccToChange = prevPrevAcc;
@@ -715,7 +756,7 @@ MuseScore {
 								} else {
 									prevNext = "next note";
 								}
-								//logError(Choosing prev note: theAccToChange="+theAccToChange+" pc2change="+thePitchClassToChange);
+								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
 							
 							var j = 0;
@@ -914,7 +955,7 @@ MuseScore {
 			} // if !note.tieBack
 		} // end var i in notes
 		
-		if (progressShowing) progress.close();
+		progress.close();
 		dialog.msg = errorMsg;
 		dialog.show();
 	}
@@ -936,14 +977,11 @@ MuseScore {
 		if (percentage == 0) {
 			progressStartTime = Date.now();
 		} else {
-			if (!progressShowing) {
+			if (!progress.visible) {
 				var currentTime = Date.now();
 				var elapsedTime = currentTime - progressStartTime;
 				//logError(elapsedTime now "+elapsedTime);
-				if (elapsedTime > 3000) {
-					progress.show();
-					progressShowing = true;
-				}
+				if (elapsedTime > 3000) progress.show();
 			} else {
 				progress.progressPercent = percentage;
 			}
@@ -1380,6 +1418,15 @@ MuseScore {
 		}
 		curScore.endCmd();
 	}
+	
+	function clefAtTick (staffIdx, tick) {
+		if (clefs[staffIdx] == undefined) {
+			logError ('clefs['+staffIdx+'] == undefined');
+			return null;
+		}
+		var clefsBeforeOrAtThisTick = clefs[staffIdx].filter (e => e.parent.tick <= tick);
+		return clefsBeforeOrAtThisTick.pop(); // return last array
+	}
 		
 	function getPageNumber (e) {
 		var p = e.parent;
@@ -1394,6 +1441,48 @@ MuseScore {
 		} else {
 			return 0;
 		}
+	}
+	
+	// CONVERTS A TPC TO AN ALTERATION
+	function tpc2alter(tpc) {
+		return parseInt((tpc + 8) / 7) - 3;
+	}
+	
+	// CONVERTS A TPC TO AN ALTERATION, TAKING KEY INTO CONSIDERATION
+	function tpc2alterByKey(tpc, key) {
+		return (tpc - key + 8 + 7) / 7 - 4;
+	}
+	
+	// RETURNS THE NUMBER OF DIATONIC STEPS UP FROM C OF A TPC
+	function tpc2step(tpc) {
+		var steps = [ 3, 0, 4, 1, 5, 2, 6 ];
+		return steps[(tpc + 8) % 7];
+	}
+	
+	// RETURNS THE ABSOLUTE STEP FROM A PITCH AND KEY SIGNATURE
+	// THIS IS MEASURED FROM C0:
+	// C0 = 0, D0 = 1, ... 
+	// C1 = 7, D1 = 8, ...
+	// C2 = 14, D2 = 15
+	// C3 = 21
+	// C4 = 28
+	// C5 (Middle C) = 35
+	// C6 = 42, D6 = 43, E6 = 44
+	
+	function pitch2absStepByKey(pitch, tpc, key) {
+		// sanitize input data
+		if (pitch < 0) pitch += 12;
+		if (pitch > 127) pitch -= 12;
+		if (tpc < -1) tpc += 12;
+		if (tpc > 33) tpc -= 12;
+		if (key < -7) key += 12;
+		if (key > 7) key -= 12;
+	
+		var octave = parseInt((pitch - tpc2alter(tpc)) / 12);
+		var step = tpc2step(tpc);
+		var alter = tpc2alterByKey(tpc, key);
+		var theArray = [octave * 7 + step, octave, alter]; // returns an array of absStep, octave, alteration
+		return theArray;
 	}
 	
 	function logError (str) {

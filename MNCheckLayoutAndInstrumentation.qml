@@ -932,7 +932,7 @@ MuseScore {
 					if (lastTempoChangeMarkingBar != -1 && tempoChangeMarkingEnd == -1 && lastTempoChangeMarking != null && currentBarNum >= lastTempoChangeMarkingBar + 8 && lastTempoChangeMarking.type != Element.GRADUAL_TEMPO_CHANGE) {
 						// check here for textual tempo change markings that are not a special 'gradual tempo change' element
 						// NB: Gradual tempo change elements are checked later, so we can check the whole bar for any terminating markings
-						addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
+						addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking, nor\nan ‘a tempo’ or ‘tempo primo’ marking.",lastTempoChangeMarking);
 						lastTempoChangeMarkingBar = -1;
 						tempoChangeMarkingEnd = -1;
 					}
@@ -1675,7 +1675,7 @@ MuseScore {
 						if (doCheckTempoMarkings && tempoChangeMarkingEnd != -1 && currTick > tempoChangeMarkingEnd + division * 2) {
 							var endsInFermata = false;
 							if (fermatas[currentStaffNum].length > 0) endsInFermata = fermatas[currentStaffNum].filter (e => e.parent.tick > tempoChangeMarkingEnd && e.parent.tick < tempoChangeMarkingEnd + division *4).length > 0;
-							if (!endsInFermata) addError ("You have indicated a gradual tempo change here,\nbut I couldn’t find a new tempo marking\nor ‘a tempo’/‘tempo primo’.",lastTempoChangeMarking);
+							if (!endsInFermata) addError ("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking, nor\nan ‘a tempo’ or ‘tempo primo’ marking.",lastTempoChangeMarking);
 							tempoChangeMarkingEnd = -1;
 						}
 						
