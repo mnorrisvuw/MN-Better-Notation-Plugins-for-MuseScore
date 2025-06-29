@@ -3597,6 +3597,8 @@ MuseScore {
 					}
 				} else {
 					if (isBracketed) addError ("This looks like a change to arco.\nYou don’t need the parentheses around the technique.",textObject);
+					if (currentPlayingTechnique === "lhpizz") addError ("It’s not necessary to indicate ‘arco’\nafter a left-hand pizz.", textObject);	
+
 					currentPlayingTechnique = "arco";
 				}
 			}
@@ -3604,7 +3606,8 @@ MuseScore {
 			// **** CHECK ALREADY PLAYING PIZZ **** //
 			if (lowerCaseText.includes("pizz")) {
 				if (lowerCaseText.includes ('l.h.') || lowerCaseText.includes ('left hand') || lowerCaseText.includes ('l. h.')) {
-					addError ('You can indicate a left-hand pizz. using\njust a ‘+’ articulation above the notehead',textObject);	
+					addError ('You can indicate a left-hand pizz. using\njust a ‘+’ articulation above the notehead',textObject);
+					currentPlayingTechnique = "lhpizz";	
 				}  else {
 					if (currentPlayingTechnique === "pizz") {
 						if (!isBracketed) {
