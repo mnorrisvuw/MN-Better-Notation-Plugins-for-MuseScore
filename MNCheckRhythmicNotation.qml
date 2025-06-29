@@ -502,7 +502,10 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							// ** 		CHECK 5: CONDENSE OVERSPECIFIED REST 		** //
 							// ** ————————————————————————————————————————————————— ** //
-		
+							
+							// if this is a rest, then start building an array of rests
+							// until you get to the last one, then check whether any of the rests
+							// could be condensed into a single rest
 							if (isNote || hasPause) {
 								rests = [];
 								restCrossesBeat = false;
@@ -527,7 +530,6 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
 							// ** ————————————————————————————————————————————————— ** //
-							//logError ('isGliss '+isGliss);
 							if (lastNoteInTie && !isGliss) {
 								if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
 								tiedNotes = [];
@@ -1385,7 +1387,15 @@ MuseScore {
 									if (prevNoteRest == null) {
 										canBeSimplified = false;
 									} else {
-										canBeSimplified =  (timeSigNum % 2 == 0 || timeSigDenom < 4) && prevNoteRest.duration.ticks == quaver && startPos % minim == quaver;
+										// there's a special case to flag here, which is a crotchet tied to a quaver on a quaver offbeat of 2
+										var isCrotchetTiedToQuaver = tiedNotes.length == 2 && tempDisplayDur == quaver;
+										var isOnOffOfBeat2 = startBeat == 1 && startFrac == quaver;
+										if (isCrotchetTiedToQuaver && isOnOffOfBeat2) {
+											canBeSimplified = false;
+											addError ('These notes should be swapped to be\na quaver tied to a crotchet.\n(Select them and choose Tools→Regroup Rhythms).',[tiedNotes[0],tiedNotes[1]]);
+										} else {
+											canBeSimplified =  (timeSigNum % 2 == 0 || timeSigDenom < 4) && prevNoteRest.duration.ticks == quaver && startPos % minim == quaver;
+										}
 										//logError ("startPos = "+startPos);
 										//logError ("Can be simplified = "+canBeSimplified+" because "+(timeSigNum % 2 == 0 || timeSigDenom < 4)+" "+(prevNoteRest.duration.ticks == quaver)+" "+(startPos % minim == quaver));
 									}
