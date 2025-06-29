@@ -2241,7 +2241,7 @@ MuseScore {
 			
 			var firstStaffName = staves[i].part.longName;
 			// check to see whether this staff name indicates that it's a shared staff
-			var firstLetterIsANumber = !isNaN(firstStaffName.substring(0,1)); // checks to see if the staff name begins with, e.g., '2 Bassoons'
+			var firstLetterIsANumber = !isNaN(firstStaffName.substr(0,1)); // checks to see if the staff name begins with, e.g., '2 Bassoons'
 			if (firstLetterIsANumber) {
 				isSharedStaffArray[i] = true;
 			} else {
@@ -3392,7 +3392,7 @@ MuseScore {
 
 	
 	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText) {
-		var isBracketed = lowerCaseText.substring(0,1) === "(";
+		var isBracketed = lowerCaseText.substr(0,1) === "(";
 		
 		if (isRest) {
 			for (var i = 0; i < techniques.length; i ++) {
@@ -3447,7 +3447,7 @@ MuseScore {
 			if (lowerCaseText.includes("unis.")) addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead.",textObject);
 			if (lowerCaseText.includes("div.")) addError("Don’t use ‘div.’ for winds and brass.",textObject);
 			
-			if (lowerCaseText.substring(0,3) === "flz") {
+			if (lowerCaseText.substr(0,3) === "flz") {
 				// check trem
 				flzFound = true;
 				if (!isTremolo) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
@@ -3476,10 +3476,10 @@ MuseScore {
 			}
 			
 			// **** CHECK ALREADY PLAYING ORD. **** .//
-			if (lowerCaseText.substring(0,5) === "(ord." ) {
+			if (lowerCaseText.substr(0,5) === "(ord." ) {
 				if (currentContactPoint != "ord") addError ("This looks like it’s an indication to change to ord.\nIf so, you don’t need the parentheses.",textObject)
 			}
-			if (lowerCaseText.substring(0,4) === "ord." || lowerCaseText === "pos. nat.") {
+			if (lowerCaseText.substr(0,4) === "ord." || lowerCaseText === "pos. nat.") {
 				if (currentContactPoint === "ord" && (currentPlayingTechnique === "arco" || currentPlayingTechnique === "pizz")) {
 					if (currentVibrato != 'con') {
 						addError("Instrument is already playing ord?\nIs that meant to refer to the vibrato (i.e. vib. norm.?)",textObject);
@@ -3603,15 +3603,19 @@ MuseScore {
 			
 			// **** CHECK ALREADY PLAYING PIZZ **** //
 			if (lowerCaseText.includes("pizz")) {
-				if (currentPlayingTechnique === "pizz") {
-					if (!isBracketed) {
-						addError("Instrument is already playing pizz?",textObject);
+				if (lowerCaseText.includes ('l.h.') || lowerCaseText.includes ('left hand') || lowerCaseText.includes ('l. h.')) {
+					addError ('You can indicate a left-hand pizz. using\njust a ‘+’ articulation above the notehead');	
+				}  else {
+					if (currentPlayingTechnique === "pizz") {
+						if (!isBracketed) {
+							addError("Instrument is already playing pizz?",textObject);
+						}
+					} else {
+						if (isBracketed) addError ("This looks like a change to pizz.\nYou don’t need the parentheses around the technique.",textObject);
+						currentPlayingTechnique = "pizz";
+						var pizzStartedInThisBar = true; // TO FIX
+						haveHadPlayingIndication = true;
 					}
-				} else {
-					if (isBracketed) addError ("This looks like a change to pizz.\nYou don’t need the parentheses around the technique.",textObject);
-					currentPlayingTechnique = "pizz";
-					var pizzStartedInThisBar = true; // TO FIX
-					haveHadPlayingIndication = true;
 				}
 			}
 			
@@ -4021,12 +4025,12 @@ MuseScore {
 				// ** CHECK SUBTITLE ** //
 				if (eSubtype === "Subtitle") {
 					if (plainText === "Subtitle") addError( "You have not changed the default subtitle text.", textObject);
-					if (plainText != lowerCaseText && lowerCaseText.substring(0,4) === "for " && lowerCaseText.length < 20) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
+					if (plainText != lowerCaseText && lowerCaseText.substr(0,4) === "for " && lowerCaseText.length < 20) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
 					
 					var elemPage = textObject.parent;
 					while (elemPage && elemPage.type != Element.PAGE) elemPage = elemPage.parent;
 					
-					if (hasTitlePage && lowerCaseText.substring(0,3) === 'for' && elemPage.is(firstPageOfMusic)) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
+					if (hasTitlePage && lowerCaseText.substr(0,3) === 'for' && elemPage.is(firstPageOfMusic)) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
 				}
 				
 				// ** CHECK COMPOSER ** //
@@ -4087,11 +4091,11 @@ MuseScore {
 					var isSpellingError = false;
 					for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
 						var spellingError = spellingerrorsatstart[i*2];
-						if (lowerCaseText.substring(0,spellingError.length) === spellingError) {
+						if (lowerCaseText.substr(0,spellingError.length) === spellingError) {
 							isSpellingError = true;
 							var correctSpelling = spellingerrorsatstart[i*2+1];
 							var diff = plainText.length-spellingError.length;
-							var correctText = (diff > 0) ? correctSpelling+plainText.substring(spellingError.length) : correctSpelling;
+							var correctText = (diff > 0) ? correctSpelling+plainText.substr(spellingError.length) : correctSpelling;
 							if (plainText.length > 50) {
 								addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.",textObject);
 							} else {
@@ -4126,31 +4130,30 @@ MuseScore {
 						for (var i = 0; i < dontCap.length; i++) {
 							var theWord = dontCap[i];
 							var l = theWord.length;
-							if (plainText.includes(theWord) && plainText.substring(0,l) !== theWord) {
+							if (plainText.includes(theWord) && plainText.substr(0,l) !== theWord) {
 								addError ( "You don’t need to capitalise ‘"+theWord+"", textObject);
 								return;
 							}
 						}
 					}
 					
-					// **** CHECK vib **** //
+					// **** CHECK VIB **** //
 					if (eSubtype !== "Title" && eSubtype !== "Subtitle" && isStringInstrument) {
 						if (lowerCaseText === 'vib' || lowerCaseText === 'vib.' || lowerCaseText === 'vibr.' || lowerCaseText === 'vibrato') addError ("This indication is a little ambiguous.\nDo you mean ‘vib. norm.’?", textObject);
 					}
 					
 					// **** CHECK TEXT THAT IS INCORRECTLY CAPITALISED **** //
-					// don't check title/composer etc
+					// but don't check title/composer etc
 					if (eSubtype !== "Title" && eSubtype !== "Subtitle" && eSubtype !== "Composer" && eType !== Element.TEMPO) {
 						//logError ('checking lower case text: '+plainText);
 						for (var i = 0; i < shouldbelowercase.length; i++) {
 							var lowercaseMarking = shouldbelowercase[i];
-							var r = new RegExp ('\\b'+lowercaseMarking+'\\b'); // i flag is case-insensitive
+							var r = new RegExp ('\\b'+lowercaseMarking+'\\b');
 							var theMatch = lowerCaseText.match(r);
 							if (theMatch != null) {
 								var theIndex = theMatch.index;
-								//logError ('Matched '+lowercaseMarking+'; theIndex = '+theIndex+'; plain = '+plainText.substring(theIndex,1)+'; lct = '+lowerCaseText.substring(theIndex,1));
-
-								if (plainText.substring(theIndex,1) !== lowerCaseText.substring(theIndex,1)) {
+								if (plainText.substr(theIndex,1) !== lowerCaseText.substr(theIndex,1)) {
+									//logError ('lowercaseMarking = '+lowercaseMarking+' theIndex = '+theIndex+' ps = '+plainText.substr(theIndex,1)+' lcs = '+lowerCaseText.substr(theIndex,1));
 									addError("‘"+lowercaseMarking+"’ should not have a capital first letter.",textObject);
 									return;
 								}
@@ -4200,11 +4203,11 @@ MuseScore {
 						addError( "This can be abbreviated to ‘molto vib.’",textObject);
 						return;
 					}
-					if (lowerCaseText.substring(0,5) === "arco.") {
+					if (lowerCaseText.substr(0,5) === "arco.") {
 						addError( "‘arco’ should not have a full-stop at the end.",textObject);
 						return;
 					}
-					if (lowerCaseText.substring(0,10) === "sul tasto.") {
+					if (lowerCaseText.substr(0,10) === "sul tasto.") {
 						addError( "‘tasto’ should not have a full-stop at the end.",textObject);
 						return;
 					}
@@ -4289,7 +4292,7 @@ MuseScore {
 								addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
 								return;
 							}
-							if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
+							if (plainText.substr(0,1) != lowerCaseText.substr(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
 						}
 			
 						// **** IS THIS A TEMPO MARKING? **** //
@@ -4340,7 +4343,7 @@ MuseScore {
 							if (eType != Element.TEMPO_TEXT) addError("Text ‘"+plainText+"’ is a tempo marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
 					
 							// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
-							if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
+							if (plainText.substr(0,1) === lowerCaseText.substr(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substr(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
 							
 							// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
 							if (plainText.slice(-1) === '.' && !lowerCaseText.includes("mouv")) addError ("Tempo markings do not need a full-stop at the end.",textObject);
