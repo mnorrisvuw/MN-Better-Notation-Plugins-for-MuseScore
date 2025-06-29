@@ -3604,7 +3604,7 @@ MuseScore {
 			// **** CHECK ALREADY PLAYING PIZZ **** //
 			if (lowerCaseText.includes("pizz")) {
 				if (lowerCaseText.includes ('l.h.') || lowerCaseText.includes ('left hand') || lowerCaseText.includes ('l. h.')) {
-					addError ('You can indicate a left-hand pizz. using\njust a ‘+’ articulation above the notehead');	
+					addError ('You can indicate a left-hand pizz. using\njust a ‘+’ articulation above the notehead',textObject);	
 				}  else {
 					if (currentPlayingTechnique === "pizz") {
 						if (!isBracketed) {
