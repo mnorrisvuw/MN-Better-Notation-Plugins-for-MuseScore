@@ -1503,9 +1503,32 @@ MuseScore {
 									}
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
+									var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
+									if (flaggedStaccatoOnShortDecayInstrumentBarNum > 0 && flaggedStaccatoOnShortDecayInstrumentBarNum < currentBarNum - 4) flaggedStaccatoOnShortDecayInstrumentBarNum = 0;
+									if (theArticulationArray) {
+										lastArticulationTick = currTick;
+										if (doCheckArticulation) {
+											checkArticulation (noteRest, theArticulationArray);
+											var numStaccatos = 0;
+											for (var i = 0; i < theArticulationArray.length; i++) {
+												if (staccatoArray.includes(theArticulationArray[i].symbol)) numStaccatos++;
+											}
+											if (numStaccatos > 0) checkStaccatoIssues (noteRest);
+											if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
+										}
+									} else {
+										if (doCheckExpressiveDetail) {
+											if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
+												if (isStringInstrument || isWindOrBrassInstrument) {
+													lastArticulationTick = currTick + 1;
+													addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage.",noteRest);
+												}
+											}
+										}
+									}
+									// ************ CHECK ARTICULATION & STACCATO ISSUES ************ //
 									if (isTied && !isLv) {
 										var hasStaccato = false, hasHarmonic = false;
-										var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
 										if (theArticulationArray != null) {
 											for (var i = 0; i < theArticulationArray.length; i++) {
 												if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
@@ -1535,30 +1558,7 @@ MuseScore {
 										prevWasGraceNote = true;
 									}
 																
-									// ************ CHECK ARTICULATION & STACCATO ISSUES ************ //
-									if (flaggedStaccatoOnShortDecayInstrumentBarNum > 0 && flaggedStaccatoOnShortDecayInstrumentBarNum < currentBarNum - 4) flaggedStaccatoOnShortDecayInstrumentBarNum = 0;
-									var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
-									if (theArticulationArray) {
-										lastArticulationTick = currTick;
-										if (doCheckArticulation) {
-											checkArticulation (noteRest, theArticulationArray);
-											var numStaccatos = 0;
-											for (var i = 0; i < theArticulationArray.length; i++) {
-												if (staccatoArray.includes(theArticulationArray[i].symbol)) numStaccatos++;
-											}
-											if (numStaccatos > 0) checkStaccatoIssues (noteRest);
-											if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
-										}
-									} else {
-										if (doCheckExpressiveDetail) {
-											if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
-												if (isStringInstrument || isWindOrBrassInstrument) {
-													lastArticulationTick = currTick + 1;
-													addError("This passage has had no articulation for the last while\nConsider adding more detail to this passage.",noteRest);
-												}
-											}
-										}
-									}
+									
 								
 									var nn = noteRest.notes.length;
 									isChord = nn > 1;
@@ -3386,7 +3386,32 @@ MuseScore {
 			// CHECK FOR UPBOW/DOWNBOW MARKINGS IN NON-STRING INSTRUMENTS
 			if (!isStringInstrument) {
 				if (stringArticulationsArray.includes(theSymbol)) addError ('This is a string articulation, but this is not a string instrument.', theArticulation);
-			}		
+			} else {
+				var prevNoteHasBowMarking = false;
+				var nextNoteHasBowMarking = false;
+				var prevNote = getPreviousNoteRest(noteRest);
+				var nextNote = getNextNoteRest(noteRest);
+				if (prevNote) {
+					var prevNoteArticulationArray = getArticulationArray(prevNote);
+					if (prevNoteArticulationArray != null) {
+						for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
+							prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray [j]);
+						}
+					}
+				}
+				if (nextNote) {
+					var nextNoteArticulationArray = getArticulationArray(nextNote);
+					if (nextNoteArticulationArray != null) {
+						for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
+							nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray [j]);
+						}
+					}
+				}
+				if (!prevNoteHasBowMarking && !nextNoteHasBowMarking) {
+					addError ('Are you sure this isolated bow marking is necessary?\n(Only write bow markings that are required for a specific effect.)', theArticulation);
+					return;
+				}
+			}	
 		}	
 	}
 
