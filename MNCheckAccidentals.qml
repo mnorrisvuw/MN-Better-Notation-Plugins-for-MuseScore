@@ -527,7 +527,7 @@ MuseScore {
 					if (prevBarNumAnyOctave > 0) {
 						// SITUATION 1
 						// The previous alteration of this pitch class is different, and it occurred within the last two bars
-						if (!accVisible && currentBarNum != prevBarNumAnyOctave && currentBarNum - prevBarNumAnyOctave < 3) {
+						if (!accVisible && currentBarNum != prevBarNumAnyOctave && currentBarNum - prevBarNumAnyOctave == 1) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
 							//logError ('acc='+acc+'; currAccs[diatonicPitch]='+currAccs[diatonicPitch]+'; currPCAccs[diatonicPitchClass]='+currPCAccs[diatonicPitchClass]);
