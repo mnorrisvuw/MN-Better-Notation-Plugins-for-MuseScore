@@ -1159,7 +1159,6 @@ MuseScore {
 								if (p == dottedcrotchet) canBeCondensed = startFrac == quaver && timeSigDenom == 2;
 								if (p == crotchet) canBeCondensed = (isCompound && tempDisplayDur !== quaver);
 								if (p < crotchet) canBeCondensed = sameBeat;
-								if (p == dottedquaver) canBeCondensed = isCompound && sameBeat;
 								if (canBeCondensed && isCompound && restActualDur == beatLength * 2 / 3) canBeCondensed = false;
 								//logError(p="+p+" canBeCondensed = "+canBeCondensed+" isCompound="+isCompound); 
 							
@@ -1392,7 +1391,7 @@ MuseScore {
 										var isOnOffOfBeat2 = startBeat == 1 && startFrac == quaver;
 										if (isCrotchetTiedToQuaver && isOnOffOfBeat2) {
 											canBeSimplified = false;
-											addError ('These notes should be swapped to be\na quaver tied to a crotchet.\n(Select them and choose Tools→Regroup Rhythms).',[tiedNotes[0],tiedNotes[1]]);
+											addError ('These notes should be swapped.\n(Select them and choose Tools→Regroup Rhythms).',[tiedNotes[0],tiedNotes[1]]);
 										} else {
 											canBeSimplified =  (timeSigNum % 2 == 0 || timeSigDenom < 4) && prevNoteRest.duration.ticks == quaver && startPos % minim == quaver;
 										}
@@ -1599,7 +1598,7 @@ MuseScore {
 			return;
 		}
 		
-		if (isLastNoteInBeat && !isOnlyNoteInBeat) {			
+		if (isLastNoteInBeat) {			
 			// Last note in a beat — anything except 1 or 2
 			if (!hasBeam && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note and\nintervening rests (if any) to ‘AUTO’.",noteRest);
 			return;
@@ -1635,17 +1634,19 @@ MuseScore {
 		if (hasBeam && nextHasBeam && lastNoteInBeat) {
 			
 			var beamTriesToGoForwards = currentBeamMode != Beam.NONE;
-			var nextBeamTriesToGoBack = nextBeamMode == Beam.AUTO || nextBeamMode == Beam.BEGIN32 || nextBeamMode == Beam.BEGIN64 || nextBeamMode == Beam.MID;
+			var nextBeamTriesToGoBack = nextBeamMode == Beam.BEGIN32 || nextBeamMode == Beam.BEGIN64 || nextBeamMode == Beam.MID;
+			var specificDumbMuseScoreBreakCase = isNote && nextItemIsNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && !nextNextItemIsNote;
+			// this specific case I disagree with MuseScore's automatic beaming practice. So there.
+			if (specificDumbMuseScoreBreakCase && nextBeamMode == Beam.AUTO) nextBeamTriesToGoBack = true;
 
 			if (beamTriesToGoForwards && nextBeamTriesToGoBack) {
 								
 				// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
 				var exception1 = isNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && nextNextItemIsNote;
-				var specificBreakCase = isNote && nextItemIsNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && !nextNextItemIsNote;
 				
 				if (!exception1) {
 					if (isNote) {
-						if (specificBreakCase) {
+						if (specificDumbMuseScoreBreakCase) {
 							addError( "This note should not be beamed to the next note.\nSet the ‘Beam type’ property of the following note to ‘No beam’.",noteRest);
 						} else {
 							addError( "This note should not be beamed to the next note.\nSet the ‘Beam type’ property of this note and the following to AUTO.",noteRest);

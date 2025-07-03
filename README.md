@@ -121,7 +121,7 @@ A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that assi
 
 *MN Better Notation Plugins require MuseScore Studio 4.5.2 or later.*
 
-**YOUTUBE**: Watch [a YouTube video](https://youtu.be/qCZixnkVHZw) on how to install the plugins.
+**YOUTUBE**: Watch [a YouTube video](https://www.youtube.com/watch?v=TztQKb71Rw8) on how to install the plugins.
 
 **INSTRUCTIONS**:
 * **Download** the project as a zip file either from the green Code button above, or from the direct download link below.
