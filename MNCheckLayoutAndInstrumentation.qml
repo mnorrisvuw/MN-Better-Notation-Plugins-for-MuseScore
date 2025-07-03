@@ -1013,7 +1013,7 @@ MuseScore {
 					
 					// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 					if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 2 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
-						logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
+						//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
 						addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
 					}
 				}
@@ -4030,8 +4030,7 @@ MuseScore {
 			var tn = textObject.name.toLowerCase();
 			
 			// remove all tags
-			var styledTextWithoutTags = styledText.replace(/<[^>]+>/g, "");
-			var plainText = styledTextWithoutTags;
+			var plainText = styledText.replace(/<[^>]+>/g, "");
 			
 			if (typeof plainText != 'string') logError('checkTextObject() — Typeof plainText not string: '+(typeof plainText));
 			for (var i = 0; i < replacements.length; i += 2) {
@@ -4342,10 +4341,10 @@ MuseScore {
 										nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
 									} else {
 										//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-										if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
-										if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
+										if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = plainText;
+										if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = plainText;
 									}
-									logError ("Found a tempo marking: non bold text is "+nonBoldText);
+									//logError ("Found a tempo marking: non bold text is "+nonBoldText+'; styledTextWithoutTags = '+plainText);
 									if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
 									
 									// does this require a metronome mark?
