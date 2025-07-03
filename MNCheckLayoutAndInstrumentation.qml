@@ -4454,7 +4454,7 @@ MuseScore {
 								var markingContainsPhrase = plainText.length > 10 && markingLastWordIsPrimarilyAlphabetic;
 								//logError ('isTempoMarking: '+isTempoMarking+' lastTempoMarking == null '+(lastTempoMarking == null)+' length: '+plainText.length+' markingContainsPhrase '+markingContainsPhrase);
 								if (currentBarNum < 2 && !isTempoMarking && lastTempoMarking == null && plainText.length < 11 && !markingContainsPhrase) {
-									addError ("Performers like it when you add a tempo phrase or mood descriptor\nas well as a metronome marking at the start of a work.",textObject);
+									addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",textObject);
 								} 
 								var metroSection = styledTextWithoutTags.split('=')[1];
 								if (metroSection === lastMetroSection) {

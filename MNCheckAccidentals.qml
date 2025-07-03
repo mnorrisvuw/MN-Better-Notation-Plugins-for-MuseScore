@@ -923,7 +923,7 @@ MuseScore {
 						if (noteToHighlight == null) {
 							logError ('noteToHighlight = null');
 						} else {
-							addError("In non-tonal music, avoid writing "+noteLabel+"s.\nIn tonal music, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better.",noteToHighlight);
+							addError("In non-tonal music, avoid writing "+noteLabel+"s. In tonal music,\nhowever, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better here.",noteToHighlight);
 						}
 					}
 				} // end if (!doShowError && accVisible && isProblematic && !isMicrotonal)
