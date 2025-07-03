@@ -1241,11 +1241,14 @@ MuseScore {
 					for (var i = possibleSimplificationFirstRestIndex; i <= possibleSimplificationLastRestIndex; i++) {
 						theArray.push(rests[i]);
 					}
-					if (p == dottedquaver && (lastRestDur != quaver || totalNumRests > 2)) {
-						addError ('Spell as a semiquaver followed by a quaver.',theArray);
-					} else {
-						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them\nand choosing Tools→Regroup rhythms. (Ignore if using\nrest to show placement of fermata/etc.)',theArray);
+					if (p == dottedquaver) {
+						if (lastRestDur != quaver || totalNumRests > 2) {
+							addError ('Spell as a semiquaver followed by a quaver.',theArray);
+							return;
+						}
+						if (!isCompound) return;
 					}
+					addError(tempText+'Condense rests as a '+simplificationText+' by selecting them\nand choosing Tools→Regroup rhythms. (Ignore if using\nrest to show placement of fermata/etc.)',theArray);
 				}
 			}
 		}		
