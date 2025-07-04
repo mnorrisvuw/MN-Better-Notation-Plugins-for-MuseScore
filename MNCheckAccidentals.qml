@@ -915,13 +915,12 @@ MuseScore {
 							break;
 					} // end switch TeAccToChange
 					
-					if (newNotePitch === "") {
-						logError("Couldn’t find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
-					}
+					if (newNotePitch === "") logError("checkChord () — Couldn’t find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
+
 					newNoteLabel = newNotePitch + newNoteAccidental;
 					if (doShowError){
 						if (noteToHighlight == null) {
-							logError ('noteToHighlight = null');
+							logError ('checkChord () — noteToHighlight = null');
 						} else {
 							addError("In non-tonal music, avoid writing "+noteLabel+"s. In tonal music,\nhowever, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better here.",noteToHighlight);
 						}
@@ -1421,7 +1420,7 @@ MuseScore {
 	
 	function clefAtTick (staffIdx, tick) {
 		if (clefs[staffIdx] == undefined) {
-			logError ('clefs['+staffIdx+'] == undefined');
+			logError ('clefAtTick() — clefs['+staffIdx+'] == undefined');
 			return null;
 		}
 		var clefsBeforeOrAtThisTick = clefs[staffIdx].filter (e => e.parent.tick <= tick);
