@@ -4036,8 +4036,8 @@ MuseScore {
 			var tn = textObject.name.toLowerCase();
 			
 			// remove all tags
-			var plainText = styledText.replace(/<[^>]+>/g, "");
-			
+			var plainTextWithSymbols = styledText.replace(/<[^>]+>/g, "");
+			var plainText = plainTextWithSymbols;
 			if (typeof plainText != 'string') logError('checkTextObject() — Typeof plainText not string: '+(typeof plainText));
 			for (var i = 0; i < replacements.length; i += 2) {
 				var regex1 = new RegExp(replacements[i],"g");
@@ -4394,10 +4394,12 @@ MuseScore {
 						// **** CHECK METRONOME MARKINGS **** //
 						var isMetronomeMarking = false;
 						if (plainText.includes("=")) {
+							//logError ('Checking metro');
 							for (var j = 0; j < metronomemarkings.length && !isMetronomeMarking; j++) {
-								//logError (plainText+" includes "+metronomemarkings[j]+" = "+plainText.includes(metronomemarkings[j]));
-								if (plainText.includes(metronomemarkings[j])) {
+								//logError (plainTextWithSymbols+" includes "+metronomemarkings[j]+" = "+plainTextWithSymbols.includes(metronomemarkings[j]));
+								if (plainTextWithSymbols.includes(metronomemarkings[j])) {
 									isMetronomeMarking = true;
+									//logError ('Found metro');
 									if (textObject.offsetX < -4.5) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
 
 									// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
@@ -4426,8 +4428,8 @@ MuseScore {
 											nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
 										} else {
 											//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-											if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = plainText;
-											if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = plainText;
+											if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = plainTextWithSymbols;
+											if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = plainTextWithSymbols;
 										}
 									}
 									if (isTempoMarking && hasParentheses) {
@@ -4462,7 +4464,11 @@ MuseScore {
 									addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",textObject);
 								} 
 								var metroSection = plainText.split('=')[1];
+								//logError ('Checking metroSection: '+metroSection+'; lastMetroSection='+lastMetroSection);
+
 								if (metroSection === lastMetroSection) {
+									//logError ('metroSection: lastTempoChangeMarking = '+lastTempoChangeMarking+'; styledText='+styledText);
+
 									if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
 										addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
 									} else {
