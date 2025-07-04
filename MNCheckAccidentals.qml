@@ -539,7 +539,7 @@ MuseScore {
 						if (!accVisible && currentBarNum != prevBarNumSameOctave && currentBarNum == prevBarNumAnyOctave) {
 							currentAccidental = accidentalNames[acc+2];
 							prevAccidental = accidentalNames[currPCAccs[diatonicPitchClass] + 2];
-							addError("Put a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" earlier in the bar.",note);
+							addError("Consider adding a courtesy "+currentAccidental+" on this note,\nas it was a "+prevAccidental+" earlier in the bar.",note);
 						}
 					}
 				}
