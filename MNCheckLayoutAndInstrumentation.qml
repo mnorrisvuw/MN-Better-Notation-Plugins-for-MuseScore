@@ -311,6 +311,7 @@ MuseScore {
 	property var numTrills: 0
 	property var nextTrillStart: -1
 	property var nextTrill: null
+	property var nextTrillDur: 0
 
 	// ** PEDALS ** //
 	property var pedals: []
