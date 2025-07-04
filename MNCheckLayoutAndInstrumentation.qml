@@ -649,7 +649,7 @@ MuseScore {
 			if (tempSystem == null) {
 				var tempMMR = mmrs[1];
 				if (tempMMR == null) {
-					logError ('tempMMR == null');
+					logError ('checkScore() — tempMMR is null');
 				} else {
 					tempSystem = mmrs[1].parent.parent.parent;
 				}
@@ -661,7 +661,7 @@ MuseScore {
 				if (tempSystem == null) {
 					var tempMMR = mmrs[firstBarInSecondSystemBarNum];
 					if (tempMMR == null) {
-						logError ('tempMMR == null');
+						logError ('checkScore() — tempMMR is null');
 					} else {
 						tempSystem = mmrs[firstBarInSecondSystemBarNum].parent.parent.parent;
 					}
@@ -1436,7 +1436,7 @@ MuseScore {
 				var mmax = minNoteCountPerSystem * 2;
 				//logError("CHECKING SYS "+sys+": nc="+noteCountInSys+" nb="+numBeatsInSys+" mmin="+mmin+" mmax="+mmax);
 				if (bar == undefined) {
-					logError("Main loop — check spacing — BAR UNDEFINED");
+					logError("checkScore() — bar is underfined");
 				} else {
 					if (noteCountInSys < minNoteCountPerSystem) {
 						if (hasMMRs) {
@@ -1555,7 +1555,6 @@ MuseScore {
 				isPedalled = true;
 				currentPedal = pedals[currentStaffNum][currentPedalNum];
 				if (currentPedal == null || currentPedal == undefined) {
-					logError ('currentPedal is '+currentPedal+'; nextPedalStart='+nextPedalStart+'; currentPedalNum = '+currentPedalNum);
 					currentPedalNum = numPedals;
 				} else {
 					if (prevPedal != null && prevPedalEnd != -1 && prevPedalEnd >= currTick - beatLength) {
@@ -1642,7 +1641,6 @@ MuseScore {
 						
 						currentHairpin = hairpins[currentStaffNum][currentHairpinNum];
 						if (currentHairpin == null || currentHairpin == undefined) {
-							logError ('currentHairpin = '+currentHairpin+'; currentStaffNUm = '+currentStaffNum+'; currentHairpinNum = '+currentHairpinNum+'; numHairpins = '+numHairpins);
 							nextHairpinStart = endOfScoreTick;
 						} else {
 							var hairpinStartTick = currentHairpin.spannerTick.ticks;
@@ -1673,11 +1671,11 @@ MuseScore {
 			if (currentDynamicNum < numDynamics) {
 				var nextDynamic = dynamics[currentStaffNum][currentDynamicNum];
 				if (nextDynamic == null || nextDynamic == undefined) {
-					logError ('nextDynamic is '+nextDynamic);
+					logError ('checkScoreElements() — nextDynamic is '+nextDynamic);
 				} else {
 					var p = nextDynamic.parent;
 					if (p == undefined) {
-						logError ('Dynamic parent undefined: Type = '+nextDynamic.type+'; Subtype = '+nextDynamic.subtypeName()+'; text = '+nextDynamic.text+'; parent is undefined');
+						logError ('checkScoreElements() — Dynamic parent is undefined: Type = '+nextDynamic.type+'; Subtype = '+nextDynamic.subtypeName()+'; text = '+nextDynamic.text+'; parent is undefined');
 					} else {
 						
 						// THIS CAN BE REFACTORED BY MAKING NEXTDYNAMICTICK A PROPERTY AND JUST CALCULATING THIS ONCE
@@ -5441,7 +5439,7 @@ MuseScore {
 		// **** CHECK SLUR GOING OVER A REST FOR STRINGS, WINDS & BRASS **** //
 		if (isRest) {
 			if ((isWindOrBrassInstrument || isStringInstrument) && !flaggedSlurredRest && currentSlurLength > 0) {
-				logError("slurStart "+currentSlurStart+"; slurEnd "+currentSlurEnd+"; isRest: "+isRest+"; currTick = "+currTick);
+				//logError("slurStart "+currentSlurStart+"; slurEnd "+currentSlurEnd+"; isRest: "+isRest+"; currTick = "+currTick);
 				addError("In general, avoid putting slurs over rests.",currentSlur);
 				flaggedSlurredRest = true;
 				return;
@@ -6390,7 +6388,7 @@ MuseScore {
 	
 	function getTick (e) {
 		if (e == null) {
-			logError ("Tried to get tick of null");
+			logError ("getTick() — tried to get tick of null");
 			return 0;
 		}
 		var tick = 0;
@@ -6403,7 +6401,7 @@ MuseScore {
 				tick = e.firstSegment.tick;
 			} else {
 				if (e.parent == undefined || e.parent == null) {
-					logError("showAllErrors() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
+					logError("getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
 				} else {
 					var p;
 					if (eType == Element.TUPLET) {
@@ -6413,7 +6411,7 @@ MuseScore {
 					}
 					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) {
 						if (p.parent == null) {
-							logError ("Parent of "+e.name+" was null");
+							logError ("getTick() — Parent of "+e.name+" was null");
 							return 0;
 						}
 						p = p.parent;
