@@ -3372,18 +3372,26 @@ MuseScore {
 					var prevNote = getPreviousNoteRest(noteRest);
 					var nextNote = getNextNoteRest(noteRest);
 					if (prevNote) {
+						//logError ('prevNote found');
+
 						var prevNoteArticulationArray = getArticulationArray(prevNote);
 						if (prevNoteArticulationArray != null) {
+							//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
 							for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
-								prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray [j]);
+								//logError ('artic = '+prevNoteArticulationArray [j]);
+								prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray[j].symbol);
 							}
 						}
 					}
 					if (nextNote) {
+						//logError ('nextNote found');
+
 						var nextNoteArticulationArray = getArticulationArray(nextNote);
 						if (nextNoteArticulationArray != null) {
+							//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
+
 							for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
-								nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray [j]);
+								nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray[j].symbol);
 							}
 						}
 					}
@@ -4344,7 +4352,7 @@ MuseScore {
 										if ((eType == Element.TEMPO_TEXT || eSubtype === "Tempo") && tempoFontStyle != 1) nonBoldText = plainText;
 										if ((eType == Element.METRONOME || eSubtype === "Metronome") && metronomeFontStyle != 1) nonBoldText = plainText;
 									}
-									//logError ("Found a tempo marking: non bold text is "+nonBoldText+'; styledTextWithoutTags = '+plainText);
+									//logError ("Found a tempo marking: non bold text is "+nonBoldText+'; plainText = '+plainText);
 									if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
 									
 									// does this require a metronome mark?
@@ -4387,10 +4395,10 @@ MuseScore {
 						
 						// **** CHECK METRONOME MARKINGS **** //
 						var isMetronomeMarking = false;
-						if (styledTextWithoutTags.includes("=")) {
+						if (plainText.includes("=")) {
 							for (var j = 0; j < metronomemarkings.length && !isMetronomeMarking; j++) {
-								//logError (styledTextWithoutTags+" includes "+metronomemarkings[j]+" = "+styledTextWithoutTags.includes(metronomemarkings[j]));
-								if (styledTextWithoutTags.includes(metronomemarkings[j])) {
+								//logError (plainText+" includes "+metronomemarkings[j]+" = "+plainText.includes(metronomemarkings[j]));
+								if (plainText.includes(metronomemarkings[j])) {
 									isMetronomeMarking = true;
 									if (textObject.offsetX < -4.5) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
 
@@ -4420,8 +4428,8 @@ MuseScore {
 											nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
 										} else {
 											//logError ("eType = "+eType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-											if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = styledTextWithoutTags;
-											if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = styledTextWithoutTags;
+											if ((eType == Element.TEMPO_TEXT || eSubtype === 'Tempo') && tempoFontStyle != 1) nonBoldText = plainText;
+											if ((eType == Element.METRONOME || eSubtype === 'Metronome') && metronomeFontStyle != 1) nonBoldText = plainText;
 										}
 									}
 									if (isTempoMarking && hasParentheses) {
@@ -4455,7 +4463,7 @@ MuseScore {
 								if (currentBarNum < 2 && !isTempoMarking && lastTempoMarking == null && plainText.length < 11 && !markingContainsPhrase) {
 									addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",textObject);
 								} 
-								var metroSection = styledTextWithoutTags.split('=')[1];
+								var metroSection = plainText.split('=')[1];
 								if (metroSection === lastMetroSection) {
 									if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
 										addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
@@ -6103,12 +6111,15 @@ MuseScore {
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
 			var objectArray = (Array.isArray(element)) ? element : [element];
-			desiredPosX = 0;
-			desiredPosY = 0;
+			desiredPosX = desiredPosY = 0;
+			
 			for (var j = 0; j < objectArray.length; j++) {
+
 				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
+				var isString = eType == undefined;
+				var eSubtype = isString ? '' : element.subtypeName();
 				var staffNum = firstStaffNum;
 			
 				// the errorObjects array includes a list of the Elements to attach the text object to
@@ -6119,7 +6130,6 @@ MuseScore {
 				//		system1 n		— top of bar 1, staff n
 				//		system2 n		— first bar in second system, staff n
 			
-				var isString = typeof element === 'string';
 				var theLocation = element;
 				if (isString) {
 					if (element.includes(' ')) {
@@ -6137,6 +6147,8 @@ MuseScore {
 							if (elemStaff == undefined) {
 								isString = true;
 								theLocation = "";
+								desiredPosX = element.pagePos.x;
+								desiredPosY = element.pagePos.y;
 							} else {
 								staffNum = 0;
 								while (!curScore.staves[staffNum].is(elemStaff)) {
@@ -6157,7 +6169,7 @@ MuseScore {
 				
 				// style the element
 				if (element !== "pagetop" && element !== "top" && element !== "pagetopright") {
-					if (element.type == Element.CHORD) {
+					if (eType == Element.CHORD) {
 						element.color = "hotpink";
 						for (var k = 0; k<element.notes.length; k++) element.notes[k].color = "hotpink";
 					} else {
@@ -6167,10 +6179,9 @@ MuseScore {
 				
 				// add text object to score for the first object in the array
 				if (j == 0) {
-					var tick;		
+					var tick = 0;		
 					if (isString) {
 						//logError ('Attaching comment '+i+' to '+theLocation);
-						tick = 0;
 						if (theLocation.includes("pagetop")) {
 							desiredPosX = 2.5;
 							desiredPosY = 2.5;
@@ -6179,7 +6190,6 @@ MuseScore {
 						if (theLocation === "system2") tick = firstBarInSecondSystem.firstSegment.tick;
 					} else {
 						tick = getTick(element);
-						//logError ('Comment '+i+' tick = '+tick+' staffNum = '+staffNum);
 					}
 					
 					// add a text object at the location where the element is
@@ -6240,6 +6250,9 @@ MuseScore {
 			var commentWidth = comment.bbox.width;
 			var element = errorObjects[i];
 			var eType = element.type;
+			var isString = eType == undefined;
+			var eSubtype = isString ? '' : element.subtypeName();
+
 			checkObjectPage = false;
 			if (eType == Element.TEXT) {
 				checkObjectPage = true;
@@ -6264,8 +6277,14 @@ MuseScore {
 					var commentPageNum = commentPage.pagenumber; // get page number
 					
 					// move over to the top right of the page if needed
-					if (theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
-		
+					if (isString && theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+				
+					// FIX IN 4.6 — Composer pagePos currently returning the wrong location
+					if (eSubtype === 'Composer') {
+						offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth;
+						offy[i] += 8.0;
+					}
+
 					// check to see if this comment has been placed too close to other comments
 					var maxOffset = 10;
 					var minOffset = 1.5;
