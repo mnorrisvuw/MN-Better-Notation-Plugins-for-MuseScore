@@ -870,7 +870,7 @@ MuseScore {
 					}
 					if (!isCompound) {
 						if (!prevIsNote && prevDisplayDur == quaver) {
-							addError ("This crotchet is hiding the beat.\nConsider swapping with the previous quaver rest.",noteRest);
+							addError ("This crotchet is hiding the beat.\nConsider swapping with the previous quaver rest.\n(Select them and choose Tools→Regroup rhythms).",noteRest);
 							return;
 						}
 					}
