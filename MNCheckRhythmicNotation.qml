@@ -638,7 +638,7 @@ MuseScore {
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
-		dialog.titleText = 'MN CHECK RHYTHMIC NOTATION TEST '+versionNumber;
+		dialog.titleText = 'MN CHECK RHYTHMIC NOTATION '+versionNumber;
 
 		dialog.show();
 	
@@ -2167,6 +2167,7 @@ MuseScore {
 			text: dialog.titleText
 			font.bold: true
 			font.pointSize: dialog.fontSize
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -2179,7 +2180,7 @@ MuseScore {
 			}
 			width: parent.width-45
 			height: 2
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 
 		ScrollView {
@@ -2202,6 +2203,7 @@ MuseScore {
 				leftInset: 0
 				leftPadding: 0
 				readOnly: true
+				color: ui.theme.fontPrimaryColor
 			}
 		}
 

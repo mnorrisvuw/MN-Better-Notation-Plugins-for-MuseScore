@@ -6568,6 +6568,7 @@ MuseScore {
 			text: dialog.titleText
 			font.bold: true
 			font.pointSize: dialog.fontSize
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -6580,7 +6581,7 @@ MuseScore {
 			}
 			width: parent.width-45
 			height: 2
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 
 		ScrollView {
@@ -6748,6 +6749,7 @@ MuseScore {
 			text: "Options"
 			font.bold: true
 			font.pointSize: 16
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -6759,7 +6761,7 @@ MuseScore {
 			}
 			width: parent.width-45
 			height: 1
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		GridLayout {
@@ -6778,6 +6780,7 @@ MuseScore {
 				text: "Layout"
 				font.bold: true
 				Layout.columnSpan: 3
+				color: ui.theme.fontPrimaryColor
 			}
 			CheckBox {
 				text: "Check optimal score style settings"
@@ -6814,6 +6817,7 @@ MuseScore {
 				text: "Fundamentals"
 				font.bold: true
 				Layout.columnSpan: 3
+				color: ui.theme.fontPrimaryColor
 			}
 			CheckBox {
 				text: "Check clefs"
@@ -6881,6 +6885,7 @@ MuseScore {
 				text: "Text and dynamics"
 				font.bold: true
 				Layout.columnSpan: 3
+				color: ui.theme.fontPrimaryColor
 			}
 			
 			CheckBox {
@@ -6918,6 +6923,7 @@ MuseScore {
 				text: "Instrumentation"
 				font.bold: true
 				Layout.columnSpan: 3
+				color: ui.theme.fontPrimaryColor
 			}
 			CheckBox {
 				text: "Check range/register issues"

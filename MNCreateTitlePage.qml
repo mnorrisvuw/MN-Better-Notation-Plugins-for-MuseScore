@@ -395,6 +395,7 @@ MuseScore {
 			text: dialog.titleText
 			font.bold: true
 			font.pointSize: dialog.fontSize
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -402,7 +403,7 @@ MuseScore {
 			width: parent.width-45
 			y:45
 			height: 1
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 	
 		ScrollView {
@@ -467,6 +468,7 @@ MuseScore {
 			text: "Click one of the templates below to create a title page"
 			font.bold: true
 			font.pointSize: 18
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -477,7 +479,7 @@ MuseScore {
 			anchors.topMargin: 10
 			width: parent.width-45
 			height: 1
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		ListModel {
@@ -585,6 +587,7 @@ MuseScore {
 			anchors.leftMargin: 20
 			text: '<b>NOTE</b>: end result may differ if you do not have the specific font installed. Links to required fonts can be found <a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore?tab=readme-ov-file#fonts">here</a>'
 			onLinkActivated: Qt.openUrlExternally(link)
+			color: ui.theme.fontPrimaryColor
 		}
 	}
 }

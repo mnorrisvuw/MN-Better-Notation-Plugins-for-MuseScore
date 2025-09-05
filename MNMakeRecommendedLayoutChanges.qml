@@ -2451,6 +2451,7 @@ MuseScore {
 			text: dialog.titleText
 			font.bold: true
 			font.pointSize: dialog.fontSize
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -2458,7 +2459,7 @@ MuseScore {
 			width: parent.width-45
 			y:45
 			height: 1
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 	
 		ScrollView {
@@ -2478,6 +2479,7 @@ MuseScore {
 				leftInset: 0
 				leftPadding: 0
 				readOnly: true
+				color: ui.theme.fontPrimaryColor
 			}
 		}
 	
@@ -2527,6 +2529,7 @@ MuseScore {
 			text: "Options"
 			font.bold: true
 			font.pointSize: 18
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		Rectangle {
@@ -2538,7 +2541,7 @@ MuseScore {
 			}
 			width: parent.width-45
 			height: 1
-			color: "black"
+			color: ui.theme.fontPrimaryColor
 		}
 		
 		GridLayout {
@@ -2557,6 +2560,7 @@ MuseScore {
 				text: "Change layout"
 				font.bold: true
 				Layout.columnSpan: 2
+				color: ui.theme.fontPrimaryColor
 			}
 			CheckBox {
 				text: "Remove existing layout breaks"
@@ -2619,6 +2623,7 @@ MuseScore {
 				text: "Change fonts"
 				font.bold: true
 				Layout.columnSpan: 2
+				color: ui.theme.fontPrimaryColor
 			}
 			
 			CheckBox {
@@ -2666,6 +2671,7 @@ MuseScore {
 		Text {
 			text : '<p>*Requires installation of custom font ‘Times New Roman Accidentals’<br />(provided in download folder)</p>'
 			textFormat: Text.RichText
+			color: ui.theme.fontPrimaryColor
 			anchors {
 				left: grid.left
 				top: grid.bottom
