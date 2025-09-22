@@ -422,6 +422,7 @@ MuseScore {
 			var accVisible = false;
 			var isDoubleAcc = false;
 			
+			// NOTE: MIDI Pitch is *sounding* pitchj
 			var MIDIPitch = note.pitch;
 			var tpc = note.tpc;
 
@@ -453,7 +454,7 @@ MuseScore {
 			
 			// ***** CALCULATE THE PITCH INFORMATION ***** //
 			var dpArray = pitch2absStepByKey (MIDIPitch, tpc, currentKeySig);
-			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, octave, alteration
+			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, octave, alteration, where middle C is 
 			var diatonicPitchClass = diatonicPitch % 7; // step from 0 (C) to 6 (B)
 			
 			//if (currentStaffNum == 3 && currentBarNum > 60 && currentBarNum < 70) logError('staffIdx='+staffIdx+'; MIDIPitch='+MIDIPitch+'; dp='+diatonicPitch+'; pdp='+prevDiatonicPitch+'; dpc='+diatonicPitchClass);
@@ -699,12 +700,12 @@ MuseScore {
 						
 						if (doShowError) {
 							
-							//logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+' tpc='+tpc+'; prevMIDIPitch='+prevMIDIPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
+							logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+'; username='+note.userName()+'; tpc='+tpc+'; prevMIDIPitch='+prevMIDIPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
 															
 							// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 							scalarIntervalLabel = intervalNames[scalarIntervalAbs];
-							//logError('scalarIntervalAbs='+scalarIntervalAbs+'); scalarIntervalClass='+scalarIntervalClass+'\nchromaticIntervalAbs='+chromaticIntervalAbs+'; chromaticIntervalClass='+chromaticIntervalClass);
-							//logError('scalarIntervalAbs = '+scalarIntervalAbs+'); scalarIntervalLabel='+scalarIntervalLabel);
+							logError('scalarIntervalAbs='+scalarIntervalAbs+'); scalarIntervalClass='+scalarIntervalClass+'\nchromaticIntervalAbs='+chromaticIntervalAbs+'; chromaticIntervalClass='+chromaticIntervalClass);
+							logError('scalarIntervalAbs = '+scalarIntervalAbs+'); scalarIntervalLabel='+scalarIntervalLabel);
 							article = (alterationLabel === "augmented") ? "an" : "a";
 							noteToHighlight = note;
 							thisNoteHighlighted = true;
@@ -740,7 +741,7 @@ MuseScore {
 								} else {
 									prevNext = "next note";
 								}
-								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
+								logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
 							if (whichNoteToRewrite == 0) {
 								theAccToChange = prevPrevAcc;
@@ -756,7 +757,7 @@ MuseScore {
 								} else {
 									prevNext = "next note";
 								}
-								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
+								logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
 							
 							var j = 0;
@@ -772,7 +773,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kNaturalStr;
 									}
-									//logError(-2 ");
+									logError("-2 ");
 									
 									break;
 					
@@ -786,7 +787,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kSharpStr;
 									}
-									//logError(-1 ");
+									logError("-1 ");
 									break;
 					
 								case 0:
@@ -810,7 +811,7 @@ MuseScore {
 											newNoteAccidental = "bb";
 										}
 									}
-									//logError(0 ");
+									logError("0 ");
 									break;
 					
 								case 1:
@@ -822,7 +823,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kFlatStr;
 									}
-									//logError(1 ");
+									logError("1 ");
 									break;
 					
 								case 2: 
@@ -834,7 +835,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kNaturalStr;
 									}
-									//logError(2 ");
+									logError("2 ");
 									break;
 							}
 							//if (newNotePitch === "") logError(Couldnt find new note pitch");
@@ -1442,7 +1443,7 @@ MuseScore {
 		}
 	}
 	
-	// CONVERTS A TPC TO AN ALTERATION
+	// CONVERTS A TPC TO AN ALTERATION (e.g. -1 = flat, +1 = sharp, etc.)
 	function tpc2alter(tpc) {
 		return parseInt((tpc + 8) / 7) - 3;
 	}

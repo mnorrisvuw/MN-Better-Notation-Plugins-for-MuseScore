@@ -34,6 +34,8 @@ MuseScore {
 	FileIO { id: tempomarkingsfile; source: Qt.resolvedUrl("./assets/tempomarkings.txt").toString().slice(8); onError: { console.log(msg); } }
 	FileIO { id: tempochangemarkingsfile; source: Qt.resolvedUrl("./assets/tempochangemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
 	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
+	FileIO { id: hypehnationfile; source: Qt.resolvedUrl("./assets/EnglishHyphDict.txt").toString().slice(8); onError: { console.log(msg); } }
+
 
 	// ** DEBUG **
 	property var debug: true
@@ -119,6 +121,8 @@ MuseScore {
 	property var numNotesUnderOttava: 0
 	property var measureTicks: []
 	property var cursor: null
+	property var unhyphenatedWords: []
+	property var hyphenatedWords: []
 		
 	// ** FLAGS ** //
  	property var flaggedWeKnowWhosPlaying: false
@@ -356,7 +360,6 @@ MuseScore {
 	property var numOttavas: 0
 	property var nextOttavaStart: -1
 	property var currentOttavaEnd: -1
-
 	
 	// ** TREMOLOS ** //
 	property var oneNoteTremolos:[]
@@ -695,7 +698,7 @@ MuseScore {
 		if (curScore.style.value("concertPitch") && scoreIncludesTransposingInstrument) addError ("It looks like you have at least one transposing instrument, but the score is currently displayed in concert pitch.\nUntick ‘Concert Pitch’ in the bottom right to display a transposed score (see ‘Behind Bars’, p. 505)","pagetop");
 		
 		// ************  					CHECK TITLE PAGE EXISTS 				************ // 
-		if (doCheckTitleAndSubtitle && !hasTitlePage) addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
+		if (doCheckTitleAndSubtitle && !hasTitlePage && numPagesOfMusic > 1) addError ("This score is longer than 2 pages, but doesn’t appear to have a title page.\n(Ignore this if you are planning to add a title page to the score in another app.)","pagetop");
 		
 		// ************  				CHECK TITLE TEXT AND STAFF TEXT OBJECTS FOR ERRORS 					************ //
 		if (doCheckTitleAndSubtitle) checkScoreText();
@@ -1808,6 +1811,11 @@ MuseScore {
 		tempomarkings = tempomarkingsfile.read().trim().split('\n');
 		tempochangemarkings = tempochangemarkingsfile.read().trim().split('\n');
 		versionNumber = versionnumberfile.read().trim();
+		var hyphenationArray = hyphenationfile.read().trim().split(';\n');
+		hyphenationArray.forEach (item => { const parts = item.split(' ');
+			unhyphenatedWords.push(parts[0]);
+			hyphenatedWords.push(parts[1]);
+		});
 		
 		// **** WORK OUT INSTRUMENT RANGES **** //
 		var tempinstrumentranges = instrumentrangesfile.read().trim().split('\n');
@@ -4070,6 +4078,8 @@ MuseScore {
 				// ** CHECK COMPOSER ** //
 				if (eSubtype === "Composer") {
 					if (plainText === "Composer / arranger") addError( "You have not changed the default composer text.", textObject);
+					if (plainText.substring(0,3).toLocaleLowerCase() === "by ") addError ("You don’t need ‘by’ at the start", textObject);
+					if (plainText.substring(0,11).toLocaleLowerCase() === "composed by") addError ("You don’t need ‘Composed by’ at the start of this text", textObject);
 					var textPage = textObject.parent;
 					while (textPage.type != Element.PAGE) {
 						textPage = textPage.parent;
@@ -4077,17 +4087,21 @@ MuseScore {
 					}
 					if (textPage != null && textPage != undefined) {
 						if (textPage.pagenumber == firstPageOfMusicNum) { 
-
-							var match = plainText.match(/^[A-Z][a-z]+[A-Z]/);
-							var output = '';
-							if (match) {
-								output = match[0] + plainText.substr(match[0].length).toLocaleUpperCase();
-							} else {
-								output = plainText.toLocaleUpperCase();
+							// check to see whether the composer text is upper or lower case
+							//var match = plainText.match(/^[A-Z][a-z]+[A-Z]/);
+							var upperCaseText = '';
+							//if (match) {
+								//output = match[0] + plainText.substring(match[0].length).toLocaleUpperCase();
+							//} else {
+								upperCaseText = plainText.toLocaleUpperCase();
+							//}
+							var keepLowerCase = ["arr. ", "by ", "arranged ", "orch. ", "orchestrated "];
+							for (var i=0; i<keepLowerCase.length; i++) {
+								if (plainText.includes(keepLowerCase[i])) {
+									upperCaseText = upperCaseText.replace(keepLowerCase[i].toLocaleUpperCase(),keepLowerCase[i]);
+								}
 							}
-							var keepLowerCase = ["arr.", "by", "arranged", "orch.", "orchestrated"];
-							for (var i=0; i<keepLowerCase.length; i++) output = output.replace(keepLowerCase[i].toLocaleUpperCase(),keepLowerCase[i]);
-							if (plainText !== output) addError ("(Optional) A common house style is to have composer names in all caps.\n(See ‘Behind Bars’, p. 504)", textObject);
+							if (plainText !== upperCaseText) addError ("(Optional) A common house style is to have composer names in all caps.\n(See ‘Behind Bars’, p. 504)", textObject);
 						}
 					}
 				}
@@ -4715,14 +4729,21 @@ MuseScore {
 				if (currTick < currentSlur.spannerTick.ticks + currentSlur.spannerTicks.ticks) addError ("This note is slurred, but is not a melisma.",noteRest);
 			}
 		} else {
-			if (isMelisma[theTrack]) {
-				// check for slur
-				//logError("isSlurred = "+isSlurred+" isTied = "+isTied);
-				if (!isSlurred && !isTied)	addError ("This melisma requires a slur.",noteRest);
-			} else {
-				if (!flaggedNoLyrics) {
-					flaggedNoLyrics = true;
-					addError ("This is note in a vocal part does not have any lyrics.",noteRest);
+			// no lyrics found
+			var isTiedBack = noteRest.notes[0].tieBack != null;
+			if (!isTiedBack) {
+				if (isMelisma[theTrack]) {
+					// check for slur
+					//logError("isSlurred = "+isSlurred+" isTied = "+isTied);
+					if (!isSlurred)	addError ("This melisma requires a slur.",noteRest);
+				} else {
+					if (!isSlurred) {
+						if (!flaggedNoLyrics) {
+							flaggedNoLyrics = true;
+							//logError ("TieBack = "+noteRest.notes[0].tieBack);
+							addError ("This note in a vocal part does not have any lyrics;\nif this is a melisma, it requires a slur.",noteRest);
+						}
+					}
 				}
 			}
 		}
