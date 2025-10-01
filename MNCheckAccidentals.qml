@@ -700,12 +700,12 @@ MuseScore {
 						
 						if (doShowError) {
 							
-							logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+'; username='+note.userName()+'; tpc='+tpc+'; prevMIDIPitch='+prevMIDIPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
+							//logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+'; username='+note.userName()+'; tpc='+tpc+'; prevMIDIPitch='+prevMIDIPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
 															
 							// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 							scalarIntervalLabel = intervalNames[scalarIntervalAbs];
-							logError('scalarIntervalAbs='+scalarIntervalAbs+'); scalarIntervalClass='+scalarIntervalClass+'\nchromaticIntervalAbs='+chromaticIntervalAbs+'; chromaticIntervalClass='+chromaticIntervalClass);
-							logError('scalarIntervalAbs = '+scalarIntervalAbs+'); scalarIntervalLabel='+scalarIntervalLabel);
+							//logError('scalarIntervalAbs='+scalarIntervalAbs+'); scalarIntervalClass='+scalarIntervalClass+'\nchromaticIntervalAbs='+chromaticIntervalAbs+'; chromaticIntervalClass='+chromaticIntervalClass);
+							//logError('scalarIntervalAbs = '+scalarIntervalAbs+'); scalarIntervalLabel='+scalarIntervalLabel);
 							article = (alterationLabel === "augmented") ? "an" : "a";
 							noteToHighlight = note;
 							thisNoteHighlighted = true;
@@ -741,7 +741,7 @@ MuseScore {
 								} else {
 									prevNext = "next note";
 								}
-								logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
+								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
 							if (whichNoteToRewrite == 0) {
 								theAccToChange = prevPrevAcc;
@@ -757,7 +757,7 @@ MuseScore {
 								} else {
 									prevNext = "next note";
 								}
-								logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
+								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
 							
 							var j = 0;
@@ -773,7 +773,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kNaturalStr;
 									}
-									logError("-2 ");
+									//logError("-2 ");
 									
 									break;
 					
@@ -787,7 +787,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kSharpStr;
 									}
-									logError("-1 ");
+									//logError("-1 ");
 									break;
 					
 								case 0:
@@ -811,7 +811,7 @@ MuseScore {
 											newNoteAccidental = "bb";
 										}
 									}
-									logError("0 ");
+									//logError("0 ");
 									break;
 					
 								case 1:
@@ -823,7 +823,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kFlatStr;
 									}
-									logError("1 ");
+									//logError("1 ");
 									break;
 					
 								case 2: 
@@ -835,7 +835,7 @@ MuseScore {
 									} else {
 										newNoteAccidental = kNaturalStr;
 									}
-									logError("2 ");
+									//logError("2 ");
 									break;
 							}
 							//if (newNotePitch === "") logError(Couldnt find new note pitch");

@@ -540,7 +540,7 @@ MuseScore {
 		"lyricsPosBelow", 3, // Lyrics → Position
 		"lyricsMinTopDistance", 1, // Lyrics → Min. margin to current stave
 		"lyricsMinBottomDistance", 1.5, // Lyrics → Min. margin to other staves
-		"lyricsMinDistance", 0.25, // Lyrics → Min. gap between lyrics
+		"lyricsMinDistance", 0.7, // Lyrics → Min. gap between lyrics
 		"lyricsLineHeight","",
 		"lyricsDashMinLength","",
 		"lyricsDashMaxLength","",

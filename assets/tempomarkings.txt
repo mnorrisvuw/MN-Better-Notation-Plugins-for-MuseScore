@@ -42,8 +42,10 @@ tempo comodo
 tempo di
 tempo giusto
 tempo primo
-tempo 1°
-tempo 1o
+tempo secondo
+tempo 1
+tempo 2
+tempo i
 tempo semplice
 mouvement
 mouvt

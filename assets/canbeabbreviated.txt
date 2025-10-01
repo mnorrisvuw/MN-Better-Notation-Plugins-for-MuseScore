@@ -64,3 +64,5 @@ normal vibr.
 vib. norm.
 normal vibrato
 vib. norm.
+battuto
+batt.

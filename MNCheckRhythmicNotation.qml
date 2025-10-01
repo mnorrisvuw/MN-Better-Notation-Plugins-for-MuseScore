@@ -381,7 +381,7 @@ MuseScore {
 							isGliss = glisses[currentTrack][currTick] != null;
 							if (!isHidden) totalMusicDurThisTrack += soundingDur;
 							//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
-							if (isPickupBar && isRest && noteRest.durationType.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
+							if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
 							
 							
 							// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
@@ -704,7 +704,7 @@ MuseScore {
 	function checkManuallyEnteredBarRest (noteRest) {
 		if (isPickupBar) return;
 		isBarRest = isRest && soundingDur == barDur;
-		isManuallyEnteredBarRest = isBarRest && noteRest.durationType.type < 14;
+		isManuallyEnteredBarRest = isBarRest && noteRest.durationTypeWithDots.type < 14;
 		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to create a correctly positioned bar rest.",noteRest);
 	}
 	
