@@ -619,7 +619,7 @@ MuseScore {
 				
 		// ************  				SELECT AND PRE-PROCESS ENTIRE SCORE			************ //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		setProgress (1);
@@ -6552,7 +6552,7 @@ MuseScore {
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
