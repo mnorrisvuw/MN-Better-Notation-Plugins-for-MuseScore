@@ -125,6 +125,7 @@ MuseScore {
 	property var unhyphenatedWordsLower: []
 	property var hyphenatedWords: []
 	property var isVocalScore: false
+	property var isChoirScore: false
 	//property var lyrics: []
 		
 	// ** FLAGS ** //
@@ -586,7 +587,7 @@ MuseScore {
 		}
 		numExcerpts = curScore.excerpts.length;
 		
-		if (doCheckPartStyle && numParts > 1 && numExcerpts < numParts) addError ("Parts have not yet been created/opened, so I wasn’t able to check the part settings.\nYou can do this by clicking ‘Parts’ then ’Open All’.\n\nOnce you have created and opened the parts, please run this again to check the parts.\nIgnore this message if you do not plan to create parts.","pagetopright");
+		if (doCheckPartStyle && numParts > 1 && numExcerpts < numParts && !isChoirScore) addError ("Parts have not yet been created/opened, so I wasn’t able to check the part settings.\nYou can do this by clicking ‘Parts’ then ’Open All’.\n\nOnce you have created and opened the parts, please run this again to check the parts.\nIgnore this message if you do not plan to create parts.","pagetopright");
 		
 		// **** INITIALISE ALL ARRAYS **** //
 		
@@ -700,8 +701,6 @@ MuseScore {
 		// ************  				CHECK SCORE & PAGE SETTINGS 				************ // 
 		checkScoreAndPageSettings();
 		
-		// ************  					CHECK PART SETTINGS 					************ // 
-		if (doCheckPartStyle && numParts > 1 && numExcerpts >= numParts) checkPartSettings();
 		
 		// ************					CHECK IF SCORE IS TRANSPOSED				************ //
 		if (curScore.style.value("concertPitch") && scoreIncludesTransposingInstrument) addError ("It looks like you have at least one transposing instrument, but the score is currently displayed in concert pitch.\nUntick ‘Concert Pitch’ in the bottom right to display a transposed score (see ‘Behind Bars’, p. 505)","pagetop");
@@ -717,6 +716,10 @@ MuseScore {
 		
 		// ************ 							CHECK FOR STAFF ORDER ISSUES 							************ //
 		if (doCheckStaffNamesAndOrder) checkStaffOrder();
+		
+		// ************  					CHECK PART SETTINGS 					************ // 
+		// NB do AFTER checkStaffOrder
+		if (doCheckPartStyle && numParts > 1 && numExcerpts >= numParts) checkPartSettings();
 		
 		// ************  							CHECK STAFF NAMES ISSUES 								************ // 
 		if (doCheckStaffNamesAndOrder) checkStaffNames();
@@ -1223,7 +1226,7 @@ MuseScore {
 									}
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
-									var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
+									var theArticulationArray = noteRest.articulations;
 									if (flaggedStaccatoOnShortDecayInstrumentBarNum > 0 && flaggedStaccatoOnShortDecayInstrumentBarNum < currentBarNum - 4) flaggedStaccatoOnShortDecayInstrumentBarNum = 0;
 									if (theArticulationArray) {
 										lastArticulationTick = currTick;
@@ -1249,7 +1252,7 @@ MuseScore {
 									// ************ CHECK ARTICULATION & STACCATO ISSUES ************ //
 									if (isTied && !isLv) {
 										var hasStaccato = false, hasHarmonic = false;
-										if (theArticulationArray != null) {
+										if (theArticulationArray.length > 0) {
 											for (var i = 0; i < theArticulationArray.length; i++) {
 												if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 												if (theArticulationArray[i].symbol == kHarmonicCircle) hasHarmonic = true;
@@ -2347,18 +2350,24 @@ MuseScore {
 	function checkStaffOrder () {
 		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
 		// **** ALSO NOTE ANY GRAND STAVES														 **** //
+		var numVocalParts = 0;
+		var numVisibleStaves = 0;
+		for (var i = 0; i < numStaves; i++) {
+			if (staffVisible[i]) {
+				numVisibleStaves ++;
+				var instrumentType = version46? curScore.staves[i].part.musicXmlId : curScore.staves[i].part.instrumentId;
+				if (instrumentType.includes("strings.")) scoreHasStrings = true;
+				if (instrumentType.includes("wind.")) scoreHasWinds = true;
+				if (instrumentType.includes("brass.")) scoreHasBrass = true;
+				if (instrumentType.includes("voice.")) numVocalParts ++;
+			}
+		}
+		isChoirScore = numVocalParts > 0 && numVocalParts == numVisibleStaves;
 		
 		// ** FIRST CHECK THE ORDER OF STAVES IF ONE OF THE INSTRUMENTS IS A GRAND STAFF ** //
 		if (numGrandStaves > 0) {
 			// CHECK ALL SEXTETS, OR SEPTETS AND LARGER THAT DON"T MIX WINDS & STRINGS
-			for (var i = 0; i < numStaves; i++) {
-				if (staffVisible[i]) {
-					var instrumentType = version46? curScore.staves[i].part.musicXmlId : curScore.staves[i].part.instrumentId;
-					if (instrumentType.includes("strings.")) scoreHasStrings = true;
-					if (instrumentType.includes("wind.")) scoreHasWinds = true;
-					if (instrumentType.includes("brass.")) scoreHasBrass = true;
-				}
-			}
+			
 			// do we need to check the order of grand staff instruments?
 			// only if there are less than 7 parts, or all strings or all winds or only perc + piano
 			var checkGrandStaffOrder = (numParts < 7) || ((scoreHasWinds || scoreHasBrass) != scoreHasStrings) || (!(scoreHasWinds || scoreHasBrass) && !scoreHasStrings);
@@ -3409,8 +3418,8 @@ MuseScore {
 					if (prevNote) {
 						//logError ('prevNote found');
 
-						var prevNoteArticulationArray = getArticulationArray(prevNote);
-						if (prevNoteArticulationArray != null) {
+						var prevNoteArticulationArray = prevNote.articulations;
+						if (prevNoteArticulationArray.length > 0) {
 							//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
 							for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
 								//logError ('artic = '+prevNoteArticulationArray [j]);
@@ -3421,8 +3430,8 @@ MuseScore {
 					if (nextNote) {
 						//logError ('nextNote found');
 
-						var nextNoteArticulationArray = getArticulationArray(nextNote);
-						if (nextNoteArticulationArray != null) {
+						var nextNoteArticulationArray = nextNote.articulations;
+						if (nextNoteArticulationArray.length > 0) {
 							//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
 
 							for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
@@ -3684,8 +3693,8 @@ MuseScore {
 			}
 			
 			// **** CHECK COL LEGNO BATT & TRATTO **** //
-			if (lowerCaseText.includes("col legno")) {
-				if (lowerCaseText.includes("batt")) {
+			if (lowerCaseText.includes("col legno") || lowerCaseText.includes("c.l.") || lowerCaseText.includes("clb") || lowerCaseText.includes("clt") || lowerCaseText.includes("c. l.")) {
+				if (lowerCaseText.includes("batt") || lowerCaseText.includes("c.l.b") || lowerCaseText.includes("clb") || lowerCaseText.includes("c. l. b")) {
 					if (currentPlayingTechnique === "clb") {
 						if (!isBracketed) {
 							addError("Instrument is already playing col legno battuto?",textObject);
@@ -3696,7 +3705,7 @@ MuseScore {
 						haveHadPlayingIndication = true;
 					}
 				} else {
-					if (lowerCaseText.includes("tratto")) {
+					if (lowerCaseText.includes("tratto") || lowerCaseText.includes("c.l.t") || lowerCaseText.includes("clt") || lowerCaseText.includes("c. l. t")) {
 						if (currentPlayingTechnique === "clt") {
 							if (!isBracketed) {
 								addError("Instrument is already playing col legno tratto?",textObject);
@@ -5339,7 +5348,7 @@ MuseScore {
 		if (noteRest.notes[0].tieBack) return;
 		isStringHarmonic = false;
 		
-		var theArticulationArray = getArticulationArray(noteRest, staffNum);
+		var theArticulationArray = noteRest.articulations;
 
 		var nn = noteRest.notes.length;
 		//logError("CHECKING STRING HARMONIC — nn = "+nn);
@@ -5449,7 +5458,7 @@ MuseScore {
 		if (currentStaffNum == lastPizzIssueStaff && currentBarNum - lastPizzIssueBar < 5) return;
 		
 		// check staccato		
-		var theArticulationArray = getArticulationArray (noteRest, currentStaffNum);
+		var theArticulationArray = noteRest.articulations;
 		if (theArticulationArray) {
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) {
@@ -5570,7 +5579,7 @@ MuseScore {
 
 						if (chordMatches && noteheadStyle == prevNoteheadStyle) {
 							//logError ("here1");
-							if (getArticulationArray(noteRest,staffNum) == null) {
+							if (noteRest.articulations == null) {
 								//logError ("here2");
 								if (isEndOfSlur && prevWasStartOfSlur) {
 									addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie, or do you need to add articulation?",currentSlur);
@@ -5618,7 +5627,7 @@ MuseScore {
 			if (!isStartOfSlur && !isEndOfSlur) {
 				if (typeof staffNum !== 'number') logError("checkSlurIssues() — Articulation error");
 			
-				var theArticulationArray = getArticulationArray(noteRest, staffNum);
+				var theArticulationArray = noteRest.articulations;
 				if (theArticulationArray) {
 					for (var i = 0; i < theArticulationArray.length; i++) {
 						if (accentsArray.includes(theArticulationArray[i].symbol) ) {
@@ -5939,7 +5948,7 @@ MuseScore {
 		if (n > 1 && graceNotes[0].duration.ticks < division * 0.25) addError ("It is recommended that grace notes use only\n1 or 2 beams (see ‘Behind Bars’, p. 125).",graceNotes[0]);
 		if (!isSlurred) {
 			var hasArtic = false;
-			var theArtic = getArticulationArray(graceNotes[0],staffNum);
+			var theArtic = graceNotes[0].articulations;
 			
 			if (theArtic != null) {
 				for (var i = 0; i < theArtic.length; i++) {
@@ -5951,24 +5960,6 @@ MuseScore {
 			var gnIsTied = graceNotes[0].notes[0].tieForward != null || graceNotes[0].notes[0].tieBack != null ;
 			if (!hasArtic && !gnIsTied) addError("In general, grace-notes should always be slurred to the main note,\nunless you add staccatos or accents to them.",graceNotes[0]);
 		}
-	}
-	
-	function getArticulationArray (noteRest) {
-		// I WISH: you could just get the articulations of a note instead of having to do this hack
-		// I WISH: you could get the staffidx of a note/staff
-		var theTick = (noteRest.parent.type == Element.CHORD) ? noteRest.parent.parent.tick : noteRest.parent.tick;
-		var theTrack = noteRest.track;		
-		if (theTick == undefined || theTick == null) {
-			logError("getArticulationArray() — couldn’t get articulation tick for this item = "+theTick);
-		} else {
-			if (articulations[theTrack] == null || articulations[theTrack] == undefined) {
-				logError("getArticulationArray() — articulations["+theTrack+"] is undefined ");
-			} else {
-				if (articulations[theTrack][theTick] == null || articulations[theTrack][theTick] == undefined) return null;
-				return articulations[theTrack][theTick];
-			}
-		}
-		return null;
 	}
 	
 	function checkRehearsalMark (textObject) {
@@ -6033,11 +6024,17 @@ MuseScore {
 	function checkOneNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) logError("checkOneNoteTremolo() — tremolo is "+tremolo);
 		lastArticulationTick = currTick;
-		//logError ('Tremolo type = '+tremolo.subtype);
-		var tremDescription = tremolo.subtypeName();
-		var tremSubdiv = (tremDescription.includes("eighth")) ? 8 : parseInt(tremDescription.match(/\d+/)[0]);
-		var strokesArray = [0,8,16,32,64];
-		var numStrokes = strokesArray.indexOf(tremSubdiv);
+		//var tremDescription = tremolo.subtypeName();
+		// var tremSubdiv = (tremDescription.includes("eighth")) ? 8 : parseInt(tremDescription.match(/\d+/)[0]);
+		var tremSubdiv = tremolo.tremoloType;
+		//logError ('Tremolo type = '+tremolo.tremoloType);
+
+		//var strokesArray = [8,16,32,64,128,8,16,32,64];
+		//var numStrokes = strokesArray.indexOf(tremSubdiv);
+
+		if (tremSubdiv > 4) tremSubdiv -= 5;
+		var numStrokes = tremSubdiv + 1;
+		//logError ('numStrokes = '+numStrokes);
 		var dur = parseFloat(noteRest.duration.ticks) / division;
 		
 		switch (numStrokes) {
@@ -6045,7 +6042,7 @@ MuseScore {
 				logError("checkOneNoteTremolo() — Couldn’t calculate number of strokes");
 				break;
 			case 1:
-				if (!flaggedOneStrokeTrem) addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
+				if (dur > 0.5 && !flaggedOneStrokeTrem) addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
 				flaggedOneStrokeTrem = true;
 				break;
 			case 2:
@@ -6065,8 +6062,8 @@ MuseScore {
 			flaggedFlz = true;
 		}
 		var hasStaccato = false;
-		var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
-		if (theArticulationArray != null) {
+		var theArticulationArray = noteRest.articulations
+		if (theArticulationArray.length > 0) {
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 			}
@@ -6077,10 +6074,17 @@ MuseScore {
 	function checkTwoNoteTremolo (noteRest, tremolo) {
 		if (tremolo == null || tremolo == undefined) logError("checkTwoNoteTremolo() — tremolo is "+tremolo);
 		lastArticulationTick = currTick;
-		var tremDescription = tremolo.subtypeName();
-		var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
-		var strokesArray = [0,8,16,32,64];
-		var numStrokes = strokesArray.indexOf(tremSubdiv);
+		// var tremDescription = tremolo.subtypeName();
+		// var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
+		// var strokesArray = [0,8,16,32,64];
+		// var numStrokes = strokesArray.indexOf(tremSubdiv);
+		var tremSubdiv = tremolo.tremoloType;
+		
+		//var strokesArray = [8,16,32,64,128,8,16,32,64];
+		if (tremSubdiv > 4) tremSubdiv -= 5;
+		var numStrokes = tremSubdiv + 1;
+		//logError ('numStrokes = '+numStrokes);
+
 		var dur = 2 * parseFloat(noteRest.duration.ticks) / division;
 		//logError("TWO-NOTE TREMOLO HAS "+numStrokes+" strokes; dur is "+dur+"; isSlurred = "+isSlurred+"; isPitchedPercussionInstrument = "+isPitchedPercussionInstrument);
 		if (!isSlurred) {
@@ -6102,7 +6106,7 @@ MuseScore {
 				logError("checkTwoNoteTremolo() — Couldn’t calculate number of strokes");
 				break;
 			case 1:
-				addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
+				if (dur > 0.5) addError("Are you sure you want a one-stroke measured tremolo here?\nThese are almost always better written as quavers.",noteRest);
 				break;
 			case 2:
 				if (dur >= 0.25 && dur < 0.5) addError("You don’t need more than 1 stroke for an unmeasured tremolo on semiquavers.",noteRest);
@@ -6117,8 +6121,8 @@ MuseScore {
 		}
 		
 		var hasStaccato = false;
-		var theArticulationArray = getArticulationArray(noteRest,currentStaffNum)
-		if (theArticulationArray != null) {
+		var theArticulationArray = noteRest.articulations
+		if (theArticulationArray.length > 0) {
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
 			}
