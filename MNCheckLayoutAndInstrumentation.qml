@@ -467,15 +467,9 @@ MuseScore {
 		
 	}
 	
-	function setupArticulationSymbolsArrays () {
-	// var staccato = SymId.articStaccatissimoAbove;
+	function setupArticulationSymbolsArrays () {	
 	
-	// ** NB THESE ARE HARD-CODED BECAUSE OF AN 8-SECOND HANG ENCOUNTERED in MS 4.5 WHEN CALLING SymId
-	// ** IF THIS HANG CAN BE RESOLVED, WE SHOULD RECODE THESE TO THE COMMENTED-OUT TEXT
-	staccatoArray = [599, 600, 605, 606, 617, 618, 619, 620, 621, 622, 623, 624, 631, 632];
-	
-	
-	/*staccatoArray = [SymId.articAccentStaccatoAbove, SymId.articAccentStaccatoBelow,
+	staccatoArray = [SymId.articAccentStaccatoAbove, SymId.articAccentStaccatoBelow,
 		SymId.articSoftAccentStaccatoAbove, SymId.articSoftAccentStaccatoBelow,
 		SymId.articStaccatissimoAbove, SymId.articStaccatissimoBelow,
 		SymId.articStaccatissimoStrokeAbove, SymId.articStaccatissimoStrokeBelow,
@@ -483,19 +477,14 @@ MuseScore {
 		SymId.articStaccatoAbove, SymId.articStaccatoBelow,
 		SymId.articTenutoStaccatoAbove, SymId.articTenutoStaccatoBelow,
 		SymId.articMarcatoStaccatoAbove, SymId.articMarcatoStaccatoBelow,
-		SymId.articSoftAccentTenutoStaccatoAbove, SymId.articSoftAccentTenutoStaccatoBelow];*/
-		
-	stringArticulationsArray = [2652, 2653, 2654, 2655, 2656, 2677, 2678, 2679, 2680, 2681];
-	
-	/*stringArticulationsArray = [SymId.stringsDownBow, SymId.stringsDownBowAwayFromBody, SymId.stringsDownBowBeyondBridge,
+		SymId.articSoftAccentTenutoStaccatoAbove, SymId.articSoftAccentTenutoStaccatoBelow];
+			
+	stringArticulationsArray = [SymId.stringsDownBow, SymId.stringsDownBowAwayFromBody, SymId.stringsDownBowBeyondBridge,
 		SymId.stringsDownBowTowardsBody, SymId.stringsDownBowTurned,
 		SymId.stringsUpBow, SymId.stringsUpBowAwayFromBody, SymId.stringsUpBowBeyondBridge,
-		SymId.stringsUpBowTowardsBody, SymId.stringsUpBowTurned ];	 */
-		
-		
-	accentsArray = [ 597, 598, 599, 600, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 628, 629 ];
-		
-	/*	accentsArray = [ SymId.articAccentAbove, SymId.articAccentBelow,
+		SymId.stringsUpBowTowardsBody, SymId.stringsUpBowTurned ];
+				
+	accentsArray = [SymId.articAccentAbove, SymId.articAccentBelow,
 		SymId.articAccentStaccatoAbove,	SymId.articAccentStaccatoBelow,
 		SymId.articMarcatoAbove, SymId.articMarcatoBelow,
 		SymId.articMarcatoStaccatoAbove, SymId.articMarcatoStaccatoBelow,
@@ -503,18 +492,16 @@ MuseScore {
 		SymId.articSoftAccentAbove,	SymId.articSoftAccentBelow,
 		SymId.articSoftAccentStaccatoAbove,	SymId.articSoftAccentStaccatoBelow,
 		SymId.articSoftAccentTenutoAbove, SymId.articSoftAccentTenutoBelow,
-		SymId.articSoftAccentTenutoStaccatoAbove, SymId.articSoftAccentTenutoStaccatoBelow]; */
-		
-	iterationArticulationArray = [607, 608, 623, 624, 627, 628, 629, 630, 631, 632];
-		
-	/*	iterationArticulationArray = [SymId.articTenutoAbove, SymId.articTenutoBelow,
+		SymId.articSoftAccentTenutoStaccatoAbove, SymId.articSoftAccentTenutoStaccatoBelow];
+				
+	iterationArticulationArray = [SymId.articTenutoAbove, SymId.articTenutoBelow,
 		SymId.articTenutoAccentAbove, SymId.articTenutoAccentBelow,
 		SymId.articMarcatoTenutoAbove, SymId.articMarcatoTenutoBelow,
 		SymId.articTenutoStaccatoAbove, SymId.articTenutoStaccatoBelow,
 		SymId.articStaccatissimoAbove, SymId.articStaccatissimoBelow,
 		SymId.articStaccatissimoStrokeAbove, SymId.articStaccatissimoStrokeBelow,
 		SymId.articStaccatissimoWedgeAbove, SymId.articStaccatissimoWedgeBelow,
-		SymId.articStaccatoAbove, SymId.articStaccatoBelow]; */
+		SymId.articStaccatoAbove, SymId.articStaccatoBelow];
 		
 	}
 	
@@ -568,11 +555,10 @@ MuseScore {
 		var cursor2 = curScore.newCursor();
 
 		var prevTick = [];
-		var endOfPieceTick = curScore.selection;
 		
-		parts = curScore.parts;
 		
 		// ** calculate number of parts, but ignore hidden ones
+		parts = curScore.parts;
 		numParts = 0;
 		for (var i = 0; i < parts.length; i++) if (parts[i].show) visibleParts.push(parts[i]);
 		numParts = visibleParts.length;
@@ -603,7 +589,6 @@ MuseScore {
 		// THESE ITEMS CAN APPLY TO SPECIFIC TRACKS OR NOTEHEADS
 		for (var i = 0; i < numTracks; i++) {
 			slurs[i] = [];
-			articulations[i] = [];
 			currentSlurNumOnTrack[i] = -1;
 			prevSlurNumOnTrack[i] = -1;
 			nextSlurStartOnTrack[i] = -1;
@@ -5362,7 +5347,7 @@ MuseScore {
 				}
 				
 				// check artificial harmonic with a harmonic circle above it
-				if (theArticulationArray) {
+				if (theArticulationArray != undefined) {
 					for (var i = 0; i < theArticulationArray.length; i++) {
 						if (theArticulationArray[i].symbol == kHarmonicCircle) {
 							addError ("Artificial harmonics don’t require a harmonic circle.",theArticulationArray[i]);
@@ -5383,7 +5368,7 @@ MuseScore {
 			if (typeof staffNum !== 'number') logError("Artic error in checkStringHarmonic nn1");
 			//logError("The artic sym = "+theArticulation.symbol.toString());
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
-			if (theArticulationArray) {
+			if (theArticulationArray != undefined) {
 				for (var i = 0; i < theArticulationArray.length; i++) {
 					if (theArticulationArray[i].symbol == kHarmonicCircle) {
 						isStringHarmonic = true;
@@ -5441,7 +5426,7 @@ MuseScore {
 		
 		// check staccato		
 		var theArticulationArray = noteRest.articulations;
-		if (theArticulationArray) {
+		if (theArticulationArray != undefined) {
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) {
 					addError("It’s not recommended to have a staccato articulation on a pizzicato note.", noteRest);

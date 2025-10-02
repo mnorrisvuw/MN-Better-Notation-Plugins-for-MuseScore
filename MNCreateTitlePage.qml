@@ -23,6 +23,7 @@ MuseScore {
 	thumbnailName: "MNCreateTitlePage.png"	
 	property var selectionArray: []
 	property var titlePageStyles: []
+	property var frames: []
 	property var spatium: 0
 	property var theTitle: ''
 	property var theSubtitle: ''
@@ -60,16 +61,20 @@ MuseScore {
 			return;
 		}
 		
+		
 		// ** CHECK THERE ISN’T ALREADY A TITLE PAGE ** //
 		var firstBarInScore = curScore.firstMeasure;
 		var firstPageOfMusic = firstBarInScore.parent.parent;
 		
-		// RETURN IF THERE'S ALREADY A TITLE PAGE (DO SOMETHING HERE)
+		// ** RETURN IF THERE'S ALREADY A TITLE PAGE ** //
 		if (firstPageOfMusic.pagenumber > 1) {
 			dialog.msg = 'This score appears to already have a title page.';
 			dialog.show();
 			return;	
 		}
+		
+		// **** GET ANY FRAMES **** //
+		getFrames();
 		
 		// ** ANALYSE THE EXISTING TITLE, SUBTITLE AND COMPOSER INFO ** //
 		checkTitle ();
@@ -78,6 +83,7 @@ MuseScore {
 			dialog.show();
 			return;
 		}
+		
 		// *** SHOW THE TITLE PAGE STYLE DIALOG *** //
 		var stylesText = stylesfile.read().trim();
 		var stylesJSON = JSON.parse(stylesText);
@@ -91,21 +97,28 @@ MuseScore {
 		styles.show();
 	}
 	
+	function getFrames() {
+		var systems = curScore.systems;
+		var numSystems = systems.length;
+		for (var i = 0; i < numSystems; i++ ) {
+			var system = systems[i];
+			var measures = system.measures;
+			for (var j = 0; j < measures.length; j++ ) {
+				var e = measures[j];
+				if (e.type == Element.VBOX) frames.push(e);
+			}
+		}
+	}
+	
 	function checkTitle () {
 				
 		// ** SELECT ALL THE SCORE TEXT ** //
-		curScore.startCmd ();
-		cmd ("select-all");
-		cmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		var tempText = curScore.selection.elements[0];
-		cmd ("select-similar");
-		var elems = curScore.selection.elements;
-		for (var i = 0; i < elems.length; i++) {
-			var e = elems[i];
-			if (!e.is(tempText)) {
-				//logError ("Found text object "+e.text);
+		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
+		for (var i = 0; i < frames.length; i++) {
+			var frame = frames[i];
+			var elems = frame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
 				var eSubtype = e.subtypeName();
 				// Strip out any tags
 				if (eSubtype == 'Title') theTitle = e.text.replace(/<[^>]+>/g, "");
@@ -113,9 +126,6 @@ MuseScore {
 				if (eSubtype == 'Composer') theComposer = e.text.replace(/<[^>]+>/g, "");
 			}
 		}
-		if (vbox != null) { removeElement (vbox)};
-		cmd ("escape");
-		curScore.endCmd();		
 	}
 	
 	function buttonClicked (chosenLabel) {
@@ -140,19 +150,25 @@ MuseScore {
 		var lineStyle = ("line" in chosenTitlePageStyle) ? chosenTitlePageStyle.line : null;
 		var line2Style = ("line2" in chosenTitlePageStyle) ? chosenTitlePageStyle.line2 : null;	
 		
-		// ** SELECT ALL THE SCORE TEXT ** //
+		// ** SELECT ALL ** //
 		curScore.startCmd();
-		cmd ("select-all");
-		cmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		cmd ("select-similar");
-		if (vbox != null) removeElement (vbox);
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
-		// add another vbox
+		
+		// ** CREATE A NEW VBOX ** //
+		curScore.startCmd();
+		cmd ("insert-vbox");
+		curScore.endCmd();
+		var boxToDelete = curScore.selection.elements[0];
+		cmd ("select-similar");
+		
+		// ** CREATE FRONT MATTER ** //
 		if (doFrontMatter) {
 			curScore.startCmd();
 			cmd ("insert-vbox");
+			curScore.endCmd();
+			curScore.startCmd();
+
 			frontMatterBox = curScore.selection.elements[0];
 			cmd ("page-break");
 			cmd ("poet-text");
@@ -162,9 +178,15 @@ MuseScore {
 			frontMatter.fontSize = 10;
 			if ("frontmatterfont" in chosenTitlePageStyle) frontMatter.fontFace = chosenTitlePageStyle.frontmatterfont;
 			curScore.endCmd();
+
 		}
+		
+		// ** CREATE TITLE PAGE ** //
 		curScore.startCmd();
 		cmd ("insert-vbox");
+		curScore.endCmd();
+
+		curScore.startCmd();
 		titlePageBox = curScore.selection.elements[0];
 		cmd ("page-break");
 		var newTitle = null;
@@ -201,6 +223,7 @@ MuseScore {
 		}
 		curScore.endCmd();
 		cmd ("escape");
+		deleteObj(boxToDelete);
 		var spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI;
 		titlePageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
 		var fontStyles = {'PLAIN' : 0, 'BOLD' : 1, 'ITALIC' : 2};
