@@ -43,7 +43,6 @@ MuseScore {
 	property var currentZ: 16384
 	property var numLogs: 0
 	property var versionNumber: ''
-	property var version46: false
 	
 	// ** OPTIONS **
  	property var doCheckScoreStyle: true
@@ -903,7 +902,8 @@ MuseScore {
 			
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
-			currentInstrumentId = version46 ? currentStaff.part.musicXmlId : currentStaff.part.instrumentId;
+			currentInstrumentId = currentStaff.part.musicXmlId;
+			logError ('currentInstrumentId = '+currentInstrumentId);
 			currentInstrumentName = currentStaff.part.longName;
 			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — this routine does that
 			calculateCalcId();
@@ -1785,7 +1785,7 @@ MuseScore {
 			var nextInstrumentChangeTick = instrumentChanges[currentStaffNum][currentInstrumentNum].parent.tick;
 			if (currTick >= nextInstrumentChangeTick) {
 				var newInstrument = curScore.staves[currentStaffNum].part.instrumentAtTick(currTick);
-				currentInstrumentId = version46 ? newInstrument.musicXmlId : newInstrument.instrumentId;
+				currentInstrumentId = newInstrument.musicXmlId;
 				calculateCalcId();
 				currentInstrumentName = newInstrument.longName;
 				currentInstrumentNum ++;
@@ -2238,7 +2238,7 @@ MuseScore {
 				visiblePartFound = true;
 				firstVisibleStaff = i;
 			}
-			currentInstrumentId = version46 ? part.musicXmlId : part.instrumentId;
+			currentInstrumentId = part.musicXmlId;
 			//logError ('Staff '+i+' is '+currentInstrumentId+' '+currentInstrumentId.length+' '+currentInstrumentId.replace(/</g,"≤"));
 
 			calculateCalcId();
@@ -2355,7 +2355,7 @@ MuseScore {
 		for (var i = 0; i < numStaves; i++) {
 			if (staffVisible[i]) {
 				numVisibleStaves ++;
-				var instrumentType = version46? curScore.staves[i].part.musicXmlId : curScore.staves[i].part.instrumentId;
+				var instrumentType = curScore.staves[i].part.musicXmlId;
 				if (instrumentType.includes("strings.")) scoreHasStrings = true;
 				if (instrumentType.includes("wind.")) scoreHasWinds = true;
 				if (instrumentType.includes("brass.")) scoreHasBrass = true;
@@ -2400,7 +2400,7 @@ MuseScore {
 		if (numParts > 3 && numParts < 6) {
 			for (var i = 0; i < numStaves; i ++) {
 				if (staffVisible[i]) {
-					var id = version46 ? curScore.staves[i].part.musicXmlId : curScore.staves[i].part.instrumentId;
+					var id = curScore.staves[i].part.musicXmlId;
 					if (id.includes("wind.flutes.flute")) {
 						numFl ++;
 						flStaff = i;
@@ -2602,6 +2602,7 @@ MuseScore {
 			isTrombone = currentInstrumentCalcId === "brass.trombone.tenor";
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
+			logError ('isVoice = '+isVoice+'; currentInstrumentId = '+currentInstrumentId);
 			isCello = currentInstrumentId.includes("cello");
 			// isDecayInstrument = isPercussionInstrument || isHarp || isPiano;
 			checkInstrumentClefs = false;
@@ -4748,10 +4749,12 @@ MuseScore {
 	}
 	
 	function checkLyrics (noteRest) {
+		logError ('checking lyrics');
+
 		var theTrack = noteRest.track;
 
 		if (noteRest.lyrics.length > 0) {
-			//logError ('lyrics found');
+			logError ('lyrics found');
 			// lyrics found
 			for (var i = 0; i < noteRest.lyrics.length; i++) {
 				var l = noteRest.lyrics[i];
