@@ -1,6 +1,6 @@
 # MN Better Notation Plugins for MuseScore
 
-A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that assists in the creation of beautiful, player-friendly scores by providing over 160 different checks for common notation and layout issues, and providing easy ways to create title pages and automatically tweak your scores to look fantastic.
+A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assists in the creation of beautiful, player-friendly scores by providing over 160 different checks for common notation and layout issues, and providing easy ways to create title pages and automatically tweak your scores to look fantastic.
 
   <p>
     <a href="#includedplugins">Included plug-ins</a> •
@@ -73,7 +73,7 @@ A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that assi
   * **Tempo markings**: tempo marking not entered in Tempo text, rit./accel. without a terminating metronome mark/tempo indication/a tempo/tempo primo, tempo marking too large, metronome marking in bold, tempo marking not in bold, missing tempo marking, ‘approx.’ rather than ‘c.’, redundant (repeated) metronome marks, two rits or accels in a row without an intervening tempo marking, unnecessary parentheses in metronome marking, opening metronome marking without a ‘mood descriptor’
   * **Text objects**: common misspellings, incorrectly capitalised text, space or non-alphanumeric character at start, text could be abbreviated, incorrect location for expressions, straight quotes instead of curly, default title/subtitle/composer not changed, techniques placed over rests
   * **Rehearsal marks**: missing rehearsal marks, rehearsal marks placed in first two bars, rehearsal marks out of sequence
-  * **Vocal music**: notes lacking lyrics, notes lacking melismatic extensions, melismata lacking slurs, multiple syllables under one slur, correct positioning of dynamics
+  * **Vocal music**: checks correct hyphenation of common lyrics, notes lacking lyrics, notes lacking melismatic extensions, melismata lacking slurs, multiple syllables under one slur, correct positioning of dynamics
   * **Orchestral parts issues**: monophonic line on a shared wind/brass staff missing player indication (e.g. 1./a 2 etc.); monophonic orchestral string part lacking ‘unis.’ after ‘div.’ marking
   * **String-specific issues**: redundant arco/pizz./col legno/tasto/pont/ord. markings, passage that looks arco but is marked pizz., incorrect notation for string harmonics, string harmonic does not exist, artificial harmonic interval incorrect, overly long slurs, long pizz. notes, staccato pizz. notes, slurs that may be too long for one bow stroke, fingered tremolos not slurred, bowed tremolos slurred, multiple-stops where two notes have to be played on the same string, triple- or quadruple-stops written with all strings sustained, potentially impossible double-stops, difficult passages of fast multiple-stops, slurs that are too long for stated dynamic, inappropriate slurred staccato, artificial harmonics too high, incorrect fluttertounge notation, queries potentially unnecessary isolated bow markings, bow markings in non-string instruments, harmonics written with both diamond noteheads and harmonic circles
   * **Harp-specific issues**: double flats/sharps, impossible chords, too many notes in a chord, too many quick pedal changes, slurred staccato
@@ -119,7 +119,7 @@ A set of plug-ins for [MuseScore Studio 4.5](https://musescore.org/en) that assi
 
 ## <a id="installation"></a>Installation
 
-*MN Better Notation Plugins require MuseScore Studio 4.5.2 or later.*
+*MN Better Notation Plugins require MuseScore Studio 4.6 or later.*
 
 **YOUTUBE**: Watch [a YouTube video](https://www.youtube.com/watch?v=TztQKb71Rw8) on how to install the plugins.
 

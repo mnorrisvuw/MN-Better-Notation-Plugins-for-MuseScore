@@ -365,9 +365,6 @@ MuseScore {
 	property var currentOttavaEnd: -1
 	
 	// ** TREMOLOS ** //
-	property var oneNoteTremolos:[]
-	property var twoNoteTremolos:[]
-	
 	property var instrumentChanges: []
 	property var hasInstrumentChanges: false
 	property var numInstrumentChanges: 0
@@ -439,7 +436,6 @@ MuseScore {
 			dialog.show();
 			return;
 		}
-		// version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
 		
 		// **** INITIALISE MAIN VARIABLES **** //
 		var staves = curScore.staves;
@@ -595,8 +591,6 @@ MuseScore {
 			pedals[i] = [];
 			hairpins[i] = [];
 			trills[i] = [];
-			oneNoteTremolos[i] = [];
-			twoNoteTremolos[i] = [];
 			instrumentChanges[i] = [];
 			ottavas[i] = [];
 			dynamics[i] = [];
@@ -903,7 +897,7 @@ MuseScore {
 			// **** REWIND TO START OF SELECTION **** //
 			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
 			currentInstrumentId = currentStaff.part.musicXmlId;
-			logError ('currentInstrumentId = '+currentInstrumentId);
+			//logError ('currentInstrumentId = '+currentInstrumentId);
 			currentInstrumentName = currentStaff.part.longName;
 			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — this routine does that
 			calculateCalcId();
@@ -1293,6 +1287,23 @@ MuseScore {
 									
 									// ************ CHECK WHETHER CHORD NOTES ARE TIED ************ //
 									if (doCheckSlursAndTies && isChord) checkChordNotesTied(noteRest);
+									
+									// ************ CHECK TREMOLOS ************ //
+									isTremolo = false;
+									if (doCheckTremolosAndFermatas) {
+										isTremolo = (noteRest.tremoloSingleChord) || (noteRest.tremoloTwoChord);
+										/*
+										if (noteRest.tremoloSingleChord != undefined) {
+											isTremolo = true;
+											checkOneNoteTremolo(noteRest);
+										}
+										if (noteRest.tremoloTwoChord != undefined) {
+											isTremolo = true;
+											checkTwoNoteTremolo(noteRest);
+										}
+										*/
+										// Bug in MS 4.6 — wait for MS 4.6.1
+									}
 								
 									// ************ CHECK OTTAVA ************ //
 									if (doCheckOttavas && isOttava) checkOttava(noteRest,currentOttava);
@@ -1333,11 +1344,7 @@ MuseScore {
 									// ************ CHECK PIANO STRETCH ************ //
 									if (doCheckPianoHarpAndPercussion && isKeyboardInstrument && isChord) checkPianoStretch(noteRest);
 						
-									// ************ CHECK TREMOLOS ************ //
-									if (doCheckTremolosAndFermatas) {
-										if (oneNoteTremolos[currentStaffNum][currTick] != null) checkOneNoteTremolo(noteRest,oneNoteTremolos[currentStaffNum][currTick]);
-										if (twoNoteTremolos[currentStaffNum][currTick] != null) checkTwoNoteTremolo(noteRest,twoNoteTremolos[currentStaffNum][currTick]);
-									}
+									
 									
 									// ************ CHECK GLISSES ************ //
 									// NO OPTION
@@ -1777,9 +1784,6 @@ MuseScore {
 			}
 		}
 				
-		// ************ CHECK TREMOLO ************ //
-		isTremolo = (oneNoteTremolos[currentStaffNum][currTick] != null) || (twoNoteTremolos[currentStaffNum][currTick] != null);
-		
 		// ************ CHECK INSTRUMENT CHANGE ************ //
 		if (numInstrumentChanges > 0 && currentInstrumentNum < numInstrumentChanges) {
 			var nextInstrumentChangeTick = instrumentChanges[currentStaffNum][currentInstrumentNum].parent.tick;
@@ -2066,7 +2070,7 @@ MuseScore {
 				var sameTrill = false;
 				if (prevTrillSegment != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevTrillSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevTrillSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) sameTrill = !e.parent.is(prevTrillSegment.parent);
+					if (sameLoc) sameTrill = e.spanner.is(prevTrillSegment.spanner);
 				}
 				// only add it if it's not already added
 				if (!sameTrill) trills[staffIdx].push(e);
@@ -2080,7 +2084,7 @@ MuseScore {
 				var sameOttava = false;
 				if (prevOttavaSegment != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevOttavaSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevOttavaSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) sameOttava = !e.parent.is(prevOttavaSegment.parent);
+					if (sameLoc) sameOttava = e.spanner.is(prevOttavaSegment.spanner);
 				}
 				if (!sameOttava) ottavas[staffIdx].push(e);
 				prevOttavaSegment = e;
@@ -2093,7 +2097,7 @@ MuseScore {
 				var sameGlissando = false;
 				if (prevGlissandoSegment != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevGlissandoSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevGlissandoSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) sameGlissando = !e.parent.is(prevGlissandoSegment.parent);
+					if (sameLoc) sameGlissando = e.spanner.is(prevGlissandoSegment.spanner);
 				}
 				if (!sameGlissando) glisses[etrack][e.spanner.spannerTick.ticks] = e;
 				prevGlissandoSegment = e;
@@ -2106,7 +2110,7 @@ MuseScore {
 				var sameSlur = false;
 				if (prevSlurSegment != null && e.parent != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevSlurSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevSlurSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) sameSlur = !e.parent.is(prevSlurSegment.parent);
+					if (sameLoc) sameSlur = e.spanner.is(prevSlurSegment.spanner);
 				}
 				if (!sameSlur){
 					slurs[etrack].push(e);
@@ -2122,16 +2126,12 @@ MuseScore {
 				var samePedal = false;
 				if (prevPedalSegment != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevPedalSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevPedalSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) samePedal = !e.parent.is(prevPedalSegment.parent);
+					if (sameLoc) samePedal = e.spanner.is(prevPedalSegment.spanner);
 				}
 				// only add it if it's not already added
 				if (!samePedal) pedals[staffIdx].push(e);
 				prevPedalSegment = e;
 			}
-			
-			// *** TREMOLOS *** //
-			if (etype == Element.TREMOLO_SINGLECHORD) oneNoteTremolos[staffIdx][e.parent.parent.tick] = e;
-			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 			
 			// *** INSTRUMENT CHANGES *** //
 			if (etype == Element.INSTRUMENT_CHANGE) {
@@ -2154,7 +2154,7 @@ MuseScore {
 			
 			// *** L.Vs *** //
 			if (etype == Element.LAISSEZ_VIB) {
-				lv[staffIdx][e.spanner.spannerTick.ticks] = e;
+				lv[staffIdx][e.spannerTick.ticks] = e;
 				prevLV = e;
 			}
 			if (etype == Element.LAISSEZ_VIB_SEGMENT) {
@@ -2164,20 +2164,11 @@ MuseScore {
 				var sameLV = false;
 				if (prevLV != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevLV.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevLV.spanner.spannerTicks.ticks);
-					if (sameLoc) prevLV = !e.parent.is(prevLV.parent);
+					if (sameLoc) prevLV = e.spanner.is(prevLV.spanner);
 				}
 				// only add it if it's not already added
 				if (!sameLV) lv[staffIdx][e.spanner.spannerTick.ticks] = e;
 				prevLV = e;
-			}
-			
-			// *** ARTICULATION *** //
-			if (etype == Element.ARTICULATION) {
-				var theTick = (e.parent.parent.type == Element.CHORD) ? e.parent.parent.parent.tick : e.parent.parent.tick;
-				var theTrack = e.track;
-				if (articulations[theTrack][theTick] == null || articulations[theTrack][theTick] == undefined) articulations[theTrack][theTick] = new Array();
-				articulations[theTrack][theTick].push(e);
-				//logError("Found articulation "+e.subtypeName()+"; pushed to artic["+staffIdx+"]["+theTick+"] — now has "+articulations[staffIdx][theTick].length+" items");
 			}
 		}
 		
@@ -2602,7 +2593,7 @@ MuseScore {
 			isTrombone = currentInstrumentCalcId === "brass.trombone.tenor";
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
-			logError ('isVoice = '+isVoice+'; currentInstrumentId = '+currentInstrumentId);
+			//logError ('isVoice = '+isVoice+'; currentInstrumentId = '+currentInstrumentId);
 			isCello = currentInstrumentId.includes("cello");
 			// isDecayInstrument = isPercussionInstrument || isHarp || isPiano;
 			checkInstrumentClefs = false;
@@ -3420,11 +3411,13 @@ MuseScore {
 						//logError ('prevNote found');
 
 						var prevNoteArticulationArray = prevNote.articulations;
-						if (prevNoteArticulationArray.length > 0) {
-							//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
-							for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
-								//logError ('artic = '+prevNoteArticulationArray [j]);
-								prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray[j].symbol);
+						if (prevNoteArticulationArray != undefined) {
+							if (prevNoteArticulationArray.length > 0) {
+								//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
+								for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
+									//logError ('artic = '+prevNoteArticulationArray [j]);
+									prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray[j].symbol);
+								}
 							}
 						}
 					}
@@ -3432,11 +3425,13 @@ MuseScore {
 						//logError ('nextNote found');
 
 						var nextNoteArticulationArray = nextNote.articulations;
-						if (nextNoteArticulationArray.length > 0) {
-							//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
-
-							for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
-								nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray[j].symbol);
+						if (nextNoteArticulationArray != undefined) {
+							if (nextNoteArticulationArray.length > 0) {
+								//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
+	
+								for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
+									nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray[j].symbol);
+								}
 							}
 						}
 					}
@@ -4749,12 +4744,12 @@ MuseScore {
 	}
 	
 	function checkLyrics (noteRest) {
-		logError ('checking lyrics');
+		//logError ('checking lyrics');
 
 		var theTrack = noteRest.track;
 
 		if (noteRest.lyrics.length > 0) {
-			logError ('lyrics found');
+			//logError ('lyrics found');
 			// lyrics found
 			for (var i = 0; i < noteRest.lyrics.length; i++) {
 				var l = noteRest.lyrics[i];
@@ -4863,7 +4858,7 @@ MuseScore {
 		for (var i = strWords.length-1; i>=0; i--) {
 			var checkStr = strWords[i];
 			
-			if (checkStr === 'p' || checkStr === 'pp' || checkStr === 'ppp' || checkStr.includes('fp') || checkStr.includes('fzp') || checkStr.includes('n')) {
+			if (checkStr.includes ('p') || checkStr.includes('n')) {
 				currDynamicLevel = 0;
 				return;
 			}
@@ -5378,8 +5373,11 @@ MuseScore {
 				
 				// check override on the top note
 				if (noteRest.duration.ticks < 2 * division) {
+					// TO DO FOR 4.6 — CHECK
+					// if (!noteRest.tremoloTwoChord) {
 					var noteheadType = topNote.headType;
 					if (noteheadType != NoteHeadType.HEAD_HALF) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
+					// }
 				}
 				
 				// check artificial harmonic with a harmonic circle above it
@@ -6024,17 +6022,11 @@ MuseScore {
 		if (stretch < 14 && numNotes > 5) addError("It looks like there are too many notes in this chord to play in one hand.\nConsider splitting it between the hands.",noteRest);
 	}
 	
-	function checkOneNoteTremolo (noteRest, tremolo) {
+	function checkOneNoteTremolo (noteRest) {
+		var tremolo = noteRest.tremoloSingleChord; // introduced in MS 4.6
 		if (tremolo == null || tremolo == undefined) logError("checkOneNoteTremolo() — tremolo is "+tremolo);
 		lastArticulationTick = currTick;
-		//var tremDescription = tremolo.subtypeName();
-		// var tremSubdiv = (tremDescription.includes("eighth")) ? 8 : parseInt(tremDescription.match(/\d+/)[0]);
 		var tremSubdiv = tremolo.tremoloType;
-		//logError ('Tremolo type = '+tremolo.tremoloType);
-
-		//var strokesArray = [8,16,32,64,128,8,16,32,64];
-		//var numStrokes = strokesArray.indexOf(tremSubdiv);
-
 		if (tremSubdiv > 4) tremSubdiv -= 5;
 		var numStrokes = tremSubdiv + 1;
 		//logError ('numStrokes = '+numStrokes);
@@ -6074,19 +6066,14 @@ MuseScore {
 		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo.",noteRest);
 	}
 	
-	function checkTwoNoteTremolo (noteRest, tremolo) {
+	function checkTwoNoteTremolo (noteRest) {
+		var tremolo = noteRest.tremoloTwoChord;
 		if (tremolo == null || tremolo == undefined) logError("checkTwoNoteTremolo() — tremolo is "+tremolo);
 		lastArticulationTick = currTick;
-		// var tremDescription = tremolo.subtypeName();
-		// var tremSubdiv = parseInt(tremDescription.match(/\d+/)[0]);
-		// var strokesArray = [0,8,16,32,64];
-		// var numStrokes = strokesArray.indexOf(tremSubdiv);
 		var tremSubdiv = tremolo.tremoloType;
-		
-		//var strokesArray = [8,16,32,64,128,8,16,32,64];
 		if (tremSubdiv > 4) tremSubdiv -= 5;
 		var numStrokes = tremSubdiv + 1;
-		//logError ('numStrokes = '+numStrokes);
+		logError ('numStrokes = '+numStrokes);
 
 		var dur = 2 * parseFloat(noteRest.duration.ticks) / division;
 		//logError("TWO-NOTE TREMOLO HAS "+numStrokes+" strokes; dur is "+dur+"; isSlurred = "+isSlurred+"; isPitchedPercussionInstrument = "+isPitchedPercussionInstrument);

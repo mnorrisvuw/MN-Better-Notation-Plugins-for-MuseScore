@@ -124,9 +124,10 @@ MuseScore {
 		setProgress (0);
 		
 		
-		// ** VERSION CHECK ** //
-		if (MuseScore.mscoreMajorVersion < 4 || (MuseScore.mscoreMajorVersion == 4 && MuseScore.mscoreMajorVersion < 4)) {
-				dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires at MuseScore v. 4.4 or later.</p> ";
+		// **** VERSION CHECK **** //
+		var version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
+		if (!version46) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6 or later.</p> ";
 			dialog.show();
 			return;
 		}
