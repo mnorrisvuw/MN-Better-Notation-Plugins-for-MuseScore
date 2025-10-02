@@ -79,6 +79,7 @@ MuseScore {
 	property var prevPrevNoteHighlighted: false
 	property var scoreIncludesTransposingInstrument: false
 	property var lastAccidentalBarNum: 0
+	property var frames: []
 
   onRun: {
 		if (!curScore) return;
@@ -107,6 +108,7 @@ MuseScore {
 		var versionNumber = versionnumberfile.read().trim();
 
 		// ************ DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS ************ //
+		getFrames();
 		deleteAllCommentsAndHighlights();
 		
 		// **** EXTEND SELECTION? **** //
@@ -1017,51 +1019,26 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
-	function selectTitleText () {
-		cmd("title-text");
-		curScore.startCmd();
-		cmd("select-similar");
-	}
-	
 	function deleteAllCommentsAndHighlights () {
 	
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
 				
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
-		curScore.endCmd();
-		
-		// insert-box does not need startcmd
-		cmd ("insert-vbox");
-	
-		var vbox = curScore.selection.elements[0];
-		
-		// title-text does not need startcmd
-		cmd ("title-text");
-		
-		// select-similar does not need startcmd
-		cmd ("select-similar");
-	
-		var elems = curScore.selection.elements;
-		for (var i = 0; i<elems.length; i++) {
-			var e = elems[i];
-			var c = e.color;	
-			// style the element pink
-			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
-		}
-		if (vbox == null) {
-			logError ("deleteAllCommentsAndHighlights () — vbox was null");
-		} else {
-			curScore.startCmd();
-			removeElement (vbox);
-			curScore.endCmd();
+		for (var i = 0; i < frames.length; i++) {
+			var frame = frames[i];
+			var elems = frame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
+				var c = e.color;	
+				// style the element pink
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+			}
 		}
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
 		curScore.endCmd();
 		
 		// **** GET ALL OTHER ITEMS **** //
@@ -1101,6 +1078,20 @@ MuseScore {
 		curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
 		curScore.endCmd();
+	
+	}
+	
+	function getFrames() {
+		var systems = curScore.systems;
+		var numSystems = systems.length;
+		for (var i = 0; i < numSystems; i++ ) {
+			var system = systems[i];
+			var measures = system.measures;
+			for (var j = 0; j < measures.length; j++ ) {
+				var e = measures[j];
+				if (e.type == Element.VBOX) frames.push(e);
+			}
+		}
 	}
 
 	function addError (text,element) {

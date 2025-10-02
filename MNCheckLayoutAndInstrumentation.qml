@@ -125,6 +125,7 @@ MuseScore {
 	property var hyphenatedWords: []
 	property var isVocalScore: false
 	property var isChoirScore: false
+	property var frames: []
 	//property var lyrics: []
 		
 	// ** FLAGS ** //
@@ -613,6 +614,7 @@ MuseScore {
 		}
 				
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
+		getFrames();
 		deleteAllCommentsAndHighlights();
 				
 		// ************  				SELECT AND PRE-PROCESS ENTIRE SCORE			************ //
@@ -627,7 +629,7 @@ MuseScore {
 		analyseInstrumentsAndStaves();
 		
 		// ************  	GO THROUGH THE SCORE LOOKING FOR ANY SPANNERS (HAIRPINS, TRILLS, SLURS, OTTAVAS, ETC) 	************ //
-		analyseSpanners();
+		analyseSystemsAndSpanners();
 		setProgress (2);
 		
 		
@@ -693,8 +695,7 @@ MuseScore {
 
 		// ************  				CHECK SCORE & PAGE SETTINGS 				************ // 
 		checkScoreAndPageSettings();
-		
-		
+				
 		// ************					CHECK IF SCORE IS TRANSPOSED				************ //
 		if (curScore.style.value("concertPitch") && scoreIncludesTransposingInstrument) addError ("It looks like you have at least one transposing instrument, but the score is currently displayed in concert pitch.\nUntick ‘Concert Pitch’ in the bottom right to display a transposed score (see ‘Behind Bars’, p. 505)","pagetop");
 		
@@ -1938,7 +1939,20 @@ MuseScore {
 		}
 	}
 	
-	function analyseSpanners() {
+	function getFrames() {
+		var systems = curScore.systems;
+		var numSystems = systems.length;
+		for (var i = 0; i < numSystems; i++ ) {
+			var system = systems[i];
+			var measures = system.measures;
+			for (var j = 0; j < measures.length; j++ ) {
+				var e = measures[j];
+				if (e.type == Element.VBOX) frames.push(e);
+			}
+		}
+	}
+	
+	function analyseSystemsAndSpanners() {
 		// **** LOOK FOR AND STORE ANY ELEMENTS THAT CAN ONLY BE ACCESSED FROM SELECTION: **** //
 		// **** AND IS NOT PICKED UP IN A CURSOR LOOP (THAT WE WILL BE DOING LATER)       **** //
 		// **** THIS INCLUDES: HAIRPINS, OTTAVAS, TREMOLOS, SLURS, ARTICULATION, FERMATAS **** //
@@ -1952,7 +1966,7 @@ MuseScore {
 		var prevSlurSegment = null, prevHairpinSegment = null, prevTrillSegment = null, prevOttavaSegment = null, prevGlissandoSegment = null, prevPedalSegment = null, prevLV = null;
 		var firstChord = null;
 		if (elems.length == 0) {
-			addError ('analyseSpanners() — elems.length was 0');
+			addError ('analyseSystemsAndSpanners() — elems.length was 0');
 			return;
 		}
 		var mmrBar = curScore.firstMeasure;
@@ -3971,68 +3985,35 @@ MuseScore {
 	}
 	
 	function checkScoreText() {
-		var textToCheck = [];
-		
-		curScore.startCmd();
-		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
-		curScore.endCmd();
-		
-		// insert vbox does not need a cmd apparently
-		cmd ("insert-vbox");
-
-		var vbox = curScore.selection.elements[0];
-		
-		// title-text does not need a startcmd/endcmd
-		cmd ("title-text");
-
-		var tempText = curScore.selection.elements[0];
-		
-		// select-similar does not need a startcmd/endcmd
-
-		cmd ("select-similar");
-		
-		var elems = curScore.selection.elements;
 		currentBarNum = 0;
 		var hasTitleOnFirstPageOfMusic = false;
 		var hasSubtitleOnFirstPageOfMusic = false;
 		var hasComposerOnFirstPageOfMusic = false;
 		hasFooter = false;
-		for (var i = 0; i < elems.length; i++) {
-			var e = elems[i];
-			if (!e.is(tempText)) {
-				//logError ("Found text object "+e.text);
-				var eSubtype = e.subtypeName();
-				if (eSubtype != "Tuplet") textToCheck.push(e);
-				if (eSubtype == "Title" && getPageNumber(e) == firstPageOfMusicNum) hasTitleOnFirstPageOfMusic = true;
-				if (eSubtype == "Subtitle" && getPageNumber(e) == firstPageOfMusicNum) hasSubtitleOnFirstPageOfMusic = true;
-				if (eSubtype == "Composer" && getPageNumber(e) == firstPageOfMusicNum) hasComposerOnFirstPageOfMusic = true;
-			}
-		}
-		if (vbox == null) {
-			logError ("checkScoreText () — vbox was null");
-		} else {
-			curScore.startCmd();
-			removeElement (vbox);
-			curScore.endCmd();
-		}
 		var threshold = firstPageHeight*0.7;
-		for (var i = 0; i < textToCheck.length; i++) {
-			var box = textToCheck[i].parent;
-			if (box != null) {
-				if (box.pagePos.y > threshold) hasFooter = true;
-				//logError ("box = "+box.pagePos.y+" "+threshold);
-				checkTextObject (textToCheck[i]);
+
+		for (var i = 0; i < frames.length; i++) {
+			var frame = frames[i];
+			var elems = frame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
+				if (e.type == Element.TEXT) {
+					//logError ("Found text object in frame: "+e.text);
+					var eSubtype = e.subtypeName();
+					if (eSubtype != "Tuplet") {
+						if (frame.pagePos.y > threshold) hasFooter = true;
+						checkTextObject (e);
+					}
+					if (eSubtype == "Title" && getPageNumber(e) == firstPageOfMusicNum) hasTitleOnFirstPageOfMusic = true;
+					if (eSubtype == "Subtitle" && getPageNumber(e) == firstPageOfMusicNum) hasSubtitleOnFirstPageOfMusic = true;
+					if (eSubtype == "Composer" && getPageNumber(e) == firstPageOfMusicNum) hasComposerOnFirstPageOfMusic = true;
+				}
 			}
 		}
 
 		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
 		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
-		
-		curScore.startCmd();
-		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
-		curScore.endCmd();
-
 	}
 	
 	function checkTextObject (textObject) {
@@ -4992,7 +4973,7 @@ MuseScore {
 				if (!isEndOfSlur) {
 					if (isStringInstrument) {
 						var portatoOK = (pitch == prevPitch || pitch == nextPitch);
-						if (!portatoOK) {
+						if (!portatoOK && noteRest.duration.ticks >= division) {
 							addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
 							flaggedSlurredStaccatoBar = currentBarNum;
 						}
@@ -6558,34 +6539,15 @@ MuseScore {
 		var elementsToRecolor = [];
 				
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
-		curScore.endCmd();
-		
-		// insert-box does not need startcmd
-		cmd ("insert-vbox");
-
-		var vbox = curScore.selection.elements[0];
-		
-		// title-text does not need startcmd
-		cmd ("title-text");
-		
-		// select-similar does not need startcmd
-		cmd ("select-similar");
-
-		var elems = curScore.selection.elements;
-		for (var i = 0; i<elems.length; i++) {
-			var e = elems[i];
-			var c = e.color;	
-			// style the element pink
-			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
-		}
-		if (vbox == null) {
-			logError ("deleteAllCommentsAndHighlights () — vbox was null");
-		} else {
-			curScore.startCmd();
-			removeElement (vbox);
-			curScore.endCmd();
+		for (var i = 0; i < frames.length; i++) {
+			var frame = frames[i];
+			var elems = frame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
+				var c = e.color;	
+				// style the element pink
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+			}
 		}
 		
 		// **** SELECT ALL **** //

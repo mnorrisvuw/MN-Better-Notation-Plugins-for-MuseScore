@@ -21,45 +21,43 @@ MuseScore {
 	id: mndeletecommentsandhighlights
 	thumbnailName: "MNDeleteCommentsAndHighlights.png"	
 	property var selectionArray: [];
+	property var frames: [];
 	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 
   onRun: {
 		if (!curScore) return;
 		var versionNumber = versionnumberfile.read().trim();
 
+		// **** VERSION CHECK **** //
+		var version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
+		if (!version46) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6 or later.</p> ";
+			dialog.show();
+			return;
+		}
+		
+		getFrames();
+			
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
-		
+				
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
-		curScore.endCmd();
-		
-		cmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		cmd ("select-similar");
-
-		var elems = curScore.selection.elements;
-		for (var i = 0; i<elems.length; i++) {
-			var e = elems[i];
-			var c = e.color;	
-			// style the element pink
-			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
-		}
-		if (vbox == null) {
-			logError ("deleteAllCommentsAndHighlights () — vbox was null");
-		} else {
-			curScore.startCmd();
-			removeElement (vbox);
-			curScore.endCmd();
+		for (var i = 0; i < frames.length; i++) {
+			var frame = frames[i];
+			var elems = frame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
+				var c = e.color;	
+				// style the element pink
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+			}
 		}
 		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.selection.selectRange(0,endOfScoreTick,0,curScore.nstaves);
 		curScore.endCmd();
-
+		
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
 		
@@ -97,6 +95,7 @@ MuseScore {
 		curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
 		curScore.endCmd();
+
 		
 		// **** THE FOLLOWING FORCE A SCREEN REDRAW **** //
 		curScore.startCmd();
@@ -105,6 +104,19 @@ MuseScore {
 		cmd ('concert-pitch');
 		cmd ('concert-pitch');
 		curScore.endCmd();
+	}
+	
+	function getFrames() {
+		var systems = curScore.systems;
+		var numSystems = systems.length;
+		for (var i = 0; i < numSystems; i++ ) {
+			var system = systems[i];
+			var measures = system.measures;
+			for (var j = 0; j < measures.length; j++ ) {
+				var e = measures[j];
+				if (e.type == Element.VBOX) frames.push(e);
+			}
+		}
 	}
 	
 	function saveSelection () {
