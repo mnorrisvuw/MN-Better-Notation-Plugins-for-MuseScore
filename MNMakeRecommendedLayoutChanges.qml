@@ -49,6 +49,7 @@ MuseScore {
 	property var staffVisible: []
 	property var instrumentIds: []
 	property var instrumentCalcIds: []
+	property var frames: []
 	property var firstVisibleStaff: 0
 	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 	
@@ -88,6 +89,7 @@ MuseScore {
 		numStaves = curScore.nstaves;
 		
 		// *** REMOVE ANY COMMENTS AND HIGHLIGHTS THAT MIGHT BE LEFT OVER FROM OTHER PLUGINS ***
+		getFrames();
 		deleteAllCommentsAndHighlights();
 		
 		var finalMsg = '';
@@ -160,6 +162,19 @@ MuseScore {
 		}
 		dialog.msg = dialogMsg;
 		dialog.show();
+	}
+	
+	function getFrames() {
+		var systems = curScore.systems;
+		var numSystems = systems.length;
+		for (var i = 0; i < numSystems; i++ ) {
+			var system = systems[i];
+			var measures = system.measures;
+			for (var j = 0; j < measures.length; j++ ) {
+				var e = measures[j];
+				if (e.type == Element.VBOX) frames.push(e);
+			}
+		}
 	}
 	
 	function removeLayoutBreaksAndStretches () {
@@ -2217,30 +2232,21 @@ MuseScore {
 	}
 	
 	function setTitleFrame () {
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
-		curScore.endCmd();
-		
-		cmd ("insert-vbox");
-		var vbox = curScore.selection.elements[0];
-		cmd ("title-text");
-		var tempText = curScore.selection.elements[0];
-		cmd ("select-similar");
-		var elems = curScore.selection.elements;
-		var firstPageNum = firstMeasure.parent.parent.pagenumber;
 		var topbox = null;
+		var firstPageNum = firstMeasure.parent.parent.pagenumber;
 		
 		curScore.startCmd();
-		for (var i = 0; i < elems.length; i++) {
-			var e = elems[i];
-			if (!e.is(tempText)) {
-				//logError ("Found text object "+e.text);
+		for (var i = 0; i < frames.length; i++) {
+			var theFrame = frames[i];
+			var elems = theFrame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
 				var eSubtype = e.subtypeName();
 				if (eSubtype == "Title" && getPageNumber(e) == firstPageNum) {
 					e.align = Align.HCENTER;
 					e.offsetY = 0;
 					e.offsetX = 0.;
-					topbox = e.parent;
+					topbox = theFrame;
 				}
 				if (eSubtype == "Subtitle" && getPageNumber(e) == firstPageNum) {	
 					e.align = Align.HCENTER;
@@ -2256,13 +2262,6 @@ MuseScore {
 			}
 		}
 		curScore.endCmd();
-		if (vbox == null) {
-			logError ("checkScoreText () — vbox was null");
-		} else {
-			curScore.startCmd();
-			removeElement (vbox);
-			curScore.endCmd();
-		}
 		if (topbox != null) {
 			topbox.autoscale = 0;
 			topbox.boxHeight = 15;
@@ -2365,34 +2364,15 @@ MuseScore {
 		var elementsToRecolor = [];
 				
 		// ** CHECK TITLE TEXT FOR HIGHLIGHTS ** //
-		curScore.startCmd();
-		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
-		curScore.endCmd();
-		
-		// insert-box does not need startcmd
-		cmd ("insert-vbox");
-	
-		var vbox = curScore.selection.elements[0];
-		
-		// title-text does not need startcmd
-		cmd ("title-text");
-		
-		// select-similar does not need startcmd
-		cmd ("select-similar");
-	
-		var elems = curScore.selection.elements;
-		for (var i = 0; i<elems.length; i++) {
-			var e = elems[i];
-			var c = e.color;	
-			// style the element pink
-			if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
-		}
-		if (vbox == null) {
-			logError ("deleteAllCommentsAndHighlights () — vbox was null");
-		} else {
-			curScore.startCmd();
-			removeElement (vbox);
-			curScore.endCmd();
+		for (var i = 0; i < frames.length; i++) {
+			var frame = frames[i];
+			var elems = frame.elements;
+			for (var j = 0; j < elems.length; j++) {
+				var e = elems[j];
+				var c = e.color;	
+				// style the element pink
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+			}
 		}
 		
 		// **** SELECT ALL **** //

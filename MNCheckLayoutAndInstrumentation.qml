@@ -5377,7 +5377,7 @@ MuseScore {
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (theArticulationArray[i].symbol == SymId.stringsHarmonic) {
-					logError ('Has string harmonic');
+					//logError ('Has string harmonic');
 					isStringHarmonic = true;
 					harmonicArray = harmonicCircleIntervals;
 					break;
