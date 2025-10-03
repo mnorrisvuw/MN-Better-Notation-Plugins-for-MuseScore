@@ -41,8 +41,8 @@ MuseScore {
 	property var errorStrings: []
 	property var errorObjects: []
 	property var clefs: []
-	property var prevMIDIPitch: -1
-	property var prevPrevMIDIPitch: -1
+	property var prevWrittenPitch: -1
+	property var prevPrevWrittenPitch: -1
 	property var prevDiatonicPitch: 0
 	property var prevPC: 0
 	property var prevScalarInterval: 0
@@ -216,8 +216,8 @@ MuseScore {
 			var isHarp = currentInstrumentId === "pluck.harp";
 			if (isHarp) hasHarp = true;
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
-			prevMIDIPitch = -1;
-			prevPrevMIDIPitch = -1;
+			prevWrittenPitch = -1;
+			prevPrevWrittenPitch = -1;
 			prevDiatonicPitch = -1;
 			prevPC = -1;
 			prevScalarInterval = -1;
@@ -297,11 +297,11 @@ MuseScore {
 									// how long is it?
 									if (noteRestDur >= division * 2) {
 										// forget the last note
-										prevMIDIPitch = -1;
+										prevWrittenPitch = -1;
 										prevDiatonicPitch = -1;
 									}
 								} else {
-									checkChord (noteRest,noteRest.parent,false);
+									checkChord (noteRest,noteRest.parent,false, theStaff);
 								}
 							}
 						}
@@ -387,8 +387,11 @@ MuseScore {
 		}
 	}
 	
-	function checkChord (chord,theSegment,isGraceNote) {
+	function checkChord (chord,theSegment,isGraceNote, currentStaff) {
 		//logError("checking chord");
+		
+		var transpositionInterval = currentStaff.transpose(fractionFromTicks(theSegment.tick));
+		//logError ('transpositionInterval = '+transpositionInterval.chromatic);
 		var defaultChromaticInterval = [0,2,4,5,7,9,11];
 		var accTypes = [Accidental.FLAT3, Accidental.FLAT2, Accidental.FLAT, Accidental.NATURAL, Accidental.SHARP, Accidental.SHARP2, Accidental.SHARP3];
 		var pitchLabels = ["C","D","E","F","G","A","B"];
@@ -426,7 +429,9 @@ MuseScore {
 			var isDoubleAcc = false;
 			
 			// NOTE: MIDI Pitch is *sounding* pitchj
-			var MIDIPitch = note.pitch;
+			var soundingPitch = note.pitch;
+			var writtenPitch = soundingPitch - transpositionInterval.chromatic;
+			//logError ('soundingPitch = '+soundingPitch+'; writtenPitch = '+writtenPitch);
 			var tpc = note.tpc;
 
 			if (note.accidental == null) {
@@ -456,7 +461,7 @@ MuseScore {
 			}
 			
 			// ***** CALCULATE THE PITCH INFORMATION ***** //
-			var dpArray = pitch2absStepByKey (MIDIPitch, tpc, currentKeySig);
+			var dpArray = pitch2absStepByKey (writtenPitch, tpc, currentKeySig);
 			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, octave, alteration, where middle C is 
 			var diatonicPitchClass = diatonicPitch % 7; // step from 0 (C) to 6 (B)
 			
@@ -568,10 +573,10 @@ MuseScore {
 				var scalarInterval, chromaticInterval, scalarIntervalLabel = "";
 				var scalarIntervalAbs, scalarIntervalClass, chromaticIntervalAbs, chromaticIntervalClass;
 				
-				if (prevMIDIPitch != -1 && prevDiatonicPitch != -1) {
+				if (prevWrittenPitch != -1 && prevDiatonicPitch != -1) {
 					
 					scalarInterval = diatonicPitch - prevDiatonicPitch;
-					chromaticInterval = MIDIPitch - prevMIDIPitch;
+					chromaticInterval = writtenPitch - prevWrittenPitch;
 					//logError('scalarInterval='+scalarInterval+'; chromaticInterval='+chromaticInterval);
 					if (chromaticInterval != 0) {
 						if (scalarInterval < 0) {
@@ -598,16 +603,16 @@ MuseScore {
 						isTritone = (chromaticIntervalClass == 6);
 						
 						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
-						if (prevPrevMIDIPitch != -1) {
-							//logError(prevPrevMIDIPitch = "+prevPrevMIDIPitch+"); prevMIDIPitch="+prevMIDIPitch+" MIDIPitch="+MIDIPitch;
-							if (prevMIDIPitch - prevPrevMIDIPitch == 1 && MIDIPitch - prevMIDIPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
+						if (prevPrevWrittenPitch != -1) {
+							//logError(prevprevWrittenPitch = "+prevprevWrittenPitch+"); prevWrittenPitch="+prevWrittenPitch+" MIDIPitch="+MIDIPitch;
+							if (prevWrittenPitch - prevPrevWrittenPitch == 1 && writtenPitch - prevWrittenPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
 								//logError(Found Chromatic Ascent");
 								
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
 									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
 								}
 							}
-							if (prevMIDIPitch - prevPrevMIDIPitch == -1 && MIDIPitch - prevMIDIPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
+							if (prevWrittenPitch - prevPrevWrittenPitch == -1 && writtenPitch - prevWrittenPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
 								//logError(Found Chromatic Descent");
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
 									//logError(Prev notes");
@@ -636,8 +641,8 @@ MuseScore {
 							//logError("returning because prevNoteHighlighted = "+prevNoteHighlighted+" and prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
 							prevPrevNote = prevNote;
 							prevNote = note;
-							prevPrevMIDIPitch = prevMIDIPitch;
-							prevMIDIPitch = MIDIPitch;
+							prevPrevWrittenPitch = prevWrittenPitch;
+							prevWrittenPitch = writtenPitch;
 							prevPrevDiatonicPitchClass = prevDiatonicPitchClass;
 							prevDiatonicPitch = diatonicPitch;
 							prevDiatonicPitchClass = diatonicPitchClass;
@@ -703,7 +708,7 @@ MuseScore {
 						
 						if (doShowError) {
 							
-							//logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+'; username='+note.userName()+'; tpc='+tpc+'; prevMIDIPitch='+prevMIDIPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
+							//logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+'; username='+note.userName()+'; tpc='+tpc+'; prevWrittenPitch='+prevWrittenPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
 															
 							// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 							scalarIntervalLabel = intervalNames[scalarIntervalAbs];
@@ -935,9 +940,9 @@ MuseScore {
 					prevPrevNote = prevNote;
 					prevNote = note;
 					//logError(prevNote now "+prevNote);
-					prevPrevMIDIPitch = prevMIDIPitch;
-					prevMIDIPitch = MIDIPitch;
-					//logError(prevPrevMIDIPitch now "+prevPrevMIDIPitch+"); prevMIDIPitch now "+prevMIDIPitch;
+					prevPrevWrittenPitch = prevWrittenPitch;
+					prevWrittenPitch = writtenPitch;
+					//logError(prevprevWrittenPitch now "+prevprevWrittenPitch+"); prevWrittenPitch now "+prevWrittenPitch;
 					prevPrevDiatonicPitchClass = prevDiatonicPitchClass;
 					prevDiatonicPitch = diatonicPitch;
 					prevDiatonicPitchClass = diatonicPitchClass;
