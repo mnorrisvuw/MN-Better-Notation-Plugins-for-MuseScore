@@ -1360,7 +1360,7 @@ MuseScore {
 									// ************ CHECK DYNAMIC RESTATEMENT ************ //
 									if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic() && !isGrandStaff[currentStaffNum] ) {
 										addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
-										logError (barsSincePrevNote +' tickHasDynamic is now '+tickHasDynamic());
+										//logError (barsSincePrevNote +' tickHasDynamic is now '+tickHasDynamic());
 									}
 								}
 							}
@@ -2367,7 +2367,7 @@ MuseScore {
 				for (var i = 0; i < numGrandStaves;i++) {
 					var bottomGrandStaffNum = grandStaffTops[i]+1;
 					if (bottomGrandStaffNum < numStaves-1) {
-						if (!isGrandStaff[bottomGrandStaffNum+1] && staffVisible[bottomGrandStaffNum]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Instruments tab.","pagetop");
+						if (!isGrandStaff[bottomGrandStaffNum+1] && staffVisible[bottomGrandStaffNum]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Layout tab.","pagetop");
 					}
 				}
 			}
@@ -2437,18 +2437,18 @@ MuseScore {
 			if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
 				checkBarlinesConnected("wind quintet");
 				if (flStaff != 0) {
-					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Instruments tab.","topfunction ");
+					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Layout tab.","topfunction ");
 				} else {
 					if (obStaff != 1) {
-						addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.\nReorder using the Instruments tab.","pagetop");
+						addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.\nReorder using the Layout tab.","pagetop");
 					} else {
 						if (clStaff != 2) {
-							addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.\nReorder using the Instruments tab.","pagetop");
+							addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.\nReorder using the Layout tab.","pagetop");
 						} else {
 							if (hnStaff != 3) {
-								addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.\nReorder using the Instruments tab.","pagetop");
+								addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.\nReorder using the Layout tab.","pagetop");
 							} else {
-								if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.\nReorder using the Instruments tab.","pagetop");
+								if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.\nReorder using the Layout tab.","pagetop");
 							}
 						}
 					}
