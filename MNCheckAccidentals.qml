@@ -441,6 +441,9 @@ MuseScore {
 				accVisible = accObject.visible; // accVisible is whether the accidental is visible
 				accType = note.accidentalType; // this is an int from the Accidental enum
 				if (accVisible) lastAccidentalBarNum = currentBarNum;
+				if (accObject.accidentalBracket > 0) {
+					addError ('It is unnecessary to use a bracket for a courtesy accidental.\nSee ‘Behind Bars’, p. 83.',accObject);
+				}
 			}
 			
 			switch (accType) {
@@ -609,7 +612,7 @@ MuseScore {
 								//logError(Found Chromatic Ascent");
 								
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)){
-									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
+									if (prevAcc < 0 && !prevAccInKeySig) addError ("Use of a flat during a chromatic ascent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press J until you get the right note).", prevNote);
 								}
 							}
 							if (prevWrittenPitch - prevPrevWrittenPitch == -1 && writtenPitch - prevWrittenPitch == -1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
@@ -617,7 +620,7 @@ MuseScore {
 								if (previousNoteRestIsNote(prevNote) && previousNoteRestIsNote(note)) {
 									//logError(Prev notes");
 									
-									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press "+cmdKey+"-J until you get the right note).", prevNote);
+									if (prevAcc > 0 && !prevAccInKeySig) addError ("Use of a sharp during a chromatic descent leads to avoidable natural sign.\nConsider respelling.\n(Select the note and press J until you get the right note).", prevNote);
 								}
 							}
 						}
@@ -855,7 +858,7 @@ MuseScore {
 							}
 							
 							if (doShowError && !changeIsBad) {
-								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press "+cmdKey+"-J until you get this note)";
+								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press J until you get this note)";
 								if (weightingIsClose && scalarIntervalAbs != 0) t = "Note: The current spelling may be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.\n[SUGGESTION] "+t;
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
