@@ -694,10 +694,10 @@ MuseScore {
 		if (doCheckTimeSignatures) checkTimeSignatures();
 		
 		// ************ 							CHECK FOR STAFF ORDER ISSUES 							************ //
-		if (doCheckStaffNamesAndOrder) checkStaffOrder();
+		if (doCheckStaffNamesAndOrder) checkStaffOrderAndBrackets();
 		
 		// ************  					CHECK PART SETTINGS 					************ // 
-		// NB do AFTER checkStaffOrder
+		// NB do AFTER checkStaffOrderAndBrackets
 		if (doCheckPartStyle && numParts > 1 && numExcerpts >= numParts) checkPartSettings();
 		
 		// ************  							CHECK STAFF NAMES ISSUES 								************ // 
@@ -2338,9 +2338,11 @@ MuseScore {
 		}
 	}
 	
-	function checkStaffOrder () {
-		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
-		// **** ALSO NOTE ANY GRAND STAVES														 **** //
+	function checkStaffOrderAndBrackets () {
+		
+		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER 	**** //
+		// **** 					AND CORRECT BRACKETING				**** //
+		// **** 				ALSO NOTE ANY GRAND STAVES				**** //
 		var numVocalParts = 0;
 		var numVisibleStaves = 0;
 		for (var i = 0; i < numStaves; i++) {
@@ -2436,6 +2438,7 @@ MuseScore {
 			// **** CHECK WIND QUINTET STAFF ORDER **** //
 			if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
 				checkBarlinesConnected("wind quintet");
+				checkBrackets("wind quintet");
 				if (flStaff != 0) {
 					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Layout tab.","topfunction ");
 				} else {
@@ -2458,6 +2461,7 @@ MuseScore {
 			// **** CHECK BRASS QUINTET STAFF ORDER **** //
 			if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
 				checkBarlinesConnected("brass quintet");
+				checkBrackets("brass quintet");
 				if (tpt1Staff != 0) {
 					addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
 				} else {
@@ -2476,8 +2480,14 @@ MuseScore {
 					}
 				}
 			}
-			if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) checkBarlinesConnected("string quartet");
-			if (numParts == 5 && numVn == 2 && numVa + numVc + numDb == 3) checkBarlinesConnected("string quintet");
+			if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) {
+				checkBarlinesConnected("string quartet");
+				checkBrackets("string quartet");
+			}
+			if (numParts == 5 && numVn == 2 && numVa + numVc + numDb == 3) {
+				checkBarlinesConnected("string quintet");
+				checkBrackets("string quintet");
+			}
 		}
 	}
 	
@@ -2490,8 +2500,7 @@ MuseScore {
 			var short1 = staff1.part.shortName.trim();
 			var full1l = full1.toLowerCase();
 			var short1l = short1.toLowerCase();
-			//logError ("Staff br = "+i+" "+staff1.bracketSpan+" "+staff1.bracketColumn);
-			
+						
 			// **** CHECK FOR NON-STANDARD DEFAULT STAFF NAMES **** //
 			
 			if (fullInstNamesShowing) {
@@ -4872,8 +4881,50 @@ MuseScore {
 				var staff = curScore.staves[i];
 				//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
 				if (staff.staffBarlineSpan == 0) {
-					addError ("The barlines should go through all of the staves for a "+str,"system1 1");
+					addError ("The barlines should go through all of the staves for a "+str,"system1 0");
 					return;
+				}
+			}
+		}
+	}
+	
+	function checkBrackets (str) {
+		var singleJoinedBracketArray = ["string quartet", "wind quintet", "brass quintet", "string quintet"];
+		var firstVisibleStaff = -1;
+		var lastVisibleStaff = -1;
+		
+		for (var i = 0; i < numStaves; i++) {
+			if (staffVisible[i]) {
+				if (firstVisibleStaff == -1) firstVisibleStaff = i;
+				lastVisibleStaff = i;
+			}
+		}
+		
+		var visibleStaffSpan = lastVisibleStaff - firstVisibleStaff + 1;
+		
+		if (singleJoinedBracketArray.includes(str)) {
+			// this score only needs one bracket
+			var visibleStaff = 0;
+			for (var i = 0; i < numStaves; i++) {
+				if (staffVisible[i]) {
+					var theStaff = curScore.staves[i];
+					if (i == firstVisibleStaff) {
+						if (theStaff.brackets.length == 0) {
+							addError ('For '+str+'s, add a single bracket on the left from the Brackets palette.','system1 0');
+							return;
+						} else {
+							if (theStaff.brackets.length == 1) {
+								if (theStaff.brackets[0].systemBracket > BracketType.NORMAL) {
+									addError ('Use a normal bracket for '+str+'.',"system1 0");
+								}
+								if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
+									addError ('For '+str+'s, the staff bracket should span the entire system.','system1 0');
+								}
+							} else {
+								addError ('For '+str+'s, you only need one staff bracket.',"system1 0");
+							}
+						}
+					}
 				}
 			}
 		}
@@ -6830,7 +6881,7 @@ MuseScore {
 				onClicked: options.pageSettings = !options.pageSettings
 			}
 			CheckBox {
-				text: "Check staff names & order"
+				text: "Check names, order & brackets"
 				checked: options.staffNamesAndOrder
 				onClicked: options.staffNamesAndOrder = !options.staffNamesAndOrder
 			}

@@ -2212,12 +2212,10 @@ MuseScore {
 	}
 	
 	function setBravura () {
-		
 		curScore.startCmd();
 		setSetting ("musicalSymbolFont", "Bravura");
 		setSetting ("musicalTextFont", "Bravura Text");
 		curScore.endCmd();
-
 	}
 	
 	function setTimes () {
@@ -2228,7 +2226,6 @@ MuseScore {
 		var fontsToTimes = ["longInstrument", "shortInstrument", "instrumentChange"];
 		for (var i = 0; i < fontsToTimes.length; i++) setSetting (fontsToTimes[i]+"FontFace", "Times New Roman Accidentals");
 		curScore.endCmd();
-
 	}
 	
 	function setTitleFrame () {
