@@ -227,6 +227,7 @@ MuseScore {
 	property var prevBeam: null
 	property var wasHarmonic: false
 	property var isArco: false
+	property var trillStartTick: 0
 	
 	// ** INSTRUMENTS ** //
 	property var currentInstrumentName: ""
@@ -430,7 +431,7 @@ MuseScore {
 		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
 		
 		// **** VERSION CHECK **** //
-		var version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
+		var version46 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 5);
 		if (!version46) {
 			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6 or later.</p> ";
 			dialog.show();
@@ -1244,6 +1245,8 @@ MuseScore {
 										wasHarmonic = false;
 									}
 									
+									// ************ CHECK TRILL ************ //
+									if (isTrill && currTick == trillStartTick) checkTrill(noteRest);
 															
 									// ************ CHECK LYRICS ************ //
 									if (doCheckVoice && isVoice) checkLyrics(noteRest);
@@ -1721,7 +1724,7 @@ MuseScore {
 				if (currTick >= nextTrillStart) {
 					isTrill = true;					
 					currentTrill = trills[currentStaffNum][currentTrillNum];
-					var trillStartTick = currentTrill.spanner.spannerTick.ticks;
+					trillStartTick = currentTrill.spanner.spannerTick.ticks;
 					var trillDur = currentTrill.spanner.spannerTicks.ticks;
 			
 					currentTrillEnd = trillStartTick + trillDur;
@@ -3827,6 +3830,15 @@ MuseScore {
 		if (clefIs8ba) diatonicPitchOfMiddleLine -= 7;
 		prevClefId = clefId;
 		//logError ('prevClefId is now '+prevClefId);
+	}
+	
+	function checkTrill (noteRest) {
+		// wait until MS 4.6.1
+		/*logError ('Found trill: type = '+currentTrill.type+'; trill = '+Element.TRILL_SEGMENT);
+		if (noteRest.articulations.length > 0) {
+			logError ('Artic = '+noteRest.articulations[0].type);
+		}
+		logError ('Found trill: show acc = '+currentTrill.ornamentShowAccidental+'; show cue = '+currentTrill.ornamentShowCueNote);*/	
 	}
 	
 	function checkOttava (noteRest,ottava) {

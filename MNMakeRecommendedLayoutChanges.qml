@@ -61,7 +61,7 @@ MuseScore {
 		if (Qt.platform.os !== "osx") dialog.fontSize = 12;
 		// Show the options window
 		// **** VERSION CHECK **** //
-		var version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
+		var version46 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 5);
 		if (!version46) {
 			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6 or later.</p> ";
 			dialog.show();
