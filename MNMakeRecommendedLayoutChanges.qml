@@ -145,13 +145,7 @@ MuseScore {
 		//changeInstrumentNames();
 		
 		// *** SELECT NONE AND FORCE REDRAW *** //
-		
-		curScore.startCmd();
-		cmd ('escape');
-		cmd ('escape');
-		cmd ('concert-pitch');
-		cmd ('concert-pitch');
-		curScore.endCmd();
+		selectNone();
 		
 		var dialogMsg = '';
 		if (amendedParts) {
@@ -175,6 +169,14 @@ MuseScore {
 				if (e.type == Element.VBOX) frames.push(e);
 			}
 		}
+	}
+	
+	function selectNone () {
+		// ************  								DESELECT AND FORCE REDRAW 							************ //
+		curScore.startCmd();
+		cmd('escape');
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		curScore.endCmd();
 	}
 	
 	function removeLayoutBreaksAndStretches () {

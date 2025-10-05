@@ -620,12 +620,9 @@ MuseScore {
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
-		// ************								DESELECT ALL AND FORCE REDRAW 							************ //
-		cmd ('escape');
-		cmd ('escape');
-		cmd ('concert-pitch');
-		cmd ('concert-pitch');
-		
+		// ************ DESELECT ALL AND FORCE REDRAW ************ //
+		selectNone();
+				
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
@@ -661,6 +658,14 @@ MuseScore {
 				progress.progressPercent = percentage;
 			}
 		}
+	}
+	
+	function selectNone () {
+		// ************  								DESELECT AND FORCE REDRAW 							************ //
+		curScore.startCmd();
+		cmd('escape');
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		curScore.endCmd();
 	}
 	
 	function saveSelection () {

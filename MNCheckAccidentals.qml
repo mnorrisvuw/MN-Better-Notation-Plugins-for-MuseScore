@@ -290,7 +290,7 @@ MuseScore {
 								var graceNoteChords = noteRest.graceNotes;
 								if (graceNoteChords != null) {
 									for (var g in graceNoteChords) {
-										checkChord (graceNoteChords[g],noteRest.parent,true);
+										checkChord (graceNoteChords[g],noteRest.parent,true,theStaff);
 									}
 								}
 								if (isRest) {
@@ -321,10 +321,7 @@ MuseScore {
 		showAllErrors();
 		
 		// ************  								DESLECT AND FORCE REDRAW 							************ //
-		cmd ('escape');
-		cmd ('escape');
-		cmd ('concert-pitch');
-		cmd ('concert-pitch');
+		selectNone();
 		
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
@@ -370,6 +367,14 @@ MuseScore {
 		if (clefIs8va) clefOffset += 7;
 		if (clefIs15ma) clefOffset += 14;
 		if (clefIs8ba) clefOffset -= 7;
+	}
+	
+	function selectNone () {
+		// ************  								DESELECT AND FORCE REDRAW 							************ //
+		curScore.startCmd();
+		cmd('escape');
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		curScore.endCmd();
 	}
 	
 	function checkTransposingInstruments() {

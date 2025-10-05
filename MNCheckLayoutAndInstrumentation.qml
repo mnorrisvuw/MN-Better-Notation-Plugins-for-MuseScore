@@ -1478,9 +1478,13 @@ MuseScore {
 			}
 		}
 		
+		
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
+		
+		// ** SELECT NONE ** //
+		selectNone();
 				
 		// ** SHOW INFO DIALOG ** //
 		showFinalDialog();
@@ -1786,7 +1790,6 @@ MuseScore {
 	}
 	
 	function showFinalDialog () {
-		selectNone();
 
 		var numErrors = errorStrings.length;
 		
@@ -6572,10 +6575,8 @@ MuseScore {
 	function selectNone () {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
 		curScore.startCmd();
-		cmd ('escape');
-		cmd ('escape');
-		cmd ('concert-pitch');
-		cmd ('concert-pitch');
+		cmd('escape');
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
 		curScore.endCmd();
 	}
 	

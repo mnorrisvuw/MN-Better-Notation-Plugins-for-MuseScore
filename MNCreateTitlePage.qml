@@ -160,15 +160,17 @@ MuseScore {
 		cmd ("insert-vbox");
 		curScore.endCmd();
 		var boxToDelete = curScore.selection.elements[0];
+		curScore.startCmd();
 		cmd ("select-similar");
-		
+		curScore.endCmd();
+
 		// ** CREATE FRONT MATTER ** //
 		if (doFrontMatter) {
 			curScore.startCmd();
 			cmd ("insert-vbox");
 			curScore.endCmd();
+			
 			curScore.startCmd();
-
 			frontMatterBox = curScore.selection.elements[0];
 			cmd ("page-break");
 			cmd ("poet-text");
@@ -222,7 +224,7 @@ MuseScore {
 			newLine2.text = "—".repeat(23);
 		}
 		curScore.endCmd();
-		cmd ("escape");
+		
 		deleteObj(boxToDelete);
 		var spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI;
 		titlePageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
@@ -383,9 +385,10 @@ MuseScore {
 			theMsg = '<p>Title page and front matter page created.';
 		}
 		theMsg += ' Any long titles, subtitles or composers’ names may require additional manual adjustment.</p>';
-		cmd('escape');
-		cmd('concert-pitch');
-		cmd('concert-pitch');
+		
+		// FORCE LAYOUT
+		selectNone();
+		
 		var displayFontMessage = "fonturl" in chosenTitlePageStyle;
 		if (("os" in chosenTitlePageStyle) && isMac) displayFontMessage = false;
 		if (displayFontMessage) theMsg += '<p><b>NOTE</b>: This template requires the font ‘'+composerStyle.font+'’. If it is not already installed, download from <a href = "'+chosenTitlePageStyle.fonturl+'">'+chosenTitlePageStyle.fonturl+'</a>.</p>';
@@ -395,16 +398,18 @@ MuseScore {
 		dialog.show();
 	}
 	
-	function doCmd (theCmd) {
-		curScore.startCmd ();
-		cmd (theCmd);
-		curScore.endCmd ();
-	}
-	
 	function deleteObj (theElem) {
 		curScore.startCmd ();
 		removeElement (theElem);
 		curScore.endCmd ();
+	}
+	
+	function selectNone () {
+		// ************  								DESELECT AND FORCE REDRAW 							************ //
+		curScore.startCmd();
+		cmd('escape');
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		curScore.endCmd();
 	}
 
 	
