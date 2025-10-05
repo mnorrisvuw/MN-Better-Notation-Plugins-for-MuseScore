@@ -863,8 +863,8 @@ MuseScore {
 							}
 							
 							if (doShowError && !changeIsBad) {
-								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press J until you get this note)";
-								if (weightingIsClose && scalarIntervalAbs != 0) t = "Note: The current spelling may be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.\n[SUGGESTION] "+t;
+								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+". (Select the note and press J until you get this "+newNoteLabel+")";
+								if (weightingIsClose && scalarIntervalAbs != 0) t = "[SUGGESTION] "+t+"\n\n[Note: The current spelling may in fact be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.";
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
 							}
