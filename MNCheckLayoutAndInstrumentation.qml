@@ -126,6 +126,7 @@ MuseScore {
 	property var isVocalScore: false
 	property var isChoirScore: false
 	property var frames: []
+	property var voicesArray: []
 	//property var lyrics: []
 		
 	// ** FLAGS ** //
@@ -443,7 +444,7 @@ MuseScore {
 		numStaves = curScore.nstaves;
 		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
-		lastBarInScore = curScore.lastMeasure;		
+		lastBarInScore = curScore.lastMeasure;
 		endOfScoreTick = curScore.lastSegment.tick+1;
 		
 		spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI; // NB spatium value is given in MuseScore's DPI setting
@@ -585,6 +586,17 @@ MuseScore {
 			clefs[i] = [];
 			lv[i] = [];
 			fermatas[i] = [];
+		}
+		
+		// initialise voicesArray
+		for (var i = 1; i <= curScore.nmeasures; i++) {
+			voicesArray[i] = [];
+			for (var j = 0; j < numStaves; j++) {
+				voicesArray[i][j] = [];
+				for (var k = 0; k < 4; k++) {
+					voicesArray[i][j][k] = 0;
+				}
+			}
 		}
 		
 		// THESE ITEMS CAN APPLY TO SPECIFIC TRACKS OR NOTEHEADS
@@ -940,6 +952,10 @@ MuseScore {
 				currentTimeSig = currentBar.timesigNominal;
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
+				// ********* COUNT HOW MANY VOICES THERE ARE IN THIS BAR ********* //
+				
+				numVoicesInThisBar = voicesArray[currentBarNum][currentStaffNum][0] + voicesArray[currentBarNum][currentStaffNum][1] + voicesArray[currentBarNum][currentStaffNum][2] + voicesArray[currentBarNum][currentStaffNum][3];
+				//logError ('bar '+currentBarNum+'; staffNum = '+currentStaffNum+'; numVoicesInThisBar = '+numVoicesInThisBar);
 
 				beatLength = division;
 				var isCompound = !(timeSigNum % 3);
@@ -1017,16 +1033,6 @@ MuseScore {
 					}
 				}
 				
-				// ********* COUNT HOW MANY VOICES THERE ARE IN THIS BAR ********* //
-				var voicesArray = [0,0,0,0];
-				for (var j = 0; j < currentBar.elements.length; j++) {
-					var e = currentBar.elements[j];
-					if (e.type == Element.ChordRest) {
-						var t = e.track - startTrack;
-						if (voicesArray[t] == 0) voicesArray[t] = 1;
-					}
-				}
-				numVoicesInThisBar = voicesArray[0] + voicesArray[1] + voicesArray[2] + voicesArray[3];
 				
 				for (currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					var numNotesInThisTrack = 0;
@@ -1176,7 +1182,9 @@ MuseScore {
 								if (isRest) {
 									
 									// ************ CHECK DYNAMICS UNDER RESTS ********** //
+									//logError ('doCheckDynamics = '+doCheckDynamics+'; tickHasDynamic = '+tickHasDynamic()+'; isGrandStaff = '+isGrandStaff[currentStaffNum]);
 									if (doCheckDynamics && tickHasDynamic() && !isGrandStaff[currentStaffNum]) {
+										//logError ('allTracksHaveRestsAtCurrTick = '+allTracksHaveRestsAtCurrTick());
 										if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
 									}
 									maxLLSinceLastRest = 0;
@@ -1964,12 +1972,16 @@ MuseScore {
 			
 			// don't log if the element is not visible
 			if (!e.visible) continue;
-			
 			var etype = e.type;
-			//if (i < 100) logError ('ename = '+e.name);
 			var etrack = e.track;
-			var staffIdx = 0;
-			while (!staves[staffIdx].is(e.staff)) staffIdx++;
+			var staffIdx = e.staff.idx;
+			
+			if (etype == Element.CHORD) {
+				var theMeasureNumber = e.measure.no;
+				var theVoice = e.voice;
+				voicesArray[theMeasureNumber][staffIdx][theVoice] = 1;
+				//logError ('Found chord in voice '+theVoice+' of staff '+staffIdx+' of bar '+theMeasureNumber);
+			}
 			
 		/*	if (etype == Element.LYRICS) {
 				lyrics.push(e);
@@ -2221,23 +2233,21 @@ MuseScore {
 		var prevPart = null;
 		var prevPrevPart = null;
 		var staves = curScore.staves;
-		var visiblePartFound = false;
+		var visibleStaffFound = false;
 		
 		for (var i = 0; i < numStaves; i++) {
-			
-			var part = staves[i].part;
-			staffVisible[i] = part.show;
-			
+			var staff = staves[i];
+			var part = staff.part;
+			staffVisible[i] = staff.show;
+			//logError ('staff '+i+'; visible = '+staffVisible[i]);
 			// don't process if the part is hidden
 			if (!staffVisible[i]) continue;
 			
-			if (staffVisible[i] && !visiblePartFound) {
-				visiblePartFound = true;
+			if (!visibleStaffFound) {
+				visibleStaffFound = true;
 				firstVisibleStaff = i;
 			}
 			currentInstrumentId = part.musicXmlId;
-			//logError ('Staff '+i+' is '+currentInstrumentId+' '+currentInstrumentId.length+' '+currentInstrumentId.replace(/</g,"≤"));
-
 			calculateCalcId();
 			currentInstrumentName = part.longName;
 			var lowerStaffName = currentInstrumentName.toLowerCase();
@@ -2265,6 +2275,7 @@ MuseScore {
 				}
 			}
 			
+			//logError ('i = '+i+'; matchPart = '+part.is(prevPart)+'; primaryStaff = '+staves[i].primaryStaff);
 			if (i > 0 && part.is(prevPart)) {
 				isGrandStaff[i-1] = true;
 				isGrandStaff[i] = true;
@@ -3837,8 +3848,8 @@ MuseScore {
 	
 	function checkTrill (noteRest) {
 		// wait until MS 4.6.1
-		/*logError ('Found trill: type = '+currentTrill.type+'; trill = '+Element.TRILL_SEGMENT);
-		if (noteRest.articulations.length > 0) {
+		logError ('Found trill: type = '+currentTrill.type+'; ornament = '+currentTrill.ornament);
+		/*if (noteRest.articulations.length > 0) {
 			logError ('Artic = '+noteRest.articulations[0].type);
 		}
 		logError ('Found trill: show acc = '+currentTrill.ornamentShowAccidental+'; show cue = '+currentTrill.ornamentShowCueNote);*/	
@@ -5840,6 +5851,7 @@ MuseScore {
 				prevBeam = theBeam;
 			}
 		}*/
+		//logError ('Checking stems and beams');
 		for (var i = 0; i < noteRest.notes.length; i ++) {
 			var theNote = noteRest.notes[i];
 			//logError ('theNote.mirrorHead = '+theNote.mirrorHead);
@@ -5848,6 +5860,7 @@ MuseScore {
 			}
 		}
 		if (noteRest.stem) {
+			//logError ('noteRest.stem');
 			var stemDir = noteRest.stem.stemDirection;
 			if (stemDir != Direction.AUTO) {
 				if (noteRest.beam == null) {
@@ -5870,19 +5883,23 @@ MuseScore {
 						if (Math.abs(minL) < Math.abs(maxL)) calcDir = 1;
 					}
 					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
-						addError("Note has had stem direction flipped. If this is not deliberate,\nreset it by clicking ‘Format→Reset Shapes and Positions’.",noteRest);
+						addError("Note has had stem direction flipped. If this is not deliberate,\nselect the note and press "+cmdKey+"-R.",noteRest);
 						lastStemDirectionFlagBarNum = currentBarNum;
 					}
 				}
 			}
+			// logError ('numVoicesInThisBar = '+numVoicesInThisBar);
 			if (numVoicesInThisBar == 1) {
 				if (noteRest.beam != null) {
 					// is this the start of the beam?
 					var currBeam = noteRest.beam;
+					//logError ('beamFound — checking for equality with prev');
 					if (!currBeam.is(prevBeam)) {
 						//var beamPosAsPoint = currBeam.beamPos as point;
 						//var beamPosY = beamPosAsPoint.y;
-						var beamPosY = parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
+						var beamPosY = currBeam.posY; 
+						//logError ('Checking beam pos — '+beamPosY);
+						// parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
 						// unfortunately I can't figure out a way to access QPair in Qt
 						//logError ('beamPos = '+beamPosY);
 						//start of a new beam
