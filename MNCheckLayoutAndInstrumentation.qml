@@ -2798,20 +2798,20 @@ MuseScore {
 				var enableVerticalSpread = partStyle.value("enableVerticalSpread");
 				if (enableVerticalSpread) {
 					if (minSystemSpread < 6 || minSystemSpread > 8) {
-						styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
+						styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
 						flaggedSystemSpacing = true;
 					}
 					if (maxSystemSpread < 10 || maxSystemSpread > 14) {
-						styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
+						styleComments.push("(PSpacingage tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
 						flaggedSystemSpacing = true;
 					}
 				} else {
 					if (minSystemDistance < 6 || minSystemDistance > 8) {
-						styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–7.0sp");
+						styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–7.0sp");
 						flaggedSystemSpacing = true;
 					}
 					if (maxSystemDistance < 10 || maxSystemDistance > 14) {
-						styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
+						styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
 						flaggedSystemSpacing = true;
 					}
 				}
@@ -2821,7 +2821,7 @@ MuseScore {
 			if (!flaggedVerticalFrameBottomMargin) {
 				var verticalFrameBottomMargin = partStyle.value("frameSystemDistance");
 				if (verticalFrameBottomMargin != 8) {
-					styleComments.push("(Page tab) Set ‘Vertical frame bottom margin’ to 8.0sp");
+					styleComments.push("(Spacing tab) Set ‘Vertical frame bottom margin’ to 8.0sp");
 					flaggedVerticalFrameBottomMargin = true;
 				}
 			}
@@ -2830,7 +2830,7 @@ MuseScore {
 			if (!flaggedLastSystemFillLimit) {
 				var lastSystemFillLimit = partStyle.value("lastSystemFillLimit");
 				if (lastSystemFillLimit != 0) {
-					styleComments.push("(Page tab) Set ‘Last system fill threshold’ to 0%");
+					styleComments.push("(Spacing tab) Set ‘Last system fill threshold’ to 0%");
 					flaggedLastSystemFillLimit = true;
 				}
 			}
@@ -2839,7 +2839,7 @@ MuseScore {
 			if (!flaggedMinNoteDistance) {
 				var minNoteDistance = partStyle.value("minNoteDistance");
 				if (minNoteDistance < 1.2 || minNoteDistance > 1.4) {	
-					styleComments.push("(Bars tab) Set the ‘Min. note distance’ to between 1.2-1.4sp");
+					styleComments.push("(Spacing tab) Set ‘Padding→Note to Note’ to between 1.2-1.4sp");
 					flaggedMinNoteDistance = true;
 				}
 			}
@@ -3011,7 +3011,7 @@ MuseScore {
 			var instrumentChangeFrameType = style.value("instrumentChangeFrameType");
 			var instrumentChangeFramePadding = style.value("instrumentChangeFramePadding");
 			var rehearsalMarkFontSize = style.value("rehearsalMarkFontSize");
-			var minLyricsDistance = style.value("minLyricsDistance");
+			var lyricsMinDistance = style.value("lyricsMinDistance");
 			
 			// *************************************** //
 			// **** STYLE SETTINGS — 1. SCORE TAB **** //
@@ -3108,38 +3108,50 @@ MuseScore {
 			
 			if (crossMeasureValues != 0) styleComments.push("(Score tab) Uncheck ‘Display note values across bar boundaries’");
 			
+			
 			// *************************************** //
-			// ****  STYLE SETTINGS — 2. PAGE TAB **** //
+			// ****         9. SPACING TAB          ***** //
 			// *************************************** //
 			
 			// *** CHECK SYSTEM SPACING *** //
 			if (hasMoreThanOneSystem) {
 				if (enableVerticalSpread) {
 					if (isSoloScore) {
-						if (minSystemSpread < 6 || minSystemSpread > 8) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
-						if (maxSystemSpread < 12 || maxSystemSpread > 16) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 12.0–16.0sp");				
+						if (minSystemSpread < 6 || minSystemSpread > 8) styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
+						if (maxSystemSpread < 12 || maxSystemSpread > 16) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 12.0–16.0sp");				
 					} else {
-						if (minSystemSpread < 12 || minSystemSpread > 14) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-						if (maxSystemSpread < 24 || maxSystemSpread > 36) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
+						if (minSystemSpread < 12 || minSystemSpread > 14) styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
+						if (maxSystemSpread < 24 || maxSystemSpread > 36) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
 					}
 				} else {
-					if (minSystemDistance < 12 || minSystemDistance > 16) styleComments.push("(Page tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-					if (maxSystemDistance < 24 || maxSystemDistance > 36) styleComments.push("(Page tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
+					if (minSystemDistance < 12 || minSystemDistance > 16) styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
+					if (maxSystemDistance < 24 || maxSystemDistance > 36) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
 				}
 			}
 			
 			// *** CHECK STAFF SPACING *** //
 			if (!isSoloScore) {
 				if (enableVerticalSpread) {
-					if (minStaffSpread < 5 || minStaffSpread > 6) styleComments.push("(Page tab) Set the ‘Min. stave distance’ to between 5.0–6.0sp");
-					if (maxStaffSpread < 8 || maxStaffSpread > 10) styleComments.push("(Page tab) Set the ‘Max. stave distance’ to between 8.0–10.0sp");
+					if (minStaffSpread < 5 || minStaffSpread > 6) styleComments.push("(Spacing tab) Set the ‘Min. staff distance’ to between 5.0–6.0sp");
+					if (maxStaffSpread < 8 || maxStaffSpread > 10) styleComments.push("(Spacing tab) Set the ‘Max. staff distance’ to between 8.0–10.0sp");
 				} else {
-					if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Page tab) Set the ‘Stave distance’ to between 5.0–6.0sp");
+					if (staffDistance < 5 || staffDistance > 6) styleComments.push("(Spacing tab) Set the ‘Staff distance’ to between 5.0–6.0sp");
 				}
 			}
 			
+			if (minimumBarWidth < 14.0 || minimumBarWidth > 16.0) styleComments.push("(Spacing tab) Set ‘Horizontal Spacing→Minimum bar width’ to between 14.0-16.0sp");
+			if (spacingRatio != 1.5) styleComments.push("(Spacing tab) Set ‘Horizontal Spacing→Spacing Ratio’ to 1.5sp");
+			if (isSoloScore) {
+				if (minNoteDistance < 1.0 ) styleComments.push("(Spacing tab) Increase ‘Padding→Note to Note’ to between 1.0–1.2sp");
+				if (minNoteDistance > 1.2 ) styleComments.push("(Spacing tab) Decrease ‘Padding→Note to Note’ to between 1.0–1.2sp");
+				
+			} else {
+				if (minNoteDistance < 0.6 ) styleComments.push("(Spacing tab) Increase ‘Padding→Note to Note’ to between 0.6–0.7sp");
+				if (minNoteDistance > 0.7 ) styleComments.push("(Spacing tab) Decrease ‘Padding→Note to Note’ to between 0.6–0.7sp");
+			}
+			
 			// *** CHECK LAST SYSTEM FILL THRESHOLD *** //
-			if (lastSystemFillLimit > 0) styleComments.push("(Page tab) Set ‘Last system fill threshold’ to 0%");
+			if (lastSystemFillLimit > 0) styleComments.push("(Spacing tab) Set ‘Last system fill threshold’ to 0%");
 			
 			// ** CHECK MUSIC BOTTOM MARGIN — TO DO** //
 			//if (staffLowerBorder > 0) styleComments.push("(Page tab) Set staff 5.0–6.0sp");
@@ -3149,19 +3161,7 @@ MuseScore {
 			// *************************************** //
 			if (showFirstBarNum) styleComments.push("(Bar numbers tab) Uncheck ‘Show first’");
 			
-			// *************************************** //
-			// ****         9. BARS TAB          ***** //
-			// *************************************** //
-			if (minimumBarWidth < 14.0 || minimumBarWidth > 16.0) styleComments.push("(Bars tab) Set ‘Minimum bar width’ to between 14.0-16.0sp");
-			if (spacingRatio != 1.5) styleComments.push("(Bars tab) Set ‘Spacing Ratio’ to 1.5sp");
-			if (isSoloScore) {
-				if (minNoteDistance < 1.0 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 1.0–1.2sp");
-				if (minNoteDistance > 1.2 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 1.0–1.2sp");
-				
-			} else {
-				if (minNoteDistance < 0.6 ) styleComments.push("(Bars tab) Increase ‘Minimum note distance’ to between 0.6–0.7sp");
-				if (minNoteDistance > 0.7 ) styleComments.push("(Bars tab) Decrease ‘Minimum note distance’ to between 0.6–0.7sp");
-			}
+			
 			
 			// *************************************** //
 			// ****       10. BARLINES TAB        **** //
@@ -3177,7 +3177,7 @@ MuseScore {
 			// *************************************** //
 			// ****       18. LYRICS        	  **** //
 			// *************************************** //
-			if (minLyricsDistance != 0.7 && isVocalScore) styleComments.push("(Lyrics tab) Set ‘Min. gap between lyrics’ to 0.7sp");
+			if (lyricsMinDistance != 0.7 && isVocalScore) styleComments.push("(Lyrics tab) Set ‘Min. space between lyrics’ to 0.7sp");
 			
 			// *************************************** //
 			// ****      20. TEXT STYLES TAB      **** //
