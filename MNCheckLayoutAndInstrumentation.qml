@@ -589,7 +589,7 @@ MuseScore {
 		}
 		
 		// initialise voicesArray
-		for (var i = 1; i <= curScore.nmeasures; i++) {
+		for (var i = 0; i <= curScore.nmeasures; i++) {
 			voicesArray[i] = [];
 			for (var j = 0; j < numStaves; j++) {
 				voicesArray[i][j] = [];
@@ -954,7 +954,7 @@ MuseScore {
 				var timeSigDenom = currentTimeSig.denominator;
 				// ********* COUNT HOW MANY VOICES THERE ARE IN THIS BAR ********* //
 				
-				numVoicesInThisBar = voicesArray[currentBarNum][currentStaffNum][0] + voicesArray[currentBarNum][currentStaffNum][1] + voicesArray[currentBarNum][currentStaffNum][2] + voicesArray[currentBarNum][currentStaffNum][3];
+				numVoicesInThisBar = voicesArray[currentBarNum-1][currentStaffNum][0] + voicesArray[currentBarNum-1][currentStaffNum][1] + voicesArray[currentBarNum-1][currentStaffNum][2] + voicesArray[currentBarNum-1][currentStaffNum][3];
 				//logError ('bar '+currentBarNum+'; staffNum = '+currentStaffNum+'; numVoicesInThisBar = '+numVoicesInThisBar);
 
 				beatLength = division;
@@ -1976,8 +1976,8 @@ MuseScore {
 			var etrack = e.track;
 			var staffIdx = e.staff.idx;
 			
-			if (etype == Element.CHORD) {
-				var theMeasureNumber = e.measure.no;
+			if (etype == Element.CHORD || etype == Element.NOTE) {
+				var theMeasureNumber = (etype == Element.CHORD) ? e.measure.no : e.parent.measure.no;
 				var theVoice = e.voice;
 				voicesArray[theMeasureNumber][staffIdx][theVoice] = 1;
 				//logError ('Found chord in voice '+theVoice+' of staff '+staffIdx+' of bar '+theMeasureNumber);
@@ -5888,7 +5888,7 @@ MuseScore {
 					}
 				}
 			}
-			// logError ('numVoicesInThisBar = '+numVoicesInThisBar);
+			 //logError ('numVoicesInThisBar = '+numVoicesInThisBar);
 			if (numVoicesInThisBar == 1) {
 				if (noteRest.beam != null) {
 					// is this the start of the beam?
@@ -5897,82 +5897,88 @@ MuseScore {
 					if (!currBeam.is(prevBeam)) {
 						//var beamPosAsPoint = currBeam.beamPos as point;
 						//var beamPosY = beamPosAsPoint.y;
-						var beamPosY = currBeam.posY; 
-						//logError ('Checking beam pos — '+beamPosY);
-						// parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
-						// unfortunately I can't figure out a way to access QPair in Qt
-						//logError ('beamPos = '+beamPosY);
-						//start of a new beam
-						// collate all beams into an array
-						prevBeam = currBeam;
-						var notesInBeamArray = [];
-						var currNote = noteRest;
-						while (currNote.beam != null) {
-							if (!currNote.beam.is(currBeam)) break;
-							notesInBeamArray.push(currNote);
-							currNote = getNextNoteRest (currNote);
-						}
-	
-						var numNoteRests = notesInBeamArray.length;
-						//logError ('Found '+numNoteRests+' in beam');
-						var numNotesAboveMiddleLine = 0;
-						var numNotesBelowMiddleLine = 0;
-						var preferUpOrDown = 0;
-						
-						if (numNoteRests > 1) {
-							var maxOffsetFromMiddleLine = 0;
-							for (var i = 0; i<numNoteRests; i++) {
-								var theNoteRest = notesInBeamArray[i];
-								var numNotes = theNoteRest.notes.length;
-								
-								var maxOffsetFromMiddleLineInChord = 0;
-								var chordPreferUpOrDown = 0;
-								
-								// Go through notes in the chord
-								for (var j = 0; j < numNotes; j++) {
-									var note = theNoteRest.notes[j];
-									var offsetFromMiddleLine = 4 - note.line; // 0 = top line, 1 = top space, 2 = second top line, etc...
-									if (offsetFromMiddleLine != 0) {
-										if (Math.abs(offsetFromMiddleLine) > Math.abs(maxOffsetFromMiddleLineInChord)) {
-											maxOffsetFromMiddleLineInChord = offsetFromMiddleLine;
-											chordPreferUpOrDown = (offsetFromMiddleLine > 0) ? -1 : 1;
-										} else {
-											chordPreferUpOrDown = chordPreferUpOrDown + (offsetFromMiddleLine > 0) ? -1 : 1; 
+						var beamPos = currBeam.beamPos;
+						//logError ('beamPos = '+beamPos);
+						if (beamPos < 0) {
+							addError ('This beam appears to have been flipped.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+						} else {
+							var beamPosY = currBeam.posY; 
+							//logError ('Checking beam pos — '+beamPosY);
+							// parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]);
+							// unfortunately I can't figure out a way to access QPair in Qt
+							//logError ('beamPos = '+beamPosY);
+							//start of a new beam
+							// collate all beams into an array
+							prevBeam = currBeam;
+							var notesInBeamArray = [];
+							var currNote = noteRest;
+							while (currNote.beam != null) {
+								if (!currNote.beam.is(currBeam)) break;
+								notesInBeamArray.push(currNote);
+								currNote = getNextNoteRest (currNote);
+							}
+		
+							var numNoteRests = notesInBeamArray.length;
+							//logError ('Found '+numNoteRests+' in beam');
+							var numNotesAboveMiddleLine = 0;
+							var numNotesBelowMiddleLine = 0;
+							var preferUpOrDown = 0;
+							
+							if (numNoteRests > 1) {
+								var maxOffsetFromMiddleLine = 0;
+								for (var i = 0; i<numNoteRests; i++) {
+									var theNoteRest = notesInBeamArray[i];
+									var numNotes = theNoteRest.notes.length;
+									
+									var maxOffsetFromMiddleLineInChord = 0;
+									var chordPreferUpOrDown = 0;
+									
+									// Go through notes in the chord
+									for (var j = 0; j < numNotes; j++) {
+										var note = theNoteRest.notes[j];
+										var offsetFromMiddleLine = 4 - note.line; // 0 = top line, 1 = top space, 2 = second top line, etc...
+										if (offsetFromMiddleLine != 0) {
+											if (Math.abs(offsetFromMiddleLine) > Math.abs(maxOffsetFromMiddleLineInChord)) {
+												maxOffsetFromMiddleLineInChord = offsetFromMiddleLine;
+												chordPreferUpOrDown = (offsetFromMiddleLine > 0) ? -1 : 1;
+											} else {
+												chordPreferUpOrDown = chordPreferUpOrDown + (offsetFromMiddleLine > 0) ? -1 : 1; 
+											}
 										}
+										
 									}
 									
-								}
-								
-								//logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
-								
-								if (chordPreferUpOrDown != 0) {
-									if (chordPreferUpOrDown > 0) {
-										preferUpOrDown ++;
-										numNotesBelowMiddleLine ++;
+									//logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
+									
+									if (chordPreferUpOrDown != 0) {
+										if (chordPreferUpOrDown > 0) {
+											preferUpOrDown ++;
+											numNotesBelowMiddleLine ++;
+										}
+										if (chordPreferUpOrDown < 0) {
+											preferUpOrDown --;
+											numNotesAboveMiddleLine ++;
+										}
 									}
-									if (chordPreferUpOrDown < 0) {
-										preferUpOrDown --;
-										numNotesAboveMiddleLine ++;
-									}
+									if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
+									//logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
+		
 								}
-								if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
-								//logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
-	
-							}
-							var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
-							// 1 is stems down; 2 is stems up
-							// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
-							var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
-							//logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
-							
-							if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
-								if (preferUpOrDown > 0 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-								if (preferUpOrDown < 0 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-							} else {
-								if (numNotesAboveMiddleLine > numNotesBelowMiddleLine) {
-									if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
+								// 1 is stems down; 2 is stems up
+								// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
+								var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
+								//logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
+								
+								if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
+									if (preferUpOrDown > 0 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+									if (preferUpOrDown < 0 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
 								} else {
-									if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+									if (numNotesAboveMiddleLine > numNotesBelowMiddleLine) {
+										if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+									} else {
+										if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+									}
 								}
 							}
 						}
