@@ -209,10 +209,10 @@ MuseScore {
 	property var currentStaffNum: 0
 	property var currentTrack: 0
 	property var currentTimeSig: null
+	property var isCompound: false
 	property var currentClef: null
 	property var currentClefNum: 0
 	property var numClefs: 0
-	property var prevTimeSig: ""
 	property var prevClefId: null
 	property var prevDynamic: ""
 	property var prevDynamicObject: null
@@ -926,9 +926,7 @@ MuseScore {
 				prevClefNumInBar = -1;
 				nextClefTick = (numClefs > 0) ? clefs[currentStaffNum][0].parent.tick : endOfScoreTick;
 			}
-			
-			prevTimeSig = currentBar.timesigNominal.str;
-			
+						
 			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRAND STAFF **** //
 			if (doCheckPianoHarpAndPercussion && isVibraphone && isTopOfGrandStaff[currentStaffNum]) addError('Vibraphones are normally notated on a single treble staff,\nrather than a grand staff.','system1 '+currentStaffNum);
 									
@@ -959,7 +957,7 @@ MuseScore {
 				//logError ('bar '+currentBarNum+'; staffNum = '+currentStaffNum+'; numVoicesInThisBar = '+numVoicesInThisBar);
 
 				beatLength = division;
-				var isCompound = !(timeSigNum % 3);
+				isCompound = !(timeSigNum % 3);
 				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
 				if (isCompound && timeSigDenom >= 8) beatLength = (division * 12) / timeSigDenom;
 				if (timeSigDenom == 4) {
@@ -1386,8 +1384,8 @@ MuseScore {
 							tempoChangeMarkingEnd = -1;
 						}
 						
-						processingThisBar = cursor.next() ? cursor.measure.is(currentBar) : false;
-
+						processingThisBar = cursor.next() ? (cursor.measure.is(currentBar) && cursor.tick < barEndTick) : false;
+						
 						if (isNote) {
 							prevNote = noteRest;
 							prevNotes[currentTrack] = noteRest;
@@ -1700,6 +1698,7 @@ MuseScore {
 							checkExpressiveSwell (nextHairpin);
 							checkHairpins();
 							if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
+							//logError ("Hairpin begin text: "+currentHairpin.beginText);
 							//logError("Hairpin started at "+currTick+" & ends at "+currentHairpinEnd);
 						}
 					}
@@ -4488,8 +4487,11 @@ MuseScore {
 										metronomeDuration *= 1.5;
 										metroStr = "dotted "+metroStr;
 									}
-									if (metronomeDuration != virtualBeatLength) addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
-
+									var couldBeEither = virtualBeatLength == division / 2 && !isCompound; // time sigs like 11/8 could have a quaver or crotchet metronome
+									if (metronomeDuration != virtualBeatLength && !couldBeEither) {
+										logError ('Checking metronome marking');
+										addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
+									}
 									if (nonBoldText === "") {
 										//logError ("styledText is "+styledText.replace(/</g,'{'));
 										if (styledText.includes('<b>')) {
@@ -4986,15 +4988,15 @@ MuseScore {
 	
 	function checkTimeSignatures () {
 		var segment = curScore.firstSegment();
-		prevTimeSig = "";
+		var prevTimeSigStr = "";
 		while (segment) {
 			if (segment.segmentType == Segment.TimeSig) {
 				var theTimeSig = segment.elementAt(0);
 				if (theTimeSig.type == Element.TIMESIG) {
 					if (theTimeSig.visible) {
 						var theTimeSigStr = theTimeSig.timesig.str;
-						if (theTimeSigStr === prevTimeSig) addError("This time signature appears to be redundant (was already "+prevTimeSig+")\nIt can be safely deleted.",theTimeSig);
-						prevTimeSig = theTimeSigStr;
+						if (theTimeSigStr === prevTimeSigStr) addError("This time signature appears to be redundant (was already "+prevTimeSigStr+")\nIt can be safely deleted.",theTimeSig);
+						prevTimeSigStr = theTimeSigStr;
 						var n = theTimeSig.subtypeName();
 						if (n.includes("Common")) addError ("The ‘Common time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 4/4.",theTimeSig);
 						if (n.includes("Cut")) addError ("The ‘Cut time’ time signature is considered old-fashioned these days;\nIt is better to write this in full, as 2/2.",theTimeSig);
@@ -5400,6 +5402,9 @@ MuseScore {
 		if (t.type == Element.GRADUAL_TEMPO_CHANGE) {
 			return currTick >= t.spanner.spannerTick.ticks;
 		} else {
+			if (currTick >= t.parent.tick) {
+				logError ('Checking tempo object because currTick = '+currTick+', segment = '+t.parent.tick);
+			}
 			return currTick >= t.parent.tick;
 		}
 	}
@@ -5605,8 +5610,10 @@ MuseScore {
 		var currSlurTick = noteRest.parent.tick;
 		
 		
-
-		if (isStartOfSlur && isStringInstrument && currentSlurLength > division * 8) addError("Consider whether this slur is longer than one bow stroke\nand should be broken into multiple slurs.",currentSlur);
+		
+		if (isStartOfSlur && isStringInstrument && currentSlurLength > division * 8) addError("This slur looks very long for a string instrument,\n and may need to be broken into multiple slurs.",currentSlur);
+		
+		if (isEndOfSlur && isRest) addError ("This slur seems to end on a rest.\nWas it supposed to be an l.v. tie instead?",currentSlur);
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 4)) {
