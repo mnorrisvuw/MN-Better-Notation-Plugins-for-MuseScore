@@ -334,6 +334,7 @@ MuseScore {
 	property var nextPedalStart: -1
 	property var currentPedalEnd: -1
 	property var flaggedPedalLocation: false
+	property var isFirstPedal: false
 	
 	// ** LV ** //
 	property var lv: []
@@ -1579,6 +1580,16 @@ MuseScore {
 			if (!isPedalled && currTick >= nextPedalStart && currentPedalNum < numPedals) {
 				isPedalled = true;
 				currentPedal = pedals[currentStaffNum][currentPedalNum];
+				if (!isFirstPedal) {
+					isFirstPedal = true;
+					// check first pedal has the 'ped' text in it
+					var pedText = currentPedal.beginText;
+					var containsPedSymbol = false;
+					if (pedText) containsPedSymbol = pedText.includes('<sym>keyboardPedalPed</sym>');
+					if (!containsPedSymbol) {
+						addError ("Your first pedal marking should begin with the Ped. symbol,\navailable from the Keyboard palette.",currentPedal);
+					}
+				}
 				if (currentPedal == null || currentPedal == undefined) {
 					currentPedalNum = numPedals;
 				} else {
@@ -1660,7 +1671,7 @@ MuseScore {
 					//logError("Next hairpin start = "+nextHairpinStart+" currTick = "+currTick);
 				
 					if (currTick >= nextHairpinStart) {
-						logError ('Hairpin at '+currTick);
+						//logError ('Hairpin at '+currTick);
 						isHairpin = true;
 						lastDynamicTick = currTick;
 						//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
@@ -4620,7 +4631,7 @@ MuseScore {
 					}
 					if (includesADynamic || stringIsDynamic) {
 						firstDynamic = true;
-						logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
+						//logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
 
 						theDynamic = textObject;
 						lastDynamicTick = currTick;
@@ -5439,11 +5450,16 @@ MuseScore {
 				
 				// check override on the top note
 				if (noteRest.duration.ticks < 2 * division) {
-					// TO DO FOR 4.6 — CHECK
-					// if (!noteRest.tremoloTwoChord) {
-					var noteheadType = topNote.headType;
-					if (noteheadType != NoteHeadType.HEAD_HALF) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
-					// }
+					
+					// TO DO FOR 4.6.1 — CHECK
+					var isForceMinim = topNote.headType == NoteHeadType.HEAD_HALF;
+					var isTwoNoteTremolo = noteRest.tremoloTwoChord != null;
+					
+					// ignore if a two-note tremolo
+					if (!isForceMinim && !isTwoNoteTremolo) {
+						addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 428)",noteRest);
+						//logError ('noteheadType = '+noteheadType);
+					}
 				}
 				
 				// check artificial harmonic with a harmonic circle above it
@@ -5485,7 +5501,9 @@ MuseScore {
 				harmonicArray = diamondHarmonicIntervals;
 				// check override on the top note
 				if (noteRest.duration.ticks < 2 * division) {
-					if (noteRest.notes[0].headType != NoteHeadType.HEAD_HALF) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
+					var isForceMinim = noteRest.notes[0].headType == NoteHeadType.HEAD_HALF;
+					var isTwoNoteTremolo = noteRest.tremoloTwoChord != null;
+					if (!forceMinim && !isTwoNoteTremolo) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
 				}
 			}
 			if (isStringHarmonic) {
@@ -5656,6 +5674,7 @@ MuseScore {
 									} else {
 										errStr = "Don’t repeat the same chord under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
 									}
+									if (isStringInstrument) errStr += '\n(Ignore this message if these notes are played on different strings)';
 									addError(errStr,noteRest);
 								}
 							}
