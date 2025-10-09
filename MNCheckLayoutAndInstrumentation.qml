@@ -5703,7 +5703,7 @@ MuseScore {
 					addError("Don’t start a slur in the middle of a tied note.\nExtend the slur back to the start of the tie.",currentSlur);
 					return;
 				}
-				if (isEndOfTie) {
+				if (isEndOfTie &&  !prevWasGraceNote && !isLv) {
 					addError("Don’t start a slur at the end of a tied note.\nInclude the full duration of the tied note in the slur.",currentSlur);
 					return;
 				}
@@ -5721,19 +5721,6 @@ MuseScore {
 							return;
 						}
 					}
-				}
-			}
-		
-			// Check ties to middle of slurs
-			if (isStartOfSlur) {
-				//logError("Slur started — mid = "+isMiddleOfTie+"); end = "+isEndOfTie;
-				if (isMiddleOfTie) {
-					addError("Don’t begin a slur in the middle of a tied note.\nExtend the slur back to the start of the tie.",currentSlur);
-					return;
-				}
-				if (isEndOfTie && !isGliss) {
-					addError("Don’t begin a slur at the end of a tied note.\nStart the slur at the beginning of the next note.",currentSlur);
-					return;
 				}
 			}
 		}
