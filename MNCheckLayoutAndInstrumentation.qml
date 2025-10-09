@@ -1660,6 +1660,7 @@ MuseScore {
 					//logError("Next hairpin start = "+nextHairpinStart+" currTick = "+currTick);
 				
 					if (currTick >= nextHairpinStart) {
+						logError ('Hairpin at '+currTick);
 						isHairpin = true;
 						lastDynamicTick = currTick;
 						//logError("currSeg.type = "+currSeg.type+" eType = "+eType+" eName = "+eName);
@@ -3358,6 +3359,11 @@ MuseScore {
 	}
 	
 	function checkHairpins () {
+		
+		// **** Hairpins cancel out previous dynamic for checking **** //
+		prevDynamic = '';
+		prevDynamicBarNum = currentBarNum;
+		
 		var hairpinStartTick = currentHairpin.spanner.spannerTick.ticks;
 		var hairpinDur = currentHairpin.spanner.spannerTicks.ticks;
 		
@@ -3382,6 +3388,7 @@ MuseScore {
 		cursor2.rewindToTick(cursor.tick);
 		cursor2.filter = Segment.ChordRest;
 		var isDecresc = currentHairpin.hairpinType %2 == 1;
+		
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
 		var hairpinZoneStartTick = currentHairpinEnd - beatLength;
 		//logError ("Checking hairpin termination");
@@ -4065,7 +4072,7 @@ MuseScore {
 			checkRehearsalMark (textObject);
 			return;
 		}
-					
+		
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
 		var isComment = false;
 		if (eType == Element.TEXT) isComment = Qt.colorEqual(textObject.frameBgColor,"yellow") && Qt.colorEqual(textObject.frameFgColor,"black");
@@ -4434,8 +4441,11 @@ MuseScore {
 					
 						// **** CHECK TEMPO POINT SIZE **** //
 						if (isTempoMarking || isTempoChangeMarking) {
-							if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
-							if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
+							if (textObject.fontSize > 0) {
+								// fontSize can be -1 for mixed sizes
+								if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
+								if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
+							}
 						}
 						
 						// **** CHECK METRONOME MARKINGS **** //
@@ -4610,7 +4620,7 @@ MuseScore {
 					}
 					if (includesADynamic || stringIsDynamic) {
 						firstDynamic = true;
-						//logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
+						logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
 
 						theDynamic = textObject;
 						lastDynamicTick = currTick;
@@ -4636,10 +4646,16 @@ MuseScore {
 						}
 					
 						if (!dynamicException) {
+							
 							prevDynamicBarNum = currentBarNum;
 							prevDynamicDisplayBarNum = currentBarNum + displayOffset;
-							prevDynamic = plainText;
-							prevDynamicObject = textObject;
+							if (currentHairpin && currTick < currentHairpinEnd) {
+								prevDynamic = '';
+								prevDynamicObject = null;
+							} else {
+								prevDynamic = plainText;
+								prevDynamicObject = textObject;
+							}
 						} else {
 							if (plainText === "fmp" || plainText === "sfmp" || plainText === "sfzmp" || plainText === "sffzmp" || plainText === "sfffzmp") {
 								prevDynamicBarNum = currentBarNum;
