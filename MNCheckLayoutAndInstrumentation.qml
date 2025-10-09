@@ -1633,9 +1633,10 @@ MuseScore {
 			if (!isOttava && currTick >= nextOttavaStart && currentOttavaNum < numOttavas) {
 				isOttava = true;
 				currentOttava = ottavas[currentStaffNum][currentOttavaNum];
-				currentOttavaEnd = currentOttava.spanner.spannerTick.ticks + currentOttava.spanner.spannerTicks.ticks;
-				//logError("Ottava started at "+currTick+" & ends at "+currentOttavaEnd);
-			
+				currentOttavaEnd = currentOttava.spanner.spannerTick.ticks + currentOttava.spanner.spannerTicks.ticks;			
+				// ** Flag 22ma and 22mb markings
+				if (currentOttava.ottavaType == OttavaType.OTTAVA_22MA) addError ("Never use a 22ma marking.\nThey are almost never seen.", currentOttava);
+				if (currentOttava.ottavaType == OttavaType.OTTAVA_22MB) addError ("Never use a 22mb marking.\nThey are almost never seen.", currentOttava);
 				if (currentOttavaNum < numOttavas - 1) {
 					nextOttavaStart = ottavas[currentStaffNum][currentOttavaNum+1].spanner.spannerTick.ticks;
 					//logError("Next ottava starts at "+nextOttavaStart);
@@ -3879,11 +3880,12 @@ MuseScore {
 			logError("checkOttava() — ottava is null!");
 			return;
 		}
+		// don't flag 22ma and 22mb here, as they will already have been flagged previously
+		if (ottava.ottavaType == OttavaType.OTTAVA_22MA || ottava.ottavaType == OttavaType.OTTAVA_22MB) return;
 		numNotesUnderOttava++;
 		var numll = getMaxNumLedgerLines(noteRest);
 		if (numll > maxOttavaLedgerLines) maxOttavaLedgerLines == numll;
 		averageOttavaLedgerLines = (averageOttavaLedgerLines * (numNotesUnderOttava - 1) + numll) / numNotesUnderOttava;
-		var k8va = 0, k15ma = 2;
 		var ottavaArray = ["8va","8ba","15ma","15mb"];
 		var ottavaStr = ottavaArray[ottava.ottavaType]; 
 		//logError("Found OTTAVA: "+ottava.subtypeName()+" "+ottava.ottavaType);
@@ -3892,7 +3894,7 @@ MuseScore {
 			flaggedOttavaIssue = true;
 			
 		} else {
-			if (ottava.ottavaType == k8va || ottava.ottavaType == k15ma) {
+			if (ottava.ottavaType == OttavaType.OTTAVA_8VA || ottava.ottavaType == OttavaType.OTTAVA_15MA) {
 				//logError("Checking 8va — "+isAltoClef);
 				if (isAltoClef) {
 					addError("Never use "+ottavaStr+" in alto clef.\nChange to treble clef instead.",ottava);
@@ -3940,8 +3942,7 @@ MuseScore {
 		
 		if (currTick == currentOttavaEnd) {
 			if (numNotesUnderOttava > 0 && currentOttava != null && isTrebleClef) {
-				var k8va = 0, k15ma = 2;
-				if (currentOttava.ottavaType == k8va || currentOttava.ottavaType == k15ma) {
+				if (currentOttava.ottavaType == OttavaType.OTTAVA_8VA || currentOttava.ottavaType == OttavaType.OTTAVA_15MA) {
 					if (averageOttavaLedgerLines < 3 && maxOttavaLedgerLines < 4) addError ('The passage under this ottava doesn’t seem high enough to warrant an ottava.\nPerhaps it could be written at pitch?', currentOttava);
 				} else {
 					if ( averageOttavaLedgerLines > -3  && maxOttavaLedgerLines > -4) {
