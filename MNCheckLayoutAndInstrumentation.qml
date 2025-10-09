@@ -5910,72 +5910,58 @@ MuseScore {
 						var notesInBeamArray = [];
 						var currNote = noteRest;
 						while (currNote.beam != null) {
+							var newBeam = currNote.beam;
 							if (!currNote.beam.is(currBeam)) break;
-							notesInBeamArray.push(currNote);
+							// don't add rests to the beam array
+							if (currNote.notes != null) notesInBeamArray.push(currNote);
+							//logError ('Pushed note with pitch '+currNote.notes[0].pitch);
 							currNote = getNextNoteRest (currNote);
+							
 						}
 	
 						var numNoteRests = notesInBeamArray.length;
 						//logError ('Found '+numNoteRests+' in beam');
-						var numNotesAboveMiddleLine = 0;
-						var numNotesBelowMiddleLine = 0;
 						var preferUpOrDown = 0;
 						
 						if (numNoteRests > 1) {
-							var maxOffsetFromMiddleLine = 0;
+							var maxTopOffset = 0;
+							var maxBottomOffset = 0;
 							for (var i = 0; i<numNoteRests; i++) {
-								var theNoteRest = notesInBeamArray[i];
-								var numNotes = theNoteRest.notes.length;
-								
-								var maxOffsetFromMiddleLineInChord = 0;
-								var chordPreferUpOrDown = 0;
+								var noteRestToCheck = notesInBeamArray[i];
 								
 								// Go through notes in the chord
-								for (var j = 0; j < numNotes; j++) {
-									var note = theNoteRest.notes[j];
-									var offsetFromMiddleLine = 4 - note.line; // 0 = top line, 1 = top space, 2 = second top line, etc...
-									if (offsetFromMiddleLine != 0) {
-										if (Math.abs(offsetFromMiddleLine) > Math.abs(maxOffsetFromMiddleLineInChord)) {
-											maxOffsetFromMiddleLineInChord = offsetFromMiddleLine;
-											chordPreferUpOrDown = (offsetFromMiddleLine > 0) ? -1 : 1;
-										} else {
-											chordPreferUpOrDown = chordPreferUpOrDown + (offsetFromMiddleLine > 0) ? -1 : 1; 
-										}
-									}
-									
+								for (var j = 0; j < noteRestToCheck.notes.length; j++) {
+									var note = noteRestToCheck.notes[j];
+									var offsetFromMiddleLine = 4 - note.line; 
+									// note.line: 0 = top line, 1 = top space, 2 = second top line, etc...
+									// offsetFromMiddleLine: 0 = middle line, 1 = C, 2 = D etc.
+									//logError ('Note '+j+': pitch = '+note.pitch+' offset = '+offsetFromMiddleLine);
+									if (offsetFromMiddleLine < maxBottomOffset) maxBottomOffset = offsetFromMiddleLine;
+									if (offsetFromMiddleLine > maxTopOffset) maxTopOffset = offsetFromMiddleLine;					
 								}
-								
-								//logError ('chordPreferUpOrDown is '+chordPreferUpOrDown);
-								
-								if (chordPreferUpOrDown != 0) {
-									if (chordPreferUpOrDown > 0) {
-										preferUpOrDown ++;
-										numNotesBelowMiddleLine ++;
-									}
-									if (chordPreferUpOrDown < 0) {
-										preferUpOrDown --;
-										numNotesAboveMiddleLine ++;
-									}
-								}
-								if (Math.abs(maxOffsetFromMiddleLineInChord) > Math.abs(maxOffsetFromMiddleLine)) maxOffsetFromMiddleLine = maxOffsetFromMiddleLineInChord;
-								//logError ('preferUpOrDown is '+preferUpOrDown+' numNotesAboveMiddleLine = '+numNotesAboveMiddleLine+' numNotesBelowMiddleLine = '+numNotesBelowMiddleLine);
-	
 							}
-							var calcExtremeNotePos = (4 - maxOffsetFromMiddleLine) * 0.5;
-							// 1 is stems down; 2 is stems up
-							// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
-							var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
-							//logError ('I calculated direction as '+calcDir+' because beamPosY is '+beamPosY+' and calcExtremeNotePos is '+calcExtremeNotePos+'; preferUpOrDown is '+preferUpOrDown);
-							
-							if (numNotesAboveMiddleLine == numNotesBelowMiddleLine) {
-								if (preferUpOrDown > 0 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-								if (preferUpOrDown < 0 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-							} else {
-								if (numNotesAboveMiddleLine > numNotesBelowMiddleLine) {
-									if (calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+							// only check if the beams have to go a particular way
+							//logError ('maxBottomOffset = '+maxBottomOffset+' maxTopOffset = '+maxTopOffset);
+							if (Math.abs(maxBottomOffset) != Math.abs(maxTopOffset)) {
+								var maxOffsetFromMiddleLine = 0;
+								var whichWayStemsShouldGo = 0;
+								var calcExtremeNotePos = 0;
+								if (Math.abs(maxBottomOffset) > Math.abs(maxTopOffset)) {
+									maxOffsetFromMiddleLine = Math.abs(maxBottomOffset);
+									whichWayStemsShouldGo = 2; // stems should go up
+									calcExtremeNotePos = (4-maxBottomOffset) * 0.5;
 								} else {
-									if (calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+									maxOffsetFromMiddleLine = Math.abs(maxTopOffset);
+									whichWayStemsShouldGo = 1; // stems should go down
+									calcExtremeNotePos = (4-maxTopOffset) * 0.5;
 								}
+								// 1 is stems down; 2 is stems up
+								// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
+								var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
+								//logError ('I calculated direction as '+calcDir+' shouldbe = '+whichWayStemsShouldGo+' because beamPosY is '+beamPosY+' maxOffset = '+maxOffsetFromMiddleLine+' and calcExtremeNotePos is '+calcExtremeNotePos);
+								if (whichWayStemsShouldGo == 1 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+
+								if (whichWayStemsShouldGo == 2 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
 							}
 						}
 					}
