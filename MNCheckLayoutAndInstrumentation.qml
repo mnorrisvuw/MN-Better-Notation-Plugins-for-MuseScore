@@ -5466,7 +5466,7 @@ MuseScore {
 				if (noteRest.duration.ticks < 2 * division) {
 					var isForceMinim = noteRest.notes[0].headType == NoteHeadType.HEAD_HALF;
 					var isTwoNoteTremolo = noteRest.tremoloTwoChord != null;
-					if (!forceMinim && !isTwoNoteTremolo) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
+					if (!isForceMinim && !isTwoNoteTremolo) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
 				}
 			}
 			if (isStringHarmonic) {
