@@ -434,9 +434,9 @@ MuseScore {
 		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
 		
 		// **** VERSION CHECK **** //
-		var version46 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 5);
-		if (!version46) {
-			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6 or later.</p> ";
+		var version461 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 6) || (mscoreMajorVersion == 4 && mscoreMinorVersion == 6 && mscoreUpdateVersion >= 1);
+		if (!version461) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6.1 or later.</p> ";
 			dialog.show();
 			return;
 		}
@@ -1290,18 +1290,14 @@ MuseScore {
 									// ************ CHECK TREMOLOS ************ //
 									isTremolo = false;
 									if (doCheckTremolosAndFermatas) {
-										isTremolo = (noteRest.tremoloSingleChord) || (noteRest.tremoloTwoChord);
-										/*
-										if (noteRest.tremoloSingleChord != undefined) {
+										if (noteRest.tremoloSingleChord != undefined && noteRest.tremoloSingleChord != null) {
 											isTremolo = true;
 											checkOneNoteTremolo(noteRest);
 										}
-										if (noteRest.tremoloTwoChord != undefined) {
+										if (noteRest.tremoloTwoChord != undefined && noteRest.tremoloTwoChord != null) {
 											isTremolo = true;
 											checkTwoNoteTremolo(noteRest);
 										}
-										*/
-										// Bug in MS 4.6 — wait for MS 4.6.1
 									}
 								
 									// ************ CHECK OTTAVA ************ //
@@ -3875,7 +3871,7 @@ MuseScore {
 	}
 	
 	function checkTrill (noteRest) {
-		// wait until MS 4.6.1
+		// wait until MS 4.6.?
 		//logError ('Found trill: type = '+currentTrill.type+'; ornament = '+currentTrill.ornament);
 		/*if (noteRest.articulations.length > 0) {
 			logError ('Artic = '+noteRest.articulations[0].type);
@@ -3947,21 +3943,27 @@ MuseScore {
 				}
 			}
 		}
-		
-		
-		if (currTick == currentOttavaEnd) {
-			if (numNotesUnderOttava > 0 && currentOttava != null && isTrebleClef) {
-				if (currentOttava.ottavaType == OttavaType.OTTAVA_8VA || currentOttava.ottavaType == OttavaType.OTTAVA_15MA) {
-					if (averageOttavaLedgerLines < 3 && maxOttavaLedgerLines < 4) addError ('The passage under this ottava doesn’t seem high enough to warrant an ottava.\nPerhaps it could be written at pitch?', currentOttava);
-				} else {
-					if ( averageOttavaLedgerLines > -3  && maxOttavaLedgerLines > -4) {
-						addError ('The passage under this ottava doesn’t seem low enough to warrant an ottava.\nPerhaps it could be written at pitch?', currentOttava);
+		if (!flaggedOttavaIssue) {
+			var endNote = noteRest.notes[0].lastTiedNote;
+			var endTick = endNote.parent.fraction.ticks + endNote.parent.duration.ticks;
+			
+			//logError ('lastTIedNote = '+endNote+' endTick='+endTick);
+			if (endTick >= currentOttavaEnd) {
+				if (numNotesUnderOttava > 0 && currentOttava != null && isTrebleClef) {
+					if (currentOttava.ottavaType == OttavaType.OTTAVA_8VA || currentOttava.ottavaType == OttavaType.OTTAVA_15MA) {
+						if (averageOttavaLedgerLines < 3 && maxOttavaLedgerLines < 4) addError ('The passage under this ottava doesn’t seem high enough to warrant an ottava.\nPerhaps it could be written at pitch?', currentOttava);
+						flaggedOttavaIssue = true;
+					} else {
+						if ( averageOttavaLedgerLines > -3  && maxOttavaLedgerLines > -4) {
+							addError ('The passage under this ottava doesn’t seem low enough to warrant an ottava.\nPerhaps it could be written at pitch?', currentOttava);
+							flaggedOttavaIssue = true;
+						}
 					}
 				}
+				numNotesUnderOttava = 0;
+				averageOttavaLedgerLines = 0;
+				maxOttavaLedgerLines = 0;
 			}
-			numNotesUnderOttava = 0;
-			averageOttavaLedgerLines = 0;
-			maxOttavaLedgerLines = 0;
 		}
 	}
 	
@@ -5248,7 +5250,17 @@ MuseScore {
 		var noteOnString = [-1,-1,-1,-1];
 		var iName = "";
 		var maxStretch = 13; // 6 + 7
-		var numNotes = chord.notes.length;
+		var numNotes = 0;
+		var tempPitchArray = [];
+		
+		// ignore any bracketed notes, as they're probably just harmonic sounding
+		for (var i = 0; i < chord.notes.length; i ++) {
+			var theNote = chord.notes[i];
+			if (!theNote.hasParentheses) {
+				numNotes ++;
+				tempPitchArray.push(theNote.pitch);
+			}
+		}
 		var prevNoteRest = getPreviousNoteRest(chord);
 		var prevIsChord = (prevNoteRest == null) ? false : (prevNoteRest.type == Element.CHORD);
 		
@@ -5277,8 +5289,6 @@ MuseScore {
 			maxStretch = 9;
 		}
 		if (iName === "") return; // unknown string instrument
-		var tempPitchArray = [];
-		for (var i = 0; i < numNotes; i++) tempPitchArray.push(chord.notes[i].pitch);
 
 		//logError("stringsArray[0] ="+stringsArray[0]+" stringNames[1]="+stringNames[1]);
 		for (var stringNum = 0; stringNum < 4 && tempPitchArray.length > 0; stringNum++) {
@@ -5388,12 +5398,19 @@ MuseScore {
 		
 		var theArticulationArray = getArticulations(noteRest);
 		//logError ('Note has '+theArticulationArray.length+' artics');
-		var nn = noteRest.notes.length;
-		//logError("CHECKING STRING HARMONIC — nn = "+nn);
-		if (nn == 2) {
+		var numNotes = 0;
+		var theNotes = [];
+		for (var i = 0; i < noteRest.notes.length; i ++) {
+			var theNote = noteRest.notes[i];
+			if (!theNote.hasParentheses) {
+				numNotes ++;
+				theNotes.push(theNote);
+			}
+		}		//logError("CHECKING STRING HARMONIC — nn = "+nn);
+		if (numNotes == 2) {
 			//check for possible artificial harmonic
-			var noteheadStyle1 = noteRest.notes[0].headGroup;
-			var noteheadStyle2 = noteRest.notes[1].headGroup;
+			var noteheadStyle1 = theNotes[0].headGroup;
+			var noteheadStyle2 = theNotes[1].headGroup;
 			//logError("ns1 = "+noteheadStyle1+" vs "+NoteHeadGroup.HEAD_NORMAL+"); ns2 = "+noteheadStyle2+" vs "+NoteHeadGroup.HEAD_DIAMOND;
 			
 			// **** ARTIFICIAL HARMONICS **** //
@@ -5402,10 +5419,10 @@ MuseScore {
 				isStringHarmonic = true;
 				// we have a false harmonic
 				// are notes always in bottom-up order?
-				var noteheadPitch1 = noteRest.notes[0].pitch;
-				var noteheadPitch2 = noteRest.notes[1].pitch;
-				var bottomNote = noteheadPitch1 < noteheadPitch2 ? noteRest.notes[0] : noteRest.notes[1];
-				var topNote = noteheadPitch1 < noteheadPitch2 ? noteRest.notes[1] : noteRest.notes[0];
+				var noteheadPitch1 = theNotes[0].pitch;
+				var noteheadPitch2 = theNotes[1].pitch;
+				var bottomNote = noteheadPitch1 < noteheadPitch2 ? theNotes[0] : theNotes[1];
+				var topNote = noteheadPitch1 < noteheadPitch2 ? theNotes[1] : theNotes[0];
 				//logError("FALSE HARM FOUND: np1 "+noteheadPitch1+" np2 "+noteheadPitch2);
 				var interval = topNote.pitch - bottomNote.pitch;
 				
@@ -5414,9 +5431,8 @@ MuseScore {
 				// check override on the top note
 				if (noteRest.duration.ticks < 2 * division) {
 					
-					// TO DO FOR 4.6.1 — CHECK
 					var isForceMinim = topNote.headType == NoteHeadType.HEAD_HALF;
-					var isTwoNoteTremolo = noteRest.tremoloTwoChord != null;
+					var isTwoNoteTremolo = (noteRest.tremoloTwoChord != null && noteRest.tremoloTwoChord != undefined);
 					
 					// ignore if a two-note tremolo
 					if (!isForceMinim && !isTwoNoteTremolo) {
@@ -5440,9 +5456,9 @@ MuseScore {
 			}
 		}
 		
-		if (nn == 1) {
+		if (numNotes == 1) {
 			var harmonicArray = [];
-			var noteheadStyle = noteRest.notes[0].headGroup;
+			var noteheadStyle = theNotes[0].headGroup;
 
 			if (typeof staffNum !== 'number') logError("Artic error in checkStringHarmonic nn1");
 			//logError("The artic sym = "+theArticulation.symbol.toString());
@@ -5464,13 +5480,13 @@ MuseScore {
 				harmonicArray = diamondHarmonicIntervals;
 				// check override on the top note
 				if (noteRest.duration.ticks < 2 * division) {
-					var isForceMinim = noteRest.notes[0].headType == NoteHeadType.HEAD_HALF;
+					var isForceMinim = theNotes[0].headType == NoteHeadType.HEAD_HALF;
 					var isTwoNoteTremolo = noteRest.tremoloTwoChord != null;
 					if (!isForceMinim && !isTwoNoteTremolo) addError("The diamond harmonic notehead should be hollow.\nIn Properties, set ‘Override visual duration’ to a minim.\n(See ‘Behind Bars’, p. 11)",noteRest);
 				}
 			}
 			if (isStringHarmonic) {
-				var p = noteRest.notes[0].pitch;
+				var p = theNotes[0].pitch;
 				var harmonicOK = false;
 				
 				for (var i = 0; i < stringsArray.length && !harmonicOK; i++) {
@@ -5575,15 +5591,15 @@ MuseScore {
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
 		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 4)) {
 			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
-				addError ("This slur looks like it has been dragged away from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
+				addError ("This slur looks like it has been dragged from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
 				flaggedManualSlurBarNum = currentBarNum;
 			} else {
 				if (currentSlur.offsetY != 0) {
-					addError ("This slur looks like it has been dragged vertically away from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
+					addError ("This slur looks like it has been dragged vertically from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
 					flaggedManualSlurBarNum = currentBarNum;
 				}
 				if (currentSlur.offsetX != 0) {
-					addError ("This slur looks like it has been dragged horizontally away from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
+					addError ("This slur looks like it has been dragged horizontally from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
 					flaggedManualSlurBarNum = currentBarNum;
 				}
 			}
@@ -6102,7 +6118,7 @@ MuseScore {
 		var tremSubdiv = tremolo.tremoloType;
 		if (tremSubdiv > 4) tremSubdiv -= 5;
 		var numStrokes = tremSubdiv + 1;
-		logError ('numStrokes = '+numStrokes);
+		//logError ('numStrokes = '+numStrokes);
 
 		var dur = 2 * parseFloat(noteRest.duration.ticks) / division;
 		//logError("TWO-NOTE TREMOLO HAS "+numStrokes+" strokes; dur is "+dur+"; isSlurred = "+isSlurred+"; isPitchedPercussionInstrument = "+isPitchedPercussionInstrument);
