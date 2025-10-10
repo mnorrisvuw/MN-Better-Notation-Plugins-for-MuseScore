@@ -104,6 +104,7 @@ MuseScore {
 	property var lastCheckedTuplet: null
 	property var numConsecutiveSemiquaverTriplets: 0
 	property var frames: []
+	property var prevWasRest: false;
 	
 	property var possibleOnbeatSimplificationDurs: []
 	property var possibleOnbeatSimplificationLabels: []
@@ -697,7 +698,7 @@ MuseScore {
 	}
 	
 	function setInstrumentVariables (thePart) {
-		var currentInstrumentId = thePart.instrumentId;
+		var currentInstrumentId = thePart.musicXmlId;
 		//logError(id = "+currentInstrumentId);
 		if (currentInstrumentId != "") {
 			isStringInstrument = currentInstrumentId.includes("strings.");
@@ -1605,15 +1606,37 @@ MuseScore {
 		}
 		
 		if (isMiddleRestInBeat) {
+			prevWasRest = true;
 			if (!hasBeam) addError("This rest should be included in a beam with\nall other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘Join beams’.",noteRest);
 			return;
 		}
 		
 		if (isLastNoteInBeat) {			
 			// Last note in a beat — anything except 1 or 2
-			if (!hasBeam && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note and\nintervening rests (if any) to ‘AUTO’.",noteRest);
+			if (hasBeam) {
+				if (displayDur < quaver) {
+					if (prevWasRest) {
+						if (currentBeamMode != Beam.BEGIN32) {
+							addError("This beam should have its secondary beam broken.\nSet the ‘Beam type’ property of this note to ‘Break inner beams (8th)’.",noteRest);
+						}
+					}
+				}
+			} else {
+				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to either ‘AUTO’ or ‘Join beams’.",noteRest);
+				if (displayDur < quaver) {
+					if (prevWasRest) {
+						if (currentBeamMode != Beam.BEGIN32) {
+							addError("This note should be beamed to the previous note,\nwith the secondary beam broken.\nSet the ‘Beam type’ property of this note to ‘Break inner beams (8th)’.",noteRest);
+						}
+					} else {
+						if (currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+					}
+				}
+			}
 			return;
 		}
+		
+		prevWasRest = false;
 		
 		// Last rests in a beat — set to 0, 1 or 2
 		if (isLastRestsInBeat) acceptableBeamSettings = [Beam.AUTO,Beam.NONE,Beam.BEGIN];
