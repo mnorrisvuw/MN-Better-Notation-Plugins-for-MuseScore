@@ -4454,7 +4454,7 @@ MuseScore {
 									}
 									var couldBeEither = virtualBeatLength == division / 2 && !isCompound; // time sigs like 11/8 could have a quaver or crotchet metronome
 									if (metronomeDuration != virtualBeatLength && !couldBeEither) {
-										logError ('Checking metronome marking');
+										//logError ('Checking metronome marking');
 										addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
 									}
 									if (nonBoldText === "") {
