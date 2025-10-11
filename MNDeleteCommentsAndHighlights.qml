@@ -93,9 +93,9 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		//curScore.startCmd();
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		//curScore.endCmd();
+		curScore.endCmd();
 
 		
 		// **** THE FOLLOWING FORCE A SCREEN REDRAW **** //

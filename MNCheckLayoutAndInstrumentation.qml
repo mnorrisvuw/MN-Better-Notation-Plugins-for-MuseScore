@@ -2084,7 +2084,7 @@ MuseScore {
 				var sameHairpin = false;
 				if (prevHairpinSegment != null) {
 					sameLoc = (e.spanner.spannerTick.ticks == prevHairpinSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevHairpinSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) sameHairpin = !e.parent.is(prevHairpinSegment.parent);
+					if (sameLoc) sameHairpin = !e.spanner.is(prevHairpinSegment.parent);
 				}
 				// only add it if it's not already added
 				if (!sameHairpin) {
@@ -6650,9 +6650,9 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		//curScore.startCmd();
+		curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		//curScore.endCmd();
+		curScore.endCmd();
 
 	}
 	

@@ -215,7 +215,7 @@ MuseScore {
 				firstVisibleStaff = i;
 			}
 	
-			var id = part.instrumentId;
+			var id = part.musicXmlId;
 			instrumentIds.push(id);
 			var calcid = id;
 			var staffName = staves[i].part.longName;
