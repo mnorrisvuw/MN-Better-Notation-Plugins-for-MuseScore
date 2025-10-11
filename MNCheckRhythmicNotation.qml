@@ -104,7 +104,6 @@ MuseScore {
 	property var lastCheckedTuplet: null
 	property var numConsecutiveSemiquaverTriplets: 0
 	property var frames: []
-	property var prevWasRest: false;
 	
 	property var possibleOnbeatSimplificationDurs: []
 	property var possibleOnbeatSimplificationLabels: []
@@ -1522,8 +1521,9 @@ MuseScore {
 	
 	function checkBeamBrokenError (noteRest) {		
 		
-		// Don't process this note if it can't be beamed
+		// NB — don't process this note if there is no beam possible
 		if (displayDur >= crotchet) return;
+		//logError ('—checkBeamBroken—');
 		
 		// **** INITIALISE VARIABLES **** //
 		var isOnlyNoteInBeat = false;
@@ -1543,7 +1543,7 @@ MuseScore {
 			acceptableBeamSettings = [Beam.AUTO, Beam.NONE];
 			isLastRestBeforeNote = true;
 		}
-				
+
 		// ** 3) THE FIRST NOTE IN A BEAT WHERE THERE ARE MORE NOTES COMING IN THE BEAT
 		// ** Beam setting can be set to anything except NONE ** //
 		if (isNote && !haveHadFirstNote) {
@@ -1557,6 +1557,7 @@ MuseScore {
 			var foundAnotherRest = false;
 			var foundAnotherNote = false;
 			cursor2.rewindToTick(cursor.tick);
+
 			if (cursor2.next()) {
 				var withinBeat = true;
 				var tempNote = cursor2.element;
@@ -1565,7 +1566,7 @@ MuseScore {
 					var tempEndBeat = Math.trunc(tempEnd / beatLength);
 					withinBeat = tempEndBeat == noteStartBeat;
 					//logError(withinbeat = "+tempEnd+" "+tempEndBeat+" "+withinBeat);
-					
+
 					if (withinBeat) {
 						if (tempNote.type == Element.CHORD) {
 							foundAnotherNote = true;
@@ -1580,9 +1581,11 @@ MuseScore {
 					}
 				}
 			}
+
 			// now set the values of isOnlyNoteInBeat, lastRestsInBeat
 			if (isFirstNoteInBeat && !foundAnotherNote) isOnlyNoteInBeat = true;
 			if (isNote && !isFirstNoteInBeat && foundAnotherNote) isMiddleNoteInBeat = true;
+
 			if (isNote && isLastItemInBeat) isLastNoteInBeat = true;
 			if (isRest && !isLastRestBeforeNote) {
 				if (foundAnotherNote) {
@@ -1593,50 +1596,49 @@ MuseScore {
 			}
 		}
 		
-		if (isLastItemInBeat) haveHadFirstNote = false; // reset for next beat
-		if (isOnlyNoteInBeat) return; // if this is incorrectly beamed, it will get caught in 'check beamed to next beat' function (note to self: these could be combined)
+		if (isOnlyNoteInBeat) {
+			if (isLastItemInBeat) haveHadFirstNote = false; // reset for next beat
+			return; // if this is incorrectly beamed, it will get caught in 'check beamed to next beat' function (note to self: these could be combined)
+		}
+		
+		// check out the case for a semiquaver or less preceded by a rest 
+		if (isNote && !prevIsNote && haveHadFirstNote && !isFirstNoteInBeat) {
+			if (isLastItemInBeat) haveHadFirstNote = false;
+			if (hasBeam) {
+				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32) addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
+				return;
+			} else {
+				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
+				if (displayDur < quaver) {
+					if (currentBeamMode != Beam.BEGIN32) {
+						addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
+						return;
+					} else {
+						if (currentBeamMode != Beam.MID && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+						return;
+					}
+				}
+			}
+		}
+		if (isLastItemInBeat) haveHadFirstNote = false; // NB: FROM THIS POINT ON 'haveHadFirstNote' may be incorrect, so don't test it
+		
 		if (isMiddleNoteInBeat) {
-			//logError(middle note in beat");
 			if (!hasBeam) {
 				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
 			} else {
-				if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+				if (prevIsNote) {
+					if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+				} else {
+					if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
+				}
 			}
 			return;
 		}
 		
 		if (isMiddleRestInBeat) {
-			prevWasRest = true;
 			if (!hasBeam) addError("This rest should be included in a beam with\nall other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘Join beams’.",noteRest);
 			return;
 		}
-		
-		if (isLastNoteInBeat) {			
-			// Last note in a beat — anything except 1 or 2
-			if (hasBeam) {
-				if (displayDur < quaver) {
-					if (prevWasRest) {
-						if (currentBeamMode != Beam.BEGIN32) {
-							addError("This beam should have its secondary beam broken.\nSet the ‘Beam type’ property of this note to ‘Break inner beams (8th)’.",noteRest);
-						}
-					}
-				}
-			} else {
-				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to either ‘AUTO’ or ‘Join beams’.",noteRest);
-				if (displayDur < quaver) {
-					if (prevWasRest) {
-						if (currentBeamMode != Beam.BEGIN32) {
-							addError("This note should be beamed to the previous note,\nwith the secondary beam broken.\nSet the ‘Beam type’ property of this note to ‘Break inner beams (8th)’.",noteRest);
-						}
-					} else {
-						if (currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
-					}
-				}
-			}
-			return;
-		}
-		
-		prevWasRest = false;
 		
 		// Last rests in a beat — set to 0, 1 or 2
 		if (isLastRestsInBeat) acceptableBeamSettings = [Beam.AUTO,Beam.NONE,Beam.BEGIN];
@@ -1648,7 +1650,9 @@ MuseScore {
 		///	logError(Not correctly beamed");
 			if (isNote) {
 				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
-				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) {
+					addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+				}
 			} else {
 				if (isLastRestBeforeNote) addError("This rest should not be beamed to the next note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
 				if (isLastRestsInBeat) addError("This rest should not be beamed to the previous note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
