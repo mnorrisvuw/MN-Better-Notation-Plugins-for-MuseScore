@@ -57,7 +57,8 @@ MuseScore {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
-		
+		curScore.startCmd();
+
 		// **** GET ALL OTHER ITEMS **** //
 		var elems = curScore.selection.elements;
 		
@@ -92,21 +93,22 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
+		//curScore.endCmd();
 
 		
 		// **** THE FOLLOWING FORCE A SCREEN REDRAW **** //
 		selectNone();
+		curScore.endCmd();
 	}
 	
 	function selectNone () {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
-		curScore.startCmd();
+		//curScore.startCmd();
 		cmd('escape');
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
-		curScore.endCmd();
+		//curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		//curScore.endCmd();
 	}
 	
 	function getFrames() {

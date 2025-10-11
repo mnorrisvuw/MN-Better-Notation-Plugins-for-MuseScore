@@ -619,7 +619,8 @@ MuseScore {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
-		
+		curScore.startCmd();
+
 		setProgress (1);
 		
 		// ************  	GO THROUGH ALL INSTRUMENTS & STAVES LOOKING FOR INFO 	************ //
@@ -1492,10 +1493,10 @@ MuseScore {
 		// ** SHOW ALL OF THE ERRORS ** //
 		showAllErrors();
 		
-		
 		// ** SELECT NONE ** //
 		selectNone();
-				
+		curScore.endCmd();
+
 		// ** SHOW INFO DIALOG ** //
 		showFinalDialog();
 	}
@@ -6238,7 +6239,7 @@ MuseScore {
 		commentCursor.next();
 		
 		// save undo state
-		curScore.startCmd();
+		//curScore.startCmd();
 
 		for (var i = 0; i < numErrors; i++) {
 
@@ -6508,13 +6509,13 @@ MuseScore {
 		}
 		
 		// now reposition all the elements
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
 		}
-		curScore.endCmd();
+		//curScore.endCmd();
 	}
 	
 	//---------------------------------------------------------
@@ -6586,10 +6587,10 @@ MuseScore {
 		
 	function selectNone () {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
-		curScore.startCmd();
+		//curScore.startCmd();
 		cmd('escape');
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
-		curScore.endCmd();
+		//curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		//curScore.endCmd();
 	}
 	
 	
@@ -6649,9 +6650,9 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
+		//curScore.endCmd();
 
 	}
 	

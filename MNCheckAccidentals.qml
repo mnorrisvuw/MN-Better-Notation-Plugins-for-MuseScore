@@ -113,8 +113,9 @@ MuseScore {
 		
 		// **** EXTEND SELECTION? **** //
 		curScore.startCmd();
-		cmd ("select-all");
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
+		curScore.startCmd();
 
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;
@@ -337,7 +338,8 @@ MuseScore {
 			h += 40;
 		}
 		progress.close();
-		
+		curScore.endCmd();
+
 		dialog.height = h;
 		dialog.contentHeight = h;
 		dialog.msg = errorMsg;
@@ -371,10 +373,10 @@ MuseScore {
 	
 	function selectNone () {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
-		curScore.startCmd();
+		//curScore.startCmd();
 		cmd('escape');
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
-		curScore.endCmd();
+		//curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		//curScore.endCmd();
 	}
 	
 	function checkTransposingInstruments() {
@@ -1088,9 +1090,9 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
+		//curScore.endCmd();
 	
 	}
 	
@@ -1159,7 +1161,7 @@ MuseScore {
 		cursor.next();
 		
 		// save undo state
-		curScore.startCmd();
+		//curScore.startCmd();
 	
 		for (var i = 0; i < numErrors; i++) {
 	
@@ -1415,13 +1417,13 @@ MuseScore {
 		}
 		
 		// now reposition all the elements
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
 		}
-		curScore.endCmd();
+		//curScore.endCmd();
 	}
 	
 	function clefAtTick (staffIdx, tick) {

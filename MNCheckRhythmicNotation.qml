@@ -172,6 +172,8 @@ MuseScore {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
+		curScore.startCmd();
+
 		firstStaffNum = curScore.selection.startStaff;
 		lastStaffNum = curScore.selection.endStaff;
 		
@@ -632,7 +634,8 @@ MuseScore {
 		if (numErrors > 100) errorMsg = "<p>CHECK COMPLETED: I found over 100 issues — I have only flagged the first 100.<p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 
 		if (progressShowing) progress.close();
-		
+		curScore.endCmd();
+
 		var h = 250+numLogs*10;
 		if (h > 500) h =500;
 		dialog.height = h;
@@ -662,10 +665,10 @@ MuseScore {
 	
 	function selectNone () {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
-		curScore.startCmd();
+		//curScore.startCmd();
 		cmd('escape');
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
-		curScore.endCmd();
+		//curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		//curScore.endCmd();
 	}
 	
 	function saveSelection () {
@@ -1730,7 +1733,7 @@ MuseScore {
 		cursor.next();
 		
 		// save undo state
-		curScore.startCmd();
+		//curScore.startCmd();
 	
 		for (var i = 0; i < numErrors; i++) {
 	
@@ -1986,13 +1989,13 @@ MuseScore {
 		}
 		
 		// now reposition all the elements
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
 		}
-		curScore.endCmd();
+		//curScore.endCmd();
 	}
 		
 	function getTick (e) {
@@ -2106,9 +2109,9 @@ MuseScore {
 		
 		// **** DELETE EVERYTHING IN THE ARRAY **** //
 		for (var i = 0; i < elementsToRecolor.length; i++) elementsToRecolor[i].color = "black";
-		curScore.startCmd();
+		//curScore.startCmd();
 		for (var i = 0; i < elementsToRemove.length; i++) removeElement(elementsToRemove[i]);
-		curScore.endCmd();
+		//curScore.endCmd();
 	
 	}
 	
