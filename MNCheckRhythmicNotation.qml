@@ -1377,6 +1377,8 @@ MuseScore {
 				} else {
 					
 					// ** OFFBEAT TIE CONDENSATION ** //
+						
+					
 					// CHECK ACTUAL DURS
 
 					for (var k = 0; k < possibleOffbeatSimplificationDurs.length; k++) {
@@ -1502,15 +1504,21 @@ MuseScore {
 		var d1 = note1.actualDuration.ticks;
 		var d2 = note2.actualDuration.ticks;
 		var onBeat = startFrac == 0;
+		var noteArray = [note1,note2];
 		if (onBeat) {
 			// semiquaver crotchet
 			// quaver crotchet
 			if (beatLength == crotchet) {
-				if (d1 < crotchet && d2 == crotchet) addError ("Consider putting the crotchet first in this tie.",note1);
-				if (d1 < crotchet && d2 == minim) addError ("Consider putting the minim first in this tie.",note1);
-				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting this as a minim tied to a quaver.",note1);
-				if (d1 == dottedcrotchet && d2 == crotchet) addError ("Consider rewriting this as a minim tied to a quaver.",note1);
+				if (d1 < crotchet && d2 == crotchet) addError ("Consider putting the crotchet first in this tie.",noteArray);
+				if (d1 < crotchet && d2 == minim) addError ("Consider putting the minim first in this tie.",noteArray);
+				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting this tied note as a minim tied to a quaver.",noteArray);
+				if (d1 == dottedcrotchet && d2 == crotchet) addError ("Consider rewriting this tied note as a minim tied to a quaver.",noteArray);
+				if (d1 == minim && d2 == dottedcrotchet) addError ("Consider rewriting this tied note as a dotted minim tied to a quaver.",noteArray);
 			} 
+		} else {
+			if (beatLength == crotchet) {
+				if (d1 == dottedcrotchet && d2 == minim) addError ("Consider rewriting this tied note as a quaver tied to a dotted minim",noteArray);
+			}
 		}
 	}
 	
