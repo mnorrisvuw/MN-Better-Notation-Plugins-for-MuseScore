@@ -119,22 +119,26 @@ MuseScore {
 			var elems = frame.elements;
 			for (var j = 0; j < elems.length; j++) {
 				var e = elems[j];
-				var eSubtype = e.subtypeName();
+				var textStyle = e.subStyle;
 				// Strip out any tags
-				if (eSubtype == 'Title') theTitle = e.text.replace(/<[^>]+>/g, "");
-				if (eSubtype == 'Subtitle') theSubtitle = e.text.replace(/<[^>]+>/g, "");
-				if (eSubtype == 'Composer') theComposer = e.text.replace(/<[^>]+>/g, "");
+				if (textStyle == Tid.TITLE) theTitle = e.text.replace(/<[^>]+>/g, "");
+				if (textStyle == Tid.SUBTITLE) theSubtitle = e.text.replace(/<[^>]+>/g, "");
+				if (textStyle == Tid.COMPOSER) theComposer = e.text.replace(/<[^>]+>/g, "");
 			}
 		}
 	}
 	
 	function buttonClicked (chosenLabel) {
+		
 		var doFrontMatter = styles.createFrontMatter;
 		var doChangeAllFonts = styles.changeAllFonts;
 		var titlePageBox = null;
 		var frontMatterBox = null;
 		styles.close ();
-		
+		var spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI;
+		titlePageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
+		var hasBottom = false;
+
 		var chosenTitlePageStyle = null;
 		for (var i = 0; i < titlePageStyles.length && chosenTitlePageStyle == null; i++) {
 			if (titlePageStyles[i].label === chosenLabel) chosenTitlePageStyle = titlePageStyles[i];
@@ -169,110 +173,39 @@ MuseScore {
 			curScore.startCmd();
 			cmd ("insert-vbox");
 			curScore.endCmd();
-			
 			curScore.startCmd();
 			frontMatterBox = curScore.selection.elements[0];
 			cmd ("page-break");
-			cmd ("poet-text");
-			var frontMatter = curScore.selection.elements[0];
-			frontMatter.text = frontMatterText;
+			curScore.addText( 'poet', frontMatterText);
+			var frontMatter = frontMatterBox.elements.slice(-1)[0];
 			frontMatter.align = Align.HCENTER;
 			frontMatter.fontSize = 10;
 			if ("frontmatterfont" in chosenTitlePageStyle) frontMatter.fontFace = chosenTitlePageStyle.frontmatterfont;
 			curScore.endCmd();
-
 		}
 		
 		// ** CREATE TITLE PAGE ** //
 		curScore.startCmd();
 		cmd ("insert-vbox");
 		curScore.endCmd();
-
-		curScore.startCmd();
+		getFrames();
 		titlePageBox = curScore.selection.elements[0];
 		cmd ("page-break");
 		var newTitle = null;
 		var titleLines = 0;
-		if (theTitle !== '') {
-			cmd ("title-text");
-			newTitle = curScore.selection.elements[0];
-			newTitle.text = theTitle;
-			titleLines = theTitle.split(/\n/).length;
-		}
-		var newSubtitle = null;
-		if (theSubtitle != '') {
-			cmd ("subtitle-text");
-			newSubtitle = curScore.selection.elements[0];
-			newSubtitle.text = theSubtitle;
-		}
-		var newComposer = null;
-		var composerLines = 0;
-		if (theComposer != '') {
-			cmd ("composer-text");
-			newComposer = curScore.selection.elements[0];
-			newComposer.text = theComposer;
-			composerLines = theComposer.split(/\n/).length;
-		}
-		if (lineStyle != null) {
-			cmd ("poet-text");
-			var newLine = curScore.selection.elements[0];
-			newLine.text = "—".repeat(23);
-		}
-		if (line2Style != null) {
-			cmd ("poet-text");
-			var newLine2 = curScore.selection.elements[0];
-			newLine2.text = "—".repeat(23);
-		}
-		curScore.endCmd();
-		
-		deleteObj(boxToDelete);
-		var spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI;
-		titlePageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
 		var fontStyles = {'PLAIN' : 0, 'BOLD' : 1, 'ITALIC' : 2};
 		var alignStyles = {'LEFT' : Align.LEFT, 'HCENTER' : Align.HCENTER, 'RIGHT' : Align.RIGHT, 'RIGHT VCENTER' : (Align.RIGHT | Align.VCENTER), 'HCENTER BOTTOM' : (Align.HCENTER | Align.BOTTOM), 'LEFT VCENTER' : (Align.LEFT | Align.VCENTER) };
 		
-		// NOW SET UP THE FONT STYLING AS PER THE TEMPLATES
-		var hasBottom = false;
-		if (newComposer != null) {
-			
+		// ***** ADD TITLE TEXT ***** //
+		if (theTitle !== '') {
+			var theText = theTitle;
+			if ("case" in titleStyle) if (titleStyle.case == "UPPER") theText = theText.toUpperCase();
+			if ("space" in titleStyle) theText = theText.replace(/(.)/g,'$1\u2009'); // 2009 is a thin space
 			curScore.startCmd();
-			newComposer.fontSize = ("fontsize" in composerStyle) ? composerStyle.fontsize : 32.0;
-			if ("font" in composerStyle) newComposer.fontFace = composerStyle.font;
-			if ("fontstyle" in composerStyle) newComposer.fontStyle = fontStyles[composerStyle.fontstyle];
-			if ("align" in composerStyle) {
-				newComposer.align = alignStyles[composerStyle.align];
-				if (!hasBottom) hasBottom = composerStyle.align.includes("BOTTOM");
-			} else {
-				newComposer.align = Align.CENTER;
-			}
-			if ("offsety" in composerStyle) {
-				var accountForMultipleLines = true;
-				if ("align" in composerStyle) if (!composerStyle.align.includes ("VCENTER") && composerStyle.offsetY < 40) accountForMultipleLines = false;
-				if (accountForMultipleLines) {
-					newComposer.offsetY = (composerStyle.offsety - ((composerLines - 1) * newComposer.fontSize / 2)) / spatium;
-				} else {
-					newComposer.offsetY = composerStyle.offsety / spatium;
-				}
-			}
-			if ("offsetx" in composerStyle) newComposer.offsetX = composerStyle.offsetx / spatium;
-			var theText = newComposer.text.replace(/<[^>]+>/g, "");
-			var composerIsUpperCase = theText === theText.toUpperCase();
-			var composerGoingToUpperCase = false;
-			if ("case" in composerStyle) {
-				if (composerStyle.case == "UPPER") {
-					theText = theText.toUpperCase();
-					composerGoingToUpperCase = true;
-				}
-			}
-			// convert to titleCase
-			if (composerIsUpperCase && !composerGoingToUpperCase) theText = theText.replace(/\b\w+/g,function(s){return s.charAt(0).toUpperCase() + s.substr(1).toLowerCase();});
-			
-			if ("space" in composerStyle) theText = theText.replace(/(.)/g,'$1\u2009'); // 2009 is a thin space
-			if (theText.includes('Arr.') && !composerGoingToUpperCase) theText = theText.replace('Arr.','arr.');
-			newComposer.text = theText;
+			curScore.addText( 'title', theText);
 			curScore.endCmd();
-		}
-		if (newTitle != null) {
+			newTitle = titlePageBox.elements.slice(-1)[0];
+			titleLines = theTitle.split(/\n/).length;
 			curScore.startCmd();
 			newTitle.fontSize = ("fontsize" in titleStyle) ? titleStyle.fontsize : 28.0;
 			if ("font" in titleStyle) {
@@ -298,13 +231,19 @@ MuseScore {
 					newTitle.offsetY = titleStyle.offsety / spatium;
 				}
 			}
-			if ("offsetx" in titleStyle) newTitle.offsetX = titleStyle.offsetx / spatium;
-			if ("case" in titleStyle) if (titleStyle.case == "UPPER") newTitle.text = newTitle.text.toUpperCase();
-			if ("space" in titleStyle) newTitle.text = newTitle.text.replace(/(.)/g,'$1\u2009'); // 2009 is a thin space
-
+			if ("offsetx" in titleStyle) newTitle.offsetX = titleStyle.offsetx / spatium;		
 			curScore.endCmd();
 		}
-		if (newSubtitle != null) {
+		
+		// ***** ADD SUBTITLE TEXT ***** //
+		var newSubtitle = null;
+		if (theSubtitle != '') {
+			var theText = theSubtitle;
+			if ("case" in subtitleStyle) if (subtitleStyle.case == "UPPER") theText = theText.toUpperCase();
+			curScore.startCmd();
+			curScore.addText( 'subtitle', theText);
+			curScore.endCmd();
+			newSubtitle = titlePageBox.elements.slice(-1)[0];
 			curScore.startCmd();
 			newSubtitle.fontSize = ("fontsize" in subtitleStyle) ? subtitleStyle.fontsize : 22.0;
 			if ("font" in subtitleStyle) {
@@ -323,10 +262,64 @@ MuseScore {
 			}
 			if ("offsety" in subtitleStyle) newSubtitle.offsetY = subtitleStyle.offsety / spatium;
 			if ("offsetx" in subtitleStyle) newSubtitle.offsetX = subtitleStyle.offsetx / spatium;
-			if ("case" in subtitleStyle) if (subtitleStyle.case == "UPPER") newSubtitle.text = newSubtitle.text.toUpperCase();
 			curScore.endCmd();
 		}
-		if (newLine != null) {
+		
+		// ***** ADD COMPOSER TEXT ***** //
+		var newComposer = null;
+		var composerLines = 0;
+		if (theComposer != '') {
+			var theText = theComposer.replace(/<[^>]+>/g, ""); // strip out any styles
+			var composerIsUpperCase = theText === theText.toUpperCase();
+			var composerGoingToUpperCase = false;
+			if ("case" in composerStyle) {
+				if (composerStyle.case == "UPPER") {
+					theText = theText.toUpperCase();
+					composerGoingToUpperCase = true;
+				}
+			}
+			// convert to title case
+			if (composerIsUpperCase && !composerGoingToUpperCase) theText = theText.replace(/\b\w+/g,function(s){return s.charAt(0).toUpperCase() + s.substr(1).toLowerCase();});
+			if ("space" in composerStyle) theText = theText.replace(/(.)/g,'$1\u2009'); // 2009 is a thin space
+			if (theText.includes('Arr.') && !composerGoingToUpperCase) theText = theText.replace('Arr.','arr.');
+			curScore.startCmd();
+			curScore.addText( 'composer', theText);
+			curScore.endCmd();
+			newComposer = titlePageBox.elements.slice(-1)[0];
+			composerLines = theComposer.split(/\n/).length;
+			curScore.startCmd();
+			newComposer.fontSize = ("fontsize" in composerStyle) ? composerStyle.fontsize : 32.0;
+			if ("font" in composerStyle) newComposer.fontFace = composerStyle.font;
+			if ("fontstyle" in composerStyle) newComposer.fontStyle = fontStyles[composerStyle.fontstyle];
+			if ("align" in composerStyle) {
+				newComposer.align = alignStyles[composerStyle.align];
+				if (!hasBottom) hasBottom = composerStyle.align.includes("BOTTOM");
+			} else {
+				newComposer.align = Align.CENTER;
+			}
+			if ("offsety" in composerStyle) {
+				var accountForMultipleLines = true;
+				if ("align" in composerStyle) if (!composerStyle.align.includes ("VCENTER") && composerStyle.offsetY < 40) accountForMultipleLines = false;
+				if (accountForMultipleLines) {
+					newComposer.offsetY = (composerStyle.offsety - ((composerLines - 1) * newComposer.fontSize / 2)) / spatium;
+				} else {
+					newComposer.offsetY = composerStyle.offsety / spatium;
+				}
+			}
+			if ("offsetx" in composerStyle) newComposer.offsetX = composerStyle.offsetx / spatium;
+			curScore.endCmd();
+		}
+		
+		// ***** ADD LINE 1 ***** //
+		if (lineStyle != null) {
+			var theChar = ("char" in lineStyle) ? lineStyle.char : "—";
+			var repeats = ("repeats" in lineStyle) ? lineStyle.repeats : 23;
+			var theText = theChar.repeat(repeats);
+			curScore.startCmd();
+			curScore.addText( 'poet', theText);
+			curScore.endCmd();
+			var newLine = titlePageBox.elements.slice(-1)[0];
+			
 			curScore.startCmd();
 			newLine.fontSize = ("fontsize" in lineStyle) ? lineStyle.fontsize : 22.0;
 			if ("font" in lineStyle) newLine.fontFace = lineStyle.font;
@@ -339,38 +332,35 @@ MuseScore {
 			}
 			if ("offsety" in lineStyle) newLine.offsetY = lineStyle.offsety / spatium;
 			if ("offsetx" in lineStyle) newLine.offsetX = lineStyle.offsetx / spatium;
-			var repeats = 23;
-			if ("repeats" in lineStyle) repeats = lineStyle.repeats;
-			if ("char" in lineStyle) {
-				newLine.text = lineStyle.char.repeat(repeats);
-			} else {
-				if (repeats != 23) newLine.text = '—'.repeat(repeats);
-			}
 			curScore.endCmd();
 		}
-		
-		if (newLine2 != null) {
+		// ***** ADD LINE 2 ***** //
+		if (line2Style != null) {
+			var theChar = ("char" in line2Style) ? line2Style.char : "—";
+			var repeats = ("repeats" in line2Style) ? line2Style.repeats : 23;
+			var theText = theChar.repeat(repeats);
+			curScore.startCmd();
+			curScore.addText( 'poet', theText);
+			curScore.endCmd();
+			var newLine2 = titlePageBox.elements.slice(-1)[0];
+			
 			curScore.startCmd();
 			newLine2.fontSize = ("fontsize" in line2Style) ? line2Style.fontsize : 22.0;
-			if ("font" in line2Style) newLine2.fontFace = line2Style.font;
-			if ("fontstyle" in line2Style) newLine2.fontStyle = fontStyles[line2Style.fontstyle];
+			if ("font" in line2Style) newLine.fontFace = line2Style.font;
+			if ("fontstyle" in line2Style) newLine.fontStyle = fontStyles[line2Style.fontstyle];
 			if ("align" in line2Style) {
-				newLine2.align = alignStyles[line2Style.align];
+				newLine.align = alignStyles[line2Style.align];
 				if (!hasBottom) hasBottom = line2Style.align.includes("BOTTOM");
 			} else {
 				newLine2.align = Align.CENTER;
 			}
-			if ("offsety" in line2Style) newLine2.offsetY = line2Style.offsety / spatium;
-			if ("offsetx" in line2Style) newLine2.offsetX = line2Style.offsetx / spatium;
-			var repeats = 23;
-			if ("repeats" in line2Style) repeats = line2Style.repeats;
-			if ("char" in line2Style) {
-				newLine2.text = line2Style.char.repeat(repeats);
-			} else {
-				if (repeats != 23) newLine2.text = '—'.repeat(repeats);
-			}
+			if ("offsety" in line2Style) newLine.offsetY = line2Style.offsety / spatium;
+			if ("offsetx" in line2Style) newLine.offsetX = line2Style.offsetx / spatium;
 			curScore.endCmd();
 		}
+		
+		deleteObj(boxToDelete);
+		
 		var calcBoxHeight = hasBottom ? Math.round(titlePageHeight / 1.95) : titlePageHeight;
 		curScore.startCmd();
 		titlePageBox.boxHeight = calcBoxHeight; //titlePageHeight - (titlePageBox.pagePos.y * 2);
@@ -387,7 +377,7 @@ MuseScore {
 		theMsg += ' Any long titles, subtitles or composers’ names may require additional manual adjustment.</p>';
 		
 		// FORCE LAYOUT
-		selectNone();
+		//selectNone();
 		
 		var displayFontMessage = "fonturl" in chosenTitlePageStyle;
 		if (("os" in chosenTitlePageStyle) && isMac) displayFontMessage = false;
@@ -406,10 +396,12 @@ MuseScore {
 	
 	function selectNone () {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
-		curScore.startCmd();
+		/*curScore.startCmd();
 		cmd('escape');
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
 		curScore.endCmd();
+		curScore.startCmd();
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
+		curScore.endCmd();*/
 	}
 
 	
@@ -564,6 +556,7 @@ MuseScore {
 				
 				Text {
 					text: model.label
+					color: ui.theme.fontPrimaryColor
 				}
 			}
 		}
