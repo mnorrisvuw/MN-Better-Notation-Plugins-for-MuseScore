@@ -2451,108 +2451,125 @@ MuseScore {
 		var numVa = 0;
 		var numVc = 0;
 		var numDb = 0;
+		var numPf = 0;
 		var flStaff, obStaff, clStaff, bsnStaff, hnStaff;
 		var tpt1Staff, tpt2Staff, tbnStaff, tbaStaff;
-	
-		// Check Quintets
-		if (numParts > 3 && numParts < 6) {
-			for (var i = 0; i < numStaves; i ++) {
-				if (staffVisible[i]) {
-					var id = curScore.staves[i].part.musicXmlId;
-					if (id.includes("wind.flutes.flute")) {
-						numFl ++;
-						flStaff = i;
-					}
-					if (id.includes("wind.reed.oboe") || id.includes("wind.reed.english-horn")) {
-						numOb ++;
-						obStaff = i;
-					}
-					if (id.includes("wind.reed.clarinet")) {
-						numCl ++;
-						clStaff = i;
-					}
-					if (id.includes("wind.reed.bassoon") || id.includes("wind.reed.contrabassoon")) {
-						numBsn ++;
-						bsnStaff = i;
-					}
-					if (id.includes( "brass.french-horn")) {
-						numHn ++;
-						hnStaff = i;
-					}
-					if (id.includes( "brass.trumpet")) {
-						numTpt ++;
-						if (numTpt == 1) tpt1Staff = i;
-						if (numTpt == 2) tpt2Staff = i;
-					}
-					if (id.includes("brass.trombone")) {
-						numTbn ++;
-						tbnStaff = i;
-					}
-					if (id.includes ("brass.tuba")) {
-						numTba ++;
-						tbaStaff = i;
-					}
-					
-					if (id.includes ("strings.violin")) numVn ++;
-					if (id.includes ("strings.viola")) numVa ++;
-					if (id.includes ("strings.cello")) numVc ++;
-					if (id.includes ("strings.contrasbass")) numDb ++;
-					
-				}
-			}
-			// **** CHECK WIND QUINTET STAFF ORDER **** //
-			if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
-				checkBarlinesConnected("wind quintet");
-				checkBrackets("wind quintet");
-				if (flStaff != 0) {
-					addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Layout tab.","topfunction ");
-				} else {
-					if (obStaff != 1) {
-						addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.\nReorder using the Layout tab.","pagetop");
-					} else {
-						if (clStaff != 2) {
-							addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.\nReorder using the Layout tab.","pagetop");
-						} else {
-							if (hnStaff != 3) {
-								addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.\nReorder using the Layout tab.","pagetop");
-							} else {
-								if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.\nReorder using the Layout tab.","pagetop");
-							}
-						}
-					}
-				}
-			}
+				
 		
-			// **** CHECK BRASS QUINTET STAFF ORDER **** //
-			if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
-				checkBarlinesConnected("brass quintet");
-				checkBrackets("brass quintet");
-				if (tpt1Staff != 0) {
-					addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
+		for (var i = 0; i < numStaves; i ++) {
+			if (staffVisible[i]) {
+				var id = curScore.staves[i].part.musicXmlId;
+				logError (id);
+				if (id.includes("wind.flutes.flute")) {
+					numFl ++;
+					flStaff = i;
+				}
+				if (id.includes("wind.reed.oboe") || id.includes("wind.reed.english-horn")) {
+					numOb ++;
+					obStaff = i;
+				}
+				if (id.includes("wind.reed.clarinet")) {
+					numCl ++;
+					clStaff = i;
+				}
+				if (id.includes("wind.reed.bassoon") || id.includes("wind.reed.contrabassoon")) {
+					numBsn ++;
+					bsnStaff = i;
+				}
+				if (id.includes( "brass.french-horn")) {
+					numHn ++;
+					hnStaff = i;
+				}
+				if (id.includes( "brass.trumpet")) {
+					numTpt ++;
+					if (numTpt == 1) tpt1Staff = i;
+					if (numTpt == 2) tpt2Staff = i;
+				}
+				if (id.includes("brass.trombone")) {
+					numTbn ++;
+					tbnStaff = i;
+				}
+				if (id.includes ("brass.tuba")) {
+					numTba ++;
+					tbaStaff = i;
+				}
+				
+				if (id.includes ("strings.violin")) numVn ++;
+				if (id.includes ("strings.viola")) numVa ++;
+				if (id.includes ("strings.cello")) numVc ++;
+				if (id.includes ("strings.contrabass")) numDb ++;
+				if (id.includes ("keyboard.piano")) numPf ++;
+			}
+		}
+		//logError ('numParts = '+numParts+'; numPf = '+numPf);
+
+		// ** CHECK PIANO TRIO ** //
+		if (numParts == 3 && numPf > 0) {
+			checkBrackets ("piano trio");
+		}
+		
+		// ** CHECK PIANO QUARTET ** //
+		if (numParts == 4 && numPf > 0) {
+			checkBrackets ("piano quartet");
+		}
+		
+		// ** CHECK STRING QUARTET ** //
+
+		if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) {
+			checkBarlinesConnected("string quartet");
+			checkBrackets("string quartet");
+		}
+			
+		// **** CHECK WIND QUINTET **** //
+		if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
+			checkBarlinesConnected("wind quintet");
+			checkBrackets("wind quintet");
+			if (flStaff != 0) {
+				addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Layout tab.","topfunction ");
+			} else {
+				if (obStaff != 1) {
+					addError("You appear to be composing a wind quintet\nbut the oboe should be the second staff.\nReorder using the Layout tab.","pagetop");
 				} else {
-					if (tpt2Staff != 1) {
-						addError("You appear to be composing a brass quintet\nbut the second trumpet should be the second staff.","pagetop");
+					if (clStaff != 2) {
+						addError("You appear to be composing a wind quintet\nbut the clarinet should be the third staff.\nReorder using the Layout tab.","pagetop");
 					} else {
-						if (hnStaff != 2) {
-							addError("You appear to be composing a brass quintet\nbut the horn should be the third staff.","pagetop");
+						if (hnStaff != 3) {
+							addError("You appear to be composing a wind quintet\nbut the horn should be the fourth staff.\nReorder using the Layout tab.","pagetop");
 						} else {
-							if (tbnStaff != 3) {
-								addError("You appear to be composing a brass quintet\nbut the trombone should be the fourth staff.","pagetop");
-							} else {
-								if (tbaStaff != 4) addError("You appear to be composing a brass quintet\nbut the tuba should be the bottom staff.","pagetop");
-							}
+							if (bsnStaff != 4) addError("You appear to be composing a wind quintet\nbut the bassoon should be the bottom staff.\nReorder using the Layout tab.","pagetop");
 						}
 					}
 				}
 			}
-			if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) {
-				checkBarlinesConnected("string quartet");
-				checkBrackets("string quartet");
+		}
+	
+		// **** CHECK BRASS QUINTET **** //
+		if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
+			checkBarlinesConnected("brass quintet");
+			checkBrackets("brass quintet");
+			if (tpt1Staff != 0) {
+				addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
+			} else {
+				if (tpt2Staff != 1) {
+					addError("You appear to be composing a brass quintet\nbut the second trumpet should be the second staff.","pagetop");
+				} else {
+					if (hnStaff != 2) {
+						addError("You appear to be composing a brass quintet\nbut the horn should be the third staff.","pagetop");
+					} else {
+						if (tbnStaff != 3) {
+							addError("You appear to be composing a brass quintet\nbut the trombone should be the fourth staff.","pagetop");
+						} else {
+							if (tbaStaff != 4) addError("You appear to be composing a brass quintet\nbut the tuba should be the bottom staff.","pagetop");
+						}
+					}
+				}
 			}
-			if (numParts == 5 && numVn == 2 && numVa + numVc + numDb == 3) {
-				checkBarlinesConnected("string quintet");
-				checkBrackets("string quintet");
-			}
+		}
+		
+		// **** CHECK STRING QUINTET **** //
+		if (numParts == 5 && numVn == 2 && numVa + numVc + numDb == 3) {
+			checkBarlinesConnected("string quintet");
+			checkBrackets("string quintet");
 		}
 	}
 	
@@ -3060,6 +3077,7 @@ MuseScore {
 			var instrumentChangeFramePadding = style.value("instrumentChangeFramePadding");
 			var rehearsalMarkFontSize = style.value("rehearsalMarkFontSize");
 			var lyricsMinDistance = style.value("lyricsMinDistance");
+			var mergeMatchingRests = style.value("mergeMatchingRests");
 			
 			// *************************************** //
 			// **** STYLE SETTINGS — 1. SCORE TAB **** //
@@ -3158,7 +3176,7 @@ MuseScore {
 			
 			
 			// *************************************** //
-			// ****         9. SPACING TAB          ***** //
+			// ****      2. SPACING TAB          ***** //
 			// *************************************** //
 			
 			// *** CHECK SYSTEM SPACING *** //
@@ -3210,11 +3228,15 @@ MuseScore {
 			if (showFirstBarNum) styleComments.push("(Bar numbers tab) Uncheck ‘Show first’");
 			
 			
-			
 			// *************************************** //
-			// ****       10. BARLINES TAB        **** //
+			// ****       5. BARLINES TAB        **** //
 			// *************************************** //
 			if (barlineWidth != 0.16) styleComments.push("(Barlines tab) Set ‘Thin barline thickness’ to 0.16sp");
+			
+			// *************************************** //
+			// ****       6. RESTS TAB        **** //
+			// *************************************** //
+			if (mergeMatchingRests != 1) styleComments.push("(Rests tab) Check ‘Merge matching rests’");
 			
 			// *************************************** //
 			// ****       17. SLURS & TIES        **** //
@@ -4972,6 +4994,7 @@ MuseScore {
 	
 	function checkBrackets (str) {
 		var singleJoinedBracketArray = ["string quartet", "wind quintet", "brass quintet", "string quintet"];
+		var noBracketArray = ["piano trio", "piano quartet"];
 		var firstVisibleStaff = -1;
 		var lastVisibleStaff = -1;
 		
@@ -4986,7 +5009,6 @@ MuseScore {
 		
 		if (singleJoinedBracketArray.includes(str)) {
 			// this score only needs one bracket
-			var visibleStaff = 0;
 			for (var i = 0; i < numStaves; i++) {
 				if (staffVisible[i]) {
 					var theStaff = curScore.staves[i];
@@ -4997,15 +5019,27 @@ MuseScore {
 						} else {
 							if (theStaff.brackets.length == 1) {
 								if (theStaff.brackets[0].systemBracket > BracketType.NORMAL) {
-									addError ('Use a normal bracket for '+str+'.',"system1 0");
+									addError ('Use a normal bracket for '+str+'s.',"system1 0");
 								}
 								if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
 									addError ('For '+str+'s, the staff bracket should span the entire system.','system1 0');
 								}
 							} else {
-								addError ('For '+str+'s, you only need one staff bracket.',"system1 0");
+								addError ('For '+str+'s, you only need one staff bracket.\nSelect all unnecessary brackets and press ‘delete’.',"system1 0");
 							}
 						}
+					}
+				}
+			}
+		}
+		
+		if (noBracketArray.includes(str)) {
+			for (var i = 0; i < numStaves; i++) {
+				if (staffVisible[i]) {
+					var theStaff = curScore.staves[i];
+					if (!isGrandStaff[i] && theStaff.brackets.length != 0) {
+						addError ('For '+str+'s, you don’t need a bracket, except for a brace on the piano.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
+						return;
 					}
 				}
 			}

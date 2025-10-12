@@ -2132,10 +2132,10 @@ MuseScore {
 				var sameLoc = false;
 				var sameGlissando = false;
 				if (prevGlissandoSegment != null) {
-					sameLoc = (e.spannerTick.ticks == prevGlissandoSegment.spannerTick.ticks) && (e.spannerTicks.ticks == prevGlissandoSegment.spannerTicks.ticks);
-					if (sameLoc) sameGlissando = !e.parent.is(prevGlissandoSegment.parent);
+					sameLoc = (e.spanner.spannerTick.ticks == prevGlissandoSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevGlissandoSegment.spanner.spannerTicks.ticks);
+					if (sameLoc) sameGlissando = !e.spanner.is(prevGlissandoSegment.spanner);
 				}
-				if (!sameGlissando) glisses[etrack][e.spannerTick.ticks] = e;
+				if (!sameGlissando) glisses[etrack][e.spanner.spannerTick.ticks] = e;
 				prevGlissandoSegment = e;
 			}
 		}
