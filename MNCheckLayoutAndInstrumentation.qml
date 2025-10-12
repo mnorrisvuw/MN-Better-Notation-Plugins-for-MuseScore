@@ -92,9 +92,6 @@ MuseScore {
 	property var isTenorClef: false
 	property var isBassClef: false
 	property var isPercClef: false
-	property var clefIs8va: false
-	property var clefIs8ba: false
-	property var clefIs15ma: false
 	property var diatonicPitchOfMiddleLine: 41
 	property var initialTempoExists: false
 	property var prevKeySigSharps: 0
@@ -212,8 +209,13 @@ MuseScore {
 	property var isCompound: false
 	property var currentClef: null
 	property var currentClefNum: 0
+	property var currentClefBarNum: 0
+	property var currentClefTick: 0
+	property var isMidBarClef: false
+	property var isEndOfBarClef: false
+	property var firstNoteSinceClefChange: false
 	property var numClefs: 0
-	property var prevClefId: null
+	property var prevClefType: -1
 	property var prevDynamic: ""
 	property var prevDynamicObject: null
 	property var prevDynamicBarNum: 0
@@ -781,7 +783,7 @@ MuseScore {
 			prevDynamicObject = null;
 			prevDynamicBarNum = 0;
 			prevDynamicDisplayBarNum = 0;
-			prevClefId = null;
+			prevClefType = -1;
 			prevMultipleStop = null;
 			prevIsMultipleStop = false;
 			prevMultipleStopInterval = 0;
@@ -906,25 +908,20 @@ MuseScore {
 			
 			// ** clefs
 			numClefs = clefs[currentStaffNum].length;
-			currentClefNum = -1;
-			cursor.filter = Segment.HeaderClef;
-			cursor.staffIdx = currentStaffNum;
-			cursor.voice = 0;
-			cursor.rewind(Cursor.SCORE_START);
-			if (cursor.element == null) cursor.next();
-			currentBar = cursor.measure;
-			currentSystem = null;
-			currentSystemNum = 0;
-			numNoteRestsInThisSystem = 0;
-			numBeatsInThisSystem = 0;
-			var headerClef = cursor.element;
-			currentClef = headerClef;
+			currentClefNum = 0;
+			prevClefType = -1;
+			currentClef = clefs[currentStaffNum][0];
+			currentClefTick = 0;
+			currentClefBarNum = 1;
+			firstNoteSinceClefChange = false;
 			
 			// NB: call checkClef AFTER the currentInstrumentName/Id setup and AFTER set InstrumentVariables
 			if (currentClef != null) {
-				checkClef(currentClef, true);
-				prevClefNumInBar = -1;
-				nextClefTick = (numClefs > 0) ? clefs[currentStaffNum][0].parent.tick : endOfScoreTick;
+				checkClef(currentClef);
+				prevClefNumInBar = 0;
+				nextClefTick = (numClefs > 1) ? clefs[currentStaffNum][1].parent.tick : endOfScoreTick;
+			} else {
+				logError ('checkScore() — couldn’t find currentClef');
 			}
 						
 			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRAND STAFF **** //
@@ -940,10 +937,13 @@ MuseScore {
 				// reset clef from the previous bar
 				firstClefNumInBar = prevClefNumInBar; // we need to do this to keep track of clefs; in future we can replace this with clefAtTick()
 				currentClefNum = firstClefNumInBar;
-				currentClef = currentClefNum == -1 ? headerClef : clefs[currentStaffNum][currentClefNum];
-				//logError ('firstClefNumInBar = '+firstClefNumInBar);
-				var firstClefIdInBar = currentClef.subtypeName();
-				prevClefId = firstClefIdInBar;
+				if (currentClefNum >= clefs[currentStaffNum].length) {
+					logError ('currentClefNum >= numClefs');
+				} else {
+					currentClef = clefs[currentStaffNum][currentClefNum];
+				}
+				var firstClefTypeInBar = currentClef.transposingClefType;
+				prevClefType = firstClefTypeInBar;
 				var startTrack = currentStaffNum * 4;
 				var goneToNextBar = false;
 				var firstNoteInThisBar = null;
@@ -1050,10 +1050,10 @@ MuseScore {
 					// ** clef
 					if (firstClefNumInBar != currentClefNum) {
 						currentClefNum = firstClefNumInBar;
-						currentClef = (currentClefNum == -1) ? headerClef : clefs[currentStaffNum][currentClefNum];
+						currentClef = clefs[currentStaffNum][currentClefNum];
 						setClef(currentClef);
 						nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
-						prevClefId = firstClefIdInBar;
+						prevClefType = firstClefTypeInBar;
 					}
 					
 					// ** slurs
@@ -1207,6 +1207,15 @@ MuseScore {
 										if (nextChordRest != null) {
 											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest.",noteRest);
 										}
+									}
+									
+									// ************ CHECK CLEF ********** //
+									if (!firstNoteSinceClefChange && currentClefTick > 0) {
+										firstNoteSinceClefChange = true;
+										var ticksSinceLastClef = currTick - currentClefTick;
+										//logError ('firstNote: ticksSinceLastClef = '+ticksSinceLastClef+'; isEndOfBarClef = '+isEndOfBarClef+'; currentBarNum = '+currentBarNum+'; currentClefBarNum = '+currentClefBarNum);
+										if (isMidBarClef && ticksSinceLastClef >= division) addError ('Try moving this mid-bar clef closer to the next note.',currentClef);
+										if (isEndOfBarClef && currentBarNum != currentClefBarNum) addError ('Don’t put a clef before an empty bar.\nTry moving it closer to the next note.',currentClef);
 									}
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
@@ -1771,23 +1780,32 @@ MuseScore {
 		
 		// ************ CLEF ************ //
 		if (numClefs > 0) {
-			if (currTick >= nextClefTick) {
-				//logError ('>= nextClefTick');
+			if (currTick >= nextClefTick && currTick != currentBar.lastSegment.tick) {
+				//logError ('currTick = '+currTick+' nextClefTick was '+nextClefTick+'; lastSeg = '+currentBar.lastSegment.tick);
+				//logError ('currentClefNum = '+currentClefNum+'; numClefs = '+numClefs+'; about to increment');
+				if (currentClefNum < numClefs - 1) currentClefNum ++;
 				while (currentClefNum < numClefs - 1) {
-					 if (clefs[currentStaffNum][currentClefNum+1].parent.tick <= currTick) {
+					if (clefs[currentStaffNum][currentClefNum+1].parent.tick <= currTick) {
 						currentClefNum ++;
 					} else {
 						break;
 					}
 				}
-				var currentClefTick = clefs[currentStaffNum][currentClefNum].parent.tick;
+				currentClefTick = clefs[currentStaffNum][currentClefNum].parent.tick;
+				//logError ('currentClefNum is now '+currentClefNum+'; currentClefTick is now '+currentClefTick);
+
 				if (currentClefTick <= currTick) {
 					currentClef = clefs[currentStaffNum][currentClefNum];
+					currentClefBarNum = currentClef.parent.parent.no + 1;
+					if (currentClef.parent.tick == currentClef.parent.parent.lastSegment.tick) currentClefBarNum ++;
+					//logError ('currentClefNum = '+currentClefNum+' in bar '+currentClefBarNum+'; isHeader = '+currentClef.isHeader+'; tick = '+currentClef.parent.tick);
 					if (currentTrack % 4 == 0 && currentClefTick == currTick) {
 						//logError ('*** FOUND clef on track 0');
-						checkClef(currentClef,false);
+						checkClef(currentClef);
+						firstNoteSinceClefChange = false;
 						nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
 						prevClefNumInBar = currentClefNum;
+						//logError ('nextClefTick = '+nextClefTick);
 					} else {
 						//logError ('*** FOUND clef on other track or previously noted:');
 						setClef (currentClef);
@@ -1972,8 +1990,6 @@ MuseScore {
 		var staves = curScore.staves;
 		var elems = curScore.selection.elements;
 		var s = curScore.selection;
-		//logError ('Selection is: '+s.startStaff+' '+s.endStaff+' '+s.startSegment.tick);
-		//logError ('Elems length = '+elems.length);
 		var prevSlurSegment = null, prevHairpinSegment = null, prevTrillSegment = null, prevOttavaSegment = null, prevGlissandoSegment = null, prevPedalSegment = null, prevLV = null;
 		var firstChord = null;
 		if (elems.length == 0) {
@@ -1982,6 +1998,19 @@ MuseScore {
 		}
 		var mmrBar = curScore.firstMeasure;
 		var mmrBarNum = 1;
+		
+		// ** PUSH ALL HEADER CLEFS
+		cursor.filter = Segment.HeaderClef;
+		for (var staffIdx = 0; staffIdx < curScore.nstaves; staffIdx ++) {
+			cursor.staffIdx = staffIdx;
+			cursor.voice = 0;
+			cursor.rewind(Cursor.SCORE_START);
+			if (cursor.element == undefined || cursor.element == null) {
+				logError ('no header clef found for staff '+staffIdex);
+			} else {
+				clefs[staffIdx].push(cursor.element);
+			}
+		}
 		for (var i = 0; i<elems.length; i++) {
 			
 			var e = elems[i];
@@ -3819,21 +3848,78 @@ MuseScore {
 		}
 	}
 	
-	function checkClef (clef, isHeaderClef) {
+	function checkClef (clef) {
 		if (clef == null) {
 			logError("checkClef() — clef is null!");
 			return;
 		}
-		var clefId = clef.subtypeName();
-		if (clefId === prevClefId) {
-			addError("This clef is redundant: already was "+clefId.toLowerCase()+".\nIt can be safely deleted.",clef);
-			//logError ('clefId and prevClefId are the same: '+clefId);
+		var clefType = clef.transposingClefType;
+		var clefSegment = clef.parent;
+		var clefTick = clefSegment.tick;
+		var clefMeasure = clefSegment.parent;
+		var clefMeasureStart = clefMeasure.firstSegment.tick;
+		isEndOfBarClef = false;
+		isMidBarClef = false;
+		if (clefTick == clefMeasure.lastSegment.tick) {
+			clefMeasure = clefMeasure.nextMeasure;
+			isEndOfBarClef = true;
+		} else {
+			if (clefTick > clefMeasureStart) {
+				isMidBarClef = true;
+				if ((clefTick - clefMeasureStart) % beatLength != 0) {
+					addError ('If possible, move this clef to the start of the beat.',clef);
+				}
+			}
 		}
-		//logError("Checking clef — "+clefId+" prevClefId is "+prevClefId);
+			
+		//logError ('clefType = '+clefType+'; prevClefType = '+clefType);
+		if (clefType == prevClefType && !clef.isHeader) {
+			var clefId = clef.subtypeName();
+			addError("This clef is redundant: already was "+clefId.toLowerCase()+".\nIt can be safely deleted.",clef);
+		}
+
 		setClef (clef);
+		
+		// *** CHECK LOCATION OF CLEFS *** //
+	}
+	
+	function setClef (clef) {
+		var trebleClefs = [ClefType.G, ClefType.G15_MB, ClefType.G8_VB, ClefType.G8_VA, ClefType.G15_MA, ClefType.G8_VB_O, ClefType.G8_VB_P,ClefType.G_1];
+		var bassClefs = [ClefType.F,ClefType.F15_MB,ClefType.F8_VB,ClefType.F_8VA,ClefType.F_15MA,ClefType.F_B,ClefType.F_C,ClefType.F_F18C,ClefType.F_19C];
+		var ottavaClefs = [ClefType.G8_VA,ClefType.F_8VA];
+		var quintissimaClefs = [ClefType.G15_MA, ClefType.F_15MA];
+		var ottavaBassaClefs = [ClefType.G8_VB_P,ClefType.F8_VB,ClefType.C4_8VB];
+		var quintissimaBassaClefs = [ClefType.G15_MB, ClefType.F15_MB];
+		
+		var clefType = clef.transposingClefType;
+		isTrebleClef = trebleClefs.includes(clefType);
+		isAltoClef = clefType == ClefType.C3;
+		isTenorClef = clefType == ClefType.C4;
+		isBassClef = bassClefs.includes(clefType);
+		isPercClef = clefType == ClefType.PERC || clefType == ClefType.PERC2;
+		
+		// CHECK FOR 8va etc.
+		var clefIs8va = ottavaClefs.includes(clefType);
+		var clefIs15ma = quintissimaClefs.includes(clefType);
+		var clefIs8ba = ottavaBassaClefs.includes(clefType);
+		var clefIs15mb = quintissimaBassaClefs.includes(clefType);
+
+		diatonicPitchOfMiddleLine = 41; // B4 = 41 in diatonic pitch notation (where C4 = 35)
+		if (isAltoClef) diatonicPitchOfMiddleLine = 35; // C4 = 35
+		if (isTenorClef) diatonicPitchOfMiddleLine = 33; // A3 = 33
+		if (isBassClef) diatonicPitchOfMiddleLine = 29; // D3 = 29
+		if (clefIs8va) diatonicPitchOfMiddleLine += 7;
+		if (clefIs15ma) diatonicPitchOfMiddleLine += 14;
+		if (clefIs8ba) diatonicPitchOfMiddleLine -= 7;
+		if (clefIs15mb) diatonicPitchOfMiddleLine -= 14;
+		prevClefType = clefType;
 		
 		// **** CHECK FOR INAPPROPRIATE CLEFS **** //
 		if (checkInstrumentClefs) {
+			if (!isPiano && clefIs8va) 	addError ('This 8va clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs15ma) addError ('This 15ma clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs8ba && !isGuitar) addError ('This 8ba clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs15mb) addError ('This 15mb clef is rarely used.\nAre you sure that’s right?', clef);
 			if (isBassClef && clefIs8ba) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
 			if (isTrombone && isTrebleClef) {
 				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.",clef);
@@ -3843,32 +3929,8 @@ MuseScore {
 				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef.",clef);
 				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef.",clef);
 			}
-			if (!isHeaderClef && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nIf possible, move this material to the other staff to avoid clef changes.",clef);
+			if (clef.isHeader && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nIf possible, move this material to the other staff to avoid clef changes.",clef);
 		}
-	}
-	
-	function setClef (clef) {
-		var clefId = clef.subtypeName();
-		//logError ('Clef id is '+clefId+'; prevClefId is '+prevClefId);
-		
-		// FIX FOR 4.6 — change to subtype
-		isTrebleClef = clefId.includes("Treble clef");
-		isAltoClef = clefId === "Alto clef";
-		isTenorClef = clefId === "Tenor clef";
-		isBassClef = clefId.includes("Bass clef");
-		isPercClef = clefId === "Percussion";
-		clefIs8va = clefId.includes("8va alta");
-		clefIs15ma = clefId.includes("15ma alta");
-		clefIs8ba = clefId.includes("8va bassa");
-		diatonicPitchOfMiddleLine = 41; // B4 = 41 in diatonic pitch notation (where C4 = 35)
-		if (isAltoClef) diatonicPitchOfMiddleLine = 35; // C4 = 35
-		if (isTenorClef) diatonicPitchOfMiddleLine = 33; // A3 = 33
-		if (isBassClef) diatonicPitchOfMiddleLine = 29; // D3 = 29
-		if (clefIs8va) diatonicPitchOfMiddleLine += 7;
-		if (clefIs15ma) diatonicPitchOfMiddleLine += 14;
-		if (clefIs8ba) diatonicPitchOfMiddleLine -= 7;
-		prevClefId = clefId;
-		//logError ('prevClefId is now '+prevClefId);
 	}
 	
 	function checkTrill (noteRest) {
@@ -5461,7 +5523,7 @@ MuseScore {
 			var harmonicArray = [];
 			var noteheadStyle = theNotes[0].headGroup;
 
-			if (typeof staffNum !== 'number') logError("Artic error in checkStringHarmonic nn1");
+			if (typeof staffNum !== 'number') logError("checkStringHarmonic() — Artic error, numNotes == 1");
 			//logError("The artic sym = "+theArticulation.symbol.toString());
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
 			for (var i = 0; i < theArticulationArray.length; i++) {
