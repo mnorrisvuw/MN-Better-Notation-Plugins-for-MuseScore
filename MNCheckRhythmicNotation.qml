@@ -1521,6 +1521,7 @@ MuseScore {
 		} else {
 			if (beatLength == crotchet) {
 				if (d1 == dottedcrotchet && d2 == minim) addError ("Consider rewriting this tied note as a quaver tied to a dotted minim",noteArray);
+				if (startFrac == division / 2 && d1 == crotchet && d2 == semiquaver) addError ("Consider rewriting this tied note as a quaver tied to a dotted quaver.\n(Select both notes and choose Tools→Regroup rhythms)",noteArray);
 			}
 		}
 	}
