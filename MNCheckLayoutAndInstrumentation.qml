@@ -1042,7 +1042,6 @@ MuseScore {
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStartTick);
 					var processingThisBar = cursor.element && cursor.tick < barEndTick;
-					isSforzando = false;
 					
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
@@ -1080,6 +1079,7 @@ MuseScore {
 					while (processingThisBar) {
 						isNote = false;
 						isRest = false;
+						isSforzando = false;
 						var currSeg = cursor.segment;
 						currTick = currSeg.tick;
 
@@ -2459,7 +2459,7 @@ MuseScore {
 		for (var i = 0; i < numStaves; i ++) {
 			if (staffVisible[i]) {
 				var id = curScore.staves[i].part.musicXmlId;
-				logError (id);
+				//logError (id);
 				if (id.includes("wind.flutes.flute")) {
 					numFl ++;
 					flStaff = i;
@@ -2502,16 +2502,13 @@ MuseScore {
 			}
 		}
 		//logError ('numParts = '+numParts+'; numPf = '+numPf);
+		if (numParts == 2) checkBrackets("duo");
 
 		// ** CHECK PIANO TRIO ** //
-		if (numParts == 3 && numPf > 0) {
-			checkBrackets ("piano trio");
-		}
+		if (numParts == 3 && numPf > 0) checkBrackets ("piano trio");
 		
 		// ** CHECK PIANO QUARTET ** //
-		if (numParts == 4 && numPf > 0) {
-			checkBrackets ("piano quartet");
-		}
+		if (numParts == 4 && numPf > 0) checkBrackets ("piano quartet");
 		
 		// ** CHECK STRING QUARTET ** //
 
@@ -4994,7 +4991,7 @@ MuseScore {
 	
 	function checkBrackets (str) {
 		var singleJoinedBracketArray = ["string quartet", "wind quintet", "brass quintet", "string quintet"];
-		var noBracketArray = ["piano trio", "piano quartet"];
+		var noBracketArray = ["piano trio", "piano quartet", "duo"];
 		var firstVisibleStaff = -1;
 		var lastVisibleStaff = -1;
 		
@@ -5037,9 +5034,16 @@ MuseScore {
 			for (var i = 0; i < numStaves; i++) {
 				if (staffVisible[i]) {
 					var theStaff = curScore.staves[i];
-					if (!isGrandStaff[i] && theStaff.brackets.length != 0) {
-						addError ('For '+str+'s, you don’t need a bracket, except for a brace on the piano.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
-						return;
+					if (theStaff.brackets.length != 0) {
+						if (theStaff.brackets[0].systemBracket == BracketType.BRACE) {
+							if (!isGrandStaff[i]) {
+								addError ('You don’t need a brace here.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
+								return;
+							}
+						} else {
+							addError ('For '+str+'s, you don’t need a bracket.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
+							return;
+						}
 					}
 				}
 			}
