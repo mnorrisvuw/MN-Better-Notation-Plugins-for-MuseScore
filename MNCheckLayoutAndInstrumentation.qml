@@ -765,7 +765,7 @@ MuseScore {
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			
 			var currentStaff = curScore.staves[currentStaffNum];
-			 
+			currentSystemNum = 0;
 			displayOffset = 0;
 
 			//don't process if this part is hidden
@@ -4334,7 +4334,7 @@ MuseScore {
 						if (lowerCaseText === 'vib' || lowerCaseText === 'vib.' || lowerCaseText === 'vibr.' || lowerCaseText === 'vibrato') addError ("This indication is a little ambiguous.\nDo you mean ‘vib. norm.’?", textObject);
 					}
 					
-					// **** CHECK SUL **** //
+					// **** CHECK SUL CAPITALISATION **** //
 					if (lowerCaseText.includes('sul ') && lowerCaseText.length == 5) {
 						if (lowerCaseText === plainText) {
 							addError ("Capitalise the string name (i.e. ‘sul "+lowerCaseText.substring(4).toUpperCase()+"’)", textObject);
