@@ -4156,7 +4156,7 @@ MuseScore {
 		if (!textObject.visible) return;
 		
 		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a2", "a 2","a3", "a 3","a4", "a 4","a5", "a 5","a6", "a 6","a7","a 7","a8","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
-		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z","","p","","ppp","","pp","","mp","","mf","","f","","ff","","fff","","sf","","sfz","","sffz","","z","","n","&nbsp;"," "," "," "];
+		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z","dynamicNiente", "n", "","p","","ppp","","pp","","mp","","mf","","f","","ff","","fff","","sf","","sfz","","sffz","","z","","n","&nbsp;"," "," "," "];
 		
 		var elementType = textObject.type;
 		var isTempoChangeMarking = elementType == Element.GRADUAL_TEMPO_CHANGE;
@@ -4680,7 +4680,7 @@ MuseScore {
 					//logError("styledText = "+styledText.replace(/</g,'≤')+"; lct = "+lowerCaseText+" objectIsDynamic = "+objectIsDynamic+"; includesADynamic = "+includesADynamic+"; stringIsDynamic = "+stringIsDynamic);
 					// **** CHECK REDUNDANT DYNAMIC **** //
 					if (objectIsDynamic && includesADynamic && !stringIsDynamic) {
-						addError ('This dynamic marking is unusal, or has an extraneous character in it somewhere',textObject);
+						addError ('This dynamic marking is unusual, or has an extraneous character in it somewhere',textObject);
 					}
 					if (includesADynamic || stringIsDynamic) {
 						firstDynamic = true;
@@ -4910,7 +4910,7 @@ MuseScore {
 	}
 	
 	function isDynamic (str) {
-		var dynamics = ["pppp", "ppp","pp","p", "mp", "mf", "f", "ff", "fff", "ffff","sf", "sfz","sffz","fz","fpppp", "fppp","fpp","fp", "fmp", "fmf", "ffpppp", "ffppp","ffpp","ffp", "ffmp", "sfpppp", "sfppp","sfpp","sfp", "sfmp", "sfzpppp", "sfzppp","sfzpp","sfzp", "sfzmp","mfpppp", "mfppp","mfpp","mfp", "mfmp", "sffpppp", "sffppp","sffpp","sffp", "sffmp", "sffzpppp", "sffzppp","sffzpp","sffzp", "sffzmp", "fzpppp", "fzppp","fzpp","fzp", "fzmp"];
+		var dynamics = ["pppp", "ppp","pp","p", "mp", "mf", "f", "ff", "fff", "ffff","sf", "sfz","sffz","fz","fpppp", "fppp","fpp","fp", "fmp", "fmf", "ffpppp", "ffppp","ffpp","ffp", "ffmp", "sfpppp", "sfppp","sfpp","sfp", "sfmp", "sfzpppp", "sfzppp","sfzpp","sfzp", "sfzmp","mfpppp", "mfppp","mfpp","mfp", "mfmp", "sffpppp", "sffppp","sffpp","sffp", "sffmp", "sffzpppp", "sffzppp","sffzpp","sffzp", "sffzmp", "fzpppp", "fzppp","fzpp","fzp", "fzmp", "n", "niente"];
 		var l = str.length;
 		var words = str.split(/[.,;:\s]+/);
 		for (var i = 0; i < words.length; i++) {
