@@ -4334,6 +4334,13 @@ MuseScore {
 						if (lowerCaseText === 'vib' || lowerCaseText === 'vib.' || lowerCaseText === 'vibr.' || lowerCaseText === 'vibrato') addError ("This indication is a little ambiguous.\nDo you mean ‘vib. norm.’?", textObject);
 					}
 					
+					// **** CHECK SUL **** //
+					if (lowerCaseText.includes('sul ') && lowerCaseText.length == 5) {
+						if (lowerCaseText === plainText) {
+							addError ("Capitalise the string name (i.e. ‘sul "+lowerCaseText.substring(4).toUpperCase()+"’)", textObject);
+						}
+					}
+					
 					// **** CHECK TEXT THAT IS INCORRECTLY CAPITALISED **** //
 					// but don't check title/composer etc
 					if (!isTitleText && !isSubtitleText && !isComposerText && !isTempoText) {
