@@ -1517,6 +1517,7 @@ MuseScore {
 				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting this tied note as a minim tied to a quaver.",noteArray);
 				if (d1 == dottedcrotchet && d2 == crotchet) addError ("Consider rewriting this tied note as a minim tied to a quaver.",noteArray);
 				if (d1 == minim && d2 == dottedcrotchet) addError ("Consider rewriting this tied note as a dotted minim tied to a quaver.",noteArray);
+				if (d1 == dottedcrotchet && d2 == semiquaver) addError ("Consider rewriting this tied note as a crotchet tied to a dotted quaver.", noteArray);
 			} 
 		} else {
 			if (beatLength == crotchet) {
