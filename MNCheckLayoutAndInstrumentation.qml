@@ -5495,7 +5495,7 @@ MuseScore {
 	function checkStringHarmonic (noteRest, staffNum) {
 
 		var harmonicCircleIntervals = [12,19,24,28,31,34,36,38,40,42,43,45,46,47,48];
-		var diamondHarmonicIntervals = [3,4,5,7,12,19,24,28,31,34,36];
+		var diamondHarmonicIntervals = [3,4,5,7,9,12,16,19,24,28,31,34,36];
 		var violinStrings = [55,62,69,76];
 		var violaStrings = [48,55,62,69];
 		var celloStrings = [36,43,50,57];
@@ -5578,21 +5578,24 @@ MuseScore {
 		if (numNotes == 1) {
 			var harmonicArray = [];
 			var noteheadStyle = theNotes[0].headGroup;
-
+			var isHarmonicCircle = false;
 			if (typeof staffNum !== 'number') logError("checkStringHarmonic() — Artic error, numNotes == 1");
-			//logError("The artic sym = "+theArticulation.symbol.toString());
+			//logError("The artic sym = "+theArticulationArray.symbol.toString()+'; noteheadStyle = '+noteheadStyle);
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (theArticulationArray[i].symbol == SymId.stringsHarmonic) {
-					//logError ('Has string harmonic');
+					logError ('isHarmonicCircle');
+					isHarmonicCircle = true;
 					isStringHarmonic = true;
 					harmonicArray = harmonicCircleIntervals;
 					break;
 				}
 			}
 			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle == NoteHeadGroup.HEAD_DIAMOND_OLD) {
-				if (isStringHarmonic) {
+				logError ('isDiamond');
+				if (isHarmonicCircle) {
 					addError ("This harmonic has both a diamond notehead and a harmonic circle.\nYou should choose one or the other, but not both.", noteRest);
+					return;
 				} else {
 					isStringHarmonic = true;
 				}
@@ -5613,7 +5616,13 @@ MuseScore {
 						harmonicOK = (p == stringsArray[i]+harmonicArray[j]);
 					}
 				}
-				if (!harmonicOK) addError("You can’t get this pitch with a natural harmonic.\nDid you mean a diamond notehead instead of a harmonic circle?",noteRest);
+				if (!harmonicOK) {
+					if (isHarmonicCircle) {
+						addError("You can’t get this pitch with a natural harmonic.\nDid you mean a diamond notehead instead of a harmonic circle?",noteRest);
+					} else {
+						addError("There isn’t a (well-defined) harmonic at this pitch, and it won’t sound like much.\nAre you sure this is correct?",noteRest);
+					}
+				}
 			}
 		}
 	}
