@@ -146,6 +146,7 @@ MuseScore {
 	property var flaggedFastMultipleStops: false
 	property var flaggedOneStrokeTrem: false
 	property var flaggedManualSlurBarNum: -1
+	property var flaggedBravuraHarmonics: false
 
  	property var firstVisibleStaff: 0
 	property var staffVisible: []
@@ -5513,6 +5514,16 @@ MuseScore {
 			if (!theNote.hasParentheses) {
 				numNotes ++;
 				theNotes.push(theNote);
+			}
+			// check for Bravura harmonics
+			if (!flaggedBravuraHarmonics) {
+				//logError (curScore.style.value('musicalSymbolFont'));
+				if (curScore.style.value('musicalSymbolFont') === 'Bravura') {
+					if (theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND || theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND_OLD) {
+						flaggedBravuraHarmonics = true;
+						addError ("Diamond noteheads in the ‘Bravura’ font don’t meet standard notation guidelines.\nThey are too small and oddly shaped — see ‘Behind Bars’ p. 11.\nConsider changing the music font to ‘Leland’ instead.", noteRest);
+					}
+				}
 			}
 		}		//logError("CHECKING STRING HARMONIC — nn = "+nn);
 		if (numNotes == 2) {
