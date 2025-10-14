@@ -2072,6 +2072,17 @@ MuseScore {
 			}
 		}
 		
+		// ** CHECK BRACKETS FOR HIGHLIGHTS ** //
+		for (var i = 0; i < curScore.nstaves; i++) {
+			var staff = curScore.staves[i];
+			var brackets = staff.brackets;
+			for (j = 0; j < brackets.length; j++) {
+				var e = brackets[j];
+				var c = e.color;
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+			}
+		}
+		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
