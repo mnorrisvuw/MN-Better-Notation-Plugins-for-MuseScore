@@ -121,7 +121,7 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
 
 ## <a id="installation"></a>Installation
 
-*MN Better Notation Plugins require MuseScore Studio 4.6 or later.*
+*MN Better Notation Plugins require MuseScore Studio 4.6.1 or later.*
 
 **YOUTUBE**: Watch [a YouTube video](https://www.youtube.com/watch?v=TztQKb71Rw8) on how to install the plugins.
 

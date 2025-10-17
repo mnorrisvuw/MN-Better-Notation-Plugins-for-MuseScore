@@ -2250,6 +2250,9 @@ MuseScore {
 				leftPadding: 0
 				readOnly: true
 				color: ui.theme.fontPrimaryColor
+				background: Rectangle {
+					color: "transparent"
+				}
 			}
 		}
 

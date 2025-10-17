@@ -32,7 +32,6 @@ MuseScore {
 	property var amendedParts: false
 	property var removeLayoutBreaksOption: false
 	property var setSpacingOption: false
-	property var setBravuraOption: false
 	property var setTimesOption: false
 	property var setFontSizesOption: false
 	property var setPartsOption: false
@@ -74,7 +73,6 @@ MuseScore {
 	function makeChanges() {
 		removeLayoutBreaksOption = options.removeBreaks;
 		setSpacingOption = options.setSpacing;
-		setBravuraOption = options.setBravura;
 		setTimesOption = options.setTimes;
 		setFontSizesOption = options.setFontSizes;
 		setPartsOption = options.setParts;
@@ -127,7 +125,6 @@ MuseScore {
 		
 		// *** FONT SETTINGS *** //
 		if (setTimesOption) setTimes();
-		if (setBravuraOption) setBravura();
 		if (setFontSizesOption) setFontSizes();
 		if (formatTempoMarkingsOption) formatTempoMarkings();
 		if (removeManualTextFormattingOption) removeManualTextFormatting();
@@ -981,7 +978,7 @@ MuseScore {
 		"chordModifierAdjust","",
 		"concertPitch","",
 		"multiVoiceRestTwoSpaceOffset","",
-		"mergeMatchingRests","",
+		"mergeMatchingRests","1",
 		"createMultiMeasureRests","",
 		"minEmptyMeasures","",
 		"singleMeasureMMRestUseNormalRest","",
@@ -2158,10 +2155,6 @@ MuseScore {
 					for (var j = 0; j < fontsToTwelvePoint.length; j++) setPartSetting (thePart, fontsToTwelvePoint[j]+"FontSize", 12);
 				}
 				
-				if (setBravuraOption) {
-					setPartSetting (thePart, "musicalSymbolFont", "Bravura");
-					setPartSetting (thePart, "musicalTextFont", "Bravura Text");
-				}
 				
 				if (setTimesOption) {
 					var fontsToTimes = ["tuplet", "lyricsOdd", "lyricsEven", "hairpin", "romanNumeral", "volta", "stringNumber", "longInstrument", "shortInstrument","expression", "tempo", "tempoChange", "metronome", "measureNumber", "mmRestRange", "systemText", "staffText", "pageNumber", "instrumentChange"];
@@ -2213,12 +2206,6 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
-	function setBravura () {
-		curScore.startCmd();
-		setSetting ("musicalSymbolFont", "Bravura");
-		setSetting ("musicalTextFont", "Bravura Text");
-		curScore.endCmd();
-	}
 	
 	function setTimes () {
 		var fontsToTimes = ["tuplet", "lyricsOdd", "lyricsEven", "hairpin", "romanNumeral", "volta", "stringNumber","expression", "tempo", "tempoChange", "metronome", "measureNumber", "mmRestRange", "systemText", "staffText", "pageNumber"];
@@ -2478,6 +2465,9 @@ MuseScore {
 				leftPadding: 0
 				readOnly: true
 				color: ui.theme.fontPrimaryColor
+				background: Rectangle {
+					color: "transparent"
+				}
 			}
 		}
 	
@@ -2505,7 +2495,6 @@ MuseScore {
 		property color backgroundColor: ui.theme.backgroundSecondaryColor
 		property var removeBreaks: true
 		property var setSpacing: true
-		property var setBravura: true
 		property var setOtherStyleSettings: true
 		property var setTimes: true
 		property var setTitleFrame: true
@@ -2624,14 +2613,6 @@ MuseScore {
 				color: ui.theme.fontPrimaryColor
 			}
 			
-			CheckBox {
-				text: "Set music font to Bravura"
-				checked: options.setBravura
-				onClicked: {
-					checked = !checked
-					options.setBravura = checked
-				}
-			}
 			CheckBox {
 				text: "Set text font to Times New Roman*"
 				checked: options.setTimes

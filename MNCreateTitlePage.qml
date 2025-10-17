@@ -451,6 +451,9 @@ MuseScore {
 				leftPadding: 0
 				readOnly: true
 				onLinkActivated: Qt.openUrlExternally(link)
+				background: Rectangle {
+					color: "transparent"
+				}
 			}
 		}
 	
