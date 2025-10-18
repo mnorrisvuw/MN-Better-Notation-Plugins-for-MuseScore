@@ -2030,7 +2030,6 @@ MuseScore {
 				var theMeasureNumber = (etype == Element.CHORD) ? e.measure.no : e.parent.measure.no;
 				var theVoice = e.voice;
 				voicesArray[theMeasureNumber][staffIdx][theVoice] = 1;
-				//logError ('Found chord in voice '+theVoice+' of staff '+staffIdx+' of bar '+theMeasureNumber);
 			}
 			
 		/*	if (etype == Element.LYRICS) {
@@ -2107,37 +2106,25 @@ MuseScore {
 			if (firstChord == null && etype == Element.CHORD) firstChord = e;
 			
 			// *** HAIRPINS
-			if (etype == Element.HAIRPIN) {
-				logError ('found hairpin');
-				hairpins[staffIdx].push(e);
-				if (e.subtypeName().includes(" line") && e.spanner.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
-			}
 			if (etype == Element.HAIRPIN_SEGMENT) {
-				//logError ('found hairpin on staff '+staffIdx);
-				var sameLoc = false;
 				var sameHairpin = false;
 				if (prevHairpinSegment != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevHairpinSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevHairpinSegment.spanner.spannerTicks.ticks) && (e.staffIdx == prevHairpinSegment.staffIdx);
+					var sameLoc = (e.spanner.spannerTick.ticks == prevHairpinSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevHairpinSegment.spanner.spannerTicks.ticks) && (e.staffIdx == prevHairpinSegment.staffIdx);
 					if (sameLoc) sameHairpin = e.spanner.is(prevHairpinSegment.spanner);
 				}
-				//logError ('sameHairpin = '+sameHairpin);
 				// only add it if it's not already added
 				if (!sameHairpin) {
 					hairpins[staffIdx].push(e);
-					//logError ('Staff '+staffIdx+' now has '+hairpins[staffIdx].length+' hairpins');
 					if (e.subtypeName().includes(" line") && e.spanner.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 				}
 				prevHairpinSegment = e;
 			}
 			
 			// *** TRILLS *** //
-			if (etype == Element.TRILL) trills[staffIdx].push(e);
 			if (etype == Element.TRILL_SEGMENT) {
-				//logError ('found hairpin');
-				var sameLoc = false;
 				var sameTrill = false;
 				if (prevTrillSegment != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevTrillSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevTrillSegment.spanner.spannerTicks.ticks);
+					var sameLoc = (e.spanner.spannerTick.ticks == prevTrillSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevTrillSegment.spanner.spannerTicks.ticks) && (e.staffIdx == prevTrillSegment.staffIdx);
 					if (sameLoc) sameTrill = e.spanner.is(prevTrillSegment.spanner);
 				}
 				// only add it if it's not already added
@@ -2146,12 +2133,10 @@ MuseScore {
 			}
 			
 			// *** OTTAVAS
-			if (etype == Element.OTTAVA) ottavas[staffIdx].push(e);
 			if (etype == Element.OTTAVA_SEGMENT) {
-				var sameLoc = false;
 				var sameOttava = false;
 				if (prevOttavaSegment != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevOttavaSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevOttavaSegment.spanner.spannerTicks.ticks);
+					var sameLoc = (e.spanner.spannerTick.ticks == prevOttavaSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevOttavaSegment.spanner.spannerTicks.ticks) && (e.staffIdx == prevOttavaSegment.staffIdx);
 					if (sameLoc) sameOttava = e.spanner.is(prevOttavaSegment.spanner);
 				}
 				if (!sameOttava) ottavas[staffIdx].push(e);
@@ -2159,12 +2144,10 @@ MuseScore {
 			}
 			
 			// *** SLURS *** //
-			if (etype == Element.SLUR) slurs[etrack].push(e);
 			if (etype == Element.SLUR_SEGMENT) {
-				var sameLoc = false;
 				var sameSlur = false;
 				if (prevSlurSegment != null && e.parent != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevSlurSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevSlurSegment.spanner.spannerTicks.ticks);
+					var sameLoc = (e.spanner.spannerTick.ticks == prevSlurSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevSlurSegment.spanner.spannerTicks.ticks) && (e.staffIdx == prevSlurSegment.staffIdx);
 					if (sameLoc) sameSlur = e.spanner.is(prevSlurSegment.spanner);
 				}
 				if (!sameSlur){
@@ -2175,12 +2158,10 @@ MuseScore {
 			}
 			
 			// *** PEDAL MARKINGS *** //
-			if (etype == Element.PEDAL) pedals[staffIdx].push(e);
-			if (etype == Element.PEDAL_SEGMENT) { // ONLY ADD THE SEGMENT IF WE HAVEN'T ALREADY ADDED IT
-				var sameLoc = false;
+			if (etype == Element.PEDAL_SEGMENT) {
 				var samePedal = false;
 				if (prevPedalSegment != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevPedalSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevPedalSegment.spanner.spannerTicks.ticks);
+					var sameLoc = (e.spanner.spannerTick.ticks == prevPedalSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevPedalSegment.spanner.spannerTicks.ticks);
 					if (sameLoc) samePedal = e.spanner.is(prevPedalSegment.spanner);
 				}
 				// only add it if it's not already added
@@ -2213,17 +2194,10 @@ MuseScore {
 			if (etype == Element.CLEF) clefs[staffIdx].push(e);
 			
 			// *** L.Vs *** //
-			if (etype == Element.LAISSEZ_VIB) {
-				lv[staffIdx][e.spannerTick.ticks] = e;
-				prevLV = e;
-			}
 			if (etype == Element.LAISSEZ_VIB_SEGMENT) {
-				//logError ('Found LV');
-
-				var sameLoc = false;
 				var sameLV = false;
 				if (prevLV != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevLV.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevLV.spanner.spannerTicks.ticks);
+					var sameLoc = (e.spanner.spannerTick.ticks == prevLV.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevLV.spanner.spannerTicks.ticks) && (e.staffIdx == prevLV.staffIdx);
 					if (sameLoc) prevLV = e.spanner.is(prevLV.spanner);
 				}
 				// only add it if it's not already added
