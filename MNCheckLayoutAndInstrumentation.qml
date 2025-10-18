@@ -293,7 +293,10 @@ MuseScore {
 	property var dynamicTicks: []
 	property var currDynamicLevel: 0
 	property var expressiveSwell: 0
-	property var currentDynamicNum: 0
+	property var currentDynamic: null
+	property var currentDynamicNum: -1
+	property var nextDynamic: null
+	property var nextDynamicTick: 0
 	property var numDynamics: 0
 	property var isSforzando: false
 	
@@ -797,8 +800,23 @@ MuseScore {
 			lastDynamicTick = -1;
 			numConsecutiveMusicBars = 0;
 			lastDynamicFlagBar = -1;
-			currentDynamicNum = 0;
+			currentDynamicNum = -1;
+			currentDynamic = null;
 			numDynamics = dynamics[currentStaffNum].length;
+			if (numDynamics == 0) {
+				// no dynamics marked!
+				nextDynamic = null;
+				nextDynamicTick = endOfScoreTick;
+			} else {
+				getNextDynamic();
+				if (nextDynamicTick == 0) {
+					currentDynamic = nextDynamic;
+					currentDynamicNum ++;
+					checkTextObject(currentDynamic);
+					getNextDynamic();
+				}
+			}
+					
 			pedalSettings = [-1,-1,-1,-1,-1,-1,-1];
 			pedalSettingLastNeededTick = [-1,-1,-1,-1,-1,-1,-1];
 			numInstrumentChanges = instrumentChanges[currentStaffNum].length;
@@ -812,7 +830,6 @@ MuseScore {
 			flaggedClefTooHigh = false;
 			flaggedOttavaTooLow = false;
 			flaggedOttavaTooHigh = false;
-			
 			flaggedClefTooLowBarNum = 0;
 			flaggedClefTooHighBarNum = 0;
 			flaggedOttavaTooLowBarNum = 0;
@@ -853,11 +870,8 @@ MuseScore {
 			currentHairpinNum = 0;
 			currentHairpinEnd = 0;
 			numHairpins = hairpins[currentStaffNum].length;
-			//logError ('numHairpins on staff '+currentStaffNum+' = '+numHairpins);
-			//logError ('currentHairpinNum = '+currentHairpinNum);
 			nextHairpin = (numHairpins == 0) ? null : hairpins[currentStaffNum][0];
 			nextHairpinStart = (numHairpins == 0) ? 0 : nextHairpin.spanner.spannerTick.ticks;
-			//logError ('nextHairpinStart = '+nextHairpinStart);
 			expressiveSwell = 0;
 			
 			// ** trills
@@ -1680,40 +1694,27 @@ MuseScore {
 				}
 			}
 			// ************ DYNAMIC? ************ //		
-			if (currentDynamicNum < numDynamics) {
-				var nextDynamic = dynamics[currentStaffNum][currentDynamicNum];
-				if (nextDynamic == null || nextDynamic == undefined) {
-					logError ('checkScoreElements() — nextDynamic is '+nextDynamic);
-				} else {
-					var p = nextDynamic.parent;
-					if (p == undefined) {
-						logError ('checkScoreElements() — Dynamic parent is undefined: Type = '+nextDynamic.type+'; Subtype = '+nextDynamic.subtypeName()+'; text = '+nextDynamic.text+'; parent is undefined');
-					} else {
-						
-						// THIS CAN BE REFACTORED BY MAKING NEXTDYNAMICTICK A PROPERTY AND JUST CALCULATING THIS ONCE
-						while (p.type != Element.SEGMENT) p = p.parent;
-						var nextDynamicTick = p.tick;
-						
-						if (currTick >= nextDynamicTick) {
-							checkTextObject(nextDynamic);
-							//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic);
-							currentDynamicNum ++;
-							if (currTick == nextDynamicTick && isNote) {
-								if (noteRest.actualDuration.ticks < division) {
-									var loudArray = ['dynamicForte','dynamicSforzando','dynamicZ','sf'];
-									var isLoud = false, isSoft = false;
-									for (var i = 0; i < loudArray.length && !isLoud; i++) isLoud = nextDynamic.text.includes(loudArray[i]);
-									var softArray = ['dynamicPiano'];
-									
-									for (var i = 0; i < softArray.length && !isSoft; i++) isSoft = nextDynamic.text.includes(softArray[i]);
-									//logError (nextDynamic.text+' isLoud:'+isLoud+' isSoft:'+isSoft);
-									if (isLoud && isSoft) {
-										addError ("This is a compound dynamic with loud and soft elements,\nwhich doesn’t make sense for a short note.\nConsider lengthening the note or changing the dynamic.",nextDynamic);
-									}
-								}
+			if (currentDynamicNum < numDynamics && nextDynamicTick < endOfScoreTick) {
+				if (currTick >= nextDynamicTick) {
+					currentDynamic = nextDynamic;
+					currentDynamicNum ++;
+					checkTextObject(currentDynamic);
+					//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic);
+					if (currTick == nextDynamicTick && isNote) {
+						if (noteRest.actualDuration.ticks < division) {
+							var loudArray = ['dynamicForte','dynamicSforzando','dynamicZ','sf'];
+							var isLoud = false, isSoft = false;
+							for (var i = 0; i < loudArray.length && !isLoud; i++) isLoud = nextDynamic.text.includes(loudArray[i]);
+							var softArray = ['dynamicPiano'];
+							
+							for (var i = 0; i < softArray.length && !isSoft; i++) isSoft = nextDynamic.text.includes(softArray[i]);
+							//logError (nextDynamic.text+' isLoud:'+isLoud+' isSoft:'+isSoft);
+							if (isLoud && isSoft) {
+								addError ("This is a compound dynamic with loud and soft elements,\nwhich doesn’t make sense for a short note.\nConsider lengthening the note or changing the dynamic.",nextDynamic);
 							}
 						}
 					}
+					getNextDynamic();
 				}
 			}
 		}
@@ -1940,6 +1941,23 @@ MuseScore {
 				var e = measures[j];
 				if (e.type == Element.VBOX) frames.push(e);
 			}
+		}
+	}
+	
+	function getNextDynamic () {
+		if (currentDynamicNum < numDynamics-1) {
+			nextDynamic = dynamics[currentStaffNum][currentDynamicNum+1];
+			if (nextDynamic == null || nextDynamic == undefined) {
+				logError ('nextDynamic was '+nextDyanmic);
+			} else {
+				var p = nextDynamic.parent;
+				while (p.type != Element.SEGMENT) p = p.parent;
+				nextDynamicTick = p.tick;
+				//logError ('next Dynamic is '+nextDynamic.text+' at '+nextDynamicTick);
+			}
+		} else {
+			nextDynamic = null;
+			nextDynamicTick = endOfScoreTick;
 		}
 	}
 	
