@@ -448,7 +448,7 @@ MuseScore {
 		numStaves = curScore.nstaves;
 		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
-		logError ('bar name = '+firstBarInScore.userName());
+		//logError ('bar name = '+firstBarInScore.userName());
 		lastBarInScore = curScore.lastMeasure;
 		endOfScoreTick = curScore.lastSegment.tick+1;
 		
@@ -742,6 +742,7 @@ MuseScore {
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			
 			var currentStaff = curScore.staves[currentStaffNum];
+			currentBar = firstBarInScore;
 			currentSystemNum = 0;
 			displayOffset = 0;
 
@@ -852,8 +853,11 @@ MuseScore {
 			currentHairpinNum = 0;
 			currentHairpinEnd = 0;
 			numHairpins = hairpins[currentStaffNum].length;
+			//logError ('numHairpins on staff '+currentStaffNum+' = '+numHairpins);
+			//logError ('currentHairpinNum = '+currentHairpinNum);
 			nextHairpin = (numHairpins == 0) ? null : hairpins[currentStaffNum][0];
 			nextHairpinStart = (numHairpins == 0) ? 0 : nextHairpin.spanner.spannerTick.ticks;
+			//logError ('nextHairpinStart = '+nextHairpinStart);
 			expressiveSwell = 0;
 			
 			// ** trills
@@ -904,6 +908,7 @@ MuseScore {
 			if (doCheckPianoHarpAndPercussion && isVibraphone && isTopOfGrandStaff[currentStaffNum]) addError('Vibraphones are normally notated on a single treble staff,\nrather than a grand staff.','system1 '+currentStaffNum);
 									
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
+				//logError ('barloop '+currentBarNum);
 				if (currentBar.irregular) displayOffset ++;
 				
 				barStartTick = currentBar.firstSegment.tick;
@@ -1007,7 +1012,6 @@ MuseScore {
 					}
 				}
 				
-				
 				for (currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					var numNotesInThisTrack = 0;
 					var numNoteRestsInThisTrack = 0;
@@ -1017,7 +1021,6 @@ MuseScore {
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStartTick);
 					var processingThisBar = cursor.element && cursor.tick < barEndTick;
-					
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
 					
@@ -1068,7 +1071,7 @@ MuseScore {
 								if (tempoText.length > 0) t = tempoText[0];
 							}
 						}
-						
+						if (currTick == barEndTick) logError ('Wont calc because currTick == barEndTick');
 						if (currTick != barEndTick) {
 							
 							// ** CHECK IF MELISMA IS STILL GOING ** //
@@ -1482,7 +1485,7 @@ MuseScore {
 	}
 	
 	function checkScoreElements (noteRest) {
-		
+
 		// ** CHECK SLURS ** //
 		if (currentSlurNumOnTrack[currentTrack] < numSlurs) {
 			if (isSlurred && currTick > currentSlurEnd) {
@@ -1631,9 +1634,10 @@ MuseScore {
 		
 		if (doCheckDynamics) {
 			// ************ UNDER A HAIRPIN? ************ //
+			
+			//if (currentHairpinNum >= numHairpins) logError ('Not checking hairpin because '+currentHairpinNum+' >= '+numHairpins);
 			if (currentHairpinNum < numHairpins) {
 				if (isHairpin) {
-					
 					lastDynamicTick = currTick;
 					if (currTick >= currentHairpinEnd) {
 						//logError("Hairpin ended because currTick = "+currTick+" & currentHairpinEnd = "+currentHairpinEnd);
@@ -1962,7 +1966,7 @@ MuseScore {
 				}
 				if (system.firstMeasure != null) { // ignore frames
 					var systemTop = system.canvasPos.y;
-					var systemHeight = system.firstMeasure.bbox.height;
+					var systemHeight = system.firstMeasure.bbox.height; // to get the height of a system, get the height of its first measure
 					var systemBottom = systemTop + systemHeight;
 					//logError ('page '+i+' system '+j+'; systemTop = '+systemTop+' systemBottom = '+systemBottom);
 					visibleSystemNum ++;
@@ -2104,21 +2108,23 @@ MuseScore {
 			
 			// *** HAIRPINS
 			if (etype == Element.HAIRPIN) {
-				//logError ('found hairpin');
+				logError ('found hairpin');
 				hairpins[staffIdx].push(e);
 				if (e.subtypeName().includes(" line") && e.spanner.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 			}
 			if (etype == Element.HAIRPIN_SEGMENT) {
-				//logError ('found hairpin');
+				//logError ('found hairpin on staff '+staffIdx);
 				var sameLoc = false;
 				var sameHairpin = false;
 				if (prevHairpinSegment != null) {
-					sameLoc = (e.spanner.spannerTick.ticks == prevHairpinSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevHairpinSegment.spanner.spannerTicks.ticks);
-					if (sameLoc) sameHairpin = !e.spanner.is(prevHairpinSegment.parent);
+					sameLoc = (e.spanner.spannerTick.ticks == prevHairpinSegment.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevHairpinSegment.spanner.spannerTicks.ticks) && (e.staffIdx == prevHairpinSegment.staffIdx);
+					if (sameLoc) sameHairpin = e.spanner.is(prevHairpinSegment.spanner);
 				}
+				//logError ('sameHairpin = '+sameHairpin);
 				// only add it if it's not already added
 				if (!sameHairpin) {
 					hairpins[staffIdx].push(e);
+					//logError ('Staff '+staffIdx+' now has '+hairpins[staffIdx].length+' hairpins');
 					if (e.subtypeName().includes(" line") && e.spanner.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
 				}
 				prevHairpinSegment = e;
@@ -3399,6 +3405,7 @@ MuseScore {
 		// **** Does the hairpin start under a rest? **** //
 		var noteAtHairpinStart = getNoteRestAtTick(hairpinStartTick);
 		var hairpinStartsOnRest = (noteAtHairpinStart == null) ? true : noteAtHairpinStart.type == Element.REST;
+		//logError ('hairpinStartsOnRest = '+hairpinStartsOnRest+'; noteAtHairpinStart = '+noteAtHairpinStart);
 		if (hairpinStartsOnRest && !isGrandStaff[cursor.staffIdx]) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);
 		
 		
@@ -4987,12 +4994,14 @@ MuseScore {
 						} else {
 							if (theStaff.brackets.length == 1) {
 								//logError ('first system bracket is '+theStaff.brackets[0].systemBracket+'; bracketType Normal = '+BracketType.NORMAL+'; bracketType brace = '+BracketType.BRACE);
+								//logError ('theStaff.brackets[0].bracketSpan = '+theStaff.brackets[0].bracketSpan+'; visibleStaffSpan = '+visibleStaffSpan);
 
 								if (theStaff.brackets[0].systemBracket != BracketType.NORMAL) {
 									addError ('This bracket is the wrong kind of bracket for '+str+'.\nDelete it and add a normal bracket instead',theStaff.brackets[0]);
-								}
-								if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
-									addError ('For '+str+'s, the staff bracket should span the entire system.',theStaff.brackets[0]);
+								} else {
+									if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
+										addError ('For '+str+'s, the staff bracket should span the entire system.',theStaff.brackets[0]);
+									}
 								}
 							} else {
 								addError ('For '+str+'s, you only need one staff bracket.\nSelect all unnecessary brackets and press ‘delete’.',theStaff.brackets[1]);
