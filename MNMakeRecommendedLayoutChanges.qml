@@ -288,16 +288,19 @@ MuseScore {
 			prevPrevPart = prevPart;
 			prevPart = part;
 		}
+		isTopOfGrandStaff[numStaves] = false;
 	}
 
 	
 	function doConnectBarlines () {
+		
 		// **** CHECK STANDARD CHAMBER LAYOUTS FOR CORRECT SCORE ORDER **** //
 		// **** ALSO NOTE ANY GRAND STAVES			  				 **** //
 		// **** AND CHECK BARLINES ARE CONNECTED PROPERLY 			**** //
 		var scoreHasStrings = false;
 		var scoreHasWinds = false;
 		var scoreHasBrass = false;
+		var scoreHasVoices = false;
 		
 		// ** FIRST CHECK THE ORDER OF STAVES IF ONE OF THE INSTRUMENTS IS A GRAND STAFF ** //
 		if (numGrandStaves > 0) {
@@ -308,6 +311,7 @@ MuseScore {
 					if (instrumentType.includes("strings.")) scoreHasStrings = true;
 					if (instrumentType.includes("wind.")) scoreHasWinds = true;
 					if (instrumentType.includes("brass.")) scoreHasBrass = true;
+					if (instrumentType.includes("voice.")) scoreHasVoice = true;
 				}
 			}
 			// do we need to check the order of grand staff instruments?
@@ -317,9 +321,9 @@ MuseScore {
 			if (checkGrandStaffOrder) {
 				for (var i = 0; i < numGrandStaves;i++) {
 					var bottomGrandStaffNum = grandStaffTops[i]+1;
-					if (bottomGrandStaffNum < numStaves-1) {
+					/*if (bottomGrandStaffNum < numStaves-1) {
 						if (!isGrandStaff[bottomGrandStaffNum+1] && staffVisible[bottomGrandStaffNum]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Instruments tab.","pagetop");
-					}
+					}*/
 				}
 			}
 		}
@@ -342,9 +346,7 @@ MuseScore {
 		var numWinds = 0;
 		var numBrass = 0;
 		var numStrings = 0;
-		var flStaff, obStaff, clStaff, bsnStaff, hnStaff;
-		var tpt1Staff, tpt2Staff, tbnStaff, tbaStaff;
-		var firstStringPart = 0, firstWindPart = 0, firstBrassPart = 0;
+		var firstStringPart = 0, firstBrassPart = 0;
 		var lastStringPart = 0, lastWindPart = 0, lastBrassPart = 0;
 		
 		// Check Quintets
@@ -442,10 +444,14 @@ MuseScore {
 			curScore.endCmd();
 		} else {
 			curScore.startCmd();
-			for (var i = 0; i < lastVisibleStaff-1; i++) {
+			for (var i = 0; i < lastVisibleStaff; i++) {
 				if (staffVisible[i]) {
 					var staff = curScore.staves[i];
-					if (staff.staffBarlineSpan == 0) staff.staffBarlineSpan = 1;
+					if (instrumentIds[i].includes ("voice.") || isTopOfGrandStaff[i+1]) {
+						if (staff.staffBarlineSpan == 1) staff.staffBarlineSpan = 0;
+					} else {
+						if (staff.staffBarlineSpan == 0) staff.staffBarlineSpan = 1;
+					}
 				}
 			}
 			curScore.endCmd();
