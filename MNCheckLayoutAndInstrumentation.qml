@@ -3405,9 +3405,9 @@ MuseScore {
 		var endOffset = currentHairpin.userOff2.x;
 		//logError ("off: "+startOffset+" "+endOffset);
 		var m = 1.0;
-		if (startOffset >= m && endOffset < m) addError ("This hairpin’s startpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
-		if (startOffset < m && endOffset >= m) addError ("This hairpin’s endpoint has been manually moved away from its default location.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
-		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start- and endpoint have been manually moved away from their default locations.\nThis may result in poor positioning if the bars are resized.\nYou can either select the hairpin and press "+cmdKey+"-R, or delete the hairpin\nand recreate it by first selecting a passage and then creating the hairpin.",currentHairpin);
+		if (startOffset >= m && endOffset < m) addError ("This hairpin’s start has been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
+		if (startOffset < m && endOffset >= m) addError ("This hairpin’s end has been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
+		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start & end have been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
 		
 		var cursor2 = curScore.newCursor();
 
@@ -6349,7 +6349,7 @@ MuseScore {
 		// create new cursor to add the comments
 		var commentCursor = curScore.newCursor();
 		commentCursor.inputStateMode = Cursor.INPUT_STATE_SYNC_WITH_SCORE;
-		commentCursor.filter = Segment.All;
+		commentCursor.filter = Segment.ChordRest;
 		commentCursor.next();
 		
 		// save undo state
@@ -6399,17 +6399,10 @@ MuseScore {
 								desiredPosX = element.pagePos.x;
 								desiredPosY = element.pagePos.y;
 							} else {
-								staffNum = 0;
-								while (!curScore.staves[staffNum].is(elemStaff)) {
-									staffNum ++; // I WISH: staffNum = element.staff.staffidx
-									if (curScore.staves[staffNum] == null || curScore.staves[staffNum] == undefined) {
-										logError ("showAllErrors() — got staff error "+staffNum+" — bailing");
-										return;
-									}
-								}
+								staffNum = element.staffIdx;
 								// Handle the case where a system-attached object reports a staff that is hidden
 								if (eType == Element.TEMPO_TEXT || eType == Element.SYSTEM_TEXT || eType == Element.REHEARSAL_MARK || eType == Element.METRONOME) {
-									while (!curScore.staves[staffNum].part.show && staffNum < curScore.nstaves) staffNum ++;
+									staffNum = element.effectiveStaffIdx;
 								}
 							}
 						}
@@ -6451,6 +6444,10 @@ MuseScore {
 						tick = getTick(element);
 					}
 					
+					commentCursor.staffIdx = staffNum;
+					commentCursor.track = staffNum * 4;
+					commentCursor.rewindToTick(tick);
+					
 					// add a text object at the location where the element is
 					var comment = newElement(Element.STAFF_TEXT);
 					comment.text = theText;
@@ -6467,9 +6464,6 @@ MuseScore {
 					comment.autoplace = false;
 					comment.offsetx = 0;
 					comment.offsety = 0;
-					commentCursor.staffIdx = staffNum;
-					commentCursor.track = staffNum * 4;
-					commentCursor.rewindToTick(tick);
 					commentCursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
@@ -6498,7 +6492,6 @@ MuseScore {
 		var offy = [];
 		
 		for (var i = 0; i < comments.length; i++) {
-			var elementHeight = 0;
 			var commentOffset = 1.0;
 			var comment = comments[i];
 			offx.push(0);
@@ -6527,7 +6520,7 @@ MuseScore {
 			
 			var commentPage = comment.parent;
 			while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
-		
+			
 			if (commentPage != null && commentPage != undefined) {
 				if (commentPage.type == Element.PAGE) {
 		
@@ -6638,6 +6631,8 @@ MuseScore {
 			var comment = comments[i];
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
+			if (comment.text.includes('hairpin')) logError ('Object measure = '+comment.parent.parent.no);
+
 		}
 		//curScore.endCmd();
 	}
@@ -6652,14 +6647,13 @@ MuseScore {
 			logError ("getTick() — tried to get tick of null");
 			return 0;
 		}
-		var tick = 0;
 		var eType = e.type;
-		var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
-		if (spannerArray.includes(eType)) {
-			tick = e.spanner.spannerTick.ticks;
+		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
+		if (e.spanner != undefined) {
+			return e.spanner.spannerTick.ticks;
 		} else {
 			if (eType == Element.MEASURE) {
-				tick = e.firstSegment.tick;
+				return e.firstSegment.tick;
 			} else {
 				if (e.parent == undefined || e.parent == null) {
 					logError("getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
@@ -6677,11 +6671,11 @@ MuseScore {
 						}
 						p = p.parent;
 					}
-					if (p.type == Element.SEGMENT) tick = p.tick;
+					if (p.type == Element.SEGMENT) return p.tick;
 				}
 			}
 		}
-		return tick;
+		return 0;
 	}
 	
 	function getBarNumber (e) {

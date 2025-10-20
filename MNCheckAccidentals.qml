@@ -1168,7 +1168,7 @@ MuseScore {
 		
 		// create new cursor to add the comments
 		var cursor = curScore.newCursor();
-		cursor.filter = Segment.All;
+		cursor.filter = Segment.ChordRest;
 		cursor.next();
 		
 		// save undo state
