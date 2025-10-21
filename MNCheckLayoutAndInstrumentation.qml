@@ -307,6 +307,7 @@ MuseScore {
 		
 	// ** FERMATAS ** //
 	property var fermatas: []
+	property var isFermata: false
 	
 	// ** HAIRPINS ** //
 	property var hairpins: []
@@ -343,7 +344,6 @@ MuseScore {
 	property var isFirstPedal: false
 	
 	// ** LV ** //
-	property var lv: []
 	property var isLv: false
 	
 	// ** SLURS ** //
@@ -595,7 +595,6 @@ MuseScore {
 			dynamics[i] = [];
 			dynamicTicks[i] = [];
 			clefs[i] = [];
-			lv[i] = [];
 			fermatas[i] = [];
 		}
 		
@@ -1100,8 +1099,15 @@ MuseScore {
 							isNote = eType == Element.CHORD;
 							isRest = eType == Element.REST;
 							
+							// ************ CHECK IF THERE’S A FERMATA ************ //
+							if (isNote || isRest) checkFermata (elem);
+							
 							// ************ IS LV? ************ //
-							isLv = isNote && lv[currentStaffNum][currTick] != null;
+							isLv = false;
+							if (isNote) {
+								var theTie = elem.notes[0].tieForward;
+								if (theTie != null) isLv = theTie.type == Element.LAISSEZ_VIB;
+							}
 							
 							// ************ CHECK KEY SIGNATURE ************ //
 							if (eType == Element.KEYSIG && currentStaffNum == 0) checkKeySignature(elem,cursor.keySignature);
@@ -1219,14 +1225,18 @@ MuseScore {
 											checkArticulation (noteRest, theArticulationArray);
 											var numStaccatos = 0;
 											for (var i = 0; i < theArticulationArray.length; i++) {
-												if (staccatoArray.includes(theArticulationArray[i].symbol)) numStaccatos++;
+												if (theArticulationArray[i].visible) {
+													if (staccatoArray.includes(theArticulationArray[i].symbol)) numStaccatos++;
+												}
 											}
 											if (numStaccatos > 0) checkStaccatoIssues (noteRest);
 											if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
 											if (isSforzando){
 												var isAccented = false;
 												for (var i = 0; i < theArticulationArray.length && !isAccented; i++) {
-													isAccented = accentsArray.includes(theArticulationArray[i].symbol);
+													if (theArticulationArray[i].visible) {
+														isAccented = accentsArray.includes(theArticulationArray[i].symbol);
+													}
 												}
 												if (!isAccented) addError("This note is marked as some kind of sforzando,\nbut has no accent articulation. Consider\nadding an accent to aid the performer.",noteRest);
 											}
@@ -1247,8 +1257,10 @@ MuseScore {
 										var hasStaccato = false, hasHarmonic = false;
 										if (theArticulationArray.length > 0) {
 											for (var i = 0; i < theArticulationArray.length; i++) {
-												if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
-												if (theArticulationArray[i].symbol == SymId.stringsHarmonic) hasHarmonic = true;
+												if (theArticulationArray[i].visible) {
+													if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
+													if (theArticulationArray[i].symbol == SymId.stringsHarmonic) hasHarmonic = true;
+												}
 											}
 											if (isTiedBack && doCheckSlursAndTies && !hasStaccato && !hasHarmonic) addError("This note has articulation in the middle of a tie.\nDid you mean that to be slurred instead?",noteRest);
 										}
@@ -2012,7 +2024,7 @@ MuseScore {
 		// **** GLISSES, PEDALS, TEMPO TEXT																								**** //
 		
 		var elems = curScore.selection.elements;
-		var prevSlurSegment = null, prevHairpinSegment = null, prevTrillSegment = null, prevOttavaSegment = null, prevPedalSegment = null, prevLV = null;
+		var prevSlurSegment = null, prevHairpinSegment = null, prevTrillSegment = null, prevOttavaSegment = null, prevPedalSegment = null;
 		var firstChord = null;
 		if (elems.length == 0) {
 			addError ('analyseSystemsAndSpanners() — elems.length was 0');
@@ -2211,17 +2223,6 @@ MuseScore {
 			}
 			if (etype == Element.CLEF) clefs[staffIdx].push(e);
 			
-			// *** L.Vs *** //
-			if (etype == Element.LAISSEZ_VIB_SEGMENT) {
-				var sameLV = false;
-				if (prevLV != null) {
-					var sameLoc = (e.spanner.spannerTick.ticks == prevLV.spanner.spannerTick.ticks) && (e.spanner.spannerTicks.ticks == prevLV.spanner.spannerTicks.ticks) && (e.staffIdx == prevLV.staffIdx);
-					if (sameLoc) prevLV = e.spanner.is(prevLV.spanner);
-				}
-				// only add it if it's not already added
-				if (!sameLV) lv[staffIdx][e.spanner.spannerTick.ticks] = e;
-				prevLV = e;
-			}
 		}
 		
 		// sort the tempo text array
@@ -3468,6 +3469,30 @@ MuseScore {
 		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.", currentHairpin);
 	}
 	
+	function checkFermata (noteRest) {
+		isFermata = false;
+		if (isNote || isRest) {
+			var theSeg = noteRest.parent;
+			while (theSeg.type != Element.SEGMENT) {
+				theSeg = theSeg.parent;
+				if (theSeg == undefined || theSeg == null) return;
+			}
+			var theAnnotations = theSeg.annotations;
+			if (theAnnotations != null) {
+				var n = theAnnotations.length;
+				for (var i = 0; i < n; i++) {
+					var theElem = theAnnotations[i];
+					//logError ('checking element');
+					if (theElem.type == Element.FERMATA) {
+						//logError ('isFermata');
+						isFermata = true;
+						return;
+					}
+				}
+			}
+		}
+	}
+	
 	function checkArticulation (noteRest, theArticulationArray) {
 		
 			
@@ -3475,47 +3500,49 @@ MuseScore {
 	
 		for (var i = 0; i < numArtic; i++) {
 			var theArticulation = theArticulationArray[i];
-			var theSymbol = theArticulation.symbol;
-			
-			// CHECK FOR UPBOW/DOWNBOW MARKINGS IN NON-STRING INSTRUMENTS
-			var hasBowMarking = stringArticulationsArray.includes(theSymbol);
-			if (hasBowMarking) {
-				if (!isStringInstrument) {
-					addError ('This is a string articulation, but this is not a string instrument.', theArticulation);
-				} else {
-					var prevNoteHasBowMarking = false;
-					var nextNoteHasBowMarking = false;
-					var prevNote = getPreviousNoteRest(noteRest);
-					var nextNote = getNextNoteRest(noteRest);
-					if (prevNote) {
-						//logError ('prevNote found');
-
-						var prevNoteArticulationArray = getArticulations(prevNote);
-						if (prevNoteArticulationArray.length > 0) {
-							//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
-							for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
-								//logError ('artic = '+prevNoteArticulationArray [j]);
-								prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray[j].symbol);
+			if (theArticulation.visible) {
+				var theSymbol = theArticulation.symbol;
+				
+				// CHECK FOR UPBOW/DOWNBOW MARKINGS IN NON-STRING INSTRUMENTS
+				var hasBowMarking = stringArticulationsArray.includes(theSymbol);
+				if (hasBowMarking) {
+					if (!isStringInstrument) {
+						addError ('This is a string articulation, but this is not a string instrument.', theArticulation);
+					} else {
+						var prevNoteHasBowMarking = false;
+						var nextNoteHasBowMarking = false;
+						var prevNote = getPreviousNoteRest(noteRest);
+						var nextNote = getNextNoteRest(noteRest);
+						if (prevNote) {
+							//logError ('prevNote found');
+	
+							var prevNoteArticulationArray = getArticulations(prevNote);
+							if (prevNoteArticulationArray.length > 0) {
+								//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
+								for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
+									//logError ('artic = '+prevNoteArticulationArray [j]);
+									prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray[j].symbol);
+								}
 							}
 						}
-					}
-					if (nextNote) {
-						//logError ('nextNote found');
-
-						var nextNoteArticulationArray = getArticulations(nextNote);
-						if (nextNoteArticulationArray.length > 0) {
-							//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
-
-							for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
-								nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray[j].symbol);
+						if (nextNote) {
+							//logError ('nextNote found');
+	
+							var nextNoteArticulationArray = getArticulations(nextNote);
+							if (nextNoteArticulationArray.length > 0) {
+								//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
+	
+								for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
+									nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray[j].symbol);
+								}
 							}
 						}
-					}
-					if (!prevNoteHasBowMarking && !nextNoteHasBowMarking) {
-						addError ('Are you sure this isolated bow marking is necessary?\n(Only write bow markings that are required for a specific effect.)', theArticulation);
-						return;
-					}
-				}	
+						if (!prevNoteHasBowMarking && !nextNoteHasBowMarking) {
+							addError ('Are you sure this isolated bow marking is necessary?\n(Only write bow markings that are required for a specific effect.)', theArticulation);
+							return;
+						}
+					}	
+				}
 			}
 		}	
 	}
@@ -5075,7 +5102,7 @@ MuseScore {
 									return;
 								}
 							} else {
-								addError ('For '+str+'s, you don’t need a bracket.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
+								addError ('For '+str+'s, you don’t need a bracket around the staves.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
 								return;
 							}
 						}
@@ -5129,11 +5156,14 @@ MuseScore {
 	}
 	
 	function checkStaccatoIssues (noteRest) {
+		if (isFermata) {
+			addError ("Don’t put a fermata over a staccato note.", noteRest);
+		}
 		if (noteRest.duration.ticks >= division * 2) {
 			addError ("Don’t put staccato dots on long notes, unless the tempo is very fast.",noteRest);
 			return;
-		}		
-		if (isDotted(noteRest) && noteRest.duration.ticks >= (division * 0.5)) {
+		}
+		if (isDotted(noteRest) && noteRest.duration.ticks >= division * 0.5) {
 			addError ("Putting staccato dots on dotted notes may be ambiguous.",noteRest);
 			return;
 		}
@@ -5590,9 +5620,12 @@ MuseScore {
 				// check artificial harmonic with a harmonic circle above it
 				if (theArticulationArray != undefined) {
 					for (var i = 0; i < theArticulationArray.length; i++) {
-						if (theArticulationArray[i].symbol == SymId.stringsHarmonic) {
-							addError ("Artificial harmonics don’t require a harmonic circle.",theArticulationArray[i]);
-							break;
+						if (theArticulationArray[i].visible) {
+							if (theArticulationArray[i].symbol == SymId.stringsHarmonic) {
+								// found a harmonic circle
+								addError ("Artificial harmonics don’t require a harmonic circle.",theArticulationArray[i]);
+								break;
+							}
 						}
 					}
 				}
@@ -5611,11 +5644,12 @@ MuseScore {
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (theArticulationArray[i].symbol == SymId.stringsHarmonic) {
-					//logError ('isHarmonicCircle');
-					isHarmonicCircle = true;
-					isStringHarmonic = true;
-					harmonicArray = harmonicCircleIntervals;
-					break;
+					if (theArticulationArray[i].visible) {
+						isHarmonicCircle = true;
+						isStringHarmonic = true;
+						harmonicArray = harmonicCircleIntervals;
+						break;
+					}
 				}
 			}
 			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle == NoteHeadGroup.HEAD_DIAMOND_OLD) {
@@ -5679,11 +5713,13 @@ MuseScore {
 		var theArticulationArray = getArticulations(noteRest);
 		if (theArticulationArray.length > 0) {
 			for (var i = 0; i < theArticulationArray.length; i++) {
-				if (staccatoArray.includes(theArticulationArray[i].symbol)) {
-					addError("It’s not recommended to have a staccato articulation on a pizzicato note.", noteRest);
-					lastPizzIssueBar = currentBarNum;
-					lastPizzIssueStaff = currentStaffNum;
-					return;
+				if (theArticulationArray[i].visible) {
+					if (staccatoArray.includes(theArticulationArray[i].symbol)) {
+						addError("It’s not recommended to have a staccato articulation on a pizzicato note.", noteRest);
+						lastPizzIssueBar = currentBarNum;
+						lastPizzIssueStaff = currentStaffNum;
+						return;
+					}
 				}
 			}
 		}
@@ -5851,10 +5887,12 @@ MuseScore {
 				var theArticulationArray = getArticulations(noteRest);
 				if (theArticulationArray.length > 0) {
 					for (var i = 0; i < theArticulationArray.length; i++) {
-						if (accentsArray.includes(theArticulationArray[i].symbol) ) {
-							if (isStringInstrument) addError("In general, avoid putting accents on notes in the middle of a slur\nas strings usually articulate accents with a bow change.",noteRest);
-							if (isWindOrBrassInstrument) addError("In general, avoid putting accents on notes in the middle of a slur\nas winds and brass usually articulate accents with their tongue.",noteRest);
-							return;
+						if (theArticulationArray[i].visible) {
+							if (accentsArray.includes(theArticulationArray[i].symbol) ) {
+								if (isStringInstrument) addError("In general, avoid putting accents on notes in the middle of a slur\nas strings usually articulate accents with a bow change.",noteRest);
+								if (isWindOrBrassInstrument) addError("In general, avoid putting accents on notes in the middle of a slur\nas winds and brass usually articulate accents with their tongue.",noteRest);
+								return;
+							}
 						}
 					}
 				}
@@ -6067,8 +6105,11 @@ MuseScore {
 						prevBeam = currBeam;
 						var notesInBeamArray = [];
 						var currNote = noteRest;
+						var isCrossStaff = false;
 						while (currNote.beam != null) {
 							if (!currNote.beam.is(currBeam)) break;
+							if (currNote.staffMove != 0) isCrossStaff = true;
+
 							// don't add rests to the beam array
 							if (currNote.notes != null) notesInBeamArray.push(currNote);
 							//logError ('Pushed note with pitch '+currNote.notes[0].pitch);
@@ -6077,8 +6118,6 @@ MuseScore {
 						}
 	
 						var numNoteRests = notesInBeamArray.length;
-						//logError ('Found '+numNoteRests+' in beam');
-						var preferUpOrDown = 0;
 						
 						if (numNoteRests > 1) {
 							var maxTopOffset = 0;
@@ -6100,15 +6139,15 @@ MuseScore {
 							// only check if the beams have to go a particular way
 							//logError ('maxBottomOffset = '+maxBottomOffset+' maxTopOffset = '+maxTopOffset);
 							if (Math.abs(maxBottomOffset) != Math.abs(maxTopOffset)) {
-								var maxOffsetFromMiddleLine = 0;
+								//var maxOffsetFromMiddleLine = 0;
 								var whichWayStemsShouldGo = 0;
 								var calcExtremeNotePos = 0;
 								if (Math.abs(maxBottomOffset) > Math.abs(maxTopOffset)) {
-									maxOffsetFromMiddleLine = Math.abs(maxBottomOffset);
+									//maxOffsetFromMiddleLine = Math.abs(maxBottomOffset);
 									whichWayStemsShouldGo = 2; // stems should go up
 									calcExtremeNotePos = (4-maxBottomOffset) * 0.5;
 								} else {
-									maxOffsetFromMiddleLine = Math.abs(maxTopOffset);
+									//maxOffsetFromMiddleLine = Math.abs(maxTopOffset);
 									whichWayStemsShouldGo = 1; // stems should go down
 									calcExtremeNotePos = (4-maxTopOffset) * 0.5;
 								}
@@ -6116,9 +6155,9 @@ MuseScore {
 								// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
 								var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
 								//logError ('I calculated direction as '+calcDir+' shouldbe = '+whichWayStemsShouldGo+' because beamPosY is '+beamPosY+' maxOffset = '+maxOffsetFromMiddleLine+' and calcExtremeNotePos is '+calcExtremeNotePos);
-								if (whichWayStemsShouldGo == 1 && calcDir != 1) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								if (whichWayStemsShouldGo == 1 && calcDir != 1 && !isCrossStaff) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
 
-								if (whichWayStemsShouldGo == 2 && calcDir != 2) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
+								if (whichWayStemsShouldGo == 2 && calcDir != 2 && !isCrossStaff) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
 							}
 						}
 					}
@@ -6266,7 +6305,12 @@ MuseScore {
 		var hasStaccato = false;
 		var theArticulationArray = getArticulations(noteRest)
 		for (var i = 0; i < theArticulationArray.length; i++) {
-			if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
+			if (theArticulationArray[i].visible) {
+				if (staccatoArray.includes(theArticulationArray[i].symbol)) {
+					hasStaccato = true;
+					break;
+				}
+			}
 		}
 		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo.",noteRest);
 	}
@@ -6318,7 +6362,12 @@ MuseScore {
 		var hasStaccato = false;
 		var theArticulationArray = getArticulations(noteRest);
 		for (var i = 0; i < theArticulationArray.length; i++) {
-			if (staccatoArray.includes(theArticulationArray[i].symbol)) hasStaccato = true;
+			if (theArticulationArray[i].visible) {
+				if (staccatoArray.includes(theArticulationArray[i].symbol)) {
+					hasStaccato = true;
+					break;
+				}
+			}
 		}
 		if (hasStaccato) addError ("It doesn’t make sense to have a staccato articulation on a tremolo.",noteRest);
 	}
@@ -6687,15 +6736,13 @@ MuseScore {
 		}
 		
 		// now reposition all the elements
-		//curScore.startCmd();
+		curScore.startCmd();
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
-			if (comment.text.includes('hairpin')) logError ('Object measure = '+comment.parent.parent.no);
-
 		}
-		//curScore.endCmd();
+		curScore.endCmd();
 	}
 	
 	//---------------------------------------------------------
