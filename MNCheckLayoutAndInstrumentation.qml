@@ -746,6 +746,7 @@ MuseScore {
 			
 			var currentStaff = curScore.staves[currentStaffNum];
 			currentBar = firstBarInScore;
+			currentBarNum = 1;
 			currentSystemNum = 0;
 			displayOffset = 0;
 
@@ -802,13 +803,14 @@ MuseScore {
 			lastDynamicFlagBar = -1;
 			currentDynamicNum = -1;
 			currentDynamic = null;
+			nextDynamicTick = -1;
 			numDynamics = dynamics[currentStaffNum].length;
 			if (numDynamics == 0) {
 				// no dynamics marked!
 				nextDynamic = null;
 				nextDynamicTick = endOfScoreTick;
 			} else {
-				getNextDynamic();
+				getNextDynamic();				
 				if (nextDynamicTick == 0) {
 					currentDynamic = nextDynamic;
 					currentDynamicNum ++;
@@ -1104,7 +1106,7 @@ MuseScore {
 							// ************ CHECK KEY SIGNATURE ************ //
 							if (eType == Element.KEYSIG && currentStaffNum == 0) checkKeySignature(elem,cursor.keySignature);
 							
-							// ************ CHECK WHERE WE ARE WITH SPANNERS ETC. ************ //
+							// ************ CHECK SPANNERS & DYNAMICS ETC. ************ //
 							checkScoreElements(elem);
 							
 							// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
@@ -1273,9 +1275,7 @@ MuseScore {
 										numNoteRestsInThisSystem += graceNotes.length / 2; // grace notes only count for half
 										prevWasGraceNote = true;
 									}
-																
 									
-								
 									var nn = noteRest.notes.length;
 									isChord = nn > 1;
 									
@@ -1362,9 +1362,9 @@ MuseScore {
 							if (isNote) {
 								if (isFirstNote) {
 									isFirstNote = false;
-								
+									//logError('firstDynamic = '+firstDynamic);
 									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
-									if (doCheckDynamics && !firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.",noteRest);
+									if (doCheckDynamics && !firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.\n(If there is a dynamic underneath, it may be too far to the right.)",noteRest);
 								
 								} else {
 								
@@ -1699,7 +1699,7 @@ MuseScore {
 					currentDynamic = nextDynamic;
 					currentDynamicNum ++;
 					checkTextObject(currentDynamic);
-					//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic);
+					//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic()+'; firstDynamic = '+firstDynamic);
 					if (currTick == nextDynamicTick && isNote) {
 						if (noteRest.actualDuration.ticks < division) {
 							var loudArray = ['dynamicForte','dynamicSforzando','dynamicZ','sf'];
@@ -2467,26 +2467,37 @@ MuseScore {
 				if (id.includes ("keyboard.piano")) numPf ++;
 			}
 		}
+		var checked = false;
 		//logError ('numParts = '+numParts+'; numPf = '+numPf);
-		if (numParts == 2) checkBrackets("duo");
+		if (numParts == 2) {
+			checkBracketsAndBraces("duo");
+			checked = true;
+		}
 
 		// ** CHECK PIANO TRIO ** //
-		if (numParts == 3 && numPf > 0) checkBrackets ("piano trio");
+		if (numParts == 3 && numPf > 0) {
+			checkBracketsAndBraces ("piano trio");
+			checked = true}
 		
 		// ** CHECK PIANO QUARTET ** //
-		if (numParts == 4 && numPf > 0) checkBrackets ("piano quartet");
+		if (numParts == 4 && numPf > 0) {
+			checkBracketsAndBraces ("piano quartet");
+			checked = true;
+		}
 		
 		// ** CHECK STRING QUARTET ** //
 
 		if (numParts == 4 && numVn == 2 && numVa == 1 && numVc == 1) {
 			checkBarlinesConnected("string quartet");
-			checkBrackets("string quartet");
+			checkBracketsAndBraces("string quartet");
+			checked = true;
 		}
 			
 		// **** CHECK WIND QUINTET **** //
 		if (numParts == 5 && numFl == 1 && numOb == 1 && numCl == 1 && numBsn == 1 && numHn == 1) {
 			checkBarlinesConnected("wind quintet");
-			checkBrackets("wind quintet");
+			checkBracketsAndBraces("wind quintet");
+			checked = true;
 			if (flStaff != 0) {
 				addError("You appear to be composing a wind quintet\nbut the flute should be the top staff.\nReorder using the Layout tab.","topfunction ");
 			} else {
@@ -2509,7 +2520,8 @@ MuseScore {
 		// **** CHECK BRASS QUINTET **** //
 		if (numParts == 5 && numTpt == 2 && numHn == 1 && numTbn == 1 && numTba == 1) {
 			checkBarlinesConnected("brass quintet");
-			checkBrackets("brass quintet");
+			checkBracketsAndBraces("brass quintet");
+			checked = true;
 			if (tpt1Staff != 0) {
 				addError("You appear to be composing a brass quintet\nbut the first trumpet should be the top staff.","pagetop");
 			} else {
@@ -2532,7 +2544,13 @@ MuseScore {
 		// **** CHECK STRING QUINTET **** //
 		if (numParts == 5 && numVn == 2 && numVa + numVc + numDb == 3) {
 			checkBarlinesConnected("string quintet");
-			checkBrackets("string quintet");
+			checkBracketsAndBraces("string quintet");
+			checked = true;
+		}
+		
+		if (!checked) {
+			checkBarlinesConnected(null);
+			checkBracketsAndBraces(null);	
 		}
 	}
 	
@@ -3040,6 +3058,7 @@ MuseScore {
 			var rehearsalMarkFontSize = style.value("rehearsalMarkFontSize");
 			var lyricsMinDistance = style.value("lyricsMinDistance");
 			var mergeMatchingRests = style.value("mergeMatchingRests");
+			var measureNumberPlacementMode = style.value("measureNumberPlacementMode");
 			
 			// *************************************** //
 			// **** STYLE SETTINGS — 1. SCORE TAB **** //
@@ -3188,7 +3207,7 @@ MuseScore {
 			// ****        4. BAR NUMBERS TAB     **** //
 			// *************************************** //
 			if (showFirstBarNum) styleComments.push("(Bar numbers tab) Uncheck ‘Show first’");
-			
+			if (measureNumberPlacementMode != 0) styleComments.push("(Bar numbers tab) Set 'Position→Show' to 'Above system'");
 			
 			// *************************************** //
 			// ****       5. BARLINES TAB        **** //
@@ -3667,12 +3686,10 @@ MuseScore {
 			if (lowerCaseText.includes("tasto") || lowerCaseText.includes("s.t") || lowerCaseText.includes("pst") || lowerCaseText.includes("mst")) {
 				if (lowerCaseText.includes("poco sul tasto") || lowerCaseText.includes("p.s.t") || lowerCaseText.includes("pst")) {
 					
-					//logError ('pst here2');
 					if (currentContactPoint === "pst") {
 						if (!isBracketed) addError("Instrument is already playing poco sul tasto?",textObject);
 					} else {
 						
-						//logError ('pst here3');
 						if (isBracketed) addError ("This looks like a change to poco sul tasto.\nYou don’t need the parentheses around the technique.",textObject);
 						currentContactPoint = "pst";
 					}
@@ -4109,7 +4126,7 @@ MuseScore {
 	}
 	
 	function checkTextObject (textObject) {
-		
+
 		if (!textObject.visible) return;
 		
 		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a2", "a 2","a3", "a 3","a4", "a 4","a5", "a 5","a6", "a 6","a7","a 7","a8","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
@@ -4117,7 +4134,6 @@ MuseScore {
 		
 		var elementType = textObject.type;
 		var isTempoChangeMarking = elementType == Element.GRADUAL_TEMPO_CHANGE;
-		
 		var textStyle = textObject.subStyle;
 		
 		// don't bother looking for certain textstyles
@@ -4145,7 +4161,6 @@ MuseScore {
 		if (elementType == Element.TEXT) isComment = Qt.colorEqual(textObject.frameBgColor,"yellow") && Qt.colorEqual(textObject.frameFgColor,"black");
 		
 		if (!isComment && styledText !== "") {	
-			
 			var tn = textObject.name.toLowerCase();
 			
 			// remove all tags
@@ -4160,15 +4175,20 @@ MuseScore {
 			var lowerCaseText = plainText.toLowerCase();
 			
 			if (lowerCaseText != '') {
-				
+
 				// ** CHECK TITLE ** //
 				if (isTitleText && plainText === "Untitled score") addError("You have not changed the default title text.", textObject);
 				
 				// ** CHECK SUBTITLE ** //
 				if (isSubtitleText) {
 					if (plainText === "Subtitle") addError( "You have not changed the default subtitle text.", textObject);
-					if (plainText != lowerCaseText && lowerCaseText.substr(0,4) === "for " && lowerCaseText.length < 20) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
 					
+					// check if the subtitle is lower-case
+					// the only exception is SATB-like choral descriptions (SSA, TTBB, etc.)
+					if (plainText != lowerCaseText && lowerCaseText.substr(0,4) === "for " && lowerCaseText.length < 20) {
+						var isSATB = plainText.match(/\b(S*A*T*B*)\b/) != null;
+						if (!isSATB) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
+					}
 					var elemPage = textObject.parent;
 					while (elemPage && elemPage.type != Element.PAGE) elemPage = elemPage.parent;
 					
@@ -4216,7 +4236,6 @@ MuseScore {
 				// ***************************************************** //
 				// ****		CHECK SPELLING AND FORMAT ERRORS		**** //
 				// ***************************************************** //
-
 
 				// **** CHECK FOR STRAIGHT QUOTES THAT SHOULD BE CURLY **** //
 				if (doCheckSpellingAndFormat) {
@@ -4940,20 +4959,35 @@ MuseScore {
 	function checkBarlinesConnected (str) {
 		var lastVisibleStaff = 0;
 		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) lastVisibleStaff = i;
-
+		
+		if (str != null) {
+			for (var i = 0; i < lastVisibleStaff-1; i++) {
+				if (staffVisible[i]) {
+					var staff = curScore.staves[i];
+					//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
+					if (staff.staffBarlineSpan == 0) {
+						addError ("The barlines should go through all of the staves for a "+str,"system1 0");
+						return;
+					}
+				}
+			}
+		}
+		
+		// check vocal staves not connected together
 		for (var i = 0; i < lastVisibleStaff-1; i++) {
 			if (staffVisible[i]) {
 				var staff = curScore.staves[i];
-				//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
-				if (staff.staffBarlineSpan == 0) {
-					addError ("The barlines should go through all of the staves for a "+str,"system1 0");
-					return;
+				if (staff.part.musicXmlId.includes('voice')) {
+					if (staff.staffBarlineSpan != 0) {
+						addError ("The barlines for vocal staves should not be connected to the following staves.\nClick each connected barline and drag up to disconnect.","system1 0");
+						return;
+					}
 				}
 			}
 		}
 	}
 	
-	function checkBrackets (str) {
+	function checkBracketsAndBraces (str) {
 		var singleJoinedBracketArray = ["string quartet", "wind quintet", "brass quintet", "string quintet"];
 		var noBracketArray = ["piano trio", "piano quartet", "duo"];
 		var firstVisibleStaff = -1;
@@ -4968,55 +5002,82 @@ MuseScore {
 		
 		var visibleStaffSpan = lastVisibleStaff - firstVisibleStaff + 1;
 		
-		if (singleJoinedBracketArray.includes(str)) {
-			// this score only needs one bracket
-			//logError ('checking singleJoined');
-			for (var i = 0; i < numStaves; i++) {
-				//logError ('checking staff '+i);
-				if (staffVisible[i]) {
-					//logError ('staff '+i+' is visible');
-
-					var theStaff = curScore.staves[i];
-					if (i == firstVisibleStaff) {
-						//logError ('first visible staff has '+theStaff.brackets.length+' brackets');
-
-						if (theStaff.brackets.length == 0) {
-							addError ('For '+str+'s, add a single bracket on the left from the Brackets palette.','system1 0');
-							return;
-						} else {
-							if (theStaff.brackets.length == 1) {
-								//logError ('first system bracket is '+theStaff.brackets[0].systemBracket+'; bracketType Normal = '+BracketType.NORMAL+'; bracketType brace = '+BracketType.BRACE);
-								//logError ('theStaff.brackets[0].bracketSpan = '+theStaff.brackets[0].bracketSpan+'; visibleStaffSpan = '+visibleStaffSpan);
-
-								if (theStaff.brackets[0].systemBracket != BracketType.NORMAL) {
-									addError ('This bracket is the wrong kind of bracket for '+str+'.\nDelete it and add a normal bracket instead',theStaff.brackets[0]);
-								} else {
-									if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
-										addError ('For '+str+'s, the staff bracket should span the entire system.',theStaff.brackets[0]);
-									}
-								}
-							} else {
-								addError ('For '+str+'s, you only need one staff bracket.\nSelect all unnecessary brackets and press ‘delete’.',theStaff.brackets[1]);
-							}
+		// check for brace on grand staves
+		for (var i = firstVisibleStaff; i < lastVisibleStaff; i++) {
+			if (isTopOfGrandStaff[i]) {
+				// check for a brace
+				var theStaff = curScore.staves[i];
+				if (theStaff.brackets.length == 0) {
+					addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
+				} else {
+					if (theStaff.brackets.length == 1) {
+						if (theStaff.brackets[0].systemBracket != BracketType.BRACE) {
+							addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
+						}
+					} else {
+						var hasBrace = false;
+						for (var j = 0; j < theStaff.brackets.length && !hasBrace; j++) {
+							hasBrace = theStaff.brackets[j].systemBracket == BracketType.BRACE;
+						}
+						if (!hasBrace) {
+							addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
 						}
 					}
 				}
 			}
 		}
 		
-		if (noBracketArray.includes(str)) {
-			for (var i = 0; i < numStaves; i++) {
-				if (staffVisible[i]) {
-					var theStaff = curScore.staves[i];
-					if (theStaff.brackets.length != 0) {
-						if (theStaff.brackets[0].systemBracket == BracketType.BRACE) {
-							if (!isGrandStaff[i]) {
-								addError ('You don’t need a brace here.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
+		if (str != null) {
+			if (singleJoinedBracketArray.includes(str)) {
+				// this score only needs one bracket
+				//logError ('checking singleJoined');
+				for (var i = 0; i < numStaves; i++) {
+					//logError ('checking staff '+i);
+					if (staffVisible[i]) {
+						//logError ('staff '+i+' is visible');
+	
+						var theStaff = curScore.staves[i];
+						if (i == firstVisibleStaff) {
+							//logError ('first visible staff has '+theStaff.brackets.length+' brackets');
+	
+							if (theStaff.brackets.length == 0) {
+								addError ('For '+str+'s, add a single bracket on the left from the Brackets palette.','system1 0');
+								return;
+							} else {
+								if (theStaff.brackets.length == 1) {
+									//logError ('first system bracket is '+theStaff.brackets[0].systemBracket+'; bracketType Normal = '+BracketType.NORMAL+'; bracketType brace = '+BracketType.BRACE);
+									//logError ('theStaff.brackets[0].bracketSpan = '+theStaff.brackets[0].bracketSpan+'; visibleStaffSpan = '+visibleStaffSpan);
+	
+									if (theStaff.brackets[0].systemBracket != BracketType.NORMAL) {
+										addError ('This bracket is the wrong kind of bracket for '+str+'.\nDelete it and add a normal bracket instead',theStaff.brackets[0]);
+									} else {
+										if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
+											addError ('For '+str+'s, the staff bracket should span the entire system.',theStaff.brackets[0]);
+										}
+									}
+								} else {
+									addError ('For '+str+'s, you only need one staff bracket.\nSelect all unnecessary brackets and press ‘delete’.',theStaff.brackets[1]);
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			if (noBracketArray.includes(str)) {
+				for (var i = 0; i < numStaves; i++) {
+					if (staffVisible[i]) {
+						var theStaff = curScore.staves[i];
+						if (theStaff.brackets.length != 0) {
+							if (theStaff.brackets[0].systemBracket == BracketType.BRACE) {
+								if (!isGrandStaff[i]) {
+									addError ('You don’t need a brace here.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
+									return;
+								}
+							} else {
+								addError ('For '+str+'s, you don’t need a bracket.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
 								return;
 							}
-						} else {
-							addError ('For '+str+'s, you don’t need a bracket.\n(Select the bracket and press ‘delete’)',theStaff.brackets[0]);
-							return;
 						}
 					}
 				}
@@ -5487,7 +5548,7 @@ MuseScore {
 				if (curScore.style.value('musicalSymbolFont') === 'Bravura') {
 					if (theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND || theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND_OLD) {
 						flaggedBravuraHarmonics = true;
-						addError ("Diamond noteheads in the ‘Bravura’ font don’t meet standard notation guidelines.\nThey are too small and oddly shaped — see ‘Behind Bars’ p. 11.\nConsider changing the music font to ‘Leland’ instead.", noteRest);
+						addError ("Diamond noteheads in the ‘Bravura’ font don’t meet standard notation guidelines.\nThey are too small and oddly shaped — see ‘Behind Bars’ p. 11.\nConsider changing the music font to ‘Leland’ instead,\nor use the ‘Mi’ notehead option.", noteRest);
 					}
 				}
 			}
