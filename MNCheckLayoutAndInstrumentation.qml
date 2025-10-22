@@ -3968,7 +3968,7 @@ MuseScore {
 				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef.",clef);
 				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef.",clef);
 			}
-			if (clef.isHeader && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nIf possible, move this material to the other staff to avoid clef changes.",clef);
+			if (!clef.isHeader && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nIf possible, move this material to the other staff to avoid clef changes.",clef);
 		}
 	}
 	
@@ -6219,7 +6219,7 @@ MuseScore {
 			if (graceNotes[0].notes.length > 0 && noteRest.notes.length > 0) {
 				gnIsSamePitch = graceNotes[0].notes[0].pitch == noteRest.notes[0].pitch;
 			}
-			if (!hasArtic && !gnIsTied && !gnIsSamePitch) addError("In general, grace-notes should always be slurred to the main note,\nunless you add staccatos or accents to them.",graceNotes[0]);
+			if (!hasArtic && !gnIsTied && !gnIsSamePitch) addError("In general, slur grace-notes to the main note,\nunless you use staccatos or accents.",graceNotes[0]);
 		}
 	}
 	
@@ -6696,10 +6696,12 @@ MuseScore {
 								var generalProximity = dx + dy < maxOffset;
 								var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
 								var isNotTooFarFromOriginalPosition = true;
-								//logError ("Same page. dx = "+dx+" dy = "+dy+" close = "+isCloseToOtherComment+" far = "+isNotTooFarFromOriginalPosition);
-								while (isCloseToOtherComment &&  isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0) {
-									offx[i] += commentOffset;
-									offy[i] -= commentOffset;
+								//logError ("text = "+comment.text+"; otherText = "+otherComment.text+"; close = "+isCloseToOtherComment+"; far = "+isNotTooFarFromOriginalPosition+'; rhs = '+(actualCommentRHS < commentPageWidth)+' y = '+(actualCommentY > 0));
+								var shiftAttempts = 0;
+								while (isCloseToOtherComment && isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0 && shiftAttempts < 5) {
+									shiftAttempts ++;
+									if (actualCommentRHS < commentPageWidth - commentOffset) offx[i] += commentOffset;
+									if (actualCommentY > commentOffset) offy[i] -= commentOffset;
 									actualCommentX = placedX + offx[i];
 									actualCommentY = placedY + offy[i];
 									actualCommentRHS = actualCommentX + commentWidth;
