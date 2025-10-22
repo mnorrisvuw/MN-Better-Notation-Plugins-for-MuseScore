@@ -1513,59 +1513,67 @@ MuseScore {
 	function checkScoreElements (noteRest) {
 
 		// ** CHECK SLURS ** //
-		if (currentSlurNumOnTrack[currentTrack] < numSlurs) {
-			if (isSlurred && currTick > currentSlurEnd) {
-														
-				// LOAD UP THE NEXT SLUR
-				var nextSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1];
-				if (nextSlur != null) {
-					var nextSlurStart = nextSlur.spanner.spannerTick.ticks;
-					var nextSlurLength = nextSlur.spanner.spannerTicks.ticks;
-					nextSlurStartOnTrack[currentTrack] = nextSlurStart;
-					
-					// ** CHECK FOR SLURS UNDER SLURS ** //
-					if (nextSlurStartOnTrack[currentTrack] < currentSlurEnd && nextSlurLength > 0 && currentSlurLength > 0) {
-						var nextSlurNote = getNoteRestAtTick(nextSlurStartOnTrack[currentTrack]);
-						if (nextSlurNote != null) {
-							if (nextSlurNote.graceNotes != null) {
-								// Note that I'm putting doCheckSlursAndTies here rather than higher up,
-								// because I still want to track slurs for some of the other user options
-								// (e.g. checking string techniques such as louré, etc.)
-								if (nextSlurNote.graceNotes.length == 0 && doCheckSlursAndTies) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",nextSlur);
-							}
-						}
+		// ** HAS CURRENT SLUR ENDED? **
+		if (isSlurred && currTick > currentSlurEnd) {
+			currentSlur = null;
+			isSlurred = false;
+			currentSlurLength = 0;
+			//logError ('slur ended; currentSlur is now false');
+		}
+		
+		// ** HAS A NEW ONE STARTED? ** //
+		if (!isSlurred && currentSlurNumOnTrack[currentTrack] < numSlurs) {
+			if (currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] > -1) {
+				prevSlurEnd = currentSlurEnd;
+				lastArticulationTick = currTick;
+				
+				//logError ('not slurred and currTick >= nextSlurTick, so going through remaining slurs');
+				// GO THROUGH REMAINING SLURS
+				// PUT THIS IN A WHILE LOOP, BECAUSE WE MAY HAVE NESTED SLURS TO DEAL WITH
+				while (currentSlurNumOnTrack[currentTrack] < numSlurs && currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] != -1) {
+					currentSlurNumOnTrack[currentTrack] ++;
+					currentSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]];
+					currentSlurStart = currentSlur.spanner.spannerTick.ticks;
+					currentSlurLength = currentSlur.spanner.spannerTicks.ticks;
+					currentSlurEnd = currentSlurStart + currentSlurLength;
+					//logError("Slur started; ends at "+currentSlurEnd);
+					var prevSlurLength = 0;
+					if (currentSlurNumOnTrack[currentTrack] > 0) prevSlurLength = slurs[currentTrack][currentSlurNumOnTrack[currentTrack] - 1].spanner.spannerTicks.ticks;
+					//logError ("Slur check: "+currentSlurNumOnTrack[currentTrack]+" "+currentSlurStart+" "+prevSlurEnd+" "+currentSlurLength+" "+prevSlurLength);
+					if (doCheckSlursAndTies && currentSlurNumOnTrack[currentTrack] > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0 && !prevWasGraceNote) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
+					if (currentSlurNumOnTrack[currentTrack] < numSlurs - 1) {
+						nextSlurStartOnTrack[currentTrack] = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1].spanner.spannerTick.ticks;
+						//logError("currTick = "+currTick+"; Next slur starts at "+nextSlurStartOnTrack[currentTrack]);
+					} else {
+						nextSlurStartOnTrack[currentTrack] = -1;
+						//logError("currTick = "+currTick+"; This is the last slur in this staff ");
 					}
 				}
-				currentSlur = null;
-				isSlurred = false;
-				//logError ('slur ends');
-			}
-		
-			if (!isSlurred && currentSlurNumOnTrack[currentTrack] < numSlurs) {
-				if (currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] > -1) {
-					prevSlurEnd = currentSlurEnd;
-					isSlurred = true;
-					lastArticulationTick = currTick;
-					
-					// GO THROUGH REMAINING SLURS
-					// PUT THIS IN A WHILE LOOP, BECAUSE WE MAY HAVE NESTED SLURS TO DEAL WITH
-					while (currentSlurNumOnTrack[currentTrack] < numSlurs && currTick >= nextSlurStartOnTrack[currentTrack] && nextSlurStartOnTrack[currentTrack] != -1) {
-						currentSlurNumOnTrack[currentTrack] ++;
-						currentSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]];
-						currentSlurStart = currentSlur.spanner.spannerTick.ticks;
-						currentSlurLength = currentSlur.spanner.spannerTicks.ticks;
-						currentSlurEnd = currentSlurStart + currentSlurLength;
-						//logError("Slur started; ends at "+currentSlurEnd);
-						var prevSlurLength = 0;
-						if (currentSlurNumOnTrack[currentTrack] > 0) prevSlurLength = slurs[currentTrack][currentSlurNumOnTrack[currentTrack] - 1].spanner.spannerTicks.ticks;
-						//logError ("Slur check: "+currentSlurNumOnTrack[currentTrack]+" "+currentSlurStart+" "+prevSlurEnd+" "+currentSlurLength+" "+prevSlurLength);
-						if (doCheckSlursAndTies && currentSlurNumOnTrack[currentTrack] > 0 && currentSlurStart == prevSlurEnd && currentSlurLength > 0 && prevSlurLength > 0 && !prevWasGraceNote) addError ("Don’t start a new slur on the same note\nas you end the previous slur.",currentSlur);
-						if (currentSlurNumOnTrack[currentTrack] < numSlurs - 1) {
-							nextSlurStartOnTrack[currentTrack] = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1].spanner.spannerTick.ticks;
-							//logError("currTick = "+currTick+"; Next slur starts at "+nextSlurStartOnTrack[currentTrack]);
-						} else {
-							nextSlurStartOnTrack[currentTrack] = -1;
-							//logError("currTick = "+currTick+"; This is the last slur in this staff ");
+				//logError ('currentSlurNum now '+currentSlurNumOnTrack[currentTrack]+' out of '+numSlurs);
+				//logError ('CHECK: currTick = '+currTick+'; currentSlurEnd = '+currentSlurEnd);
+				// did this slur end already?
+				isSlurred = currentSlurEnd >= currTick;
+				if (!isSlurred) {
+					currentSlur = null;
+					currentSlurLength = 0;
+				}
+				if (currentSlurNumOnTrack[currentTrack] < numSlurs - 1) {
+					// LOAD UP THE NEXT SLUR
+					//logError ('Loading up next slur');
+					var nextSlur = slurs[currentTrack][currentSlurNumOnTrack[currentTrack]+1];
+					if (nextSlur != null) {
+						var nextSlurStart = nextSlur.spanner.spannerTick.ticks;
+						var nextSlurLength = nextSlur.spanner.spannerTicks.ticks;
+						nextSlurStartOnTrack[currentTrack] = nextSlurStart;
+						if (nextSlurStart < currentSlurEnd && nextSlurLength > 0 && currentSlurLength > 0) {
+							var hasGraceNotes = false;
+							var nextSlurNote = getNoteRestAtTick(nextSlurStart);
+							if (nextSlurNote != null) {
+								if (nextSlurNote.graceNotes != null) {
+									if (nextSlurNote.graceNotes.length > 0) hasGraceNotes = true;
+								}
+							}
+							if (!hasGraceNotes && doCheckSlursAndTies) addError("Avoid putting slurs underneath other slurs.\nDelete one of these slurs.",nextSlur);
 						}
 					}
 				}
@@ -2145,7 +2153,7 @@ MuseScore {
 				// only add it if it's not already added
 				if (!sameHairpin) {
 					hairpins[staffIdx].push(e);
-					if (e.subtypeName().includes(" line") && e.spanner.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\non short changes of dynamic.",e);
+					if (e.subtypeName().includes(" line") && e.spanner.spannerTicks.ticks <= division * 12 && doCheckDynamics) addError ("It’s recommended to use hairpins instead of ‘cresc.’ or ‘dim.’\nfor short dynamic changes.",e);
 				}
 				prevHairpinSegment = e;
 			}
@@ -2579,6 +2587,7 @@ MuseScore {
 				if (full1l === 'violas') addError ("Change the long name of staff "+(i+1)+" to ‘Viola’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
 				if (full1l === 'violoncellos' || full1l === 'violoncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
 				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+(i+1)+" to ‘Double Bass’ or ‘D. Bass’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
+				if (full1l === 'classical guitar') addError ("Change the long name of staff "+(i+1)+" to just ‘Guitar’", "system1 "+i);
 			}
 			
 			if (shortInstNamesShowing) {
@@ -2596,7 +2605,7 @@ MuseScore {
 				if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
 			}
 			
-			var checkThisStaff = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numStaves - 1;
+			var checkThisStaff = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numStaves - 1 && staff1.show;
 
 			// **** CHECK FOR REPEATED STAFF NAMES **** //
 			if (checkThisStaff) {
@@ -2604,29 +2613,32 @@ MuseScore {
 					var staff2 = staves[j];
 					var full2 = staff2.part.longName.trim();
 					var short2 = staff2.part.shortName.trim();
-					//inst2 = staff2.InstrumentName;
-					if (fullInstNamesShowing) {
-						//logError ('full1 = '+full1+'; full2 = '+full2);
-						if (full1 === full2 && full1 != "") addError("Staff name ‘"+full1+"’ appears twice.\nRename one of them, or rename as ‘"+full1+" I’ & ‘"+full1+" II’", "system1 "+i);
-						if (full1 === full2 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" II’?", "system1 "+i);
-						if (full2 === full1 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" II’?", "system1 "+i);
-						if (full1 === full2 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" I’?", "system1 "+i);
-						if (full2 === full1 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" I’?", "system1 "+i);
-						if (full1 === full2 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 2’?", "system1 "+i);
-						if (full2 === full1 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 2’?", "system1 "+i);
-						if (full1 === full2 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 1’?", "system1 "+i);
-						if (full2 === full1 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 1’?", "system1 "+i);
-					}
-					if (shortInstNamesShowing) {
-						if (short1 === short2 && short1 != "") addError("Staff name ‘"+short1+"’ appears twice.\nRename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’","system2 "+i);
-						if (short1 === short2 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" II’?","system2 "+i);
-						if (short2 === short1 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" II’?","system2 "+i);
-						if (short1 === short2 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" I’?","system2 "+i);
-						if (short2 === short1 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" I’?","system2 "+i);
-						if (short1 === short2 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 2’?","system2 "+i);
-						if (short2 === short1 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 2’?","system2 "+i);
-						if (short1 === short2 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 1’?","system2 "+i);
-						if (short2 === short1 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 1’?","system2 "+i);
+					
+					if (staff2.show) {
+						//inst2 = staff2.InstrumentName;
+						if (fullInstNamesShowing) {
+							//logError ('full1 = '+full1+'; full2 = '+full2);
+							if (full1 === full2 && full1 != "") addError("Staff name ‘"+full1+"’ appears twice.\nRename one of them, or rename as ‘"+full1+" I’ & ‘"+full1+" II’", "system1 "+i);
+							if (full1 === full2 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" II’?", "system1 "+i);
+							if (full2 === full1 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" II’?", "system1 "+i);
+							if (full1 === full2 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" I’?", "system1 "+i);
+							if (full2 === full1 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" I’?", "system1 "+i);
+							if (full1 === full2 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 2’?", "system1 "+i);
+							if (full2 === full1 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 2’?", "system1 "+i);
+							if (full1 === full2 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 1’?", "system1 "+i);
+							if (full2 === full1 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 1’?", "system1 "+i);
+						}
+						if (shortInstNamesShowing) {
+							if (short1 === short2 && short1 != "") addError("Staff name ‘"+short1+"’ appears twice.\nRename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’","system2 "+i);
+							if (short1 === short2 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" II’?","system2 "+i);
+							if (short2 === short1 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" II’?","system2 "+i);
+							if (short1 === short2 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" I’?","system2 "+i);
+							if (short2 === short1 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" I’?","system2 "+i);
+							if (short1 === short2 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 2’?","system2 "+i);
+							if (short2 === short1 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 2’?","system2 "+i);
+							if (short1 === short2 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 1’?","system2 "+i);
+							if (short2 === short1 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 1’?","system2 "+i);
+						}
 					}
 				}
 			}
@@ -4520,7 +4532,7 @@ MuseScore {
 								if (plainTextWithSymbols.includes(metronomemarkings[j])) {
 									isMetronomeMarking = true;
 									//logError ('Found metro');
-									if (textObject.offsetX < -4.5) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
+									if (textObject.offsetX < -4.5 && !isTempoMarking) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
 
 									// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
 									var metronomeDuration = division; // crotchet
@@ -6178,17 +6190,20 @@ MuseScore {
 			checkSpanners(theGraceNote);
 		}
 		if (n == 1) {
-			var hasSlash = graceNotes[0].stemSlash != null;
-			if (graceNotes[0].duration.ticks != division * 0.5 || !hasSlash) {
-				var errorStr = "A single grace-note should ";
-				if (graceNotes[0].duration.ticks != division * 0.5) {
-					errorStr += "be a quaver ";
-					if (!hasSlash) errorStr += "with a slash";
-				} else {
-					errorStr += "have a slash through the stem";
+			var hasStem = graceNotes[0].stem != null;
+			if (hasStem) {
+				var hasSlash = graceNotes[0].stemSlash != null;
+				if (graceNotes[0].duration.ticks != division * 0.5 || !hasSlash) {
+					var errorStr = "A single grace-note should ";
+					if (graceNotes[0].duration.ticks != division * 0.5) {
+						errorStr += "be a quaver ";
+						if (!hasSlash) errorStr += "with a slash";
+					} else {
+						errorStr += "have a slash through the stem";
+					}
+					errorStr += "\ni.e. the first item in the Grace notes palette (see ‘Behind Bars’, p. 125)";
+					addError (errorStr,graceNotes[0]);
 				}
-				errorStr += "\ni.e. the first item in the Grace notes palette (see ‘Behind Bars’, p. 125)";
-				addError (errorStr,graceNotes[0]);
 			}
 		}
 		if (n > 1 && graceNotes[0].duration.ticks < division * 0.25) addError ("It is recommended that grace notes use only\n1 or 2 beams (see ‘Behind Bars’, p. 125).",graceNotes[0]);
@@ -6197,7 +6212,6 @@ MuseScore {
 			var theArtic = getArticulations(graceNotes[0]);
 			for (var i = 0; i < theArtic.length; i++) {
 				var isGN = theArtic[i].parent.is(graceNotes[0]);
-				//logError ('i = '+theArtic[i].parent+' '+graceNotes[0]+' '+isGN);
 				if (isGN) hasArtic = true;
 			}
 			var gnIsTied = graceNotes[0].notes[0].tieForward != null || graceNotes[0].notes[0].tieBack != null;
@@ -6756,6 +6770,11 @@ MuseScore {
 			return 0;
 		}
 		var eType = e.type;
+		if (eType == Element.BEAM) {
+			// In MS 4.6 currently, there's no way to get the tick of a beam, or to get its child elements to get their ticks
+			// as such, we should probably avoid highlighting beams until this is fixed
+			logError ('Found beam: tick = '+e.tick);
+		}
 		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
 		if (e.spanner != undefined) {
 			return e.spanner.spannerTick.ticks;
