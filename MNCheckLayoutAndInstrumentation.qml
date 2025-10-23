@@ -262,6 +262,7 @@ MuseScore {
 	property var isVibraphone: false
 	property var isMarimba: false
 	property var isVoice: false
+	property var isGuitar: false
 	property var isSoloScore: false
 	property var currentMute: ""
 	property var currentPlayingTechnique: ""
@@ -1040,6 +1041,15 @@ MuseScore {
 					}
 				}
 				
+				// ** clef
+				if (firstClefNumInBar != currentClefNum) {
+					currentClefNum = firstClefNumInBar;
+					currentClef = clefs[currentStaffNum][currentClefNum];
+					setClef(currentClef);
+					nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
+					prevClefType = firstClefTypeInBar;
+				}
+				
 				for (currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					var numNotesInThisTrack = 0;
 					var numNoteRestsInThisTrack = 0;
@@ -1051,15 +1061,6 @@ MuseScore {
 					var processingThisBar = cursor.element && cursor.tick < barEndTick;
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
-					
-					// ** clef
-					if (firstClefNumInBar != currentClefNum) {
-						currentClefNum = firstClefNumInBar;
-						currentClef = clefs[currentStaffNum][currentClefNum];
-						setClef(currentClef);
-						nextClefTick = (currentClefNum < numClefs - 1) ? clefs[currentStaffNum][currentClefNum+1].parent.tick : endOfScoreTick;
-						prevClefType = firstClefTypeInBar;
-					}
 					
 					// ** slurs
 					currentSlur = null;
@@ -1640,7 +1641,7 @@ MuseScore {
 				}
 				//logError("Pedal started at "+currTick+" & ends at "+currentPedalEnd);
 				if (isPedalInstrument) {
-					if (isTopOfGrandStaff[currentStaffNum] && !flaggedPedalLocation) {
+					if (isTopOfGrandStaff[currentStaffNum] && !flaggedPedalLocation && currentPedal.staffIdx == currentStaffNum) {
 						flaggedPedalLocation = true;
 						addError("Pedal markings should go below the bottom staff of a grand staff.",currentPedal);
 					}
@@ -2223,8 +2224,15 @@ MuseScore {
 					if (sameLoc) samePedal = e.spanner.is(prevPedalSegment.spanner);
 				}
 				// only add it if it's not already added
-				if (!samePedal) pedals[staffIdx].push(e);
-				prevPedalSegment = e;
+				if (!samePedal) {
+					var staffNum = staffIdx;
+					if (isGrandStaff[staffIdx]) {
+						// push into the top staff only of grand staves, so we can pick it up
+						while (staffNum > 0 && !isTopOfGrandStaff[staffNum]) staffNum --;
+					}
+					pedals[staffNum].push(e);
+					prevPedalSegment = e;
+				}
 			}
 			
 			// *** INSTRUMENT CHANGES *** //
@@ -2701,6 +2709,7 @@ MuseScore {
 			isTrombone = currentInstrumentCalcId === "brass.trombone.tenor";
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
+			isGuitar = currentInstrumentId.includes("guitar");
 			//logError ('isVoice = '+isVoice+'; currentInstrumentId = '+currentInstrumentId);
 			isCello = currentInstrumentId.includes("cello");
 			// isDecayInstrument = isPercussionInstrument || isHarp || isPiano;
@@ -3978,11 +3987,13 @@ MuseScore {
 		
 		// **** CHECK FOR INAPPROPRIATE CLEFS **** //
 		if (checkInstrumentClefs) {
-			if (!isPiano && clefIs8va) 	addError ('This 8va clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs8va && !isPiano) 	addError ('This 8va clef is rarely used.\nAre you sure that’s right?', clef);
 			if (clefIs15ma) addError ('This 15ma clef is rarely used.\nAre you sure that’s right?', clef);
-			if (clefIs8ba && !isGuitar && !isVoice) addError ('This 8ba clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs8ba) {
+				if (isTrebleClef && !isGuitar && !isVoice) addError ('This 8ba clef is rarely used.\nAre you sure that’s right?', clef);
+				if (isBassClef) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
+			}
 			if (clefIs15mb) addError ('This 15mb clef is rarely used.\nAre you sure that’s right?', clef);
-			if (isBassClef && clefIs8ba) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
 			if (isTrombone && isTrebleClef) {
 				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.",clef);
 			} else {
@@ -4296,7 +4307,44 @@ MuseScore {
 			if (windAndBrassMarkings.includes(lowerCaseText) && isWindOrBrassInstrument) {
 				weKnowWhosPlaying = true;
 				flaggedWeKnowWhosPlaying = false;
-			}			
+			}
+			
+			// ***************************************************** //
+			// ****		ANALYSE METRONOME & TEMPO MARKINGS		**** //
+			// ***************************************************** //
+			var containsMetronomeComponent = false;
+			var containsTempoComponent = false;
+			var containsTempoChangeComponent = isTempoChangeElement;
+			var resetTempo = false;
+			var metronomeComponent = '', nonMetronomeComponent = '';
+			
+			if (currentBarNum > 0) {
+				// **** CHECK TO SEE IF THIS CONTAINS A METRONOME MARKING **** //
+				if (plainText.includes("=")) {
+					var theMatch = textObject.text.match(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*/g) 
+					containsMetronomeComponent = theMatch != null;
+					if (containsMetronomeComponent) metronomeComponent = theMatch[0].replace(/<\/*b>/g,'');
+				}
+				
+				// **** CHECK TO SEE IF THIS CONTAINS A TEMPO MARKING COMPONENT **** //
+				if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+					for (var j = 0; j < tempomarkings.length && !containsTempoComponent; j++) {
+						if (lowerCaseText.includes(tempomarkings[j])) containsTempoComponent = true;
+					}
+				}
+				// if it doesn't contain a standard tempo marking, we then check to see whether there's any
+				// non-metronome component (only if it's in a tempo text style)
+				if (!containsTempoComponent && isTempoTextStyle) {
+					nonMetronomeComponent = textObject.text.replace(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*/g,'');
+					nonMetronomeComponent = nonMetronomeComponent.replace(/<\/*b>/g,'');
+					if (nonMetronomeComponent.trim() !== '') containsTempoComponent = true;
+				}
+							
+				// **** CHECK TO SEE IF THIS CONTAINS A TEMPO CHANGE ELEMENT **** //
+				if (!isTempoChangeElement && !lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+					for (var i = 0; i < tempochangemarkings.length && !containsTempoChangeComponent; i++) if (lowerCaseText.includes(tempochangemarkings[i])) containsTempoChangeComponent = true;
+				}
+			}
 			
 			// ***************************************************** //
 			// ****		CHECK SPELLING AND FORMAT ERRORS		**** //
@@ -4441,49 +4489,16 @@ MuseScore {
 				if (styledText.slice(3) === "<b>") addError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);					
 			}
 			
-			//logError ('CURRENTBARNUM = '+currentBarNum);
-			var containsMetronomeComponent = false;
-			var containsTempoComponent = false;
-			var containsTempoChangeComponent = isTempoChangeElement;
-			var resetTempo = false;
-			var metronomeComponent = '', nonMetronomeComponent = '';
+			
 
 			// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
-			if (currentBarNum > 0) {
+			if (doCheckTempoMarkings) {
 				
 				// **** 	CHECK TEMPO MARKINGS, METRONOME MARKINGS & TEMPO CHANGE MARKINGS 	**** //
-				if (doCheckTempoMarkings) {
+				if (containsTempoComponent || containsMetronomeComponent || containsTempoChangeComponent) {
 
 					// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
 					if (!initialTempoExists && (isTempoTextStyle || isMetronomeTextStyle) && currentBarNum == 1) initialTempoExists = true;
-					
-					// **** CHECK TO SEE IF THIS CONTAINS A METRONOME MARKING **** //
-					if (plainText.includes("=")) {
-						var theMatch = textObject.text.match(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*/g) 
-						containsMetronomeComponent = theMatch != null;
-						if (containsMetronomeComponent) metronomeComponent = theMatch[0].replace(/<\/*b>/g,'');
-					}
-					
-					// **** CHECK TO SEE IF THIS CONTAINS A TEMPO MARKING COMPONENT **** //
-					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-						for (var j = 0; j < tempomarkings.length && !containsTempoComponent; j++) {
-							if (lowerCaseText.includes(tempomarkings[j])) containsTempoComponent = true;
-						}
-					}
-					// if it doesn't contain a standard tempo marking, we then check to see whether there's any
-					// non-metronome component (only if it's in a tempo text style)
-					if (!containsTempoComponent && isTempoTextStyle) {
-						nonMetronomeComponent = textObject.text.replace(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*/g,'');
-						nonMetronomeComponent = nonMetronomeComponent.replace(/<\/*b>/g,'');
-						if (nonMetronomeComponent.trim() !== '') containsTempoComponent = true;
-					}
-					
-					//logError ('metro = '+metronomeComponent.replace(/</g,'≤')+'; nonMetro = '+nonMetronomeComponent.replace(/</g,'≤'));
-					
-					// **** CHECK TO SEE IF THIS CONTAINS A TEMPO CHANGE ELEMENT **** //
-					if (!isTempoChangeElement && !lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-						for (var i = 0; i < tempochangemarkings.length && !containsTempoChangeComponent; i++) if (lowerCaseText.includes(tempochangemarkings[i])) containsTempoChangeComponent = true;
-					}					
 								
 					// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
 					if (containsTempoComponent) {
@@ -4513,31 +4528,28 @@ MuseScore {
 					if (containsTempoComponent) barContainsTempo = true;
 					if (containsMetronomeComponent) barContainsMetronome = true;
 					
-					if (containsMetronomeComponent || containsTempoComponent || containsTempoChangeComponent) {
-						// *** CHECK STYLING *** //
-						if (styledText.includes("<b>")) {
-							// strip all <b> tags and their contents, then strip any other tags
-							nonBoldText = styledText.replace(/<b>.+?<\/b>/g,'').replace(/<[^>]+>/g, "");
-							boldText = styledText.replace(/^.*?<b>|<\/b>.*?(<b>|$)+/g,'');
-							//logError ('b found');
+					// *** CHECK STYLING *** //
+					if (styledText.includes("<b>")) {
+						// strip all <b> tags and their contents, then strip any other tags
+						nonBoldText = styledText.replace(/<b>.+?<\/b>/g,'').replace(/<[^>]+>/g, "");
+						boldText = styledText.replace(/^.*?<b>|<\/b>.*?(<b>|$)+/g,'');
+						//logError ('b found');
+					} else {
+						var textStyleIsBold = textObject.fontStyle == 1;
+						//logError ("textStyle = "+textObject.fontStyle+'; isBold = '+textStyleIsBold);
+					
+						if (textStyleIsBold) {
+							boldText = plainText;
+							nonBoldText = '';
 						} else {
-							var textStyleIsBold = textObject.fontStyle == 1;
-							//logError ("textStyle = "+textObject.fontStyle+'; isBold = '+textStyleIsBold);
-						
-							if (textStyleIsBold) {
-								boldText = plainText;
-								nonBoldText = '';
-							} else {
-								boldText = '';
-								nonBoldText = plainText;
-							}
+							boldText = '';
+							nonBoldText = plainText;
 						}
-						//logError ('nonBoldText = '+nonBoldText.replace(/</g,'≤')+'; boldText = '+boldText.replace(/</g,'≤'));
-						metroIsBold = boldText.includes(metronomeComponent);
-						tempoMarkingIsBold = boldText.includes(nonMetronomeComponent.trim());
-						//logError ('metroIsBold = '+metroIsBold+'; tempoMarkingIsBold = '+tempoMarkingIsBold);
 					}
-
+					//logError ('nonBoldText = '+nonBoldText.replace(/</g,'≤')+'; boldText = '+boldText.replace(/</g,'≤'));
+					metroIsBold = boldText.includes(metronomeComponent);
+					tempoMarkingIsBold = boldText.includes(nonMetronomeComponent.trim());
+					//logError ('metroIsBold = '+metroIsBold+'; tempoMarkingIsBold = '+tempoMarkingIsBold);
 					
 					if (containsMetronomeComponent || containsTempoComponent) {
 						//logError ('Found metronome component');
@@ -6021,7 +6033,13 @@ MuseScore {
 					var flagError = true;
 					if (isPedalInstrument) flagError = isPedalled;
 					//logError('flagError = '+flagError);
-					if (flagError) addError ("As this instrument naturally sustains,\nshort notes followed by rests may be ambiguous.\nUse an l.v. marking or lengthen the note to avoid the rests.",noteRest);
+					if (flagError) {
+						if (isPedalInstrument) {
+							addError ("As the pedal is down, notes will sustain.\nShort notes may therefore be ambiguous.\nConsider using an l.v. marking or\nlengthening the note to avoid the rests.",noteRest);
+						} else {
+							addError ("As this instrument naturally sustains, short\nnotes followed by rests may be ambiguous.\nConsider using an l.v. marking or\nlengthening the note to avoid the rests.",noteRest);
+						}
+					}
 				}
 			}
 		}
@@ -6951,7 +6969,6 @@ MuseScore {
 		}
 		
 		// ** CHECK HEADER CLEFS FOR HIGHLIGHTS ** //
-		// ** PUSH ALL HEADER CLEFS
 		var headerCursor = curScore.newCursor();
 		headerCursor.filter = Segment.HeaderClef;
 		for (var staffIdx = 0; staffIdx < curScore.nstaves; staffIdx ++) {

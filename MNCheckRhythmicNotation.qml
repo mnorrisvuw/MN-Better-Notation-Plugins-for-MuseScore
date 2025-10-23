@@ -2083,6 +2083,20 @@ MuseScore {
 			}
 		}
 		
+		// ** CHECK HEADER CLEFS FOR HIGHLIGHTS ** //
+		var headerCursor = curScore.newCursor();
+		headerCursor.filter = Segment.HeaderClef;
+		for (var staffIdx = 0; staffIdx < curScore.nstaves; staffIdx ++) {
+			headerCursor.staffIdx = staffIdx;
+			headerCursor.voice = 0;
+			headerCursor.rewind(Cursor.SCORE_START);
+			if (headerCursor.element != undefined && headerCursor.element != null) {
+				var e = headerCursor.element;
+				var c = e.color;
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+			}
+		}
+		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
