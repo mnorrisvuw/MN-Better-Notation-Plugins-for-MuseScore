@@ -4473,7 +4473,7 @@ MuseScore {
 					
 					// **** CHECK TO SEE IF THIS CONTAINS A METRONOME MARKING **** //
 					if (plainText.includes("=")) {
-						var theMatch = textObject.text.match(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9]*/g) 
+						var theMatch = textObject.text.match(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*/g) 
 						containsMetronomeComponent = theMatch != null;
 						if (containsMetronomeComponent) metronomeComponent = theMatch[0].replace(/<\/*b>/g,'');
 					}
@@ -4487,7 +4487,7 @@ MuseScore {
 					// if it doesn't contain a standard tempo marking, we then check to see whether there's any
 					// non-metronome component (only if it's in a tempo text style)
 					if (!containsTempoComponent && isTempoTextStyle) {
-						nonMetronomeComponent = textObject.text.replace(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9]*/g,'');
+						nonMetronomeComponent = textObject.text.replace(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*/g,'');
 						nonMetronomeComponent = nonMetronomeComponent.replace(/<\/*b>/g,'');
 						if (nonMetronomeComponent.trim() !== '') containsTempoComponent = true;
 					}
@@ -4560,6 +4560,12 @@ MuseScore {
 					
 					// *** CHECK ANY METRONOME MARKING COMPONENT *** //
 					if (containsMetronomeComponent) {
+						
+						// **** CHECK ORDER OF METRONOME AND TIME SIGNATURE **** //
+						var strToRightOfMetronomeComponent = styledText.replace(/^.*?(\()*(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>|<font.*\/>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9–\-—]*(\))*/g,'').replace(/[0-9–\-—]*/g,'').trim();
+						if (strToRightOfMetronomeComponent !== '') {
+							addError ("In general, you should put the mood/tempo descriptor\nbefore the metronome marking.",textObject);
+						}
 					
 						// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
 						var metronomeDuration = division; // crotchet
