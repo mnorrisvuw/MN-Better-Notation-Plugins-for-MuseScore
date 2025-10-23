@@ -254,6 +254,7 @@ MuseScore {
 	property var isUnpitchedPercussionInstrument: false
 	property var isPercussionInstrument: false
 	property var isShortDecayInstrument: false
+	property var isLongDecayInstrument: false
 	property var isDecayInstrument: false
 	property var isKeyboardInstrument: false
 	property var isPedalInstrument: false
@@ -1213,7 +1214,7 @@ MuseScore {
 
 									if (isNote && !isTremolo) flzFound = false;
 									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
-										var nextChordRest = getNextChordRest(cursor);
+										var nextChordRest = getNextNoteRest(cursor);
 										if (nextChordRest != null) {
 											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest.",noteRest);
 										}
@@ -1355,7 +1356,7 @@ MuseScore {
 									} // end isStringInstrument
 									
 									// ************ CHECK SHORT DECAY INSTRUMENT ISSUES ************ //
-									if (doCheckPianoHarpAndPercussion && isShortDecayInstrument) checkDecayInstrumentIssues(noteRest);
+									if (doCheckPianoHarpAndPercussion && (isShortDecayInstrument || isLongDecayInstrument)) checkDecayInstrumentIssues(noteRest);
 																
 									// ************ CHECK FLUTE HARMONIC ************ //
 									if (doCheckWindsAndBrass && isFlute) checkFluteHarmonic(noteRest);
@@ -1929,6 +1930,7 @@ MuseScore {
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = currentStaffNum;
 		cursor2.track = noteRest.track;
+		cursor2.filter = Segment.ChordRest;
 		cursor2.rewindToTick(noteRest.parent.tick);
 		if (cursor2.prev()) return cursor2.element;
 		return null;
@@ -1938,27 +1940,8 @@ MuseScore {
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = currentStaffNum;
 		cursor2.track = noteRest.track;
+		cursor2.filter = Segment.ChordRest;
 		cursor2.rewindToTick(noteRest.parent.tick);
-		if (cursor2.next()) return cursor2.element;
-		return null;
-	}
-	
-	function getNextChordRest (cursor) {
-		var cursor2 = curScore.newCursor();
-		cursor2.staffIdx = cursor.staffIdx;
-		cursor2.filter = Segment.ChordRest;
-		cursor2.track = cursor.track;
-		cursor2.rewindToTick(cursor.tick);
-		if (cursor2.next()) return cursor2.element;
-		return null;
-	}
-	
-	function getPrevChordRest (cursor) {
-		var cursor2 = curScore.newCursor();
-		cursor2.staffIdx = cursor.staffIdx;
-		cursor2.filter = Segment.ChordRest;
-		cursor2.track = cursor.track;
-		cursor2.rewindToTick(cursor.tick);
 		if (cursor2.next()) return cursor2.element;
 		return null;
 	}
@@ -2692,6 +2675,7 @@ MuseScore {
 		var bassStrings = [28,33,38,43];
 		var bassStringNames = ["E","A","D","G"];
 		var shortDecayInstruments = ["xylophone","drum.","brake-drum"];
+		var longDecayInstruments = ["keyboard.piano","vibraphone","pluck.harp","metal.cymbal","metal.bells","metal.gong"];
 		
 		if (currentInstrumentId != "") {
 			isStringInstrument = currentInstrumentId.includes("strings.");
@@ -2703,6 +2687,8 @@ MuseScore {
 			isPercussionInstrument = isPitchedPercussionInstrument || isUnpitchedPercussionInstrument;
 			isShortDecayInstrument = false;
 			for (var i = 0; i < shortDecayInstruments.length && !isShortDecayInstrument; i++) if (currentInstrumentId.includes(shortDecayInstruments[i])) isShortDecayInstrument = true;
+			isLongDecayInstrument = false;
+			for (var i = 0; i < longDecayInstruments.length && !isLongDecayInstrument; i++) if (currentInstrumentId.includes(longDecayInstruments[i])) isLongDecayInstrument = true;
 			isKeyboardInstrument = currentInstrumentId.includes("keyboard");
 			isPiano = currentInstrumentId.includes("piano");
 			isVibraphone = currentInstrumentId.includes("vibraphone");
@@ -6011,12 +5997,32 @@ MuseScore {
 		var isTied = n.tieBack != null || n.tieForward != null;
 		//logError ('dur = '+dur+'; isTremolo = '+isTremolo+'; isTrill = '+isTrill+' isTied = '+isTied);
 		if (isShortDecayInstrument) {
-			if ((dur > division * 2 || (dur > division && isTied)) && !isTremolo && !isTrill) {
+			if ((dur > division * 2 || (dur > division && isTied)) && !isTremolo && !isTrill && !isLv) {
 				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has no sustain.\nConsider shortening to one beat.",noteRest);
 			}
 		} else {
 			if ((dur > division * 4 || (dur > division * 2 && isTied)) && !isTremolo && !isTrill) {
 				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has relatively short sustain.\nConsider shortening to one beat.",noteRest);
+			}
+		}
+		var nextNoteRest = getNextNoteRest(noteRest);
+		var currentBarStart = currentBar.firstSegment.tick;
+		var whichBeat1 = Math.trunc((currTick - currentBarStart) / beatLength);
+		//logError('here1');
+		if (nextNoteRest != null && !isLv) {
+			//logError('here2');
+			var whichBeat2 = Math.trunc((nextNoteRest.parent.tick - currentBarStart) / beatLength);
+			//logError ('whichBeat1 = '+whichBeat1+'; whichBeat2 = '+whichBeat2);
+			if (nextNoteRest.type == Element.REST && (whichBeat2 - whichBeat1 < 2)) {
+				//logError('here3');
+				if (noteRest.duration.ticks < division*2 && !isTied) {
+					//logError('here4');
+					// if pedal, is the pedal down?
+					var flagError = true;
+					if (isPedalInstrument) flagError = isPedalled;
+					//logError('flagError = '+flagError);
+					if (flagError) addError ("As this instrument naturally sustains,\nshort notes followed by rests may be ambiguous.\nUse an l.v. marking or lengthen the note to avoid the rests.",noteRest);
+				}
 			}
 		}
 	}
