@@ -3988,21 +3988,21 @@ MuseScore {
 		// **** CHECK FOR INAPPROPRIATE CLEFS **** //
 		if (checkInstrumentClefs) {
 			if (clefIs8va && !isPiano) 	addError ('This 8va clef is rarely used.\nAre you sure that’s right?', clef);
-			if (clefIs15ma) addError ('This 15ma clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs15ma) addError ('Don’t use a 15ma clef.\nUse a 15ma symbol instead.', clef);
 			if (clefIs8ba) {
 				if (isTrebleClef && !isGuitar && !isVoice) addError ('This 8ba clef is rarely used.\nAre you sure that’s right?', clef);
-				if (isBassClef) addError ('It’s unnecessary to use an octave-transposing bass clef.',clef);
+				if (isBassClef) addError ('Don’t use an octave-transposing bass clef.\nUse an 8ba symbol instead.',clef);
 			}
-			if (clefIs15mb) addError ('This 15mb clef is rarely used.\nAre you sure that’s right?', clef);
+			if (clefIs15mb) addError ('Don’t use a 15mb clef.\nUse a 15mb symbol instead.', clef);
 			if (isTrombone && isTrebleClef) {
-				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.",clef);
+				addError (currentInstrumentName + " almost never reads treble clef unless\nthis is British brass band music, where treble clef is transposing.\nConsider changing to tenor clef, unless this is intended to be super-high.",clef);
 			} else {
 				if (isTrebleClef && !readsTreble) addError(currentInstrumentName+" doesn’t read treble clef.",clef);
 				if (isAltoClef && !readsAlto) addError(currentInstrumentName+" doesn’t read alto clef.",clef);
 				if (isTenorClef && !readsTenor) addError(currentInstrumentName+" doesn’t read tenor clef.",clef);
 				if (isBassClef && !readsBass) addError(currentInstrumentName+" doesn’t read bass clef.",clef);
 			}
-			if (!clef.isHeader && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+"s prefer not to have clef changes if possible.\nIf possible, move this material to the other staff to avoid clef changes.",clef);
+			if (!clef.isHeader && (isMarimba || isHarp || isVibraphone)) addError (currentInstrumentName+" prefers not to have clef changes, if possible.\nConsider moving this material to the other staff to avoid clef changes,\nunless this clef change makes the music easier to read.",clef);
 		}
 	}
 	
