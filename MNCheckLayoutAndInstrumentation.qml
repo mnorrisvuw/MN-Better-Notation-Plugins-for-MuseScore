@@ -4172,620 +4172,643 @@ MuseScore {
 		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z","dynamicNiente", "n", "","p","","ppp","","pp","","mp","","mf","","f","","ff","","fff","","sf","","sfz","","sffz","","z","","n","&nbsp;"," "," "," "];
 		
 		var elementType = textObject.type;
-		var isTempoChangeMarking = elementType == Element.GRADUAL_TEMPO_CHANGE;
+		var isTempoChangeElement = elementType == Element.GRADUAL_TEMPO_CHANGE;
 		var textStyle = textObject.subStyle;
 		
 		// don't bother looking for certain textstyles
 		if (textStyle == Tid.TUPLET || textStyle == Tid.ARTICULATION || textStyle == Tid.STICKING || textStyle == Tid.FINGERING) return;
-		var isTitleText = textStyle == Tid.TITLE;
-		var isSubtitleText = textStyle == Tid.SUBTITLE;
-		var isComposerText = textStyle == Tid.COMPOSER;
-		var isTempoText = textStyle == Tid.TEMPO;
-		var isMetronomeText = textStyle == Tid.METRONOME;
-		var nonBoldText = '';
+		var isTitleTextStyle = textStyle == Tid.TITLE;
+		var isSubtitleTextStyle = textStyle == Tid.SUBTITLE;
+		var isComposerTextStyle = textStyle == Tid.COMPOSER;
+		var isTempoTextStyle = textStyle == Tid.TEMPO;
+		var isMetronomeTextStyle = textStyle == Tid.METRONOME;
+		var nonBoldText = '', boldText = '';
 		
-		var styledText = isTempoChangeMarking ? textObject.beginText : textObject.text;
-		if (styledText == undefined) {
-			logError ("checkTextObject() — styledText is undefined");
-			styledText = '';
+		// if there's no text available, then bail
+		var styledText = isTempoChangeElement ? textObject.beginText : textObject.text;
+		if (styledText == undefined || styledText == null) {
+			logError ("checkTextObject() — styledText is "+styledText);
+			return;
 		}
-
+		
+		// if it's a rehearsal mark, we can just check it, then bail
 		if (textStyle == Tid.REHEARSAL_MARK) {
 			checkRehearsalMark (textObject);
 			return;
 		}
 		
 		// ** CHECK IT'S NOT A COMMENT WE'VE ADDED ** //
-		var isComment = false;
-		if (elementType == Element.TEXT) isComment = Qt.colorEqual(textObject.frameBgColor,"yellow") && Qt.colorEqual(textObject.frameFgColor,"black");
+		if (elementType == Element.TEXT) {
+			if (Qt.colorEqual(textObject.frameBgColor,"yellow") && Qt.colorEqual(textObject.frameFgColor,"black")) return;
+		}
 		
-		if (!isComment && styledText !== "") {	
-			var tn = textObject.name.toLowerCase();
+		var tn = textObject.name.toLowerCase();
+		
+		// remove all tags
+		var plainTextWithSymbols = styledText.replace(/<[^>]+>/g, "");
+		var plainText = plainTextWithSymbols;
+		if (typeof plainText != 'string') logError('checkTextObject() — Typeof plainText not string: '+(typeof plainText));
+		for (var i = 0; i < replacements.length; i += 2) {
+			var regex1 = new RegExp(replacements[i],"g");
+			plainText = plainText.replace(regex1,replacements[i+1]);
+		}
+		
+		var lowerCaseText = plainText.toLowerCase();
+		
+		if (lowerCaseText != '') {
+
+			// ** CHECK TITLE ** //
+			if (isTitleTextStyle && plainText === "Untitled score") addError("You have not changed the default title text.", textObject);
 			
-			// remove all tags
-			var plainTextWithSymbols = styledText.replace(/<[^>]+>/g, "");
-			var plainText = plainTextWithSymbols;
-			if (typeof plainText != 'string') logError('checkTextObject() — Typeof plainText not string: '+(typeof plainText));
-			for (var i = 0; i < replacements.length; i += 2) {
-				var regex1 = new RegExp(replacements[i],"g");
-				plainText = plainText.replace(regex1,replacements[i+1]);
+			// ** CHECK SUBTITLE ** //
+			if (isSubtitleTextStyle) {
+				if (plainText === "Subtitle") addError( "You have not changed the default subtitle text.", textObject);
+				
+				// check if the subtitle is lower-case
+				// the only exception is SATB-like choral descriptions (SSA, TTBB, etc.)
+				if (plainText != lowerCaseText && lowerCaseText.substr(0,4) === "for " && lowerCaseText.length < 20) {
+					var isSATB = plainText.match(/\b(S*A*T*B*)\b/) != null;
+					if (!isSATB) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
+				}
+				var elemPage = textObject.parent;
+				while (elemPage && elemPage.type != Element.PAGE) elemPage = elemPage.parent;
+				
+				if (hasTitlePage && lowerCaseText.substr(0,3) === 'for' && elemPage.is(firstPageOfMusic)) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
 			}
 			
-			var lowerCaseText = plainText.toLowerCase();
+			// ** CHECK COMPOSER ** //
+			if (isComposerTextStyle) {
+				if (plainText === "Composer / arranger") addError( "You have not changed the default composer text.", textObject);
+				if (plainText.substring(0,3).toLocaleLowerCase() === "by ") addError ("You don’t need ‘by’ at the start", textObject);
+				if (plainText.substring(0,11).toLocaleLowerCase() === "composed by") addError ("You don’t need ‘Composed by’ at the start of this text", textObject);
+				var textPage = textObject.parent;
+				while (textPage.type != Element.PAGE) {
+					textPage = textPage.parent;
+					if (textPage == null || textPage == undefined) break;
+				}
+				if (textPage != null && textPage != undefined) {
+					if (textPage.pagenumber == firstPageOfMusicNum) { 
+						// check to see whether the composer text is upper or lower case
+						//var match = plainText.match(/^[A-Z][a-z]+[A-Z]/);
+						var upperCaseText = '';
+						//if (match) {
+							//output = match[0] + plainText.substring(match[0].length).toLocaleUpperCase();
+						//} else {
+							upperCaseText = plainText.toLocaleUpperCase();
+						//}
+						var keepLowerCase = ["arr. ", "by ", "arranged ", "orch. ", "orchestrated "];
+						for (var i=0; i<keepLowerCase.length; i++) {
+							if (plainText.includes(keepLowerCase[i])) {
+								upperCaseText = upperCaseText.replace(keepLowerCase[i].toLocaleUpperCase(),keepLowerCase[i]);
+							}
+						}
+						if (plainText !== upperCaseText) addError ("(Optional) A common house style is to have composer names in all caps.\n(See ‘Behind Bars’, p. 504)", textObject);
+					}
+				}
+			}
 			
-			if (lowerCaseText != '') {
-
-				// ** CHECK TITLE ** //
-				if (isTitleText && plainText === "Untitled score") addError("You have not changed the default title text.", textObject);
-				
-				// ** CHECK SUBTITLE ** //
-				if (isSubtitleText) {
-					if (plainText === "Subtitle") addError( "You have not changed the default subtitle text.", textObject);
-					
-					// check if the subtitle is lower-case
-					// the only exception is SATB-like choral descriptions (SSA, TTBB, etc.)
-					if (plainText != lowerCaseText && lowerCaseText.substr(0,4) === "for " && lowerCaseText.length < 20) {
-						var isSATB = plainText.match(/\b(S*A*T*B*)\b/) != null;
-						if (!isSATB) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
-					}
-					var elemPage = textObject.parent;
-					while (elemPage && elemPage.type != Element.PAGE) elemPage = elemPage.parent;
-					
-					if (hasTitlePage && lowerCaseText.substr(0,3) === 'for' && elemPage.is(firstPageOfMusic)) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
-				}
-				
-				// ** CHECK COMPOSER ** //
-				if (isComposerText) {
-					if (plainText === "Composer / arranger") addError( "You have not changed the default composer text.", textObject);
-					if (plainText.substring(0,3).toLocaleLowerCase() === "by ") addError ("You don’t need ‘by’ at the start", textObject);
-					if (plainText.substring(0,11).toLocaleLowerCase() === "composed by") addError ("You don’t need ‘Composed by’ at the start of this text", textObject);
-					var textPage = textObject.parent;
-					while (textPage.type != Element.PAGE) {
-						textPage = textPage.parent;
-						if (textPage == null || textPage == undefined) break;
-					}
-					if (textPage != null && textPage != undefined) {
-						if (textPage.pagenumber == firstPageOfMusicNum) { 
-							// check to see whether the composer text is upper or lower case
-							//var match = plainText.match(/^[A-Z][a-z]+[A-Z]/);
-							var upperCaseText = '';
-							//if (match) {
-								//output = match[0] + plainText.substring(match[0].length).toLocaleUpperCase();
-							//} else {
-								upperCaseText = plainText.toLocaleUpperCase();
-							//}
-							var keepLowerCase = ["arr. ", "by ", "arranged ", "orch. ", "orchestrated "];
-							for (var i=0; i<keepLowerCase.length; i++) {
-								if (plainText.includes(keepLowerCase[i])) {
-									upperCaseText = upperCaseText.replace(keepLowerCase[i].toLocaleUpperCase(),keepLowerCase[i]);
-								}
-							}
-							if (plainText !== upperCaseText) addError ("(Optional) A common house style is to have composer names in all caps.\n(See ‘Behind Bars’, p. 504)", textObject);
-						}
-					}
-				}
-				
-				// **** CHECK IF THIS IS A WOODWIND OR BRASS MARKING **** //
-				// **** WE CHECK THIS FIRST BECAUSE WE ALLOW A FEW COMMON MISSPELLINGS **** //
-				if (windAndBrassMarkings.includes(lowerCaseText) && isWindOrBrassInstrument) {
-					weKnowWhosPlaying = true;
-					flaggedWeKnowWhosPlaying = false;
-				}			
-				
-				// ***************************************************** //
-				// ****		CHECK SPELLING AND FORMAT ERRORS		**** //
-				// ***************************************************** //
-
-				// **** CHECK FOR STRAIGHT QUOTES THAT SHOULD BE CURLY **** //
-				if (doCheckSpellingAndFormat) {
-					if (lowerCaseText.includes("'")) addError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.", textObject);	
-					if (lowerCaseText.includes('"')) addError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.', textObject);
-
-					// **** CHECK FOR TEXT STARTING WITH SPACE OR NON-ALPHANUMERIC **** //
-					var c = plainText.charCodeAt(0);
-					if (c == 32) addError("‘"+plainText+"’ begins with a space, which could be deleted.", textObject);
-					if (c < 32 && c != 10 && c != 13) addError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?" ,textObject);
-
-					// **** CHECK COMMON SPELLING ERRORS & ABBREVIATIONS **** //
-					var isSpellingError = false;
-					for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
-						var spellingError = spellingerrorsatstart[i*2];
-						if (lowerCaseText.substr(0,spellingError.length) === spellingError) {
-							isSpellingError = true;
-							var correctSpelling = spellingerrorsatstart[i*2+1];
-							var diff = plainText.length-spellingError.length;
-							var correctText = (diff > 0) ? correctSpelling+plainText.substr(spellingError.length) : correctSpelling;
-							if (plainText.length > 50) {
-								addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.",textObject);
-							} else {
-								addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.",textObject);
-							}
-							return;
-						}
-					}
-
-					// **** CHECK TEXT WITH SPELLING ERRORS ANYWHERE **** //
-					if (!isSpellingError) {
-						var correctText = plainText;
-						for (var i = 0; i < spellingerrorsanywhere.length / 2; i++) {
-							var spellingError = spellingerrorsanywhere[i*2];
-							if (correctText.includes(spellingError)) {
-								isSpellingError = true;
-								var correctSpelling = spellingerrorsanywhere[i*2+1];
-								correctText = correctText.replace(spellingError,correctSpelling);
-							}
-						}
-						if (isSpellingError) {
-							if (plainText.length > 50) {
-								addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.", textObject);
-							} else {
-								addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.", textObject);
-							}
-						}
-					}
-					
-					// **** CHECK Brass, Strings, Winds, Percussion **** //
-					var dontCap = ["Brass","Strings","Winds","Woodwinds","Percussion"];
-					if (!isTitleText && !isSubtitleText) {
-						for (var i = 0; i < dontCap.length; i++) {
-							var theWord = dontCap[i];
-							var l = theWord.length;
-							if (lowerCaseText.substr(0,l) === theWord && plainText.substr(0,l) !== theWord) {
-								addError ( "‘"+theWord+"’ can be lower-case.", textObject);
-								return;
-							}
-						}
-					}
-					
-					// **** CHECK A 1 **** //
-					if (lowerCaseText === 'a 1') addError ("Never write ‘a 1’ to mean the first player.\nYou should just write ‘1.’.", textObject);
-					
-					// **** CHECK VIB **** //
-					if (!isTitleText && !isSubtitleText && isStringInstrument) {
-						if (lowerCaseText === 'vib' || lowerCaseText === 'vib.' || lowerCaseText === 'vibr.' || lowerCaseText === 'vibrato') addError ("This indication is a little ambiguous.\nDo you mean ‘vib. norm.’?", textObject);
-					}
-					
-					// **** CHECK SUL CAPITALISATION **** //
-					if (lowerCaseText.includes('sul ') && lowerCaseText.length == 5) {
-						if (lowerCaseText === plainText) {
-							addError ("Capitalise the string name (i.e. ‘sul "+lowerCaseText.substring(4).toUpperCase()+"’)", textObject);
-						}
-					}
-					
-					// **** CHECK TEXT THAT IS INCORRECTLY CAPITALISED **** //
-					// but don't check title/composer etc
-					if (!isTitleText && !isSubtitleText && !isComposerText && !isTempoText) {
-						//logError ('checking lower case text: '+plainText);
-						for (var i = 0; i < shouldbelowercase.length; i++) {
-							var lowercaseMarking = shouldbelowercase[i];
-							var r = new RegExp ('\\b'+lowercaseMarking+'\\b');
-							var theMatch = lowerCaseText.match(r);
-							if (theMatch != null) {
-								var theIndex = theMatch.index;
-								if (plainText.substr(theIndex,1) !== lowerCaseText.substr(theIndex,1)) {
-									//logError ('lowercaseMarking = '+lowercaseMarking+' theIndex = '+theIndex+' ps = '+plainText.substr(theIndex,1)+' lcs = '+lowerCaseText.substr(theIndex,1));
-									addError("‘"+lowercaseMarking+"’ should not have a capital first letter.",textObject);
-									return;
-								}
-							}
-						}
-					}
-					
-					// **** CHECK TEXT THAT SHOULD HAVE A FULL-STOP AT THE END **** //
-					for (var i = 0; i < shouldhavefullstop.length; i++) {
-						if (lowerCaseText === shouldhavefullstop[i]) {
-							addError("‘"+plainText+"’ should have a full-stop at the end.",textObject);
-							return;
-						}
-					}
-					
-					// **** CHECK TEXT CAN BE ABBREVIATED **** //
-					if (!isSpellingError && !isTitleText && !isSubtitleText && !isTempoText) {
-						for (var i = 0; i < canbeabbreviated.length / 2; i++) {
-							var fullText = canbeabbreviated[i*2];
-							if (plainText.includes(fullText)) {
-								var abbreviatedText = canbeabbreviated[i*2+1];
-								var correctText = plainText.replace(fullText,abbreviatedText);
-								addError("‘"+plainText+"’ can be shortened to ‘"+correctText+"’.",textObject);
-								break;
-							}
-						}
-					}
-					
-					// **** CHECK COMMON MISSPELLINGS **** //
-					if (lowerCaseText === "mute" || lowerCaseText === "with mute" || lowerCaseText === "add mute" || lowerCaseText === "put on mute" || lowerCaseText === "put mute on" || lowerCaseText === "muted") addError( "This is best written as ‘con sord.’",textObject);
-					if (lowerCaseText === "unmuted" || lowerCaseText === "no mute" || lowerCaseText === "remove mute" || lowerCaseText === "take off mute" || lowerCaseText === "take mute off") addError( "This is best written as ‘senza sord.’",textObject);
-					if (lowerCaseText === "with vibrato") addError( "This can be abbreviated to ‘con vib.’",textObject);
-					if (lowerCaseText === "no vibrato") addError( "This can be abbreviated to ‘senza vib.’",textObject);
-					if (lowerCaseText === "much vibrato" || lowerCaseText === "a lot of vibrato") addError( "This can be abbreviated to ‘molto vib.’",textObject);
-					if (lowerCaseText.substr(0,5) === "arco.") addError( "‘arco’ should not have a full-stop at the end.",textObject);
-					if (lowerCaseText.substr(0,10) === "sul tasto.") addError( "‘tasto’ should not have a full-stop at the end.",textObject);
-					if (lowerCaseText === "norm") addError( "‘norm’ should have a full-stop at the end\n(but is more commonly written as ‘ord.’).",textObject);
-					if (lowerCaseText.includes("sul. ")) addError( "‘sul’ should not have a full-stop after it.",textObject);
-					if (lowerCaseText.includes("  ")) addError( "This text has a double-space in it.",textObject);
-					if (lowerCaseText === "normale") addError("Abbreviate ‘normale’ as ‘norm.’ or ‘ord.’.",textObject);
-					
-					// **** CHECK FOR INCORRECT STYLES **** //
-					if (styledText.includes("<i>arco")) addError("‘arco’ should not be italicised.",textObject);
-					if (styledText.includes("<i>pizz")) addError("‘pizz.’ should not be italicised.",textObject);
-					if (styledText.includes("<i>con sord")) addError("‘con sord.’ should not be italicised.",textObject);
-					if (styledText.includes("<i>senza sord")) addError("‘senza sord.’ should not be italicised.",textObject);
-					if (styledText.includes("<i>ord.")) addError("‘ord.’ should not be italicised.",textObject);
-					if (styledText.includes("<i>sul ")) addError("String techniques should not be italicised.",textObject);
-					if (styledText.slice(3) === "<b>") addError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);					
-				}
-				
-				//logError ('CURRENTBARNUM = '+currentBarNum);
-				// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
-				if (currentBarNum > 0) {
-					
-					// **** 	CHECK TEMPO MARKINGS, METRONOME MARKINGS & TEMPO CHANGE MARKINGS 	****
-					if (doCheckTempoMarkings) {
-
-						// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
-						//if (currentBarNum == 1) logError ('Element in bar 1 = '+textObject.subtypeName());
-						//logError ('Checking text: text = '+plainText+' '+elementType+' '+initialTempoExists+' '+Element.TEMPO_TEXT+' '+Element.STAFF_TEXT+' textStyle = '+textStyle+' '+Tid.TEMPO+' '+Tid.METRONOME+' '+Tid.SYSTEM+' '+currentBarNum);
-						if (!initialTempoExists && (isTempoText || isMetronomeText) && currentBarNum == 1) {
-							initialTempoExists = true;
-						//	logError ('Found initial tempo');
-						}
-						
-						//logError ('isTempoChangeMarking = '+isTempoChangeMarking+' isTempoText = '+isTempoText);
-						// **** IS THIS A TEMPO CHANGE MARKING??? **** //
-						if (!isTempoChangeMarking && !lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-							for (var i = 0; i < tempochangemarkings.length && !isTempoChangeMarking; i++) if (lowerCaseText.includes(tempochangemarkings[i])) isTempoChangeMarking = true;
-						}
-									
-						// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
-						if (isTempoChangeMarking) {
-	
-							if (lastTempoChangeMarkingBar > -1) {
-								if (styledText === lastTempoChangeMarkingText) addError ("This looks like the same tempo change marking\nas the previous ‘"+lastTempoChangeMarkingText+"’ in b. "+lastTempoChangeMarkingBar, textObject);
-							}
-							lastTempoChangeMarkingBar = currentBarNum;
-							lastTempoChangeMarking = textObject;
-							lastTempoChangeMarkingText = styledText;
-							if (isTempoChangeMarking) {
-								tempoChangeMarkingEnd = textObject.spanner.spannerTick.ticks + textObject.spanner.spannerTicks.ticks;
-								//logError ('Found gradual tempo change: end is '+tempoChangeMarkingEnd);
-							} else {
-								if (!isTempoText) {
-									addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
-									return;
-								}
-							}
-							if (plainText.substr(0,1) != lowerCaseText.substr(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
-						}
+			// **** CHECK IF THIS IS A WOODWIND OR BRASS MARKING **** //
+			// **** WE CHECK THIS FIRST BECAUSE WE ALLOW A FEW COMMON MISSPELLINGS **** //
+			if (windAndBrassMarkings.includes(lowerCaseText) && isWindOrBrassInstrument) {
+				weKnowWhosPlaying = true;
+				flaggedWeKnowWhosPlaying = false;
+			}			
 			
-						// **** IS THIS A TEMPO MARKING? **** //
-						var isTempoMarking = isTempoText;
-						if (!isTempoMarking) {
-							// even if it's not set to tempo text, check it anyway
-							if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
-								//logError ("Checking "+lowerCaseText);
-								for (var j = 0; j < tempomarkings.length && !isTempoMarking; j++) {
-									if (lowerCaseText.includes(tempomarkings[j])) {
-										isTempoMarking = true;
-										
-										// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
-										if (!isTempoText) addError("Text ‘"+plainText+"’ is a tempo marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
-										
-										// does this require a metronome mark?
-										var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo i","tempo 1","tempo secondo","tempo 2","mouv"];
-										var ignoreTempoMarking = false;
-										
-										for (var k = 0; k < tempoMarkingToIgnoreArray.length && !ignoreTempoMarking; k++) if (lowerCaseText.includes(tempoMarkingToIgnoreArray[k])) ignoreTempoMarking = true;
-										
-										if (!ignoreTempoMarking) {
-											lastTempoMarking = textObject;
-											lastTempoMarkingBar = currentBarNum;
-										}
-										continue;
-										//logError ('ignoreTempoMarking '+ignoreTempoMarking);
-									}
-								}
-							}
-						}
-												
-						if (isTempoMarking) {
-							if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of the text should align with the time signature or first note.\n(See Behind Bars, p. 183)", textObject);
-							
-							if (styledText.includes("<b>")) {
-								// strip anything not between <b> tags, then strip any other tags (to ensure '=' is no longer in string)
-								nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
-							} else {
-								//logError ("eType = "+elementType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-								if (isTempoText && tempoFontStyle != 1) nonBoldText = plainText;
-								if (isMetronomeText && metronomeFontStyle != 1) nonBoldText = plainText;
-							}
-							//logError ("Found a tempo marking: non bold text is "+nonBoldText+'; plainText = '+plainText);
-							if (nonBoldText.toLowerCase().includes(tempomarkings[j])) addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
-							
-							//logError ('isTempoMarking '+isTempoMarking);
-							lastTempoChangeMarkingBar = -1;
-							lastTempoChangeMarking = null;
-							lastTempoChangeMarkingText = '';
-							tempoChangeMarkingEnd = -1;
-					
-							// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
-							if (plainText.substr(0,1) === lowerCaseText.substr(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substr(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
-							
-							// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
-							if (plainText.slice(-1) === '.' && !lowerCaseText.includes("mouv")) addError ("Tempo markings do not need a full-stop at the end.",textObject);
-						}
-					
-						// **** CHECK TEMPO POINT SIZE **** //
-						if (isTempoMarking || isTempoChangeMarking) {
-							if (textObject.fontSize > 0) {
-								// fontSize can be -1 for mixed sizes
-								if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
-								if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
-							}
-						}
-						
-						// **** CHECK METRONOME MARKINGS **** //
-						var isMetronomeMarking = false;
-						if (plainText.includes("=")) {
-							//logError ('Checking metro');
-							for (var j = 0; j < metronomemarkings.length && !isMetronomeMarking; j++) {
-								//logError (plainTextWithSymbols+" includes "+metronomemarkings[j]+" = "+plainTextWithSymbols.includes(metronomemarkings[j]));
-								if (plainTextWithSymbols.includes(metronomemarkings[j])) {
-									isMetronomeMarking = true;
-									//logError ('Found metro');
-									if (textObject.offsetX < -4.5 && !isTempoMarking) addError ("This metronome marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
+			// ***************************************************** //
+			// ****		CHECK SPELLING AND FORMAT ERRORS		**** //
+			// ***************************************************** //
 
-									// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
-									var metronomeDuration = division; // crotchet
-									var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
-									var hasParentheses = lowerCaseText.includes('(') && lowerCaseText.includes(')');
-									var metroStr = "crotchet/quarter note";
-									if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('\uECA7')) {
-										metronomeDuration = division / 2; // quaver
-										metroStr = "quaver/eighth note";
-									}
-									if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('\uECA3')) {
-										metronomeDuration = division * 2; // minim
-										metroStr = "minim/half note";
-									}
-									if (hasAugDot) {
-										metronomeDuration *= 1.5;
-										metroStr = "dotted "+metroStr;
-									}
-									var couldBeEither = virtualBeatLength == division / 2 && !isCompound; // time sigs like 11/8 could have a quaver or crotchet metronome
-									if (metronomeDuration != virtualBeatLength && !couldBeEither) {
-										//logError ('Checking metronome marking');
-										addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
-									}
-									if (nonBoldText === "") {
-										//logError ("styledText is "+styledText.replace(/</g,'{'));
-										if (styledText.includes('<b>')) {
-											// see comment above on the RegExp
-											nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
-										} else {
-											//logError ("eType = "+elementType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
-											if (isTempoText && tempoFontStyle != 1) nonBoldText = plainTextWithSymbols;
-											if (isMetronomeText && metronomeFontStyle != 1) nonBoldText = plainTextWithSymbols;
-										}
-									}
-									if (isTempoMarking && hasParentheses) {
-										addError ('You don’t normally need brackets around metronome markings\nexcept for (e.g.) Tempo Primo/Tempo Secondo/a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
-									}
-									//logError ("Found a metronome marking: non bold text is "+nonBoldText);
-								}
-							}
-							if (isMetronomeMarking) {
-								
-								if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
-								// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
-								var metroIsPlain = nonBoldText.includes('=');
-								//logError ("isTempoMarking: "+isTempoMarking+" isTempoChangeMarking: "+isTempoChangeMarking+" isMetro: "+isMetronomeMarking+"; metroIsPlain = "+metroIsPlain);
-								if (!isTempoMarking && !isTempoChangeMarking && !metroIsPlain) {
-									addError ('It is recommended to have metronome markings in a plain font style,\nrather than bold. (See, for instance, ‘Behind Bars’ p. 183)',textObject)
-								}
-								if (isTempoMarking && !metroIsPlain) {
-									addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, rather than bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
-								}
-								//logError ('Checking metro: '+currentBarNum+' '+isTempoMarking+' '+lastTempoMarking);
-								var markingLastWord = plainText.trim().split(" ").pop();
-								var markingLastWordIsPrimarilyAlphabetic = false;
-								var letterRegex = new RegExp ('[A-Za-z]','g');
-								if (markingLastWord) {
-									var theMatches = markingLastWord.match(letterRegex);
-									if (theMatches) markingLastWordIsPrimarilyAlphabetic = (theMatches.length / markingLastWord.length ) > 0.5;
-								}
-								var markingContainsPhrase = plainText.length > 10 && markingLastWordIsPrimarilyAlphabetic;
-								//logError ('isTempoMarking: '+isTempoMarking+' lastTempoMarking == null '+(lastTempoMarking == null)+' length: '+plainText.length+' markingContainsPhrase '+markingContainsPhrase);
-								if (currentBarNum < 2 && !isTempoMarking && lastTempoMarking == null && plainText.length < 11 && !markingContainsPhrase) {
-									addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",textObject);
-								} 
-								var metroSection = plainText.split('=')[1];
-								//logError ('Checking metroSection: '+metroSection+'; lastMetroSection='+lastMetroSection);
+			// **** CHECK FOR STRAIGHT QUOTES THAT SHOULD BE CURLY **** //
+			if (doCheckSpellingAndFormat) {
+				if (lowerCaseText.includes("'")) addError("This text has a straight single quote mark in it (').\nChange to curly: ‘ or ’.", textObject);	
+				if (lowerCaseText.includes('"')) addError('This text has a straight double quote mark in it (").\nChange to curly: “ or ”.', textObject);
 
-								if (metroSection === lastMetroSection) {
-									//logError ('metroSection: lastTempoChangeMarking = '+lastTempoChangeMarking+'; styledText='+styledText);
+				// **** CHECK FOR TEXT STARTING WITH SPACE OR NON-ALPHANUMERIC **** //
+				var c = plainText.charCodeAt(0);
+				if (c == 32) addError("‘"+plainText+"’ begins with a space, which could be deleted.", textObject);
+				if (c < 32 && c != 10 && c != 13) addError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?" ,textObject);
 
-									if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
-										addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
-									} else {
-										addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar, textObject);
-									}
-								}
-								lastMetroSection = metroSection;
-								lastMetronomeMarkingBar = getBarNumber(textObject);
-								//logError ("lastMetronomeMarkingBar now "+lastMetronomeMarkingBar);
-								lastMetronomeMarkingDisplayBar = lastMetronomeMarkingBar + displayOffset;
-								lastTempoChangeMarkingBar = -1;
-								lastTempoChangeMarking = null;
-								lastTempoChangeMarkingText = '';
-								tempoChangeMarkingEnd = -1;
-								//logError ('1) lastTempoChangeMarkingBar now '+lastTempoChangeMarkingBar);
-							}
-						}
-						
-						if (isTempoChangeMarking || (isTempoMarking && !isMetronomeMarking)) lastMetroSection = '';
-					}
-				
-					if (doCheckStrings) {
-						
-						// **** CHECK DIV/UNIS. **** //
-						if (lowerCaseText.includes('div.')) {
-							if (isStringSection) {
-								isDiv = true;
-								flaggedDivError = false;
-							} else {
-								addError("You’ve written a string div. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
-								return;
-							}
-						}
-					
-						if (lowerCaseText.includes('unis.')) {
-							if (isStringSection) {
-								isDiv = false;
-								flaggedDivError = false;
-							} else {
-								addError("You’ve written a string unis. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
-								return;
-							}
-						}
-					
-						// **** CHECK WRITTEN OUT TREM **** //
-						if (lowerCaseText === "trem" || lowerCaseText === "trem." || lowerCaseText === "tremolo") {
-							addError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
-							return;
-						}
-						
-						if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
-							addError ("Change this to ‘poco sul tasto’.",textObject);
-							return;
-						}
-						
-						if (lowerCaseText === "sul tasto molto") {
-							addError ("Change this to ‘molto sul tasto’.",textObject);
-							return;
-						}
-						
-						if (lowerCaseText === "sul pont. poco" || lowerCaseText === "sul pont. un poco") {
-							addError ("Change this to ‘poco sul pont.’",textObject);
-							return;
-						}
-						
-						if (lowerCaseText === "sul pont. molto") {
-							addError ("Change this to ‘molto sul pont.’",textObject);
-							return;
-						}
-					
-						// **** CHECK SUL + STRING INDICATION **** //
-						var strings = ["I","II","III","IV"];
-						for (var i = 0; i < 4; i++) {
-							if (lowerCaseText === "sul "+strings[i]) {
-								addError ( "You don’t need ‘sul’ here;\nyou can just write the string number.", textObject);
-								return;
-							}
-						}
-					}
-					
-					var objectIsDynamic = tn === "dynamic";
-					var includesADynamic = styledText.includes('<sym>dynamic');
-					var stringIsDynamic = isDynamic(lowerCaseText);
-					
-					//logError("styledText = "+styledText.replace(/</g,'≤')+"; lct = "+lowerCaseText+" objectIsDynamic = "+objectIsDynamic+"; includesADynamic = "+includesADynamic+"; stringIsDynamic = "+stringIsDynamic);
-					// **** CHECK REDUNDANT DYNAMIC **** //
-					if (objectIsDynamic && includesADynamic && !stringIsDynamic) {
-						addError ('This dynamic marking is unusual, or has an extraneous character in it somewhere',textObject);
-					}
-					if (includesADynamic || stringIsDynamic) {
-						firstDynamic = true;
-						//logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
-
-						theDynamic = textObject;
-						lastDynamicTick = currTick;
-						setDynamicLevel (plainText);
-						
-						var isError = false;
-						var dynamicException = plainText.includes("fp") || plainText.includes("fmp") || plainText.includes("sf") || plainText.includes("fz");
-						if (prevDynamicBarNum > 0 && doCheckDynamics) {
-							
-							var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
-							if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
-								// check if visual overlapping
-								
-								if (textObject.pagePos == prevDynamicObject.pagePos && textObject.bbox.width == prevDynamicObject.bbox.width && textObject.bbox.height == prevDynamicObject.bbox.height) {
-									//logError (textObject.pagePos+' '+prevDynamicObject.pagePos);
-									//logError (textObject.text+" "+textObject.bbox+ " "+prevDynamicObject.text+" "+prevDynamicObject.bbox);
-									addError ("There appear to be two dynamic markings overlapped here.\nYou can safely delete one of them.",textObject);
-								} else {
-									addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicDisplayBarNum+".",textObject);
-								}
-								isError = true;
-							}
-						}
-					
-						if (!dynamicException) {
-							
-							prevDynamicBarNum = currentBarNum;
-							prevDynamicDisplayBarNum = currentBarNum + displayOffset;
-							if (currentHairpin && currTick < currentHairpinEnd) {
-								prevDynamic = '';
-								prevDynamicObject = null;
-							} else {
-								prevDynamic = plainText;
-								prevDynamicObject = textObject;
-							}
+				// **** CHECK COMMON SPELLING ERRORS & ABBREVIATIONS **** //
+				var isSpellingError = false;
+				for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
+					var spellingError = spellingerrorsatstart[i*2];
+					if (lowerCaseText.substr(0,spellingError.length) === spellingError) {
+						isSpellingError = true;
+						var correctSpelling = spellingerrorsatstart[i*2+1];
+						var diff = plainText.length-spellingError.length;
+						var correctText = (diff > 0) ? correctSpelling+plainText.substr(spellingError.length) : correctSpelling;
+						if (plainText.length > 50) {
+							addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.",textObject);
 						} else {
-							if (plainText === "fmp" || plainText === "sfmp" || plainText === "sfzmp" || plainText === "sffzmp" || plainText === "sfffzmp") {
-								prevDynamicBarNum = currentBarNum;
-								prevDynamic = "p";
-							}
-							if (plainText === "fp" || plainText === "sfp" || plainText === "sfzp" || plainText === "sffzp" || plainText === "sfffzp") {
-								prevDynamicBarNum = currentBarNum;
-								prevDynamic = "p";
-							}
-							if (plainText === "fpp" || plainText === "sfpp" || plainText === "sfzpp" || plainText === "sffzpp" || plainText === "sfffzpp") {
-								prevDynamicBarNum = currentBarNum;
-								prevDynamic = "pp";
-							}
-							if (plainText === "fppp" || plainText === "sfppp" || plainText === "sfzppp" || plainText === "sffzppp" || plainText === "sfffzppp") {
-								prevDynamicBarNum = currentBarNum;
-								prevDynamic = "ppp";
-							}
-							// is there an accent on this note
-							isSforzando = true;
+							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.",textObject);
 						}
-						if (isError) return;
-					}
-					//logError(""+lowerCaseText+" isDyn = "+isDyn);
-				
-					// **** CHECK FOR DYNAMIC ENTERED AS EXPRESSION (OR OTHER) TEXT **** //
-					if (doCheckDynamics && !objectIsDynamic && (includesADynamic || stringIsDynamic)) {
-						addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette.",textObject);
 						return;
 					}
-			
-					// **** CHECK FOR TECHNIQUES ENTERED AS EXPRESSION TEXT **** //
-					if (tn === "expression") {
-						if (doCheckSpellingAndFormat){
-							for (var i = 0; i < techniques.length; i ++) {
-								if (lowerCaseText.includes(techniques[i])) {
-									addError("This looks like a technique, but has been\nincorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
-									return;
-								}
-							}
+				}
+
+				// **** CHECK TEXT WITH SPELLING ERRORS ANYWHERE **** //
+				if (!isSpellingError) {
+					var correctText = plainText;
+					for (var i = 0; i < spellingerrorsanywhere.length / 2; i++) {
+						var spellingError = spellingerrorsanywhere[i*2];
+						if (correctText.includes(spellingError)) {
+							isSpellingError = true;
+							var correctSpelling = spellingerrorsanywhere[i*2+1];
+							correctText = correctText.replace(spellingError,correctSpelling);
 						}
-						if (doCheckTextPositions) {
-							var canBeAbove = plainText === "loco" || plainText.includes("ten.") || plainText.includes("tenuto") || plainText.includes("legato") || plainText.includes("flz");
-							if (textObject.placement == Placement.ABOVE && !canBeAbove) {
-								addError("Expression text should appear below the staff.\nCheck it is attached to the right staff, or it should be a technique.",textObject);
+					}
+					if (isSpellingError) {
+						if (plainText.length > 50) {
+							addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.", textObject);
+						} else {
+							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.", textObject);
+						}
+					}
+				}
+				
+				// **** CHECK Brass, Strings, Winds, Percussion **** //
+				var dontCap = ["Brass","Strings","Winds","Woodwinds","Percussion"];
+				if (!isTitleTextStyle && !isSubtitleTextStyle) {
+					for (var i = 0; i < dontCap.length; i++) {
+						var theWord = dontCap[i];
+						var l = theWord.length;
+						if (lowerCaseText.substr(0,l) === theWord && plainText.substr(0,l) !== theWord) {
+							addError ( "‘"+theWord+"’ can be lower-case.", textObject);
+							return;
+						}
+					}
+				}
+				
+				// **** CHECK A 1 **** //
+				if (lowerCaseText === 'a 1') addError ("Never write ‘a 1’ to mean the first player.\nYou should just write ‘1.’.", textObject);
+				
+				// **** CHECK VIB **** //
+				if (!isTitleTextStyle && !isSubtitleTextStyle && isStringInstrument) {
+					if (lowerCaseText === 'vib' || lowerCaseText === 'vib.' || lowerCaseText === 'vibr.' || lowerCaseText === 'vibrato') addError ("This indication is a little ambiguous.\nDo you mean ‘vib. norm.’?", textObject);
+				}
+				
+				// **** CHECK SUL CAPITALISATION **** //
+				if (lowerCaseText.includes('sul ') && lowerCaseText.length == 5) {
+					if (lowerCaseText === plainText) {
+						addError ("Capitalise the string name (i.e. ‘sul "+lowerCaseText.substring(4).toUpperCase()+"’)", textObject);
+					}
+				}
+				
+				// **** CHECK TEXT THAT IS INCORRECTLY CAPITALISED **** //
+				// but don't check title/composer etc
+				if (!isTitleTextStyle && !isSubtitleTextStyle && !isComposerTextStyle && !containsTempoComponent) {
+					//logError ('checking lower case text: '+plainText);
+					for (var i = 0; i < shouldbelowercase.length; i++) {
+						var lowercaseMarking = shouldbelowercase[i];
+						var r = new RegExp ('\\b'+lowercaseMarking+'\\b');
+						var theMatch = lowerCaseText.match(r);
+						if (theMatch != null) {
+							var theIndex = theMatch.index;
+							if (plainText.substr(theIndex,1) !== lowerCaseText.substr(theIndex,1)) {
+								//logError ('lowercaseMarking = '+lowercaseMarking+' theIndex = '+theIndex+' ps = '+plainText.substr(theIndex,1)+' lcs = '+lowerCaseText.substr(theIndex,1));
+								addError("‘"+lowercaseMarking+"’ should not have a capital first letter.",textObject);
 								return;
 							}
 						}
 					}
-					
-					checkInstrumentalTechniques (textObject, plainText, lowerCaseText);
-				
-					
 				}
-			} // end lowerCaseText != ''
-		} // end check comments
+				
+				// **** CHECK TEXT THAT SHOULD HAVE A FULL-STOP AT THE END **** //
+				for (var i = 0; i < shouldhavefullstop.length; i++) {
+					if (lowerCaseText === shouldhavefullstop[i]) {
+						addError("‘"+plainText+"’ should have a full-stop at the end.",textObject);
+						return;
+					}
+				}
+				
+				// **** CHECK TEXT CAN BE ABBREVIATED **** //
+				if (!isSpellingError && !isTitleTextStyle && !isSubtitleTextStyle && !containsTempoComponent) {
+					for (var i = 0; i < canbeabbreviated.length / 2; i++) {
+						var fullText = canbeabbreviated[i*2];
+						if (plainText.includes(fullText)) {
+							var abbreviatedText = canbeabbreviated[i*2+1];
+							var correctText = plainText.replace(fullText,abbreviatedText);
+							addError("‘"+plainText+"’ can be shortened to ‘"+correctText+"’.",textObject);
+							break;
+						}
+					}
+				}
+				
+				// **** CHECK COMMON MISSPELLINGS **** //
+				if (lowerCaseText === "mute" || lowerCaseText === "with mute" || lowerCaseText === "add mute" || lowerCaseText === "put on mute" || lowerCaseText === "put mute on" || lowerCaseText === "muted") addError( "This is best written as ‘con sord.’",textObject);
+				if (lowerCaseText === "unmuted" || lowerCaseText === "no mute" || lowerCaseText === "remove mute" || lowerCaseText === "take off mute" || lowerCaseText === "take mute off") addError( "This is best written as ‘senza sord.’",textObject);
+				if (lowerCaseText === "with vibrato") addError( "This can be abbreviated to ‘con vib.’",textObject);
+				if (lowerCaseText === "no vibrato") addError( "This can be abbreviated to ‘senza vib.’",textObject);
+				if (lowerCaseText === "much vibrato" || lowerCaseText === "a lot of vibrato") addError( "This can be abbreviated to ‘molto vib.’",textObject);
+				if (lowerCaseText.substr(0,5) === "arco.") addError( "‘arco’ should not have a full-stop at the end.",textObject);
+				if (lowerCaseText.substr(0,10) === "sul tasto.") addError( "‘tasto’ should not have a full-stop at the end.",textObject);
+				if (lowerCaseText === "norm") addError( "‘norm’ should have a full-stop at the end\n(but is more commonly written as ‘ord.’).",textObject);
+				if (lowerCaseText.includes("sul. ")) addError( "‘sul’ should not have a full-stop after it.",textObject);
+				if (lowerCaseText.includes("  ")) addError( "This text has a double-space in it.",textObject);
+				if (lowerCaseText === "normale") addError("Abbreviate ‘normale’ as ‘norm.’ or ‘ord.’.",textObject);
+				
+				// **** CHECK FOR INCORRECT STYLES **** //
+				if (styledText.includes("<i>arco")) addError("‘arco’ should not be italicised.",textObject);
+				if (styledText.includes("<i>pizz")) addError("‘pizz.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>con sord")) addError("‘con sord.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>senza sord")) addError("‘senza sord.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>ord.")) addError("‘ord.’ should not be italicised.",textObject);
+				if (styledText.includes("<i>sul ")) addError("String techniques should not be italicised.",textObject);
+				if (styledText.slice(3) === "<b>") addError("In general, you never need to manually set text to bold.\nAre you sure you want this text bold?",textObject);					
+			}
+			
+			//logError ('CURRENTBARNUM = '+currentBarNum);
+			var containsMetronomeComponent = false;
+			var containsTempoComponent = false;
+			var containsTempoChangeComponent = isTempoChangeElement;
+			var ignoreTempoMarking = false;
+			var metronomeComponent = '', nonMetronomeComponent = '';
+
+			// **** CHECK ONLY STAFF/SYSTEM TEXT (IGNORE TITLE/SUBTITLE ETC) **** //
+			if (currentBarNum > 0) {
+				
+				// **** 	CHECK TEMPO MARKINGS, METRONOME MARKINGS & TEMPO CHANGE MARKINGS 	**** //
+				if (doCheckTempoMarkings) {
+
+					// **** CHECK WHETHER INITIAL TEMPO MARKING EXISTS **** //
+					if (!initialTempoExists && (isTempoTextStyle || isMetronomeTextStyle) && currentBarNum == 1) initialTempoExists = true;
+					
+					// **** CHECK TO SEE IF THIS CONTAINS A METRONOME MARKING **** //
+					if (plainText.includes("=")) {
+						var theMatch = textObject.text.match(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9]*/g) 
+						containsMetronomeComponent = theMatch != null;
+						if (containsMetronomeComponent) metronomeComponent = theMatch[0]
+					}
+					
+					// **** CHECK TO SEE IF THIS CONTAINS A TEMPO MARKING COMPONENT **** //
+					if (!lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+						for (var j = 0; j < tempomarkings.length && !containsTempoComponent; j++) {
+							if (lowerCaseText.includes(tempomarkings[j])) containsTempoComponent = true;
+						}
+					}
+					// if it doesn't contain a standard tempo marking, we then check to see whether there's any
+					// non-metronome component (only if it's in a tempo text style)
+					if (!containsTempoComponent && isTempoTextStyle) {
+						nonMetronomeComponent = textObject.text.replace(/(<sym>metNote.*<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)*(<font.*?>.*?<\/font>)*( |\u00A0|\u2009)*=( |\u00A0|\u2009)*(c\.|approx\.|circa)*[0-9]*/g,'');
+						if (nonMetronomeComponent.trim() !== '') containsTempoComponent = true;
+					}
+					
+					// **** CHECK TO SEE IF THIS CONTAINS A TEMPO CHANGE ELEMENT **** //
+					if (!isTempoChangeElement && !lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
+						for (var i = 0; i < tempochangemarkings.length && !containsTempoChangeComponent; i++) if (lowerCaseText.includes(tempochangemarkings[i])) containsTempoChangeComponent = true;
+					}					
+								
+					// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
+					if (containsTempoComponent) {
+						if (!isTempoTextStyle) addError("‘"+plainText+"’ looks like a tempo marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
+					
+						// does this require a metronome mark?
+						var tempoMarkingToIgnoreArray = ["a tempo","tempo primo","tempo i","tempo 1","tempo secondo","tempo 2","mouv"];
+					
+						for (var k = 0; k < tempoMarkingToIgnoreArray.length && !ignoreTempoMarking; k++) if (lowerCaseText.includes(tempoMarkingToIgnoreArray[k])) ignoreTempoMarking = true;
+					
+						if (!ignoreTempoMarking) {
+							lastTempoMarking = textObject;
+							lastTempoMarkingBar = currentBarNum;
+							//logError ('set lastTempoMarkingBar to '+currentBarNum);
+						}
+					}
+					
+					//logError ('text = '+textObject.text.replace(/</g,'≤')+'; tempo = '+containsTempoComponent+'; metro = '+containsMetronomeComponent);
+					
+					if (containsMetronomeComponent || containsTempoComponent) {
+						//logError ('Found metronome component');
+						if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
+					}
+					
+					// *** CHECK ANY METRONOME MARKING COMPONENT *** //
+					if (containsMetronomeComponent) {
+					
+						// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
+						var metronomeDuration = division; // crotchet
+						var hasAugDot = metronomemarkings[j].includes('.') || metronomemarkings[j].includes('metAugmentationDot') || metronomemarkings[j].includes('\uECB7');
+						var hasParentheses = lowerCaseText.includes('(') && lowerCaseText.includes(')');
+						var metroStr = "crotchet/quarter note";
+						if (metronomemarkings[j].includes('metNote8thUp') || metronomemarkings[j].includes('\uECA7')) {
+							metronomeDuration = division / 2; // quaver
+							metroStr = "quaver/eighth note";
+						}
+						if (metronomemarkings[j].includes('metNoteHalfUp') || metronomemarkings[j].includes('\uECA3')) {
+							metronomeDuration = division * 2; // minim
+							metroStr = "minim/half note";
+						}
+						if (hasAugDot) {
+							metronomeDuration *= 1.5;
+							metroStr = "dotted "+metroStr;
+						}
+						var couldBeEither = virtualBeatLength == division / 2 && !isCompound; // time sigs like 11/8 could have a quaver or crotchet metronome
+						if (metronomeDuration != virtualBeatLength && !couldBeEither) {
+							//logError ('Checking metronome marking');
+							addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
+						}
+						if (nonBoldText === "") {
+							//logError ("styledText is "+styledText.replace(/</g,'{'));
+							if (styledText.includes('<b>')) {
+								// see comment above on the RegExp
+								nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, '');
+							} else {
+								//logError ("eType = "+elementType+" ("+Element.TEMPO_TEXT+" "+Element.METRONOME+")");
+								if (isTempoTextStyle && tempoFontStyle != 1) nonBoldText = plainTextWithSymbols;
+								if (isMetronomeTextStyle && metronomeFontStyle != 1) nonBoldText = plainTextWithSymbols;
+							}
+						}
+						//logError ('nonBoldText = '+nonBoldText+'; boldText = '+boldText);
+						
+						// *** CHECK FOR UNNECESSARY PARENTHESES *** //
+						if (hasParentheses && !ignoreTempoMarking) {
+							addError ('You don’t normally need brackets around metronome markings\nexcept for (e.g.) Tempo Primo/Tempo Secondo/a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
+						}
+						
+						// *** CHECK FOR UNNECESSARY ‘APPROX’
+						if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
+							
+						// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
+						var metroIsBold = boldText.includes(metronomeComponent);
+						
+						if (containsTempoComponent) {
+							if (metroIsBold) addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, rather than bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
+						} else {
+							if (!containsTempoChangeComponent && metroIsBold) {
+								addError ('It is recommended to have metronome markings in a plain font style,\nrather than bold. (See, for instance, ‘Behind Bars’ p. 183)',textObject)
+							}
+						}
+						
+						//logError ('Checking metro: '+currentBarNum+' '+isTempoMarking+' '+lastTempoMarking);
+						var markingLastWord = plainText.trim().split(" ").pop();
+						var markingLastWordIsPrimarilyAlphabetic = false;
+						var letterRegex = new RegExp ('[A-Za-z]','g');
+						if (markingLastWord) {
+							var theMatches = markingLastWord.match(letterRegex);
+							if (theMatches) markingLastWordIsPrimarilyAlphabetic = (theMatches.length / markingLastWord.length ) > 0.5;
+						}
+						var markingContainsPhrase = plainText.length > 10 && markingLastWordIsPrimarilyAlphabetic;
+						//logError ('isTempoMarking: '+isTempoMarking+' lastTempoMarking == null '+(lastTempoMarking == null)+' length: '+plainText.length+' markingContainsPhrase '+markingContainsPhrase);
+						if (currentBarNum < 2 && !containsTempoComponent && lastTempoMarking == null && plainText.length < 11 && !markingContainsPhrase) {
+							addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",textObject);
+						} 
+						var metroSection = plainText.split('=')[1];
+						//logError ('Checking metroSection: '+metroSection+'; lastMetroSection='+lastMetroSection);
+				
+						if (metroSection === lastMetroSection) {
+							//logError ('metroSection: lastTempoChangeMarking = '+lastTempoChangeMarking+'; styledText='+styledText);
+				
+							if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
+								addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
+							} else {
+								addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar, textObject);
+							}
+						}
+						lastMetroSection = metroSection;
+						lastMetronomeMarkingBar = getBarNumber(textObject);
+						//logError ('lastMetronomeMarkingBar = '+lastMetronomeMarkingBar);
+						lastMetronomeMarkingDisplayBar = lastMetronomeMarkingBar + displayOffset;
+						lastTempoChangeMarkingBar = -1;
+						lastTempoChangeMarking = null;
+						lastTempoChangeMarkingText = '';
+						tempoChangeMarkingEnd = -1;
+					}
+								
+					// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
+					if (containsTempoChangeComponent) {
+						if (lastTempoChangeMarkingBar > -1) {
+							if (styledText === lastTempoChangeMarkingText) addError ("This looks like the same tempo change marking\nas the previous ‘"+lastTempoChangeMarkingText+"’ in b. "+lastTempoChangeMarkingBar, textObject);
+						}
+						lastTempoChangeMarkingBar = currentBarNum;
+						lastTempoChangeMarking = textObject;
+						lastTempoChangeMarkingText = styledText;
+						if (isTempoChangeElement) {
+							tempoChangeMarkingEnd = textObject.spanner.spannerTick.ticks + textObject.spanner.spannerTicks.ticks;
+							//logError ('Found gradual tempo change: end is '+tempoChangeMarkingEnd);
+						} else {
+							tempoChangeMarkingEnd = currTick;
+							if (!isTempoTextStyle) {
+								addError( "‘"+plainText+"’ is a tempo change marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
+								return;
+							}
+						}
+						if (plainText.substr(0,1) != lowerCaseText.substr(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
+					}
+		
+					// **** CHECK TEMPO MARKINGS (BUT NOT TEMPO CHANGES) **** //
+					if (containsTempoComponent && !containsTempoChangeComponent) {
+						
+						// *** CHECK STYLING *** //
+						if (styledText.includes("<b>")) {
+							// strip all <b> tags and their contents, then strip any other tags
+							nonBoldText = styledText.replace(/<b>.*?<\/b>/g,'').replace(/<[^>]+>/g, "");
+							boldText = styledText.replace(/^.*?<b>|<\/b>.*?(<b>|$)+/g,'');
+							//logError ('b found');
+						} else {
+							var textStyleIsBold = textObject.fontStyle == 1;
+							//logError ("textStyle = "+textObject.fontStyle+'; isBold = '+textStyleIsBold);
+
+							if (textStyleIsBold) {
+								boldText = plainText;
+								nonBoldText = '';
+							} else {
+								boldText = '';
+								nonBoldText = plainText;
+							}
+						}
+						//logError ("Found a tempo marking: non bold text is "+nonBoldText+'; bold text = '+ boldText);
+						//logError ('Original text is '+textObject.text.replace(/</g,'≤'));
+						
+						// CHECK IF THIS TEMPO MARKING IS BOLD
+						// DON’T DO THIS IF THERE IS A METRONOME COMPONENT — THAT WILL BE CHECKED LATER ON
+						if (!plainText.includes('=')) {	
+							if (nonBoldText.toLowerCase().includes(tempomarkings[j]) || boldText === '') addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
+						}
+						
+						//logError ('isTempoMarking '+isTempoMarking);
+						lastTempoChangeMarkingBar = -1;
+						lastTempoChangeMarking = null;
+						lastTempoChangeMarkingText = '';
+						tempoChangeMarkingEnd = -1;
+				
+						// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
+						if (plainText.substr(0,1) === lowerCaseText.substr(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substr(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
+						
+						// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
+						if (plainText.slice(-1) === '.' && !lowerCaseText.includes('mouv') && !lowerCaseText.includes('rit') && !lowerCaseText.includes('accel')) addError ("Tempo markings do not need a full-stop at the end.",textObject);
+					}
+				
+					// **** CHECK TEMPO POINT SIZE **** //
+					if (containsTempoComponent || containsTempoChangeComponent) {
+						if (textObject.fontSize > 0) {
+							// NB fontSize can be -1 for mixed sizes, so only check if it's an actual number
+							if (textObject.fontSize > 12.0) addError("This tempo marking is larger than 12pt,\nand may appear overly large.",textObject);
+							if (textObject.fontSize < 10.0) addError("This tempo marking is smaller than 10pt,\nand may appear overly small.",textObject);
+						}
+					}
+					
+					if (containsTempoChangeComponent || (containsTempoComponent && !containsMetronomeComponent)) lastMetroSection = '';
+				}
+			
+				if (doCheckStrings) {
+					
+					// **** CHECK DIV/UNIS. **** //
+					if (lowerCaseText.includes('div.')) {
+						if (isStringSection) {
+							isDiv = true;
+							flaggedDivError = false;
+						} else {
+							addError("You’ve written a string div. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
+							return;
+						}
+					}
+				
+					if (lowerCaseText.includes('unis.')) {
+						if (isStringSection) {
+							isDiv = false;
+							flaggedDivError = false;
+						} else {
+							addError("You’ve written a string unis. marking,\nbut this doesn’t seem to be a string section\n(i.e. you haven’t used the ‘(section)’ instruments)",textObject);
+							return;
+						}
+					}
+				
+					// **** CHECK WRITTEN OUT TREM **** //
+					if (lowerCaseText === "trem" || lowerCaseText === "trem." || lowerCaseText === "tremolo") {
+						addError("You don’t need to write ‘"&plainText&"’;\njust use a tremolo marking.",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
+						addError ("Change this to ‘poco sul tasto’.",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul tasto molto") {
+						addError ("Change this to ‘molto sul tasto’.",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul pont. poco" || lowerCaseText === "sul pont. un poco") {
+						addError ("Change this to ‘poco sul pont.’",textObject);
+						return;
+					}
+					
+					if (lowerCaseText === "sul pont. molto") {
+						addError ("Change this to ‘molto sul pont.’",textObject);
+						return;
+					}
+				
+					// **** CHECK SUL + STRING INDICATION **** //
+					var strings = ["I","II","III","IV"];
+					for (var i = 0; i < 4; i++) {
+						if (lowerCaseText === "sul "+strings[i]) {
+							addError ( "You don’t need ‘sul’ here;\nyou can just write the string number.", textObject);
+							return;
+						}
+					}
+				}
+				
+				var objectIsDynamic = tn === "dynamic";
+				var includesADynamic = styledText.includes('<sym>dynamic');
+				var stringIsDynamic = isDynamic(lowerCaseText);
+				
+				//logError("styledText = "+styledText.replace(/</g,'≤')+"; lct = "+lowerCaseText+" objectIsDynamic = "+objectIsDynamic+"; includesADynamic = "+includesADynamic+"; stringIsDynamic = "+stringIsDynamic);
+				// **** CHECK REDUNDANT DYNAMIC **** //
+				if (objectIsDynamic && includesADynamic && !stringIsDynamic) {
+					addError ('This dynamic marking is unusual, or has an extraneous character in it somewhere',textObject);
+				}
+				if (includesADynamic || stringIsDynamic) {
+					firstDynamic = true;
+					//logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
+
+					theDynamic = textObject;
+					lastDynamicTick = currTick;
+					setDynamicLevel (plainText);
+					
+					var isError = false;
+					var dynamicException = plainText.includes("fp") || plainText.includes("fmp") || plainText.includes("sf") || plainText.includes("fz");
+					if (prevDynamicBarNum > 0 && doCheckDynamics) {
+						
+						var barsSincePrevDynamic = currentBarNum - prevDynamicBarNum;
+						if (plainText === prevDynamic && barsSincePrevDynamic < 5 && !dynamicException) {
+							// check if visual overlapping
+							
+							if (textObject.pagePos == prevDynamicObject.pagePos && textObject.bbox.width == prevDynamicObject.bbox.width && textObject.bbox.height == prevDynamicObject.bbox.height) {
+								//logError (textObject.pagePos+' '+prevDynamicObject.pagePos);
+								//logError (textObject.text+" "+textObject.bbox+ " "+prevDynamicObject.text+" "+prevDynamicObject.bbox);
+								addError ("There appear to be two dynamic markings overlapped here.\nYou can safely delete one of them.",textObject);
+							} else {
+								addError("This dynamic may be redundant:\nthe same dynamic was set in b. "+prevDynamicDisplayBarNum+".",textObject);
+							}
+							isError = true;
+						}
+					}
+				
+					if (!dynamicException) {
+						
+						prevDynamicBarNum = currentBarNum;
+						prevDynamicDisplayBarNum = currentBarNum + displayOffset;
+						if (currentHairpin && currTick < currentHairpinEnd) {
+							prevDynamic = '';
+							prevDynamicObject = null;
+						} else {
+							prevDynamic = plainText;
+							prevDynamicObject = textObject;
+						}
+					} else {
+						if (plainText === "fmp" || plainText === "sfmp" || plainText === "sfzmp" || plainText === "sffzmp" || plainText === "sfffzmp") {
+							prevDynamicBarNum = currentBarNum;
+							prevDynamic = "p";
+						}
+						if (plainText === "fp" || plainText === "sfp" || plainText === "sfzp" || plainText === "sffzp" || plainText === "sfffzp") {
+							prevDynamicBarNum = currentBarNum;
+							prevDynamic = "p";
+						}
+						if (plainText === "fpp" || plainText === "sfpp" || plainText === "sfzpp" || plainText === "sffzpp" || plainText === "sfffzpp") {
+							prevDynamicBarNum = currentBarNum;
+							prevDynamic = "pp";
+						}
+						if (plainText === "fppp" || plainText === "sfppp" || plainText === "sfzppp" || plainText === "sffzppp" || plainText === "sfffzppp") {
+							prevDynamicBarNum = currentBarNum;
+							prevDynamic = "ppp";
+						}
+						// is there an accent on this note
+						isSforzando = true;
+					}
+					if (isError) return;
+				}
+				//logError(""+lowerCaseText+" isDyn = "+isDyn);
+			
+				// **** CHECK FOR DYNAMIC ENTERED AS EXPRESSION (OR OTHER) TEXT **** //
+				if (doCheckDynamics && !objectIsDynamic && (includesADynamic || stringIsDynamic)) {
+					addError("This text object looks like a dynamic,\nbut has not been entered using the Dynamics palette.",textObject);
+					return;
+				}
+		
+				// **** CHECK FOR TECHNIQUES ENTERED AS EXPRESSION TEXT **** //
+				if (tn === "expression") {
+					if (doCheckSpellingAndFormat){
+						for (var i = 0; i < techniques.length; i ++) {
+							if (lowerCaseText.includes(techniques[i])) {
+								addError("This looks like a technique, but has been\nincorrectly entered as Expression text.\nPlease check whether this should be in Technique Text instead.",textObject);
+								return;
+							}
+						}
+					}
+					if (doCheckTextPositions) {
+						var canBeAbove = plainText === "loco" || plainText.includes("ten.") || plainText.includes("tenuto") || plainText.includes("legato") || plainText.includes("flz");
+						if (textObject.placement == Placement.ABOVE && !canBeAbove) {
+							addError("Expression text should appear below the staff.\nCheck it is attached to the right staff, or it should be a technique.",textObject);
+							return;
+						}
+					}
+				}
+				
+				checkInstrumentalTechniques (textObject, plainText, lowerCaseText);
+			
+				
+			}
+		} // end lowerCaseText != ''
 	}	
 	
 	function allTracksHaveRestsAtCurrTick () {
