@@ -1215,7 +1215,7 @@ MuseScore {
 
 									if (isNote && !isTremolo) flzFound = false;
 									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
-										var nextChordRest = getNextNoteRest(cursor);
+										var nextChordRest = getNextNoteRest(elem);
 										if (nextChordRest != null) {
 											if (doCheckSlursAndTies && nextChordRest.type == Element.REST) addError ("Don’t tie notes over a rest.",noteRest);
 										}
@@ -1909,7 +1909,8 @@ MuseScore {
 			//logError ('segType = '+theSeg.segmentType);
 			if (theSeg.segmentType == Segment.ChordRest) {
 				for (var i = 0; i < 4; i++) {
-					var theElem = theSeg.elementAt(i);
+					var theTrack = currentStaffNum * 4 + i;
+					var theElem = theSeg.elementAt(theTrack);
 					if (theElem != null) {
 						var theElemStart = theSeg.tick;
 						var theElemEnd = theElemStart + theElem.actualDuration.ticks;
@@ -1928,21 +1929,23 @@ MuseScore {
 	}
 		
 	function getPreviousNoteRest (noteRest) {
+		var theTick = getTick(noteRest);
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = currentStaffNum;
 		cursor2.track = noteRest.track;
 		cursor2.filter = Segment.ChordRest;
-		cursor2.rewindToTick(noteRest.parent.tick);
+		cursor2.rewindToTick(theTick);
 		if (cursor2.prev()) return cursor2.element;
 		return null;
 	}
 	
 	function getNextNoteRest (noteRest) {
+		var theTick = getTick(noteRest);
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = currentStaffNum;
 		cursor2.track = noteRest.track;
 		cursor2.filter = Segment.ChordRest;
-		cursor2.rewindToTick(noteRest.parent.tick);
+		cursor2.rewindToTick(theTick);
 		if (cursor2.next()) return cursor2.element;
 		return null;
 	}
