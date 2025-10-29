@@ -4340,8 +4340,8 @@ MuseScore {
 			// ** THIS REGEX ATTEMPTS TO MATCH ALL POSSIBLE PERMUTATIONS OF A METRONOME MARKING **//
 			// ** NB — DON'T CHANGE THIS WITHOUT CHECKING THAT THE AUGMENTATION DOT CAPTURE GROUP IS CORRECT **
 			// ** THIS IS THE INDEX OF THE CAPTURE GROUP (\.|<sym>metAugmentationDot<\/sym>|\uECB7) ** //
-			var metronomeComponentRegex = new RegExp( /(<b>)?\(?(<b>|<\/b>|c|approx|circa)*(\.\s)*(<sym>metNote.*?<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)?(<font.*?>.*?<\/font>|<font.*\/>|<b>|<\/b>)*(\s|\u00A0|\u2009)*=(\s|\u00A0|\u2009|<b>|<\/b>)*(c|approx|circa)?\.?(\s|<b>|<\/b>)*[0-9–\-—]*(<b>|<\/b>)*\)?/);
-			var augDotCaptureGroup = 5;
+			var metronomeComponentRegex = new RegExp( /(<b>)?\(?(<\/?b>|c|approx|circa|\.|\s)*(<sym>metNote.*?<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)?(<font.*?>.*?<\/font>|<font.*\/>|<b>|<\/b>)*(\s|\u00A0|\u2009)*=(\s|\u00A0|\u2009|<b>|<\/b>)*(c|approx|circa)?\.?(\s|<b>|<\/b>)*[0-9–\-—]*(<b>|<\/b>)*\)?/);
+			var augDotCaptureGroup = 4;
 			
 			if (currentBarNum > 0) {
 				// **** CHECK TO SEE IF THIS CONTAINS A METRONOME MARKING **** //
@@ -4597,13 +4597,24 @@ MuseScore {
 					// *** CHECK ANY METRONOME MARKING COMPONENT *** //
 					if (containsMetronomeComponent) {
 						
-						// **** CHECK ORDER OF METRONOME AND TIME SIGNATURE **** //
-						// delete matched regex plus any hyphens or numbers — only interested in alphanumeric stuff
+						// **** CHECK ORDER OF METRONOME AND TEMPO MARKING **** //
+						// look at the bit to the right of the metronome component we matched
+						// if there's anything over there, it should probably be to left
+						// There may be some exceptions to this I haven't thought of, however
+						// (maybe deal with this in a future version) 
 						var strToRightOfMetronomeComponent = styledText.split(metronomeComponent)[1];
-						if (strToRightOfMetronomeComponent !== '') {
-							addError ("In general, you should put the mood/tempo descriptor\nbefore the metronome marking.",textObject);
-							//logError ('styledText = '+styledText.replace(/</g,'≤')+'; strToRight = '+strToRightOfMetronomeComponent.replace(/</g,'≤'));
+						if (strToRightOfMetronomeComponent != undefined) {
+							strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.trim();
+							if (strToRightOfMetronomeComponent != '') {
+								addError ("In general, you should put the mood/tempo descriptor\nbefore the metronome marking.",textObject);
+								//logError('strToRightOfMetronomeComponent = '+strToRightOfMetronomeComponent);
+							}
 						}
+						
+						// **** CHECK IF c./circa etc. IS IN THE RIGHT PLACE
+						var theMatch = metronomeComponent.match(/(c|approx|circa)(\.|\s|<\/?b>)*(<sym>metNote.*?<\/sym>|\uECA5|\uECA7|\uECA3)+/);
+						//logError (styledText.replace(/</g,'≤'));
+						if (theMatch != null) addError ("In this tempo marking, put the ‘"+theMatch[1]+"’ after the = sign.", textObject);
 					
 						// **** CHECK THAT METRONOME MARKING MATCHES THE TIME SIGNATURE **** //
 						var metronomeDuration = division; // crotchet
