@@ -318,196 +318,196 @@ MuseScore {
 				canCheckThisBar = (isCompound && timeSigDenom > 4) || timeSigNum < 5 || timeSigNum % 2 == 0 || timeSigDenom <= 4;
 		
 				// ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
-				if (canCheckThisBar) {
 				
-					var startTrack = currentStaffNum * 4;
-					var endTrack = startTrack + 4;
-					var maxMusicDurThisBar = 0;
-					var totalMusicDurThisTrack;
-					for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
+				var startTrack = currentStaffNum * 4;
+				var endTrack = startTrack + 4;
+				var maxMusicDurThisBar = 0;
+				var totalMusicDurThisTrack;
+				for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
+					
+					totalMusicDurThisTrack = 0;
+					
+					// **** UPDATE PROGRESS MESSAGE **** //
+					loop++;
+					setProgress(5+loop*95./totalNumLoops);
+					cursor.track = currentTrack;
+					cursor.rewindToTick(barStart);
+					var processingThisBar = cursor.element && cursor.tick < barEnd;
+					
+					if (processingThisBar) {
+						// ** INITIALISE PARAMETERS ** //
+						totalRestDur = 0;
+						haveHadFirstNote = false;
+						rests = [];
+						tiedNotes = [];
+						prevSoundingDur = 0;
+						prevDisplayDur = 0;
+						prevNoteWasDoubleTremolo = false;
+						numComments = 0;
+						tiedSoundingDur = 0;
+						tiedDisplayDur = 0;
+						prevIsNote = false;
+						restCrossesBeat = false;
+						restStartedOnBeat = false;
+						isLastRest = false;
+						tieIndex = 0;
+						lastRest = false;
+						cursor2.track = currentTrack;
+					}
+					
+					while (processingThisBar) {
 						
-						totalMusicDurThisTrack = 0;
+						currTick = cursor.tick;
 						
-						// **** UPDATE PROGRESS MESSAGE **** //
-						loop++;
-						setProgress(5+loop*95./totalNumLoops);
-						cursor.track = currentTrack;
-						cursor.rewindToTick(barStart);
-						var processingThisBar = cursor.element && cursor.tick < barEnd;
+						// *** GET THE NOTE/REST, AND ITS VARIOUS PROPERTIES THAT WE'LL NEED *** //
+						var noteRest = cursor.element;
+						var isHidden = !noteRest.visible;
+						isRest = noteRest.type == Element.REST;
+						isNote = !isRest;
+						displayDur = noteRest.duration.ticks; // what the note looks like
+						soundingDur = noteRest.actualDuration.ticks; // what its actual length is, taking tuplets into account
+						noteStart = cursor.tick - barStart; // offset from the start of the bar
+						noteEnd = noteStart + soundingDur; // the tick at the end of the note
+						lastNoteInBar = noteStart + soundingDur >= barDur; // is this the last note in the bar (in this track?)
+						isTied = isNote ? (noteRest.notes[0].tieBack != null || noteRest.notes[0].tieForward != null) : false; // is this note tied either forwards or backwards?
+						noteStartFrac = noteStart % beatLength; // whereabouts this note starts within its beat
+						noteStartBeat = Math.trunc(noteStart/beatLength); // which beat in the bar
+						var noteEndFrac = noteEnd % beatLength;
+						noteEndBeat = Math.trunc(noteEnd/beatLength);
+						noteFinishesBeat = !noteEndFrac; // is this the last note in the beat?
+						numBeatsHidden = noteEndBeat-noteStartBeat-noteFinishesBeat; // how many beats does this note span?
+						noteHidesBeat = numBeatsHidden > 0; // does this note hide a beat(s)
+						isOnTheBeat = !noteStartFrac;
+						currentBeam = noteRest.beam;	
+						currentBeamMode = noteRest.beamMode;
+						currentBeamPos = noteRest.beamPos;
+						hasBeam = currentBeam != null;
+						isGliss = glisses[currentTrack][currTick] != null;
+						if (!isHidden) totalMusicDurThisTrack += soundingDur;
+						//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
+						if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
 						
-						if (processingThisBar) {
-							// ** INITIALISE PARAMETERS ** //
-							totalRestDur = 0;
-							haveHadFirstNote = false;
+						
+						// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
+						cursor2.rewindToTick(currTick);
+						var nextItemIsHidden;
+						nextItem = null;
+						nextItemIsHidden = false;
+						nextItemIsNote = false;
+						nextItemPos = 0;
+						nextItemDur = 0;
+						nextDisplayDur = 0;
+						nextItemPos = 0;
+						nextDisplayDur = -1;
+						nextItemDur = -1;
+						nextItemBeat = -1;
+						nextHasBeam = false;
+						nextBeam = null;
+						nextBeamMode = Beam.NONE;
+						
+						if (cursor2.next()) {
+							nextItem = cursor2.element;
+							nextItemIsNote = nextItem.type != Element.REST;
+							nextItemPos = cursor2.tick - cursor2.measure.firstSegment.tick;
+							nextDisplayDur = nextItem.duration.ticks;
+							nextItemDur = nextItem.actualDuration.ticks;
+							nextItemBeat = Math.trunc(nextItemPos / beatLength);
+							nextItemIsHidden = !nextItem.visible;
+							nextBeam = nextItem.beam;
+							nextHasBeam = (nextBeam != null);
+							nextBeamMode = nextItem.beamMode;
+							if (cursor2.next()) {
+								nextNextItem = cursor2.element;
+								nextNextItemIsNote = nextNextItem.type != Element.REST;
+								nextNextItemPos = cursor2.tick - cursor2.measure.firstSegment.tick;
+								nextNextItemDur = nextNextItem.actualDuration.ticks;
+								nextNextItemBeat = Math.trunc(nextNextItemPos / beatLength);
+							}
+						}
+					
+						if (isHidden) {
 							rests = [];
-							tiedNotes = [];
-							prevSoundingDur = 0;
-							prevDisplayDur = 0;
-							prevNoteWasDoubleTremolo = false;
-							numComments = 0;
-							tiedSoundingDur = 0;
-							tiedDisplayDur = 0;
-							prevIsNote = false;
 							restCrossesBeat = false;
 							restStartedOnBeat = false;
 							isLastRest = false;
-							tieIndex = 0;
-							lastRest = false;
-							cursor2.track = currentTrack;
+							tiedNotes = [];
+							isTied = false;
 						}
 						
-						while (processingThisBar) {
-							
-							currTick = cursor.tick;
-							
-							// *** GET THE NOTE/REST, AND ITS VARIOUS PROPERTIES THAT WE'LL NEED *** //
-							var noteRest = cursor.element;
-							var isHidden = !noteRest.visible;
-							isRest = noteRest.type == Element.REST;
-							isNote = !isRest;
-							displayDur = noteRest.duration.ticks; // what the note looks like
-							soundingDur = noteRest.actualDuration.ticks; // what its actual length is, taking tuplets into account
-							noteStart = cursor.tick - barStart; // offset from the start of the bar
-							noteEnd = noteStart + soundingDur; // the tick at the end of the note
-							lastNoteInBar = noteStart + soundingDur >= barDur; // is this the last note in the bar (in this track?)
-							isTied = isNote ? (noteRest.notes[0].tieBack != null || noteRest.notes[0].tieForward != null) : false; // is this note tied either forwards or backwards?
-							noteStartFrac = noteStart % beatLength; // whereabouts this note starts within its beat
-							noteStartBeat = Math.trunc(noteStart/beatLength); // which beat in the bar
-							var noteEndFrac = noteEnd % beatLength;
-							noteEndBeat = Math.trunc(noteEnd/beatLength);
-							noteFinishesBeat = !noteEndFrac; // is this the last note in the beat?
-							numBeatsHidden = noteEndBeat-noteStartBeat-noteFinishesBeat; // how many beats does this note span?
-							noteHidesBeat = numBeatsHidden > 0; // does this note hide a beat(s)
-							isOnTheBeat = !noteStartFrac;
-							currentBeam = noteRest.beam;	
-							currentBeamMode = noteRest.beamMode;
-							currentBeamPos = noteRest.beamPos;
-							hasBeam = currentBeam != null;
-							isGliss = glisses[currentTrack][currTick] != null;
-							if (!isHidden) totalMusicDurThisTrack += soundingDur;
-							//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
-							if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
-							
-							
-							// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
-							cursor2.rewindToTick(currTick);
-							var nextItemIsHidden;
-							nextItem = null;
-							nextItemIsHidden = false;
-							nextItemIsNote = false;
-							nextItemPos = 0;
-							nextItemDur = 0;
-							nextDisplayDur = 0;
-							nextItemPos = 0;
-							nextDisplayDur = -1;
-							nextItemDur = -1;
-							nextItemBeat = -1;
-							nextHasBeam = false;
-							nextBeam = null;
-							nextBeamMode = Beam.NONE;
-							
-							if (cursor2.next()) {
-								nextItem = cursor2.element;
-								nextItemIsNote = nextItem.type != Element.REST;
-								nextItemPos = cursor2.tick - cursor2.measure.firstSegment.tick;
-								nextDisplayDur = nextItem.duration.ticks;
-								nextItemDur = nextItem.actualDuration.ticks;
-								nextItemBeat = Math.trunc(nextItemPos / beatLength);
-								nextItemIsHidden = !nextItem.visible;
-								nextBeam = nextItem.beam;
-								nextHasBeam = (nextBeam != null);
-								nextBeamMode = nextItem.beamMode;
-								if (cursor2.next()) {
-									nextNextItem = cursor2.element;
-									nextNextItemIsNote = nextNextItem.type != Element.REST;
-									nextNextItemPos = cursor2.tick - cursor2.measure.firstSegment.tick;
-									nextNextItemDur = nextNextItem.actualDuration.ticks;
-									nextNextItemBeat = Math.trunc(nextNextItemPos / beatLength);
-								}
+						// *** CHECK TO SEE WHETHER THIS NOTE & NEXT NOTE HAVE A PAUSE *** //
+						var annotations = noteRest.parent.annotations;
+						hasPause = false;
+						if (annotations && annotations.length) {
+							for (var i = 0; i < annotations.length && !hasPause; i++) {
+								var theAnnotation = annotations[i];
+								if (theAnnotation.track == currentTrack && theAnnotation.type == Element.FERMATA) hasPause = true;
 							}
+						}
+						nextItemHasPause = false;
 						
-							if (isHidden) {
-								rests = [];
-								restCrossesBeat = false;
-								restStartedOnBeat = false;
-								isLastRest = false;
-								tiedNotes = [];
-								isTied = false;
-							}
-							
-							// *** CHECK TO SEE WHETHER THIS NOTE & NEXT NOTE HAVE A PAUSE *** //
-							var annotations = noteRest.parent.annotations;
-							hasPause = false;
+						if (nextItem) {
+							annotations = nextItem.parent.annotations;
 							if (annotations && annotations.length) {
 								for (var i = 0; i < annotations.length && !hasPause; i++) {
 									var theAnnotation = annotations[i];
-									if (theAnnotation.track == currentTrack && theAnnotation.type == Element.FERMATA) hasPause = true;
+									if (theAnnotation.track == currentTrack && theAnnotation.type == Element.FERMATA) nextItemHasPause = true;
 								}
 							}
-							nextItemHasPause = false;
-							
-							if (nextItem) {
-								annotations = nextItem.parent.annotations;
-								if (annotations && annotations.length) {
-									for (var i = 0; i < annotations.length && !hasPause; i++) {
-										var theAnnotation = annotations[i];
-										if (theAnnotation.track == currentTrack && theAnnotation.type == Element.FERMATA) nextItemHasPause = true;
-									}
-								}
-							}
-							
-							// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
-							var lastNoteInTie = false;
-							if (isTied) {
-								lastNoteInTie = noteRest.notes[0].tieForward == null || lastNoteInBar || nextItemHasPause;
-								if (!lastNoteInTie) {
-									// check that the notes are the same as the next
-									if (nextItemIsNote) {
-										if (noteRest.notes.length == nextItem.notes.length) {
-											for (var k = 0; k < noteRest.notes.length && !lastNoteInTie; k ++) {
-												if (noteRest.notes[k].MIDIpitch != nextItem.notes[k].MIDIpitch) lastNoteInTie = true;
-											}
-										} else {
-											lastNoteInTie = true;
+						}
+						
+						// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
+						var lastNoteInTie = false;
+						if (isTied) {
+							lastNoteInTie = noteRest.notes[0].tieForward == null || lastNoteInBar || nextItemHasPause;
+							if (!lastNoteInTie) {
+								// check that the notes are the same as the next
+								if (nextItemIsNote) {
+									if (noteRest.notes.length == nextItem.notes.length) {
+										for (var k = 0; k < noteRest.notes.length && !lastNoteInTie; k ++) {
+											if (noteRest.notes[k].MIDIpitch != nextItem.notes[k].MIDIpitch) lastNoteInTie = true;
 										}
 									} else {
 										lastNoteInTie = true;
 									}
+								} else {
+									lastNoteInTie = true;
 								}
-								tiedNotes.push(noteRest);
-								//if (lastNoteInTie) logError(lastNoteInTie");
-							} else {
-								if (wasTied) tiedNotes = [];
 							}
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 	CHECK 1: CHECK FOR MANUALLY ENTERED BAR REST	** //
-							// ** ————————————————————————————————————————————————— ** //
-							
-							checkManuallyEnteredBarRest(noteRest);
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 2: DOES THE NOTE HIDE THE BEAT??		** //
-							// ** ————————————————————————————————————————————————— ** //
-		
-							checkHidingBeatError(noteRest);
-									
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 3: NOTE/REST SHOULD NOT BREAK BEAM	** //
-							// ** ————————————————————————————————————————————————— ** //
+							tiedNotes.push(noteRest);
+							//if (lastNoteInTie) logError(lastNoteInTie");
+						} else {
+							if (wasTied) tiedNotes = [];
+						}
 						
-							checkBeamBrokenError(noteRest);
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 4: BEAMED to NOTES IN NEXT BEAT 		** //
-							// ** ————————————————————————————————————————————————— ** //
-		
-							checkBeamedToNotesInNextBeat(noteRest);
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 5: CONDENSE OVERSPECIFIED REST 		** //
-							// ** ————————————————————————————————————————————————— ** //
-							
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 	CHECK 1: CHECK FOR MANUALLY ENTERED BAR REST	** //
+						// ** ————————————————————————————————————————————————— ** //
+						
+						checkManuallyEnteredBarRest(noteRest);
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 2: DOES THE NOTE HIDE THE BEAT??		** //
+						// ** ————————————————————————————————————————————————— ** //
+	
+						if (canCheckThisBar) checkHidingBeatError(noteRest);
+								
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 3: NOTE/REST SHOULD NOT BREAK BEAM	** //
+						// ** ————————————————————————————————————————————————— ** //
+					
+						if (canCheckThisBar) checkBeamBrokenError(noteRest);
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 4: BEAMED to NOTES IN NEXT BEAT 		** //
+						// ** ————————————————————————————————————————————————— ** //
+	
+						if (canCheckThisBar) checkBeamedToNotesInNextBeat(noteRest);
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 5: CONDENSE OVERSPECIFIED REST 		** //
+						// ** ————————————————————————————————————————————————— ** //
+						
+						if (canCheckThisBar) {
 							// if this is a rest, then start building an array of rests
 							// until you get to the last one, then check whether any of the rests
 							// could be condensed into a single rest
@@ -531,88 +531,93 @@ MuseScore {
 								//logError(Found a rest: rest length now "+rests.length+"); isLastRest = "+isLastRest;
 								if (isLastRest && rests.length > 1) condenseOverSpecifiedRest(noteRest);
 							}
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
-							// ** ————————————————————————————————————————————————— ** //
-							if (lastNoteInTie && !isGliss) {
-								if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
-								tiedNotes = [];
+						}
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
+						// ** ————————————————————————————————————————————————— ** //
+						if (canCheckThisBar && lastNoteInTie && !isGliss) {
+							if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
+							tiedNotes = [];
+						}
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 			CHECK 7: COULD BE STACCATO				** //
+						// ** ————————————————————————————————————————————————— ** //
+						if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
+							if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
+								flaggedWrittenStaccato = true;
+								if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
+								if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
+								if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
+							}
+						}
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 8: SPLIT NON-BEAT-BREAKING RESTS		** //
+						// ** ————————————————————————————————————————————————— ** //
+						if (isRest && !noteHidesBeat) {
+							if (isOnTheBeat) {
+								checkOnbeatRestSpelling(noteRest);
+							} else {
+								checkOffbeatRestSpelling(noteRest);
+							}
+						}
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 9: CHECK TUPLET SETTINGS				** //
+						// ** ————————————————————————————————————————————————— ** //
+						if (noteRest.tuplet == null) {
+							firstNoteInTuplet = null;
+							numConsecutiveSemiquaverTriplets = 0;
+						} else {
+							if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
+								firstNoteInTuplet = true;
+								checkTupletSettings (noteRest.tuplet);
+								prevTuplet = noteRest.tuplet;
 							}
 							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 			CHECK 7: COULD BE STACCATO				** //
-							// ** ————————————————————————————————————————————————— ** //
-							if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
-								if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
-									flaggedWrittenStaccato = true;
-									if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
-									if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
-									if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
-								}
-							}
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 8: SPLIT NON-BEAT-BREAKING RESTS		** //
-							// ** ————————————————————————————————————————————————— ** //
-							if (isRest && !noteHidesBeat) {
-								if (isOnTheBeat) {
-									checkOnbeatRestSpelling(noteRest);
+							// Is it a semiquaver triplet?
+							if (noteRest.tuplet.actualDuration.ticks == division / 2 && noteRest.tuplet.actualNotes == 3) {
+								if (numConsecutiveSemiquaverTriplets == 0) {
+									if (firstNoteInTuplet && isOnTheBeat) numConsecutiveSemiquaverTriplets = 1;
 								} else {
-									checkOffbeatRestSpelling(noteRest);
+									numConsecutiveSemiquaverTriplets ++;
 								}
-							}
-							
-							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 9: CHECK TUPLET SETTINGS				** //
-							// ** ————————————————————————————————————————————————— ** //
-							if (noteRest.tuplet == null) {
-								firstNoteInTuplet = null;
+								if (numConsecutiveSemiquaverTriplets == 6) addError ('These semiquaver triplets could be rewritten\nas a semiquaver sextuplet.',noteRest);
+							} else {
 								numConsecutiveSemiquaverTriplets = 0;
-							} else {
-								if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
-									firstNoteInTuplet = true;
-									checkTupletSettings (noteRest.tuplet);
-									prevTuplet = noteRest.tuplet;
-								}
-								
-								// Is it a semiquaver triplet?
-								if (noteRest.tuplet.actualDuration.ticks == division / 2 && noteRest.tuplet.actualNotes == 3) {
-									if (numConsecutiveSemiquaverTriplets == 0) {
-										if (firstNoteInTuplet && isOnTheBeat) numConsecutiveSemiquaverTriplets = 1;
-									} else {
-										numConsecutiveSemiquaverTriplets ++;
-									}
-									if (numConsecutiveSemiquaverTriplets == 6) addError ('These semiquaver triplets could be rewritten\nas a semiquaver sextuplet.',noteRest);
-								} else {
-									numConsecutiveSemiquaverTriplets = 0;
-								}
 							}
-							
-							// *** GO TO NEXT SEGMENT *** //
-							if (cursor.next()) {
-								processingThisBar = cursor.measure.is(currentBar);
-							} else {
-								processingThisBar = false;
-							}
-							prevSoundingDur = soundingDur;
-							prevDisplayDur = displayDur;
-							prevIsNote = isNote;
-							prevNoteRest = noteRest;
-							//prevNoteWasDoubleTremolo = isDoubleTremolo;
-						} // end while processingThisBar
-						if (totalMusicDurThisTrack > maxMusicDurThisBar) maxMusicDurThisBar = totalMusicDurThisTrack;
-					} // end track loop
-					
-					
-					// ** ————————————————————————————————————————————————— ** //
-					// ** 	CHECK 10: CHECK TOO MUCH OR NOT ENOUGH MUSIC	** //
-					// ** ————————————————————————————————————————————————— ** //
-					//logError ("maxMusicDurThisBar = "+maxMusicDurThisBar+" barDur = "+barDur);
-					// note I leave a 5 tick buffer here, because certain durations like septuplets are irrational, and their ints don't nicely sum to the bar duration
-					if (maxMusicDurThisBar > 0 && maxMusicDurThisBar > barDur + 5) addError("This bar seems to have too many beats in it for "+timeSigStr, currentBar);
-					if (maxMusicDurThisBar > 0 && maxMusicDurThisBar < barDur - 5) addError("This bar doesn’t seem to have enough beats in it for "+timeSigStr, currentBar);
-				} // end if canCheckThisBar
+						}
+						
+						// ** ————————————————————————————————————————————————— ** //
+						// ** 		CHECK 10: ILLEGAL NOTE VALUES				** //
+						// ** ————————————————————————————————————————————————— ** //
+						checkIllegalDurations(noteRest);
+						
+						// *** GO TO NEXT SEGMENT *** //
+						if (cursor.next()) {
+							processingThisBar = cursor.measure.is(currentBar);
+						} else {
+							processingThisBar = false;
+						}
+						prevSoundingDur = soundingDur;
+						prevDisplayDur = displayDur;
+						prevIsNote = isNote;
+						prevNoteRest = noteRest;
+						//prevNoteWasDoubleTremolo = isDoubleTremolo;
+					} // end while processingThisBar
+					if (totalMusicDurThisTrack > maxMusicDurThisBar) maxMusicDurThisBar = totalMusicDurThisTrack;
+				} // end track loop
+				
+				
+				// ** ————————————————————————————————————————————————— ** //
+				// ** 	CHECK 10: CHECK TOO MUCH OR NOT ENOUGH MUSIC	** //
+				// ** ————————————————————————————————————————————————— ** //
+				//logError ("maxMusicDurThisBar = "+maxMusicDurThisBar+" barDur = "+barDur);
+				// note I leave a 5 tick buffer here, because certain durations like septuplets are irrational, and their ints don't nicely sum to the bar duration
+				if (maxMusicDurThisBar > 0 && maxMusicDurThisBar > barDur + 5) addError("This bar seems to have too many beats in it for "+timeSigStr, currentBar);
+				if (maxMusicDurThisBar > 0 && maxMusicDurThisBar < barDur - 5) addError("This bar doesn’t seem to have enough beats in it for "+timeSigStr, currentBar);
 				
 				if (currentBar) currentBar = currentBar.nextMeasure;
 				numBarsProcessed ++;
@@ -711,6 +716,31 @@ MuseScore {
 	
 		//logError(isStringInstrument = "+isStringInstrument+"); isKeyboardInstrument="+isKeyboardInstrument+"; isKeyboardInstrument="+isKeyboardInstrument+"; isWindOrBrassInstrument="+isWindOrBrassInstrument+"; isVoice="+isVoice;
 	}
+	
+	function checkIllegalDurations (noteRest) {
+		if (displayDur === minim * 2.25 && timeSigStr === '7/8') {
+			if (isNote) {
+				addError ("It is better to write divide a double-dotted minim in 7/8 time,\ninto a dotted crotchet and a minim (or vice versa)\nto match the underlying beat divisions.", noteRest);
+				return;
+			}
+		}
+		if (timeSigStr === '5/8' || timeSigStr === '7/8') {
+			if (displayDur === minim) {
+				if (isNote) {
+					if (timeSigStr === '7/8') {
+						if (noteStart != 0 && noteStart != dottedcrotchet) {
+							addError ("Never write a minim in "+timeSigStr+" time,\nunless on beat 1 or after a dotted crotchet,\nas it will be hiding a beat.\nSplit it so it matches the underlying division.", noteRest);
+						}
+					} else {
+						addError ("Never write a minim in "+timeSigStr+" time,\nas it will be hiding a beat.\nSplit it so it matches the underlying division.", noteRest);
+					}
+				} else {
+					addError ("Never write a minim rest in "+timeSigStr+" time,\nas it will be hiding a beat.\nSplit it so it matches the underlying division.", noteRest);
+				}
+			}
+		}
+	}
+
 	
 	function checkManuallyEnteredBarRest (noteRest) {
 		if (isPickupBar) return;
