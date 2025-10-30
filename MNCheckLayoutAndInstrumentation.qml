@@ -1515,7 +1515,7 @@ MuseScore {
 						continue;
 					}
 					if (numBeatsInSys > maxBeatsPerSystem && noteCountInSys > mmax) {
-						logError ('numBeatsInSys = '+numBeatsInSys+'; maxBeatsPerSys = '+maxBeatsPerSystem+'; noteCountInSys = '+noteCountInSys+'; mmax = '+mmax);
+						//logError ('numBeatsInSys = '+numBeatsInSys+'; maxBeatsPerSys = '+maxBeatsPerSystem+'; noteCountInSys = '+noteCountInSys+'; mmax = '+mmax);
 						addError("This system has quite a few bars in it,\nand may be quite squashed.\nTry moving some of the bars out of this system.",bar);
 						continue;
 					}
@@ -6072,15 +6072,19 @@ MuseScore {
 		var dur = noteRest.duration.ticks;
 		if (isArco) return;
 		var n = noteRest.notes[0];
-		var isTied = n.tieBack != null || n.tieForward != null;
+		var isTied = n.tieForward != null;
 		//logError ('dur = '+dur+'; isTremolo = '+isTremolo+'; isTrill = '+isTrill+' isTied = '+isTied);
-		if (isShortDecayInstrument) {
-			if ((dur > division * 2 || (dur > division && isTied)) && !isTremolo && !isTrill && !isLv) {
-				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has no sustain.\nConsider shortening to one beat.",noteRest);
-			}
-		} else {
-			if ((dur > division * 4 || (dur > division * 2 && isTied)) && !isTremolo && !isTrill) {
-				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has relatively short sustain.\nConsider shortening to one beat.",noteRest);
+		if (n.tieBack != null) {
+			if (isShortDecayInstrument) {
+				if ((dur > division * 2 || (dur > division && isTied)) && !isTremolo && !isTrill && !isLv) {
+					addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has no sustain.\nConsider shortening to one beat.",noteRest);
+				}
+			} else {
+				if (!isPiano) {
+					if ((dur > division * 4 || (dur > division * 3 && isTied)) && !isTremolo && !isTrill) {
+						addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that can’t sustain the same dynamic for very long.\nConsider shortening it.",noteRest);
+					}
+				}
 			}
 		}
 		var nextNoteRest = getNextNoteRest(noteRest);
