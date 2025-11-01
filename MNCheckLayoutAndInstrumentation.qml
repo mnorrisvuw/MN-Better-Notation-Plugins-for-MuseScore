@@ -5146,6 +5146,7 @@ MuseScore {
 		var lastVisibleStaff = 0;
 		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) lastVisibleStaff = i;
 		
+		// if str is not null, then it's a standard ensemble where all the staff lines should be connected
 		if (str != null) {
 			for (var i = 0; i < lastVisibleStaff-1; i++) {
 				if (staffVisible[i]) {
@@ -5159,16 +5160,29 @@ MuseScore {
 			}
 		}
 		
-		// check vocal staves not connected together
+		// check vocal staves and grand staff instruments that have been incorrectly connected
+		var prevBarlineSpan = 0;
 		for (var i = 0; i < lastVisibleStaff-1; i++) {
 			if (staffVisible[i]) {
 				var staff = curScore.staves[i];
+				var barlineSpan = staff.staffBarlineSpan;
+				
+				// *** CHECK VOCAL STAFF INSTRUMENT BARLINES *** //
 				if (staff.part.musicXmlId.includes('voice')) {
-					if (staff.staffBarlineSpan != 0) {
-						addError ("The barlines for vocal staves should not be connected to the following staves.\nClick each connected barline and drag up to disconnect.","system1 0");
-						return;
+					if (barlineSpan > 0) {
+						addError ("Vocal staves should not have their barlines\nconnected to other staves. Click each\nconnected barline and drag up to disconnect.","system1 "+i);
 					}
 				}
+				// *** CHECK GRAND STAFF INSTRUMENT BARLINES *** //
+				if (isTopOfGrandStaff[i]) {
+					if (i > 0 && prevBarlineSpan > 0) {
+						addError ("Grand staff instruments should not have their barlines\nconnected to other instruments.","system1 "+i);
+					}
+					if (barlineSpan == 0) {
+						addError ("Grand staff instruments should have their barlines\nconnected between the staves.","system1 "+i);
+					}
+				}
+				prevBarlineSpan = barlineSpan;
 			}
 		}
 	}
@@ -5836,11 +5850,16 @@ MuseScore {
 						harmonicOK = (p == stringsArray[i]+harmonicArray[j]);
 					}
 				}
+				// check whether this harmonic actually exists
 				if (!harmonicOK) {
 					if (isHarmonicCircle) {
-						addError("You can’t get this pitch with a natural harmonic.\nDid you mean a diamond notehead instead of a harmonic circle?",noteRest);
+						if (stringsArray.includes(p)) {
+							addError("You can’t get this pitch with a natural harmonic.\nIs that meant to be an open string indication instead?\nIf so, delete the harmonic circle, and replace with\na 10pt ‘0’ (zero) character as text.",noteRest);
+						} else {
+							addError("You can’t get this pitch with a natural harmonic.\nDid you mean a diamond notehead instead of a harmonic circle?",noteRest);
+						}
 					} else {
-						addError("There isn’t a (well-defined) harmonic at this pitch, and it won’t sound like much.\nAre you sure this is correct?",noteRest);
+						addError("There isn’t a clear harmonic at this touched pitch.\nAs such, it won’t sound like much.\nAre you sure this is correct?",noteRest);
 					}
 				}
 			}
