@@ -2620,29 +2620,46 @@ MuseScore {
 	
 	function checkStaffNames () {
 		var staves = curScore.staves;
+		var parts = curScore.parts;
+		var numParts = parts.length;
+		var pluralWindsAndBrassFull = ["flutes","oboes","saxes","saxophones","clarinets","bassoons","horns","trumpets","trombones","tubas"];
+		var pluralWindsAndBrassShort = ["fls","flts","obs","saxes","cls","clts","bsns","bns","hrns","hns","tpts","trps","trpts","troms","tbns","tmbns","tbas"];
+		var numberRegex = /\b(?:[0-9]|IX|IV|V?I{1,3}|V)\b/;
 		
-		for (var i = 0; i < numStaves ; i++) {
-			var staff1 = staves[i];
-			var full1 = staff1.part.longName.trim();
-			var short1 = staff1.part.shortName.trim();
+
+		for (var i = 0; i < numParts ; i++) {
+			var part1 = parts[i];
+			var staff1 = part1.staves[0];
+			var staffnum = staff1.idx;
+			//logError ('staffnum = '+staffnum);
+			var displaystaffnum = staffnum+1;
+			var full1 = part1.longName.trim();
+			var short1 = part1.shortName.trim();
 			var full1l = full1.toLowerCase();
 			var short1l = short1.toLowerCase();
 						
 			// **** CHECK FOR NON-STANDARD DEFAULT STAFF NAMES **** //
 			
 			if (fullInstNamesShowing) {
-				if (full1l === 'violins 1' || full1l === 'violin 1') addError ("Change the long name of staff "+(i+1)+" to ‘Violin I’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
-				if (full1l === 'violas 1' || full1l === 'viola 1') addError ("Change the long name of staff "+(i+1)+" to ‘Viola I’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
-				if (full1l === 'cellos 1' || full1l === 'cello 1') addError ("Change the long name of staff "+(i+1)+" to ‘Cello I’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
+				if (full1l === 'violins 1' || full1l === 'violin 1') addError ("Change the long name of staff "+displaystaffnum+" to ‘Violin I’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
+				if (full1l === 'violas 1' || full1l === 'viola 1') addError ("Change the long name of staff "+displaystaffnum+" to ‘Viola I’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
+				if (full1l === 'cellos 1' || full1l === 'cello 1') addError ("Change the long name of staff "+displaystaffnum+" to ‘Cello I’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
 				
-				if (full1l === 'violins 2' || full1l === 'violin 2') addError ("Change the long name of staff "+(i+1)+" to ‘Violin II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
-				if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name of staff "+(i+1)+" to ‘Viola II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
-				if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+(i+1)+" to ‘Cello II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+i);
+				if (full1l === 'violins 2' || full1l === 'violin 2') addError ("Change the long name of staff "+displaystaffnum+" to ‘Violin II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
+				if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name of staff "+displaystaffnum+" to ‘Viola II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
+				if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+displaystaffnum+" to ‘Cello II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
 				
-				if (full1l === 'violas') addError ("Change the long name of staff "+(i+1)+" to ‘Viola’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
-				if (full1l === 'violoncellos' || full1l === 'violoncello') addError ("Change the long name of staff "+(i+1)+" to ‘Cello’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
-				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+(i+1)+" to ‘Double Bass’ or ‘D. Bass’ (see ‘Behind Bars’, p. 509)", "system1 "+i);
-				if (full1l === 'classical guitar') addError ("Change the long name of staff "+(i+1)+" to just ‘Guitar’", "system1 "+i);
+				if (full1l === 'violas') addError ("Change the long name of staff "+displaystaffnum+" to ‘Viola’ (see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
+				if (full1l === 'violoncellos' || full1l === 'violoncello') addError ("Change the long name of staff "+displaystaffnum+" to ‘Cello’ (see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
+				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+displaystaffnum+" to ‘Double Bass’ or ‘D. Bass’ (see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
+				if (full1l === 'classical guitar') addError ("Change the long name of staff "+displaystaffnum+" to just ‘Guitar’", "system1 "+staffnum);
+				
+				// search for numbers for Roman Numerals
+				if (!numberRegex.test(full1l)) {
+					for (var x = 0; x < pluralWindsAndBrassFull.length; x++) {
+						if (full1l.includes(pluralWindsAndBrassFull[x])) addError ("You need to indicate how many\n"+full1+" there are","system1 "+staffnum);
+					}
+				}
 			}
 			
 			if (shortInstNamesShowing) {
@@ -2658,41 +2675,46 @@ MuseScore {
 				if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
 				if (short1l === 'vcs.') addError ("Change the short name of staff "+(i+1)+" to ‘Vc.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
 				if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
+				// search for numbers for Roman Numerals
+				if (!numberRegex.test(short1l)) {
+					for (var x = 0; x < pluralWindsAndBrassShort.length; x++) {
+						if (short1l.includes(pluralWindsAndBrassShort[x])) addError ("You need to indicate how many\ninstruments there are in ‘"+short1+"’","system2 "+i);
+					}
+				}
 			}
 			
-			var checkThisStaff = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numStaves - 1 && staff1.show;
+			var checkThisPart = full1 !== "" && short1 !== "" && !isGrandStaff[i] && i < numParts - 1 && part1.show;
 
 			// **** CHECK FOR REPEATED STAFF NAMES **** //
-			if (checkThisStaff) {
-				for (var j = i+1; j < numStaves; j++) {
-					var staff2 = staves[j];
-					var full2 = staff2.part.longName.trim();
-					var short2 = staff2.part.shortName.trim();
+			if (checkThisPart) {
+				for (var j = i+1; j < numParts; j++) {
+					var part2 = parts[j];
+					var full2 = part2.longName.trim();
+					var short2 = part2.shortName.trim();
 					
-					if (staff2.show) {
-						//inst2 = staff2.InstrumentName;
+					if (part2.show) {
 						if (fullInstNamesShowing) {
 							//logError ('full1 = '+full1+'; full2 = '+full2);
 							if (full1 === full2 && full1 != "") addError("Staff name ‘"+full1+"’ appears twice.\nRename one of them, or rename as ‘"+full1+" I’ & ‘"+full1+" II’", "system1 "+i);
-							if (full1 === full2 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" II’?", "system1 "+i);
-							if (full2 === full1 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" II’?", "system1 "+i);
-							if (full1 === full2 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" I’?", "system1 "+i);
-							if (full2 === full1 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" I’?", "system1 "+i);
-							if (full1 === full2 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 2’?", "system1 "+i);
-							if (full2 === full1 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 2’?", "system1 "+i);
-							if (full1 === full2 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 1’?", "system1 "+i);
-							if (full2 === full1 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 1’?", "system1 "+i);
+							if (full1 === full2 + " I") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" II’?", "system1 "+staffnum);
+							if (full2 === full1 + " I") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" II’?", "system1 "+staffnum);
+							if (full1 === full2 + " II") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" I’?", "system1 "+staffnum);
+							if (full2 === full1 + " II") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" I’?", "system1 "+staffnum);
+							if (full1 === full2 + " 1") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 2’?", "system1 "+staffnum);
+							if (full2 === full1 + " 1") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 2’?", "system1 "+staffnum);
+							if (full1 === full2 + " 2") addError("You have a staff ‘"+full2+"’ and a staff ‘"+full1+"’.\nDo you want to rename as ‘"+full2+" 1’?", "system1 "+staffnum);
+							if (full2 === full1 + " 2") addError("You have a staff ‘"+full1+"’ and a staff ‘"+full2+"’.\nDo you want to rename as ‘"+full1+" 1’?", "system1 "+staffnum);
 						}
 						if (shortInstNamesShowing) {
-							if (short1 === short2 && short1 != "") addError("Staff name ‘"+short1+"’ appears twice.\nRename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’","system2 "+i);
-							if (short1 === short2 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" II’?","system2 "+i);
-							if (short2 === short1 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" II’?","system2 "+i);
-							if (short1 === short2 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" I’?","system2 "+i);
-							if (short2 === short1 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" I’?","system2 "+i);
-							if (short1 === short2 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 2’?","system2 "+i);
-							if (short2 === short1 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 2’?","system2 "+i);
-							if (short1 === short2 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 1’?","system2 "+i);
-							if (short2 === short1 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 1’?","system2 "+i);
+							if (short1 === short2 && short1 != "") addError("Staff name ‘"+short1+"’ appears twice.\nRename one of them, or rename as ‘"+short1+" I’ + ‘"+short2+" II’","system2 "+staffnum);
+							if (short1 === short2 + " I") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" II’?","system2 "+staffnum);
+							if (short2 === short1 + " I") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" II’?","system2 "+staffnum);
+							if (short1 === short2 + " II") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" I’?","system2 "+staffnum);
+							if (short2 === short1 + " II") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" I’?","system2 "+staffnum);
+							if (short1 === short2 + " 1") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 2’?","system2 "+staffnum);
+							if (short2 === short1 + " 1") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 2’?","system2 "+staffnum);
+							if (short1 === short2 + " 2") addError("You have a staff ‘"+short2+"’ and a staff ‘"+short1+"’.\nDo you want to rename as ‘"+short2+" 1’?","system2 "+staffnum);
+							if (short2 === short1 + " 2") addError("You have a staff ‘"+short1+"’ and a staff ‘"+short2+"’.\nDo you want to rename as ‘"+short1+" 1’?","system2 "+staffnum);
 						}
 					}
 				}
@@ -3391,41 +3413,16 @@ MuseScore {
 	}
 	
 	function checkLocationsOfBottomSystems () {
-		var prevSystem = null;
-		var prevPage = null;
-		var prevFirstMeasure = null;
-		var pageHeight = 0;
-		var thresholdb = 0;
-		var cursor2 = curScore.newCursor();
-
-		var page1 = firstBarInScore.parent.parent;
-		//logError ("page1 = "+page1);
-		cursor2.staffIdx = 0;
-		cursor2.track = 0;
-		cursor2.rewind(Cursor.SCORE_START);
-		while (cursor2.next()) {
-			var currMeasure = cursor2.measure;
-			var currSystem = currMeasure.parent;
-			if (currSystem != null) {
-				if (pageHeight == 0) {
-					pageHeight = currSystem.parent.bbox.height;
-					thresholdb = pageHeight * 0.8;
-				}
-				if (!currSystem.is(prevSystem)) {
-					// new system
-					var currPage = currSystem.parent;
-					//logError ("currPage = "+currPage);
-					if (!currPage.is(prevPage)) {
-						if (prevSystem != null) {
-							// we check the *previous* system and *previous* page, which, because we have now gone to a new page, will be the last system on the previous page
-							var checkThisSystem = prevPage.is(page1) ? !hasFooter : true;
-							if (checkThisSystem) if (prevSystem.pagePos.y + prevSystem.bbox.height < thresholdb) addError ("This system should ideally be justified to the bottom of the page.",prevFirstMeasure);
-						}
-						prevPage = currPage;
-					}
-					prevSystem = currSystem;
-					prevFirstMeasure = currMeasure;
-				}
+		// get the pages of this score
+		var pages = curScore.pages;
+		var pageHeight = pages[0].bbox.height;
+		var thresholdb = hasFooter? pageHeight * 0.6 : pageHeight * 0.8;
+		for (var i = 0; i < pages.length; i++) {
+			var thePage = pages[i];
+			var systems = thePage.systems;
+			if (systems != null) {
+				var lastSystem = systems[systems.length-1];
+				if (lastSystem.pagePos.y + lastSystem.bbox.height < thresholdb) addError ("This system should ideally be justified to the bottom of the page.",lastSystem.measures[0]);
 			}
 		}
 	}
@@ -4242,6 +4239,7 @@ MuseScore {
 		var isTempoTextStyle = textStyle == Tid.TEMPO;
 		var isMetronomeTextStyle = textStyle == Tid.METRONOME;
 		var nonBoldText = '', boldText = '';
+		var elemPage = getPage(textObject);
 		
 		// if there's no text available, then bail
 		var styledText = isTempoChangeElement ? textObject.beginText : textObject.text;
@@ -4290,10 +4288,9 @@ MuseScore {
 					var isSATB = plainText.match(/\b(S*A*T*B*)\b/) != null;
 					if (!isSATB) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
 				}
-				var elemPage = textObject.parent;
-				while (elemPage && elemPage.type != Element.PAGE) elemPage = elemPage.parent;
-				
-				if (hasTitlePage && lowerCaseText.substr(0,3) === 'for' && elemPage.is(firstPageOfMusic)) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
+				if (elemPage !== null) {
+					if (hasTitlePage && lowerCaseText.substr(0,3) === 'for' && elemPage.pagenumber == firstPageOfMusicNum) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
+				}
 			}
 			
 			// ** CHECK COMPOSER ** //
@@ -4301,13 +4298,8 @@ MuseScore {
 				if (plainText === "Composer / arranger") addError( "You have not changed the default composer text.", textObject);
 				if (plainText.substring(0,3).toLocaleLowerCase() === "by ") addError ("You don’t need ‘by’ at the start", textObject);
 				if (plainText.substring(0,11).toLocaleLowerCase() === "composed by") addError ("You don’t need ‘Composed by’ at the start of this text", textObject);
-				var textPage = textObject.parent;
-				while (textPage.type != Element.PAGE) {
-					textPage = textPage.parent;
-					if (textPage == null || textPage == undefined) break;
-				}
-				if (textPage != null && textPage != undefined) {
-					if (textPage.pagenumber == firstPageOfMusicNum) { 
+				if (elemPage != null) {
+					if (elemPage.pagenumber == firstPageOfMusicNum) { 
 						// check to see whether the composer text is upper or lower case
 						var upperCaseText = plainText.toLocaleUpperCase();
 						var keepLowerCase = ["arr. ", "by ", "arranged ", "orch. ", "orchestrated "];
@@ -4459,9 +4451,7 @@ MuseScore {
 				
 				// **** CHECK SUL CAPITALISATION **** //
 				if (lowerCaseText.includes('sul ') && lowerCaseText.length == 5) {
-					if (lowerCaseText === plainText) {
-						addError ("Capitalise the string name (i.e. ‘sul "+lowerCaseText.substring(4).toUpperCase()+"’)", textObject);
-					}
+					if (lowerCaseText === plainText) addError ("Capitalise the string name (i.e. ‘sul "+lowerCaseText.substring(4).toUpperCase()+"’)", textObject);
 				}
 				
 				// **** CHECK TEXT THAT IS INCORRECTLY CAPITALISED **** //
@@ -4561,21 +4551,32 @@ MuseScore {
 								lastTempoMarkingBar = currentBarNum;
 							}
 						}
+						
+						// *** CHECK IF IT IS ATTACHED TO BEAT 1 *** //
+						if (!resetTempo) {
+							if (!isOnFirstBeatOfBar(textObject)) addError ("This tempo marking is not attached to\nthe first beat of the bar. Is it misplaced?",textObject);
+						}
+						
 					}
 					var metroIsBold = false, tempoMarkingIsBold = false;
 					if (containsTempoComponent) barContainsTempo = true;
 					if (containsMetronomeComponent) barContainsMetronome = true;
 					
-					// *** CHECK STYLING *** //
-					if (styledText.includes("<b>")) {
-						// strip all <b> tags and their contents, then strip any other tags
-						nonBoldText = styledText.replace(/<b>.+?<\/b>/g,'').replace(/<[^>]+>/g, "");
-						boldText = styledText.replace(/^.*?<b>|<\/b>.*?(<b>|$)+/g,'');
-						//logError ('b found');
-					} else {
-						var textStyleIsBold = textObject.fontStyle == 1;
-						//logError ("textStyle = "+textObject.fontStyle+'; isBold = '+textStyleIsBold);
+					// *** CHECK STYLING OF TEMPO MARKING AND METRONOME MARKING					*** //
+					// *** ANALYSE THE TEXT OBJECT AND ITS STYLING TO SEE WHICH COMPONENTS 		*** //
+					// *** ARE BOLD, AND WHICH ARE PLAIN. WE PREFER THAT THE TEMPO DESCRIPTOR 	*** //
+					// *** IS BOLD, AND THE METRONOME MARKING IS PLAIN — SEE EXAMPLES IN 		*** //
+					// *** BEHIND BARS, P. 183													*** //
 					
+					// *** IF THERE IS MANUAL STYLING, THERE WILL BE SOME <B> TAGS				*** //
+					// *** IF NO <B> TAGS, THEN THE STYLE OF THE WHOLE TEXT OBJECT APPLIES		*** //
+					if (styledText.includes("<b>")) {
+						// strip all <b> tags and their contents, to leave only the plain text
+						nonBoldText = styledText.replace(/<b>.+?<\/b>/g,'').replace(/<[^>]+>/g, "");
+						// strip out anything NOT in between <b> tags
+						boldText = styledText.replace(/^.*?<b>|<\/b>.*?(<b>|$)+/g,'');
+					} else {
+						var textStyleIsBold = textObject.fontStyle == 1;					
 						if (textStyleIsBold) {
 							boldText = plainText;
 							nonBoldText = '';
@@ -4585,8 +4586,10 @@ MuseScore {
 						}
 					}
 					//logError ('nonBoldText = '+nonBoldText.replace(/</g,'≤')+'; boldText = '+boldText.replace(/</g,'≤'));
-					metroIsBold = boldText.includes(metronomeComponent);
-					tempoMarkingIsBold = boldText.includes(nonMetronomeComponent.trim());
+					var boldTextStripped = boldText.replace(/<\/?[^>]*?>/g,'');
+					var nonMetronomeComponentStripped = nonMetronomeComponent.replace(/<\/?[^>]*?>/g,'').trim();
+					if (containsMetronomeComponent) metroIsBold = boldTextStripped.includes('=');
+					if (containsTempoComponent) tempoMarkingIsBold = boldTextStripped.includes(nonMetronomeComponentStripped);
 					//logError ('metroIsBold = '+metroIsBold+'; tempoMarkingIsBold = '+tempoMarkingIsBold);
 					
 					if (containsMetronomeComponent || containsTempoComponent) {
@@ -4611,7 +4614,7 @@ MuseScore {
 							}
 						}
 						
-						// **** CHECK IF c./circa etc. IS IN THE RIGHT PLACE
+						// **** CHECK IF c./circa etc. IS IN THE RIGHT PLACE — SHOULD BE BEFORE THE NUMBER **** //
 						var theMatch = metronomeComponent.match(/(c|approx|circa)(\.|\s|<\/?b>)*(<sym>metNote.*?<\/sym>|\uECA5|\uECA7|\uECA3)+/);
 						//logError (styledText.replace(/</g,'≤'));
 						if (theMatch != null) addError ("In this tempo marking, put the ‘"+theMatch[1]+"’ after the = sign.", textObject);
@@ -4645,40 +4648,36 @@ MuseScore {
 						var metronomeOption2 = isCompound ? (metronomeOption1 * 3) : (metronomeOption1 / 2);
 							
 						if (metronomeDuration != metronomeOption1 && metronomeDuration != metronomeOption2) {
-							addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".",textObject);
+							addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".\nAre you sure this is correct?",textObject);
 						}
 						
-						// *** CHECK FOR UNNECESSARY PARENTHESES *** //
+						// *** CHECK FOR UNNECESSARY PARENTHESES IN TEMPO MARKINGS 			*** //
+						// *** PARENTHESES ARE ONLY REALLY NEEDED FOR A TEMPO MARKINGS, ETC *** //
+						// *** NB: THIS DOESN'T YET HANDLE METRIC MODULATION MARKINGS		*** //
+						// *** SOMETHING FOR A FUTURE RELEASE!								*** //
 						if (hasParentheses && !resetTempo) {
 							addError ('You don’t normally need brackets around metronome markings\nexcept for (e.g.) Tempo Primo/Tempo Secondo/a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
 						}
 						
-						// *** CHECK FOR UNNECESSARY ‘APPROX’
-						if (lowerCaseText.includes('approx')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
+						// *** CHECK FOR UNNECESSARY ‘APPROX’ OR ‘CIRCA’ *** //
+						if (lowerCaseText.includes('approx.')) addError ('You can use ‘c.’ instead of ‘approx.’', textObject);
+						if (lowerCaseText.includes('circa')) addError ('You can use ‘c.’ instead of ‘circa’', textObject);
+
 							
-						// ** CHECK IF METRONOME MARKING IS IN METRONOME TEXT STYLE ** //
+						// *** CHECK IF BOLD/PLAIN *** //
 						if (containsTempoComponent) {
 							if (metroIsBold) {
-								addError ('It is recommended to have the metronome marking part of\nthis tempo marking in a plain font style, rather than bold.\n(See, for instance, ‘Behind Bars’ p. 183)',textObject);
+								addError ("The metronome marking component of this tempo marking\nwill look better in a plain font style, rather than bold.\n(See ‘Behind Bars’ p. 183)",textObject);
 							} else {
-								if (!tempoMarkingIsBold) addError ("It is recommended to have tempo markings\nin a bold style, rather than plain.\n(See, for instance, ‘Behind Bars’ p. 183", textObject);
+								if (!tempoMarkingIsBold) addError ("Tempo markings are better formatted bold, rather than plain.\n(See ‘Behind Bars’ p. 183", textObject);
 							}
 						} else {
 							if (!containsTempoChangeComponent && metroIsBold) {
-								addError ('It is recommended to have metronome markings in a plain font style,\nrather than bold. (See, for instance, ‘Behind Bars’ p. 183)',textObject)
+								addError ('Metronome markings are better formatted plain,\nrather than bold. (See ‘Behind Bars’ p. 183)',textObject)
 							}
 						}
 						
-						//var markingLastWord = plainText.trim().split(" ").pop();
-						// var markingLastWordIsPrimarilyAlphabetic = false;
-						//var letterRegex = new RegExp ('[A-Za-z]','g');
-						//if (markingLastWord) {
-						//	var theMatches = markingLastWord.match(letterRegex);
-						//	if (theMatches) markingLastWordIsPrimarilyAlphabetic = (theMatches.length / markingLastWord.length ) > 0.5;
-						//}
-						//var markingContainsPhrase = plainText.length > 10 && markingLastWordIsPrimarilyAlphabetic;
-						//logError ('isTempoMarking: '+isTempoMarking+' lastTempoMarking == null '+(lastTempoMarking == null)+' length: '+plainText.length+' markingContainsPhrase '+markingContainsPhrase);
-						
+						// *** CHECK FOR REPETITION OF A METRONOME MARKING *** //
 						if (metronomeComponent != '' && metronomeComponent === lastMetronomeComponent) {
 				
 							if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
@@ -4697,7 +4696,7 @@ MuseScore {
 						tempoChangeMarkingEnd = -1;
 					}
 								
-					// **** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED **** //
+					// *** CHECK TEMPO CHANGE MARKING IS NOT IN TEMPO TEXT OR INCORRECTLY CAPITALISED *** //
 					if (containsTempoChangeComponent) {
 						if (lastTempoChangeMarkingBar > -1) {
 							if (styledText === lastTempoChangeMarkingText) addError ("This looks like the same tempo change marking\nas the previous ‘"+lastTempoChangeMarkingText+"’ in b. "+lastTempoChangeMarkingBar, textObject);
@@ -4725,12 +4724,12 @@ MuseScore {
 						if (plainText.substr(0,1) != lowerCaseText.substr(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
 					}
 		
-					// **** CHECK TEMPO MARKINGS (BUT NOT TEMPO CHANGES) **** //
+					// *** CHECK TEMPO MARKINGS (BUT NOT TEMPO CHANGES) *** //
 					if (containsTempoComponent && !containsTempoChangeComponent) {
 						
 						if (!containsMetronomeComponent) {
 							
-							// CHECK IF THIS IS A FREE TIME MARKING AND DOESN'T REQUIRE A METRONOME MARKING
+							// *** CHECK IF THIS IS A FREE TIME MARKING AND DOESN'T REQUIRE A METRONOME MARKING *** //
 							if (lowerCaseText.includes('free time') || lowerCaseText.includes('tempo libero') || lowerCaseText.includes('senza tempo') || lowerCaseText.includes('senza misura') || lowerCaseText.includes('a piacere') || lowerCaseText.includes('in time') || lowerCaseText.includes('tempo giusto')) {
 								lastMetronomeComponent = '';
 								lastMetronomeMarking = '';
@@ -4738,7 +4737,7 @@ MuseScore {
 								lastMetronomeMarkingDisplayBar = lastMetronomeMarkingBar + displayOffset;
 							}
 													
-							// CHECK IF THIS TEMPO MARKING IS BOLD
+							// *** CHECK IF THIS TEMPO MARKING IS BOLD *** //
 							if (boldText === '') addError ("All tempo markings should be in bold type.\n(See ‘Behind Bars’, p. 182)",textObject);
 						}
 						
@@ -4748,14 +4747,14 @@ MuseScore {
 						lastTempoChangeMarkingText = '';
 						tempoChangeMarkingEnd = -1;
 				
-						// **** CHECK TEMPO SHOULD BE CAPITALISED **** //
+						// **** CHECK WHETHER TEMPO SHOULD BE CAPITALISED **** //
 						if (plainText.substr(0,1) === lowerCaseText.substr(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substr(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
 						
-						// ** CHECK TEMPO DOES NOT HAVE A DOT AT THE END ** //
+						// *** CHECK TEMPO DOES NOT HAVE A DOT AT THE END *** //
 						if (plainText.slice(-1) === '.' && !lowerCaseText.includes('mouv') && !lowerCaseText.includes('rit') && !lowerCaseText.includes('accel')) addError ("Tempo markings do not need a full-stop at the end.",textObject);
 					}
 				
-					// **** CHECK TEMPO POINT SIZE **** //
+					// *** CHECK TEMPO MARKING POINT SIZE IS BETWEEN 10–12pt *** //
 					if (containsTempoComponent || containsTempoChangeComponent) {
 						if (textObject.fontSize > 0) {
 							// NB fontSize can be -1 for mixed sizes, so only check if it's an actual number
@@ -4796,21 +4795,25 @@ MuseScore {
 						return;
 					}
 					
+					// **** CHECK VARIOUS MISLABELLINGS OF POCO SUL TASTO **** //
 					if (lowerCaseText === "sul tasto poco" || lowerCaseText === "sul tasto un poco") {
 						addError ("Change this to ‘poco sul tasto’.",textObject);
 						return;
 					}
 					
+					// **** CHECK VARIOUS MISLABELLINGS OF MOLTO SUL TASTO **** //
 					if (lowerCaseText === "sul tasto molto") {
 						addError ("Change this to ‘molto sul tasto’.",textObject);
 						return;
 					}
 					
+					// **** CHECK VARIOUS MISLABELLINGS OF POCO SUL PONT **** //
 					if (lowerCaseText === "sul pont. poco" || lowerCaseText === "sul pont. un poco") {
 						addError ("Change this to ‘poco sul pont.’",textObject);
 						return;
 					}
 					
+					// **** CHECK VARIOUS MISLABELLINGS OF MOLTO SUL PONT **** //
 					if (lowerCaseText === "sul pont. molto") {
 						addError ("Change this to ‘molto sul pont.’",textObject);
 						return;
@@ -4835,7 +4838,7 @@ MuseScore {
 				if (objectIsDynamic && includesADynamic && !stringIsDynamic) {
 					addError ('This dynamic marking is unusual, or has an extraneous character in it somewhere',textObject);
 				}
-				if (includesADynamic || stringIsDynamic) {
+				if ((includesADynamic || stringIsDynamic) && elemPage.pagenumber >= firstPageOfMusicNum) {
 					firstDynamic = true;
 					//logError ('dynamic here: tickHasDynamic = '+tickHasDynamic()+'; currTick = '+currTick);
 
@@ -4925,6 +4928,14 @@ MuseScore {
 			}
 		} // end lowerCaseText != ''
 	}	
+	
+	function isOnFirstBeatOfBar (e) {
+		var theTick = getTick(e);
+		var theBar = getBar(e);
+		if (theBar == null) return false;
+		var firstBeatOfBarTick = theBar.firstSegment.tick;
+		return (theTick == firstBeatOfBarTick);
+	}
 	
 	function allTracksHaveRestsAtCurrTick () {
 		
@@ -5047,12 +5058,9 @@ MuseScore {
 	function checkHyphenation (str, wordArray) {
 		var unhyphenatedStr = str.replace(/-/g,"").toLowerCase();
 		var index = unhyphenatedWordsLower.indexOf(unhyphenatedStr);
-		//logError ('unh = '+unhyphenatedStr+'; index = '+index);
-
 		if (index != -1) {
 			var correctlyHyphenatedStr = hyphenatedWords[index];
 			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) {
-				//logError ('Error found: '+str+'; array = '+wordArray.length);
 				addError ('‘'+str + '’ is not correctly hyphenated. It should be ‘'+correctlyHyphenatedStr+'’',wordArray);
 			}
 		}
@@ -6400,7 +6408,7 @@ MuseScore {
 		
 		if (currentStaffNum != firstVisibleStaff) return;
 		//logError("Found reh mark "+textObject.text);
-		if (getTick(textObject) != barStartTick) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
+		if (!isOnFirstBeatOfBar(textObject)) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
 		//logError ("Checking rehearsal mark");
 		if (currentBarNum < 2) addError ("Don’t put a rehearsal mark at the start of the piece.\nUsually your first rehearsal mark will come about 12–20 bars in.",textObject);
 		var isNumeric = !isNaN(textObject.text) && !isNaN(parseFloat(textObject.text));
@@ -6409,7 +6417,7 @@ MuseScore {
 			if (rehearsalMarkNoTags !== expectedRehearsalMark && !flaggedRehearsalMarkError) {
 				//logError ('expectedRehearsalMark = '+expectedRehearsalMark);
 				flaggedRehearsalMarkError = true;
-				addError ("This is not the rehearsal mark I would expect.\nDid you miss rehearsal mark ‘"+expectedRehearsalMark+"’?", textObject);
+				addError ("This is not the rehearsal mark I expected (‘"+expectedRehearsalMark+"’).\nTo renumber all of the rehearsal marks, Select All,\nand choose Tools→Resequence Rehearsal Marks.", textObject);
 			}
 			
 			numRehearsalMarks ++;
@@ -6767,20 +6775,11 @@ MuseScore {
 					comment.z = currentZ;
 					currentZ ++;
 					comments.push (comment);
-					var commentPage = comment.parent;
-					while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
-					var pushed = false;
-					if (commentPage != null && commentPage != undefined) {
-						if (commentPage.type == Element.PAGE) {
-							commentPages.push (commentPage);
-							pushed = true;
-						}
-					}
-					if (!pushed) commentPages.push (null);
+					var commentPage = getPage(comment);
+					commentPages.push (commentPage);
 					if (theLocation === "pagetopright" && commentPage != null) desiredPosX = commentPage.bbox.width - comment.bbox.width - 2.5;
 					commentsDesiredPosX.push (desiredPosX);
 					commentsDesiredPosY.push (desiredPosY);
-					//if (theLocation === "pagetop") logError (theText);
 				}
 			}
 		} // var i
@@ -6817,123 +6816,118 @@ MuseScore {
 			if (placedX + offx[i] < 0) offx[i] = -placedX;
 			if (placedY + offy[i] < 0) offy[i] = -placedY;
 			
-			var commentPage = comment.parent;
-			while (commentPage != null && commentPage.type != Element.PAGE && commentPage.parent != undefined) commentPage = commentPage.parent; // in theory this should get the page
+			var commentPage = getPage(comment);
+			if (commentPage) {
 			
-			if (commentPage != null && commentPage != undefined) {
-				if (commentPage.type == Element.PAGE) {
-		
-					var commentPageWidth = commentPage.bbox.width;
-					var commentPageHeight = commentPage.bbox.height;
-					var commentPageNum = commentPage.pagenumber; // get page number
-					
-					// move over to the top right of the page if needed
-					if (isString && theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+				var commentPageWidth = commentPage.bbox.width;
+				var commentPageHeight = commentPage.bbox.height;
+				var commentPageNum = commentPage.pagenumber; // get page number
 				
-					// FIX IN 4.6 — Composer pagePos currently returning the wrong location
-					if (eSubtype === 'Composer') {
-						offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth;
-						offy[i] += 8.0;
-					}
+				// move over to the top right of the page if needed
+				if (isString && theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+			
+				// FIX IN 4.6 — Composer pagePos currently returning the wrong location
+				if (eSubtype === 'Composer') {
+					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth;
+					offy[i] += 8.0;
+				}
 
-					// check to see if this comment has been placed too close to other comments
-					var maxOffset = 10;
-					var minOffset = 1.5;
-					var commentOriginalX = placedX;
-					var commentOriginalY = placedY;
-					var commentRHS = placedX + commentWidth;
-					var commentB = placedY + commentHeight;
+				// check to see if this comment has been placed too close to other comments
+				var maxOffset = 10;
+				var minOffset = 1.5;
+				var commentOriginalX = placedX;
+				var commentOriginalY = placedY;
+				var commentRHS = placedX + commentWidth;
+				var commentB = placedY + commentHeight;
+				
+				// check comment is within the page bounds
+				if (placedX < 0) offx[i] -= placedX; // LEFT HAND SIDE
+				if (commentRHS > commentPageWidth) offx[i] -= (commentRHS - commentPageWidth); // RIGHT HAND SIDE
+				if (placedY < 0) offy[i] -= placedY; // TOP
+				if (commentB > commentPageHeight) offy[i] -= (commentB - commentPageHeight); // BOTTOM
+				
+				for (var k = 0; k < i; k++) {
 					
-					// check comment is within the page bounds
-					if (placedX < 0) offx[i] -= placedX; // LEFT HAND SIDE
-					if (commentRHS > commentPageWidth) offx[i] -= (commentRHS - commentPageWidth); // RIGHT HAND SIDE
-					if (placedY < 0) offy[i] -= placedY; // TOP
-					if (commentB > commentPageHeight) offy[i] -= (commentB - commentPageHeight); // BOTTOM
-					
-					for (var k = 0; k < i; k++) {
-						var otherComment = comments[k];
-						var otherCommentPage = commentPages[k];
-						var otherCommentX = otherComment.pagePos.x + offx[k];
-						var otherCommentY = otherComment.pagePos.y + offy[k];
-						var actualCommentX = placedX + offx[i];
-						var actualCommentRHS = commentRHS + offx[i];
-						var actualCommentY = placedY + offy[i];
-						var actualCommentB = commentB + offy[i];
-	
-						if (commentPage.is(otherCommentPage)) {
-							var dx = Math.abs(actualCommentX - otherCommentX);
-							var dy = Math.abs(actualCommentY - otherCommentY);
-							if (dx <= minOffset || dy <= minOffset) {
-								var otherCommentRHS = otherCommentX + otherComment.bbox.width;
-								var otherCommentB = otherCommentY + otherComment.bbox.height;
-								var overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
-								var overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
-								var generalProximity = dx + dy < maxOffset;
-								var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
-								var isNotTooFarFromOriginalPosition = true;
-								//logError ("text = "+comment.text+"; otherText = "+otherComment.text+"; close = "+isCloseToOtherComment+"; far = "+isNotTooFarFromOriginalPosition+'; rhs = '+(actualCommentRHS < commentPageWidth)+' y = '+(actualCommentY > 0));
-								var shiftAttempts = 0;
-								while (isCloseToOtherComment && isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0 && shiftAttempts < 5) {
-									shiftAttempts ++;
-									if (actualCommentRHS < commentPageWidth - commentOffset) offx[i] += commentOffset;
-									if (actualCommentY > commentOffset) offy[i] -= commentOffset;
-									actualCommentX = placedX + offx[i];
-									actualCommentY = placedY + offy[i];
-									actualCommentRHS = actualCommentX + commentWidth;
-									actualCommentB = actualCommentY + commentHeight;
-									dx = Math.abs(actualCommentX - otherCommentX);
-									dy = Math.abs(actualCommentY - otherCommentY);
-									overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
-									overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
-									generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
-									isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
-									isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
-									//logError ("Too close: shifting comment.offsetX = "+offx[i]+" comment.offsetY = "+offy[i]+" tooClose = "+isCloseToOtherComment);				
-								}
+					var otherComment = comments[k];
+					var otherCommentPage = commentPages[k];
+					var otherCommentX = otherComment.pagePos.x + offx[k];
+					var otherCommentY = otherComment.pagePos.y + offy[k];
+					var actualCommentX = placedX + offx[i];
+					var actualCommentRHS = commentRHS + offx[i];
+					var actualCommentY = placedY + offy[i];
+					var actualCommentB = commentB + offy[i];
+					if (commentPage.pagenumber == otherCommentPage.pagenumber) {
+						var dx = Math.abs(actualCommentX - otherCommentX);
+						var dy = Math.abs(actualCommentY - otherCommentY);
+						if (dx <= minOffset || dy <= minOffset) {
+							//logError ('here');
+							var otherCommentRHS = otherCommentX + otherComment.bbox.width;
+							var otherCommentB = otherCommentY + otherComment.bbox.height;
+							var overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
+							var overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
+							var generalProximity = dx + dy < maxOffset;
+							var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
+							var isNotTooFarFromOriginalPosition = true;
+							//logError ("text = "+comment.text+"; otherText = "+otherComment.text+"; close = "+isCloseToOtherComment+"; far = "+isNotTooFarFromOriginalPosition+'; rhs = '+(actualCommentRHS < commentPageWidth)+' y = '+(actualCommentY > 0));
+							var shiftAttempts = 0;
+							while (isCloseToOtherComment && isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0 && shiftAttempts < 5) {
+								shiftAttempts ++;
+								if (actualCommentRHS < commentPageWidth - commentOffset) offx[i] += commentOffset;
+								if (actualCommentY > commentOffset) offy[i] -= commentOffset;
+								actualCommentX = placedX + offx[i];
+								actualCommentY = placedY + offy[i];
+								actualCommentRHS = actualCommentX + commentWidth;
+								actualCommentB = actualCommentY + commentHeight;
+								dx = Math.abs(actualCommentX - otherCommentX);
+								dy = Math.abs(actualCommentY - otherCommentY);
+								overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
+								overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
+								generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
+								isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
+								isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
+								
+								//logError ("Too close: shifting comment.offsetX = "+offx[i]+" comment.offsetY = "+offy[i]+" tooClose = "+isCloseToOtherComment);				
 							}
 						}
-						// check comment box is not covering the element
-						/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
-						if (!isString) {
-							var r1x = comment.pagePos.x;
-							var r1y = comment.pagePos.y;
-							var r1w = commentWidth;
-							var r1h = commentHeight;
-							var r2x = element.pagePos.x;
-							var r2y = element.pagePos.y;
-							var r2w = element.bbox.width;
-							var r2h = element.bbox.height;
-							if (element.type == Element.SLUR_SEGMENT) {
-								logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-							}
-							
-							var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-							var repeats = 0;
-							while (overlaps && repeats < 20) {
-								logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-								comment.offsetY -= commentOffset;
-								r1y -= 1.0;
-								repeats ++;
-								overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-							}
-						} */
 					}
-					if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
-				} else {
-					//logError ("parent parent parent parent was not a page — element = "+element.name);
-					// this will fail if MMR
+					// check comment box is not covering the element
+					/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
+					if (!isString) {
+						var r1x = comment.pagePos.x;
+						var r1y = comment.pagePos.y;
+						var r1w = commentWidth;
+						var r1h = commentHeight;
+						var r2x = element.pagePos.x;
+						var r2y = element.pagePos.y;
+						var r2w = element.bbox.width;
+						var r2h = element.bbox.height;
+						if (element.type == Element.SLUR_SEGMENT) {
+							logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+						}
+						
+						var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+						var repeats = 0;
+						while (overlaps && repeats < 20) {
+							logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+							comment.offsetY -= commentOffset;
+							r1y -= 1.0;
+							repeats ++;
+							overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
+						}
+					} */
 				}
+				if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
 			}
 		}
 		
 		// now reposition all the elements
-		curScore.startCmd();
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
+			curScore.startCmd();
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
+			curScore.endCmd();
 		}
-		curScore.endCmd();
 	}
 	
 	//---------------------------------------------------------
@@ -6982,24 +6976,39 @@ MuseScore {
 		return 0;
 	}
 	
+	function getBar (e) {
+		var p = e.parent;
+		var ptype = null;
+		if (p != null && p != undefined) ptype = p.type;
+		while ((p != null && p != undefined) && ptype != Element.MEASURE) {
+			p = p.parent;
+			if (p != null && p != undefined) ptype = p.type;
+		}
+		if (p == undefined) p = null;
+		return p;
+	}
+	
 	function getBarNumber (e) {
 		var theTick = getTick(e);
 		return measureTicks.filter (e => e <= theTick).length;
 	}
 	
-	function getPageNumber (e) {
+	function getPage (e) {
 		var p = e.parent;
 		var ptype = null;
-		if (p != null) ptype = p.type;
-		while (p && ptype != Element.PAGE) {
+		if (p != null && p != undefined) ptype = p.type;
+		while ((p != null && p != undefined) && ptype != Element.PAGE) {
 			p = p.parent;
-			if (p != null) ptype = p.type;
+			if (p != null && p != undefined) ptype = p.type;
 		}
-		if (p != null) {
-			return p.pagenumber;
-		} else {
-			return 0;
-		}
+		if (p == undefined) p = null;
+		return p;
+	}
+	
+	function getPageNumber (e) {
+		var p = getPage(e);
+		if (p == null) return 0;
+		return p.pagenumber;
 	}
 	
 	function logError (str) {

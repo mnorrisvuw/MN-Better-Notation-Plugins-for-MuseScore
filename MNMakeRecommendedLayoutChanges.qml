@@ -357,24 +357,23 @@ MuseScore {
 				// **** CHECK WINDS **** //
 				if (id.includes("wind")) {
 					numWinds++;
-					if (numWinds == 1) firstWindPart = i;
 					lastWindPart = i;
 				}
 				if (id.includes("wind.flutes.flute")) {
 					numFl ++;
-					flStaff = i;
+					//flStaff = i;
 				}
 				if (id.includes("wind.reed.oboe") || id.includes("wind.reed.english-horn")) {
 					numOb ++;
-					obStaff = i;
+					//obStaff = i;
 				}
 				if (id.includes("wind.reed.clarinet")) {
 					numCl ++;
-					clStaff = i;
+					//clStaff = i;
 				}
 				if (id.includes("wind.reed.bassoon") || id.includes("wind.reed.contrabassoon")) {
 					numBsn ++;
-					bsnStaff = i;
+					//bsnStaff = i;
 				}
 				
 				// **** CHECK BRASS **** //
@@ -385,20 +384,20 @@ MuseScore {
 				}
 				if (id.includes( "brass.french-horn")) {
 					numHn ++;
-					hnStaff = i;
+					//hnStaff = i;
 				}
 				if (id.includes( "brass.trumpet")) {
 					numTpt ++;
-					if (numTpt == 1) tpt1Staff = i;
-					if (numTpt == 2) tpt2Staff = i;
+					//if (numTpt == 1) tpt1Staff = i;
+					//if (numTpt == 2) tpt2Staff = i;
 				}
 				if (id.includes("brass.trombone")) {
 					numTbn ++;
-					tbnStaff = i;
+					//tbnStaff = i;
 				}
 				if (id.includes ("brass.tuba")) {
 					numTba ++;
-					tbaStaff = i;
+					//tbaStaff = i;
 				}
 				
 				// **** CHECK STRINGS **** //
