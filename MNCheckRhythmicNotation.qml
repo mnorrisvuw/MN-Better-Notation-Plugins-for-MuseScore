@@ -361,7 +361,8 @@ MuseScore {
 						
 						// *** GET THE NOTE/REST, AND ITS VARIOUS PROPERTIES THAT WE'LL NEED *** //
 						var noteRest = cursor.element;
-						var isHidden = !noteRest.visible;
+						var isHidden = !noteRest.visible || noteRest.gap;
+						//var isGap = noteRest.gap;
 						isRest = noteRest.type == Element.REST;
 						isNote = !isRest;
 						displayDur = noteRest.duration.ticks; // what the note looks like
@@ -384,6 +385,7 @@ MuseScore {
 						hasBeam = currentBeam != null;
 						isGliss = glisses[currentTrack][currTick] != null;
 						if (!isHidden) totalMusicDurThisTrack += soundingDur;
+						//logError ("track = "+currentTrack+"; noteStart = "+noteStart);
 						//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
 						if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
 						
@@ -455,145 +457,149 @@ MuseScore {
 							}
 						}
 						
-						// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
-						var lastNoteInTie = false;
-						if (isTied) {
-							lastNoteInTie = noteRest.notes[0].tieForward == null || lastNoteInBar || nextItemHasPause;
-							if (!lastNoteInTie) {
-								// check that the notes are the same as the next
-								if (nextItemIsNote) {
-									if (noteRest.notes.length == nextItem.notes.length) {
-										for (var k = 0; k < noteRest.notes.length && !lastNoteInTie; k ++) {
-											if (noteRest.notes[k].MIDIpitch != nextItem.notes[k].MIDIpitch) lastNoteInTie = true;
+						if (!isHidden) {
+							
+							// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
+							var lastNoteInTie = false;
+							if (isTied) {
+								lastNoteInTie = noteRest.notes[0].tieForward == null || lastNoteInBar || nextItemHasPause;
+								if (!lastNoteInTie) {
+									// check that the notes are the same as the next
+									if (nextItemIsNote) {
+										if (noteRest.notes.length == nextItem.notes.length) {
+											for (var k = 0; k < noteRest.notes.length && !lastNoteInTie; k ++) {
+												if (noteRest.notes[k].MIDIpitch != nextItem.notes[k].MIDIpitch) lastNoteInTie = true;
+											}
+										} else {
+											lastNoteInTie = true;
 										}
 									} else {
 										lastNoteInTie = true;
 									}
-								} else {
-									lastNoteInTie = true;
 								}
-							}
-							tiedNotes.push(noteRest);
-							//if (lastNoteInTie) logError(lastNoteInTie");
-						} else {
-							if (wasTied) tiedNotes = [];
-						}
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 	CHECK 1: CHECK FOR MANUALLY ENTERED BAR REST	** //
-						// ** ————————————————————————————————————————————————— ** //
-						
-						checkManuallyEnteredBarRest(noteRest);
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 2: DOES THE NOTE HIDE THE BEAT??		** //
-						// ** ————————————————————————————————————————————————— ** //
-	
-						if (canCheckThisBar) checkHidingBeatError(noteRest);
-								
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 3: NOTE/REST SHOULD NOT BREAK BEAM	** //
-						// ** ————————————————————————————————————————————————— ** //
-					
-						if (canCheckThisBar) checkBeamBrokenError(noteRest);
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 4: BEAMED to NOTES IN NEXT BEAT 		** //
-						// ** ————————————————————————————————————————————————— ** //
-	
-						if (canCheckThisBar) checkBeamedToNotesInNextBeat(noteRest);
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 5: CONDENSE OVERSPECIFIED REST 		** //
-						// ** ————————————————————————————————————————————————— ** //
-						
-						if (canCheckThisBar) {
-							// if this is a rest, then start building an array of rests
-							// until you get to the last one, then check whether any of the rests
-							// could be condensed into a single rest
-							if (isNote || hasPause) {
-								rests = [];
-								restCrossesBeat = false;
-								restStartedOnBeat = false;
-								isLastRest = false;
-								totalRestDur = 0;
-								//logError(Rest length now "+rests.length);
+								tiedNotes.push(noteRest);
+								//if (lastNoteInTie) logError(lastNoteInTie");
 							} else {
-								rests.push(noteRest);
-								totalRestDur += noteRest.actualDuration.ticks;
-								if (rests.length == 1) {
-									restStartedOnBeat = isOnTheBeat;
-									restStartBeat = noteStartBeat;
-								} else {
-									if (noteStartBeat != restStartBeat) restCrossesBeat = true;
-								}
-								isLastRest = (lastNoteInBar || nextItemIsNote || nextItem == null || nextItemHasPause || nextItemIsHidden);
-								//logError(Found a rest: rest length now "+rests.length+"); isLastRest = "+isLastRest;
-								if (isLastRest && rests.length > 1) condenseOverSpecifiedRest(noteRest);
-							}
-						}
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
-						// ** ————————————————————————————————————————————————— ** //
-						if (canCheckThisBar && lastNoteInTie && !isGliss) {
-							if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
-							tiedNotes = [];
-						}
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 			CHECK 7: COULD BE STACCATO				** //
-						// ** ————————————————————————————————————————————————— ** //
-						if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
-							if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
-								flaggedWrittenStaccato = true;
-								if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
-								if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
-								if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
-							}
-						}
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 8: SPLIT NON-BEAT-BREAKING RESTS		** //
-						// ** ————————————————————————————————————————————————— ** //
-						if (isRest && !noteHidesBeat) {
-							if (isOnTheBeat) {
-								checkOnbeatRestSpelling(noteRest);
-							} else {
-								checkOffbeatRestSpelling(noteRest);
-							}
-						}
-						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 9: CHECK TUPLET SETTINGS				** //
-						// ** ————————————————————————————————————————————————— ** //
-						if (noteRest.tuplet == null) {
-							firstNoteInTuplet = null;
-							numConsecutiveSemiquaverTriplets = 0;
-						} else {
-							if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
-								firstNoteInTuplet = true;
-								checkTupletSettings (noteRest.tuplet);
-								prevTuplet = noteRest.tuplet;
+								if (wasTied) tiedNotes = [];
 							}
 							
-							// Is it a semiquaver triplet?
-							if (noteRest.tuplet.actualDuration.ticks == division / 2 && noteRest.tuplet.actualNotes == 3) {
-								if (numConsecutiveSemiquaverTriplets == 0) {
-									if (firstNoteInTuplet && isOnTheBeat) numConsecutiveSemiquaverTriplets = 1;
-								} else {
-									numConsecutiveSemiquaverTriplets ++;
-								}
-								if (numConsecutiveSemiquaverTriplets == 6) addError ('These semiquaver triplets could be rewritten\nas a semiquaver sextuplet.',noteRest);
-							} else {
-								numConsecutiveSemiquaverTriplets = 0;
-							}
-						}
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 	CHECK 1: CHECK FOR MANUALLY ENTERED BAR REST	** //
+							// ** ————————————————————————————————————————————————— ** //
+							
+							checkManuallyEnteredBarRest(noteRest);
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 2: DOES THE NOTE HIDE THE BEAT??		** //
+							// ** ————————————————————————————————————————————————— ** //
+		
+							if (canCheckThisBar) checkHidingBeatError(noteRest);
+									
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 3: NOTE/REST SHOULD NOT BREAK BEAM	** //
+							// ** ————————————————————————————————————————————————— ** //
 						
-						// ** ————————————————————————————————————————————————— ** //
-						// ** 		CHECK 10: ILLEGAL NOTE VALUES				** //
-						// ** ————————————————————————————————————————————————— ** //
-						checkIllegalDurations(noteRest);
+							if (canCheckThisBar) checkBeamBrokenError(noteRest);
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 4: BEAMED to NOTES IN NEXT BEAT 		** //
+							// ** ————————————————————————————————————————————————— ** //
+		
+							if (canCheckThisBar) checkBeamedToNotesInNextBeat(noteRest);
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 5: CONDENSE OVERSPECIFIED REST 		** //
+							// ** ————————————————————————————————————————————————— ** //
+							
+							if (canCheckThisBar) {
+								// if this is a rest, then start building an array of rests
+								// until you get to the last one, then check whether any of the rests
+								// could be condensed into a single rest
+								if (isNote || hasPause) {
+									rests = [];
+									restCrossesBeat = false;
+									restStartedOnBeat = false;
+									isLastRest = false;
+									totalRestDur = 0;
+									//logError(Rest length now "+rests.length);
+								} else {
+									rests.push(noteRest);
+									totalRestDur += noteRest.actualDuration.ticks;
+									if (rests.length == 1) {
+										restStartedOnBeat = isOnTheBeat;
+										restStartBeat = noteStartBeat;
+									} else {
+										if (noteStartBeat != restStartBeat) restCrossesBeat = true;
+									}
+									isLastRest = (lastNoteInBar || nextItemIsNote || nextItem == null || nextItemHasPause || nextItemIsHidden);
+									//logError("Found a rest: there have now been "+rests.length+" rests; totalRestDur = "+totalRestDur+"; isLastRest = "+isLastRest+" isHidden = "+isHidden);
+									if (isLastRest && rests.length > 1) condenseOverSpecifiedRest(noteRest);
+								}
+							}
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (canCheckThisBar && lastNoteInTie && !isGliss) {
+								if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
+								tiedNotes = [];
+							}
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 			CHECK 7: COULD BE STACCATO				** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
+								if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
+									flaggedWrittenStaccato = true;
+									if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
+									if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
+									if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
+								}
+							}
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 8: SPLIT NON-BEAT-BREAKING RESTS		** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (isRest && !noteHidesBeat) {
+								if (isOnTheBeat) {
+									checkOnbeatRestSpelling(noteRest);
+								} else {
+									checkOffbeatRestSpelling(noteRest);
+								}
+							}
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 9: CHECK TUPLET SETTINGS				** //
+							// ** ————————————————————————————————————————————————— ** //
+							if (noteRest.tuplet == null) {
+								firstNoteInTuplet = null;
+								numConsecutiveSemiquaverTriplets = 0;
+							} else {
+								if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
+									firstNoteInTuplet = true;
+									checkTupletSettings (noteRest.tuplet);
+									prevTuplet = noteRest.tuplet;
+								}
+								
+								// Is it a semiquaver triplet?
+								if (noteRest.tuplet.actualDuration.ticks == division / 2 && noteRest.tuplet.actualNotes == 3) {
+									if (numConsecutiveSemiquaverTriplets == 0) {
+										if (firstNoteInTuplet && isOnTheBeat) numConsecutiveSemiquaverTriplets = 1;
+									} else {
+										numConsecutiveSemiquaverTriplets ++;
+									}
+									if (numConsecutiveSemiquaverTriplets == 6) addError ('These semiquaver triplets could be rewritten\nas a semiquaver sextuplet.',noteRest);
+								} else {
+									numConsecutiveSemiquaverTriplets = 0;
+								}
+							}
+							
+							// ** ————————————————————————————————————————————————— ** //
+							// ** 		CHECK 10: ILLEGAL NOTE VALUES				** //
+							// ** ————————————————————————————————————————————————— ** //
+							checkIllegalDurations(noteRest);
+							
+						}
 						
 						// *** GO TO NEXT SEGMENT *** //
 						if (cursor.next()) {
