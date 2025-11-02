@@ -206,6 +206,7 @@ MuseScore {
 	property var lastMetronomeComponent: ''
 	property var numConsecutiveMusicBars: 0
 	property var currentStaffNum: 0
+	property var currentStaff: null;
 	property var currentTrack: 0
 	property var currentTimeSig: null
 	property var firstRehearsalMarkStaffNum: 0
@@ -748,7 +749,7 @@ MuseScore {
 		// change back to numStaves
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			
-			var currentStaff = curScore.staves[currentStaffNum];
+			currentStaff = curScore.staves[currentStaffNum];
 			currentBar = firstBarInScore;
 			currentBarNum = 1;
 			currentSystemNum = 0;
@@ -3374,9 +3375,7 @@ MuseScore {
 			}
 		}
 		
-		
 		if (styleComments.length + pageSettingsComments.length > 0) {
-			//logError ("HERE");
 			var errorStr = ["SCORE SETTINGS",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
 			errorStr += "\n\nNOTE: the MN Make Recommended Layout Changes plugin can automatically change these settings for you."
 			addError(errorStr,"pagetop");
@@ -3392,16 +3391,13 @@ MuseScore {
 		var b = Math.round((loc.y + rect.height) * spatium);
 		var thresholdr = pageWidth - maxDistance;
 		var thresholdb = pageHeight - maxDistance - 15;
-		//logError ("Last measure rect is {"+l+" "+t+" "+r+" "+b+"}");
-		//logError ("Borders: "+(thresholdr)+" "+(thresholdb));
-		
 		var checkBottom = true;
+		
 		// if this is a one-page composition, only check the right hand edge of the final system
 		if (numPagesOfMusic == 1) checkBottom = false;
 		
 		// if there is only one staff, only check the right hand edge of the final system
 		if (numStaves == 1) checkBottom = false;
-		// definitely 
 		
 		if (checkBottom && r < thresholdr && b < thresholdb ) {
 			addError("Try and arrange the layout so that the final bar is\nin the bottom right-hand corner of the last page.",lastMeasure);
@@ -3426,6 +3422,12 @@ MuseScore {
 			}
 		}
 	}
+	
+	// ***************************************************************** //
+	// **** CHECK WHETHER THESE HAIRPINS ARE JUST SHORT EXPRESSIVE	**** //
+	// **** 	SWELLS, AND THEREFORE DON’T REQUIRE TERMINATING		**** //
+	// **** 		 DYNAMIC MARKINGS								**** //
+	// ***************************************************************** //
 	
 	function checkExpressiveSwell (nextHairpin) {
 		// *** checks if this hairpin is the start of an expressive swell *** //
@@ -3477,6 +3479,12 @@ MuseScore {
 		//logError ("expressive swell");
 		expressiveSwell = 1;
 	}
+	
+	// ***************************************************************** //
+	// **** CHECK HAIRPINS FOR ANY GENERAL ISSUES, SUCH AS STARTING	**** //
+	// **** 	UNDER A REST, MANUAL POSITIONING, AND TERMINATING	**** //
+	// **** 							 DYNAMICS					**** //
+	// ***************************************************************** //
 	
 	function checkHairpins () {
 		
@@ -3534,6 +3542,12 @@ MuseScore {
 		addError ("This hairpin should have a dynamic at the end,\nor end should be closer to the next dynamic.", currentHairpin);
 	}
 	
+	// ***************************************************************** //
+	// **** 														**** //
+	// **** 			CHECK FERMATAS FOR VARIOUS ISSUES		 	**** //
+	// **** 														**** //
+	// ***************************************************************** //
+	
 	function checkFermata (noteRest) {
 		isFermata = false;
 		if (isNote || isRest) {
@@ -3547,9 +3561,7 @@ MuseScore {
 				var n = theAnnotations.length;
 				for (var i = 0; i < n; i++) {
 					var theElem = theAnnotations[i];
-					//logError ('checking element');
 					if (theElem.type == Element.FERMATA) {
-						//logError ('isFermata');
 						isFermata = true;
 						return;
 					}
@@ -3558,9 +3570,14 @@ MuseScore {
 		}
 	}
 	
+	// ********************************************************************* //
+	// **** 															**** //
+	// **** 	CHECK (NON-STACCATO) ARTICULATION FOR VARIOUS ISSUES	**** //
+	// **** 															**** //
+	// ********************************************************************* //
+	
 	function checkArticulation (noteRest, theArticulationArray) {
 		
-			
 		var numArtic = theArticulationArray.length;
 	
 		for (var i = 0; i < numArtic; i++) {
@@ -3579,24 +3596,16 @@ MuseScore {
 						var prevNote = getPreviousNoteRest(noteRest);
 						var nextNote = getNextNoteRest(noteRest);
 						if (prevNote) {
-							//logError ('prevNote found');
-	
 							var prevNoteArticulationArray = getArticulations(prevNote);
 							if (prevNoteArticulationArray.length > 0) {
-								//logError ('prevNote has '+prevNoteArticulationArray.length+' artics');
 								for (var j = 0; j < prevNoteArticulationArray.length && !prevNoteHasBowMarking ; j++) {
-									//logError ('artic = '+prevNoteArticulationArray [j]);
 									prevNoteHasBowMarking = stringArticulationsArray.includes (prevNoteArticulationArray[j].symbol);
 								}
 							}
 						}
-						if (nextNote) {
-							//logError ('nextNote found');
-	
+						if (nextNote) {	
 							var nextNoteArticulationArray = getArticulations(nextNote);
-							if (nextNoteArticulationArray.length > 0) {
-								//logError ('nextNote has '+nextNoteArticulationArray.length+' artics');
-	
+							if (nextNoteArticulationArray.length > 0) {	
 								for (var j = 0; j < nextNoteArticulationArray.length && !nextNoteHasBowMarking ; j++) {
 									nextNoteHasBowMarking = stringArticulationsArray.includes (nextNoteArticulationArray[j].symbol);
 								}
@@ -5173,6 +5182,7 @@ MuseScore {
 						addError ("Vocal staves should not have their barlines\nconnected to other staves. Click each\nconnected barline and drag up to disconnect.","system1 "+i);
 					}
 				}
+				
 				// *** CHECK GRAND STAFF INSTRUMENT BARLINES *** //
 				if (isTopOfGrandStaff[i]) {
 					if (i > 0 && prevBarlineSpan > 0) {
@@ -6097,20 +6107,21 @@ MuseScore {
 	
 	function checkDecayInstrumentIssues(noteRest) {
 		var dur = noteRest.duration.ticks;
-		if (isArco) return;
 		var n = noteRest.notes[0];
+		
+		// don't check decay instrument issues if this instrument is marked as arco
+		// or if this is a note with a tie going backwards
+		if (isArco || n.tieBack != null) return;
 		var isTied = n.tieForward != null;
 		//logError ('dur = '+dur+'; isTremolo = '+isTremolo+'; isTrill = '+isTrill+' isTied = '+isTied);
-		if (n.tieBack != null) {
-			if (isShortDecayInstrument) {
-				if ((dur > division * 2 || (dur > division && isTied)) && !isTremolo && !isTrill && !isLv) {
-					addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has no sustain.\nConsider shortening to one beat.",noteRest);
-				}
-			} else {
-				if (!isPiano) {
-					if ((dur > division * 4 || (dur > division * 3 && isTied)) && !isTremolo && !isTrill) {
-						addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that can’t sustain the same dynamic for very long.\nConsider shortening it.",noteRest);
-					}
+		if (isShortDecayInstrument) {
+			if ((dur >= division * 2 || (dur >= division && isTied)) && !isTremolo && !isTrill && !isLv) {
+				addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that has no natural sustain.\nConsider shortening to one beat.",noteRest);
+			}
+		} else {
+			if (!isPiano) {
+				if ((dur > division * 4 || (dur > division * 3 && isTied)) && !isTremolo && !isTrill) {
+					addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that can’t sustain\nthe same dynamic for very long. Consider shortening it.",noteRest);
 				}
 			}
 		}
@@ -6267,20 +6278,23 @@ MuseScore {
 		if (noteRest.stem) {
 			//logError ('noteRest.stem');
 			var stemDir = noteRest.stem.stemDirection;
+			var staffLines = currentStaff.lines(fractionFromTicks(currTick));
+			// 1 → 0; 2 → 1; 3→ 2; etc.
+			var midLine = staffLines - 1;
 			if (stemDir != Direction.AUTO) {
 				if (noteRest.beam == null) {
 					//calc dir
 					var calcDir = 0;
 					var nNotes = noteRest.notes.length;
 					if (nNotes == 1) {
-						if (noteRest.notes[0].line < 4) calcDir = 2;
-						if (noteRest.notes[0].line > 4) calcDir = 1;
+						if (noteRest.notes[0].line < midLine) calcDir = 2;
+						if (noteRest.notes[0].line > midLine) calcDir = 1;
 					} else {
-						var minL = noteRest.notes[0].line - 4;
+						var minL = noteRest.notes[0].line - midLine;
 						var maxL = minL;
 					
 						for (var i=1; i<nNotes; i++) {
-							var l = noteRest.notes[i].line - 4;
+							var l = noteRest.notes[i].line - midLine;
 							if (l < minL) minL = l;
 							if (l > maxL) maxL = l;
 						}
@@ -6288,6 +6302,7 @@ MuseScore {
 						if (Math.abs(minL) < Math.abs(maxL)) calcDir = 1;
 					}
 					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
+						logError ('calcDir = '+calcDir+'; noteRest.notes[0].line = '+noteRest.notes[0].line);
 						addError("Note has had stem direction flipped. If this is not deliberate,\nselect the note and press "+cmdKey+"-R.",noteRest);
 						lastStemDirectionFlagBarNum = currentBarNum;
 					}
