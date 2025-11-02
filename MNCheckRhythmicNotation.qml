@@ -51,6 +51,7 @@ MuseScore {
 	property var noteFinishesBeat: false
 	property var hasBeam: false
 	property var nextHasBeam: false
+	property var canCheckThisBar: false
 	property var cursor: null
 	property var cursor2: null
 	property var noteStartBeat: 0
@@ -297,7 +298,7 @@ MuseScore {
 				// **** NOTE, WE ONLY CONSIDER x/8 or x/16 HERE			**** //
 				// **** BECAUSE TIME SIGS LIKE 6/4 ARE MORE AMBIGUOUS	**** //
 				// **** IN THEIR GROUPINGS								**** //
-				var canCheckThisBar = false;
+				canCheckThisBar = false;
 				isCompound = false;
 				if (timeSigDenom == 8 || timeSigDenom == 16) {
 					isCompound = !(timeSigNum % 3);
@@ -540,7 +541,7 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
 							// ** ————————————————————————————————————————————————— ** //
-							if (canCheckThisBar && lastNoteInTie && !isGliss) {
+							if (lastNoteInTie && !isGliss) {
 								if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
 								tiedNotes = [];
 							}
@@ -735,13 +736,13 @@ MuseScore {
 				if (isNote) {
 					if (timeSigStr === '7/8') {
 						if (noteStart != 0 && noteStart != dottedcrotchet) {
-							addError ("Never write a minim in "+timeSigStr+" time,\nunless on beat 1 or after a dotted crotchet,\nas it will be hiding a beat.\nSplit it so it matches the underlying division.", noteRest);
+							addError ("Never write a minim in "+timeSigStr+" time,\nunless on beat 1 or after a dotted crotchet,\nas it will be hiding a beat. Split it\nso that it matches the underlying division.", noteRest);
 						}
 					} else {
-						addError ("Never write a minim in "+timeSigStr+" time,\nas it will be hiding a beat.\nSplit it so it matches the underlying division.", noteRest);
+						addError ("Never write a minim in "+timeSigStr+" time,\nas it will be hiding a beat. Split it\nso that it matches the underlying division.", noteRest);
 					}
 				} else {
-					addError ("Never write a minim rest in "+timeSigStr+" time,\nas it will be hiding a beat.\nSplit it so it matches the underlying division.", noteRest);
+					addError ("Never write a minim rest in "+timeSigStr+" time,\nas it will be hiding a beat. Split it\nso that it matches the underlying division.", noteRest);
 				}
 			}
 		}
@@ -1308,6 +1309,8 @@ MuseScore {
 	
 	function checkTieSimplifications (noteRest) {
 		//logError ("Checking tie simplifications");
+		
+		// ** FOR CERTAIN TIME SIGS LIKE 7/4 ETC, WE CAN ONLY CHECK IF THIS IS ON THE BEAT
 
 		// ** DO TIE SIMPLIFICATION IF WE'RE ON THE LAST NOTE OF THE TIE ** //
 		// ** LOOP THROUGH THE NUMBER OF NOTES IN TIE ** //
@@ -1320,6 +1323,7 @@ MuseScore {
 		var maxOnbeatSimplification = possibleOnbeatSimplificationDurs.length-1;
 		var maxOffbeatSimplification = possibleOffbeatSimplificationDurs.length-1;
 		var maxSimplificationFound = false;
+		var firstNoteIsOnDownbeat = getPositionInBar(tiedNotes[0]) == 0;
 		
 		for (var i = 0; i < tiedNotes.length-1 && !maxSimplificationFound; i++) {
 			var startNote = tiedNotes[i];
@@ -1497,6 +1501,8 @@ MuseScore {
 		}
 		if (simplificationFound) {
 			if (simplificationIsOnBeat) {
+				// if this is an odd time signature like 7/4, etc, only check if the first note was on the downbeat
+				if (!canCheckThisBar && (possibleSimplificationFirstNoteIndex != 0 || !firstNoteIsOnDownbeat)) return;
 				var simplificationText = possibleOnbeatSimplificationLabels[possibleSimplification];
 				var tempText = '';
 				if (tiedDisplayDur == dottedcrotchet && !isCompound) tempText = '[Suggestion] ';
@@ -1506,6 +1512,7 @@ MuseScore {
 				}
 				addError (tempText+'These tied notes can be simplified to a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
 			} else {
+				if (!canCheckThisBar) return;
 				var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
 				var tempText = '';
 				if (tiedDisplayDur == dottedcrotchet && !isCompound) tempText = '[Suggestion] ';
@@ -1517,7 +1524,7 @@ MuseScore {
 			}
 		} else {
 			// check for two note ties wrong way around
-			if (tiedNotes.length == 2) {
+			if (tiedNotes.length == 2 && canCheckThisBar) {
 				var note1 = tiedNotes[0];
 				var note2 = tiedNotes[1];
 				if (note1.tuplet == null && note2.tuplet == null) {
