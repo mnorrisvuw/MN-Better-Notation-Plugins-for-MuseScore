@@ -293,16 +293,17 @@ MuseScore {
 				var expectedDuration = timeSigNum * (semibreve/timeSigDenom);
 				isPickupBar = currentBarNum == 1 && expectedDuration != barDur;
 				
-				// **** CALCULATE IF THIS IS A COMPOUND TIME SIGNATURE **** //
+				// **** CALCULATE IF THIS IS A COMPOUND TIME SIGNATURE	**** //
+				// **** NOTE, WE ONLY CONSIDER x/8 or x/16 HERE			**** //
+				// **** BECAUSE TIME SIGS LIKE 6/4 ARE MORE AMBIGUOUS	**** //
+				// **** IN THEIR GROUPINGS								**** //
 				var canCheckThisBar = false;
 				isCompound = false;
 				if (timeSigDenom == 8 || timeSigDenom == 16) {
 					isCompound = !(timeSigNum % 3);
 					if (isCompound) beatLength = (division * 12) / timeSigDenom;
 				}
-				if (timeSigDenom == 4 || timeSigDenom == 2) isCompound = !(timeSigNum % 3) && (timeSigNum > 3);
 
-				
 				// ****             CALCULATE THE 'VIRTUAL BEAT LENGTH' 				   **** //
 				// **** This is the underlying pulse, e.g. in 5/16, it would be 16th notes **** //
 				// **** However, this is different from the 'beaming beat length'          **** //
@@ -318,7 +319,6 @@ MuseScore {
 				canCheckThisBar = (isCompound && timeSigDenom > 4) || timeSigNum < 5 || timeSigNum % 2 == 0 || timeSigDenom <= 4;
 		
 				// ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
-				
 				var startTrack = currentStaffNum * 4;
 				var endTrack = startTrack + 4;
 				var maxMusicDurThisBar = 0;
