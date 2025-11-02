@@ -3579,11 +3579,17 @@ MuseScore {
 	function checkArticulation (noteRest, theArticulationArray) {
 		
 		var numArtic = theArticulationArray.length;
-	
+		
 		for (var i = 0; i < numArtic; i++) {
 			var theArticulation = theArticulationArray[i];
 			if (theArticulation.visible) {
 				var theSymbol = theArticulation.symbol;
+				
+				// CHECK USE OF WIGGLE VIBRATO
+				if (theSymbol >= SymId.wiggleVibrato && theSymbol <= SymId.wiggleWavyWide) {
+					addError ("These vibrato articulations are non-standard.\nIt’s usually better to just write (e.g.)\n‘molto vib.’ or ‘slow, wide vibrato’.", theArticulation);
+					continue;
+				}
 				
 				// CHECK FOR UPBOW/DOWNBOW MARKINGS IN NON-STRING INSTRUMENTS
 				var hasBowMarking = stringArticulationsArray.includes(theSymbol);
