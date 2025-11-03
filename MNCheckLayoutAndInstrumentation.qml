@@ -210,6 +210,7 @@ MuseScore {
 	property var currentTrack: 0
 	property var currentTimeSig: null
 	property var firstRehearsalMarkStaffNum: 0
+	property var isFirstNote: false
 	property var isCompound: false
 	property var currentClef: null
 	property var currentClefNum: 0
@@ -528,7 +529,7 @@ MuseScore {
 		}
 		
 		// ************  	INITIALISE LOCAL VARIABLES 	************ //
-		var prevBarNum = 0, isFirstNote = false, numBarsProcessed = 0;
+		var prevBarNum = 0, numBarsProcessed = 0;
 		var isTied = false;
 		
 		
@@ -1203,7 +1204,12 @@ MuseScore {
 										if (theDynamic.offsetX < -1.5) {
 											addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
 										} else {
-											if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
+											if (theDynamic.offsetX > 1.5) {
+												addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+												} else {
+													if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
+												}
+											}
 										}
 									}
 									maxLLSinceLastRest = 0;
@@ -3827,10 +3833,10 @@ MuseScore {
 			if (lowerCaseText.includes("arco") && !lowerCaseText.includes("senza arco")) {
 				if (currentPlayingTechnique === "arco") {
 					if (!isBracketed) {
-						if (haveHadPlayingIndication) {
+						if (haveHadPlayingIndication || !isFirstNote) {
 							addError("Instrument is already playing arco?",textObject);
 						} else {
-							addError("It’s not necessary to mark arco, as this is the default.",textObject);
+							addError("It’s not necessary to mark ‘arco’, as this is the default.",textObject);
 						}
 					}
 				} else {
@@ -4610,6 +4616,7 @@ MuseScore {
 					if (containsMetronomeComponent || containsTempoComponent) {
 						//logError ('Found metronome component');
 						if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
+						if (textObject.offsetX > 4.5) addError ("This tempo marking looks like it is further right than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
 					}
 					
 					// *** CHECK ANY METRONOME MARKING COMPONENT *** //
@@ -6815,8 +6822,8 @@ MuseScore {
 					comment.fontFace = "Helvetica";
 					comment.align = Align.TOP;
 					comment.autoplace = false;
-					comment.offsetx = 0;
-					comment.offsety = 0;
+					comment.offsetX = 0;
+					comment.offsetY = 0;
 					commentCursor.add(comment);
 					comment.z = currentZ;
 					currentZ ++;
