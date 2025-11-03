@@ -238,6 +238,7 @@ MuseScore {
 		var firstNoteInTuplet, prevTuplet;
 		var loop = 0;
 		var totalNumLoops = numStaves * numBars * 4;
+		var oddTimeSigPresent = false;
 		setProgress (5);
 		
 		// *********************************************************************** //
@@ -318,7 +319,7 @@ MuseScore {
 				// 3) the numerator is even (this allows 10/2, 14/8, etc)
 				// 4) the timeSigDenom is <= 4 (this allows 5/4, etc)
 				canCheckThisBar = (isCompound && timeSigDenom > 4) || timeSigNum < 5 || timeSigNum % 2 == 0 || timeSigDenom <= 4;
-		
+				if (!canCheckThisBar) oddTimeSigPresent = true;
 				// ** LOOP THROUGH ALL THE NOTERESTS IN THIS BAR ** //
 				var startTrack = currentStaffNum * 4;
 				var endTrack = startTrack + 4;
@@ -636,19 +637,23 @@ MuseScore {
 		
 		// ************ DESELECT ALL AND FORCE REDRAW ************ //
 		selectNone();
-				
+		curScore.endCmd();
+
 		// ** SHOW INFO DIALOG ** //
 		var numErrors = errorStrings.length;
+		
+		// ** PUT THE MESSAGE TOGETHER FROM THE BOTTOM UP ** //
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
+		if (oddTimeSigPresent) errorMsg = "<p>(NB: some odd time signatures (e.g. 5/4, 5/8, 7/4, 7/8, etc) were detected, which I couldn’t check for all rhythmic errors because they can be subdivided in different ways. Please check that the subdivisions into 2s and 3s match between all instruments in these bars.)</p>" + errorMsg;
+
 		if (numErrors == 0) errorMsg = "<p>CHECK COMPLETED: Congratulations — no issues found!</p><p><font size=\"6\">🎉</font></p>"+errorMsg;
 		if (numErrors == 1) errorMsg = "<p>CHECK COMPLETED: I found one issue.</p><p>Please check the score for the yellow comment box that provides more details of the issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove the comment and pink highlight.</p>" + errorMsg;
 		if (numErrors > 1 && numErrors <= 100) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
-		if (numErrors > 100) errorMsg = "<p>CHECK COMPLETED: I found over 100 issues — I have only flagged the first 100.<p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
-
+		if (numErrors > 100) errorMsg = "<p>CHECK COMPLETED: I found over 100 issues — I have only flagged the first 100.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		if (progressShowing) progress.close();
-		curScore.endCmd();
 
 		var h = 250+numLogs*10;
+		if (oddTimeSigPresent) h += 80;
 		if (h > 500) h =500;
 		dialog.height = h;
 		dialog.contentHeight = h;
@@ -736,13 +741,13 @@ MuseScore {
 				if (isNote) {
 					if (timeSigStr === '7/8') {
 						if (noteStart != 0 && noteStart != dottedcrotchet) {
-							addError ("Never write a minim in "+timeSigStr+" time,\nunless on beat 1 or after a dotted crotchet,\nas it will be hiding a beat. Split it\nso that it matches the underlying division.", noteRest);
+							addError ("Never write a minim in "+timeSigStr+" time, unless\non beat 1 or after a dotted crotchet,\nas it will be hiding a beat. Split it so that\nit matches the underlying division.", noteRest);
 						}
 					} else {
-						addError ("Never write a minim in "+timeSigStr+" time,\nas it will be hiding a beat. Split it\nso that it matches the underlying division.", noteRest);
+						addError ("Never write a minim in "+timeSigStr+" time,\nas it will be hiding a beat. Split it so that\nit matches the underlying division.", noteRest);
 					}
 				} else {
-					addError ("Never write a minim rest in "+timeSigStr+" time,\nas it will be hiding a beat. Split it\nso that it matches the underlying division.", noteRest);
+					addError ("Never write a minim rest in "+timeSigStr+" time,\nas it will be hiding a beat. Split it so that\nit matches the underlying division.", noteRest);
 				}
 			}
 		}

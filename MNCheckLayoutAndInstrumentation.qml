@@ -1305,7 +1305,7 @@ MuseScore {
 									var graceNotes = noteRest.graceNotes;
 									var hasGraceNotes = graceNotes.length > 0;
 									if (hasGraceNotes) {
-										checkGraceNotes(graceNotes, noteRest, currentStaffNum);
+										checkGraceNotes(graceNotes, noteRest);
 										numNoteRestsInThisSystem += graceNotes.length / 2; // grace notes only count for half
 										prevWasGraceNote = true;
 									}
@@ -1347,10 +1347,10 @@ MuseScore {
 									if (doCheckStrings && isStringInstrument) {
 									
 										// ************ CHECK STRING HARMONIC ************ //
-										checkStringHarmonic(noteRest, currentStaffNum); // make sure we call this BEFORE multiple stops and divisi, as it checks for false harmonics
+										checkStringHarmonic(noteRest); // make sure we call this BEFORE multiple stops and divisi, as it checks for false harmonics
 									
 										// ************ CHECK DIVISI ************ //
-										if (isStringSection) checkDivisi (noteRest, currentStaffNum);
+										if (isStringSection) checkDivisi (noteRest);
 									
 										// ************ CHECK PIZZ ISSUES ************ //
 										if (currentPlayingTechnique === "pizz") checkPizzIssues(noteRest);
@@ -1387,7 +1387,7 @@ MuseScore {
 								// **** CHECK SLUR ISSUES **** //
 								// We do this last so we can check if there were grace notes beforehand
 								// Also note that we might call 'checkSlurIssues' multiple times for the same slur, because we check for each note under the slur
-								if (doCheckSlursAndTies && isSlurred && currentSlur != null) checkSlurIssues(noteRest, currentStaffNum, currentSlur);
+								if (doCheckSlursAndTies && isSlurred && currentSlur != null) checkSlurIssues(noteRest, currentSlur);
 							
 								prevSoundingDur = soundingDur;
 							
@@ -4696,7 +4696,7 @@ MuseScore {
 						if (metronomeComponent != '' && metronomeComponent === lastMetronomeComponent) {
 				
 							if (lastTempoChangeMarking > -1 && !(styledText.includes('a tempo') || styledText.includes('mouv'))) {
-								addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking?', textObject);
+								addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar+'.\nDid you mean to include an ‘a tempo’ marking,\nor are you missing a rit./accel.?', textObject);
 							} else {
 								addError ('This looks like the same metronome marking that was set in b. '+lastMetronomeMarkingDisplayBar, textObject);
 							}
@@ -5246,37 +5246,45 @@ MuseScore {
 		if (str != null) {
 			if (singleJoinedBracketArray.includes(str)) {
 				// this score only needs one bracket
-				//logError ('checking singleJoined');
+				var theBrackets = [];
 				for (var i = 0; i < numStaves; i++) {
-					//logError ('checking staff '+i);
-					if (staffVisible[i]) {
-						//logError ('staff '+i+' is visible');
-	
+					if (staffVisible[i]) {	
 						var theStaff = curScore.staves[i];
+						var numBrackets = theStaff.brackets.length;
+						
 						if (i == firstVisibleStaff) {
-							//logError ('first visible staff has '+theStaff.brackets.length+' brackets');
-	
-							if (theStaff.brackets.length == 0) {
-								addError ('For '+str+'s, add a single bracket on the left from the Brackets palette.','system1 0');
-								return;
-							} else {
-								if (theStaff.brackets.length == 1) {
-									//logError ('first system bracket is '+theStaff.brackets[0].systemBracket+'; bracketType Normal = '+BracketType.NORMAL+'; bracketType brace = '+BracketType.BRACE);
-									//logError ('theStaff.brackets[0].bracketSpan = '+theStaff.brackets[0].bracketSpan+'; visibleStaffSpan = '+visibleStaffSpan);
-	
-									if (theStaff.brackets[0].systemBracket != BracketType.NORMAL) {
-										addError ('This bracket is the wrong kind of bracket for '+str+'.\nDelete it and add a normal bracket instead',theStaff.brackets[0]);
-									} else {
-										if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) {
-											addError ('For '+str+'s, the staff bracket should span the entire system.',theStaff.brackets[0]);
-										}
-									}
+							
+							// *** Check if no brackets have been added *** //
+							if (numBrackets == 0) addError ('For '+str+'s, there should be a single bracket around the entire system.\nAdd a bracket from the Brackets palette.','system1 0');
+							
+							if (numBrackets == 1) {
+
+								// *** Check if the bracket is a normal system bracket *** //
+								if (theStaff.brackets[0].systemBracket != BracketType.NORMAL) {
+									addError ('This bracket is the wrong kind of bracket for '+str+'.\nDelete it and add a normal bracket instead',theStaff.brackets[0]);
 								} else {
-									addError ('For '+str+'s, you only need one staff bracket.\nSelect all unnecessary brackets and press ‘delete’.',theStaff.brackets[1]);
+									// *** Check if the bracket spans the whole system *** //
+									if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) addError ('For '+str+'s, the staff bracket should span the entire system.\nClick and drag the bottom of the bracket down to the end of the system.',theStaff.brackets[0]);
 								}
+								
 							}
 						}
+						for (var j = 0; j < numBrackets; j++) theBrackets.push(theStaff.brackets[j]);
+						
 					}
+				}
+				if (theBrackets.length > 1) {
+					var bracketsToHighlight = [];
+					var foundNormalBracket = false;
+					for (var j = 0; j < theBrackets.length; j++) {
+						var theBracket = theBrackets[j];
+						if (theBrackets[j].systemBracket == BracketType.NORMAL && ! foundNormalBracket) {
+							foundNormalBracket = true;
+						} else {
+							bracketsToHighlight.push(theBracket);
+						}
+					}
+					addError ('For '+str+'s, you only need one system bracket.\nSelect all unnecessary brackets and press ‘delete’.',bracketsToHighlight);
 				}
 			}
 			
@@ -5663,7 +5671,7 @@ MuseScore {
 						return;
 					} else {
 						//logError("stringNames[stringNum - 1] = "+(stringNames[stringNum - 1])+" stringNum - 1 = "+(stringNum-1));
-						addError ("This chord is impossible to play, because there are\ntwo notes that can only be played on the "+(stringNames[stringNum - 1])+" string.",chord);
+						addError ("This chord is impossible to play, because it contains\ntwo notes that can only be played on the "+(stringNames[stringNum - 1])+" string.",chord);
 						return;
 					}
 				}
@@ -5738,7 +5746,7 @@ MuseScore {
 		return a;
 	}
 	
-	function checkStringHarmonic (noteRest, staffNum) {
+	function checkStringHarmonic (noteRest) {
 
 		var harmonicCircleIntervals = [12,19,24,28,31,34,36,38,40,42,43,45,46,47,48];
 		var diamondHarmonicIntervals = [3,4,5,7,9,12,16,19,24,28,31,34,36];
@@ -5828,7 +5836,6 @@ MuseScore {
 			var harmonicArray = [];
 			var noteheadStyle = theNotes[0].headGroup;
 			var isHarmonicCircle = false;
-			if (typeof staffNum !== 'number') logError("checkStringHarmonic() — Artic error, numNotes == 1");
 			//logError("The artic sym = "+theArticulationArray.symbol.toString()+'; noteheadStyle = '+noteheadStyle);
 			// CHECK FOR HARMONIC CIRCLE ARTICULATION ATTACHED TO THIS NOTE
 			for (var i = 0; i < theArticulationArray.length; i++) {
@@ -5882,7 +5889,7 @@ MuseScore {
 		}
 	}
 	
-	function checkDivisi (noteRest, staffNum) {
+	function checkDivisi (noteRest) {
 		if (noteRest.notes.length > 1) {
 			// we have a chord
 			//logError ('Checking div — isDiv = '+isDiv+' flaggedDivError = '+flaggedDivError+' isStringHarmonic = '+isStringHarmonic);
@@ -5963,7 +5970,7 @@ MuseScore {
 		}
 	}
 	
-	function checkSlurIssues (noteRest, staffNum, currentSlur) {
+	function checkSlurIssues (noteRest, currentSlur) {
 		//logError("Slur off1 "+currentSlur.slurUoff1+" off2 "+currentSlur.slurUoff2+" off3 "+currentSlur.slurUoff3+" off4 "+currentSlur.slurUoff4);
 		var currSlurTick = noteRest.parent.tick;
 		
@@ -6076,7 +6083,6 @@ MuseScore {
 			}
 			
 			if (!isStartOfSlur && !isEndOfSlur) {
-				if (typeof staffNum !== 'number') logError("checkSlurIssues() — Articulation error");
 			
 				var theArticulationArray = getArticulations(noteRest);
 				if (theArticulationArray.length > 0) {
@@ -6100,7 +6106,7 @@ MuseScore {
 			var maxSlurDuration = maxSlurDurations[currDynamicLevel];
 			var cursor2 = curScore.newCursor();
 
-			cursor2.staffIdx = staffNum;
+			cursor2.staffIdx = currentStaffNum;
 			cursor2.track = 0;
 			cursor2.rewindToTick(currSlurTick);
 			var beatDurInSecs = 1./cursor2.tempo;
@@ -6396,7 +6402,7 @@ MuseScore {
 		}
 	}
 	
-	function checkGraceNotes (graceNotes,noteRest,staffNum) {
+	function checkGraceNotes (graceNotes,noteRest) {
 
 		//logError ('Checking grace notes');
 		var n = graceNotes.length;
