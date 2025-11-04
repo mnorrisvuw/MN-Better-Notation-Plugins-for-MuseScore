@@ -531,10 +531,10 @@ MuseScore {
 		// ************  	INITIALISE LOCAL VARIABLES 	************ //
 		var prevBarNum = 0, numBarsProcessed = 0;
 		var isTied = false;
-		
+		cursor = curScore.newCursor();
+		var prevTick = [];
 		
 		// ************  	GET USER-SELECT OPTIONS 	************ //
-
 		doCheckScoreStyle = options.scoreStyle;
 		doCheckPartStyle = options.partStyle;
 		doCheckPageSettings = options.pageSettings;
@@ -565,18 +565,10 @@ MuseScore {
 		doCheckStrings = options.strings;
 		doCheckBarStretches = options.barStretches;
 		
-		//logError (doCheckScoreStyle+' '+doCheckPartStyle+' '+doCheckTempoMarkings+' '+doCheckDynamics);
-		
+		// ************  	CLOSE THE OPTIONS WINDOW 	************ //	
 		options.close();
-		
-		// ************  	INITIALISE VARIABLES 	************ //
-
-		cursor = curScore.newCursor();
-
-		var prevTick = [];
-		
-		
-		// ** calculate number of parts, but ignore hidden ones
+				
+		// ************  	CALCULATE NUMBER OF PARTS 	************ //	
 		parts = curScore.parts;
 		numParts = 0;
 		for (var i = 0; i < parts.length; i++) if (parts[i].show) visibleParts.push(parts[i]);
@@ -587,7 +579,6 @@ MuseScore {
 			dialog.fontSize = 12;
 		}
 		numExcerpts = curScore.excerpts.length;
-		
 		if (doCheckPartStyle && numParts > 1 && numExcerpts < numParts && !isChoirScore) addError ("Parts have not yet been created/opened, so I wasn’t able to check the part settings.\nYou can do this by clicking ‘Parts’ then ’Open All’.\n\nOnce you have created and opened the parts, please run this again to check the parts.\nIgnore this message if you do not plan to create parts.","pagetopright");
 		
 		// **** INITIALISE ALL ARRAYS **** //
@@ -651,12 +642,9 @@ MuseScore {
 		// ************  	CHECK SPACING BETWEEN SYSTEMS 	************ //
 		checkSystemSpacing();
 		
-		
-		// WORK OUT THE MEASURE THAT STARTS THE SECOND SYSTEM
-		
+		// ************  	SET UP VARIABLES THAT DEAL WITH PAGES AND SYSTEMS 	************ //
 		var firstSystem = firstBarInScore.parent;
 		var lastSystem = lastBarInScore.parent;
-		
 		if (firstSystem == null) {
 			firstSystem = firstMMRSystem;
 			if (firstSystem == null) logError ('first system is null!');
@@ -666,7 +654,6 @@ MuseScore {
 			if (lastSystem == null) logError ('last system is null!');
 		}
 		hasMoreThanOneSystem = !lastSystem.is(firstSystem);
-		
 		firstPageOfMusic = firstSystem.parent;
 		var lastPageOfMusic = lastSystem.parent;
 		firstPageOfMusicNum = firstPageOfMusic.pagenumber;
@@ -681,7 +668,7 @@ MuseScore {
 		}
 		
 		// ************					CHECK REHEARSAL MARKS						************ //
-		// do this before checking the score settings
+		// NB: do this before checking the score settings
 		if (doCheckRehearsalMarks && numBars > 30 && numStaves > 3 && !isSoloScore) checkRehearsalMarks();
 
 		// ************  				CHECK SCORE & PAGE SETTINGS 				************ // 
@@ -747,7 +734,6 @@ MuseScore {
 		
 		//MARK: currentStaffNum loop
 		// ************ 					START LOOP THROUGH WHOLE SCORE 						************ //
-		// change back to numStaves
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			
 			currentStaff = curScore.staves[currentStaffNum];
@@ -761,7 +747,6 @@ MuseScore {
 				loop += numBars * 4;
 				continue;
 			}
-			//logError("top = "+isTopOfGrandStaff[currentStaffNum]);
 			
 			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
 			prevKeySigSharps = -99; // placeholder/dummy variable
@@ -900,8 +885,7 @@ MuseScore {
 			numOttavas = ottavas[currentStaffNum].length;
 			nextOttavaStart = (numOttavas == 0) ? 0 : ottavas[currentStaffNum][0].spanner.spannerTick.ticks;
 			
-			// **** REWIND TO START OF SELECTION **** //
-			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
+			// **** GET INSTRUMENT ID & NAME OF THIS STAFF **** //
 			currentInstrumentId = currentStaff.part.musicXmlId;
 			currentInstrumentName = currentStaff.part.longName;
 			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — this routine does that
@@ -918,6 +902,7 @@ MuseScore {
 			currentClefBarNum = 1;
 			firstNoteSinceClefChange = false;
 			
+			// **** GET THE STARTING CLEF OF THIS INSTRUMENT **** //
 			// NB: call checkClef AFTER the currentInstrumentName/Id setup and AFTER set InstrumentVariables
 			if (currentClef != null) {
 				checkClef(currentClef);
@@ -929,9 +914,9 @@ MuseScore {
 						
 			// **** CHECK FOR VIBRAPHONE BEING NOTATED ON A GRAND STAFF **** //
 			if (doCheckPianoHarpAndPercussion && isVibraphone && isTopOfGrandStaff[currentStaffNum]) addError('Vibraphones are normally notated on a single treble staff,\nrather than a grand staff.','system1 '+currentStaffNum);
-									
+			
+			// **** MAIN MEASURE LOOP HERE **** //
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
-				
 				if (currentStaffNum == 0) {
 					if (currentBarNum > 1 && currentBarNum < 4) {
 						if (barContainsMetronome && !barContainsTempo && lastTempoMarking != null) {
@@ -939,9 +924,9 @@ MuseScore {
 						}
 					} 
 				}
+				
 				//logError ('barloop '+currentBarNum);
 				if (currentBar.irregular) displayOffset ++;
-				
 				barStartTick = currentBar.firstSegment.tick;
 				barEndTick = currentBar.lastSegment.tick;
 				barLength = barEndTick - barStartTick;
@@ -959,15 +944,12 @@ MuseScore {
 				var startTrack = currentStaffNum * 4;
 				var firstNoteInThisBar = null;
 				var stretch = currentBar.userStretch;
+				
+				// **** GET CURRENT TIME SIGNATURE OF THIS BAR	**** //
+				// **** AND CALCULATE THE BEAT LENGTH			**** //
 				currentTimeSig = currentBar.timesigNominal;
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
-				// ********* COUNT HOW MANY VOICES THERE ARE IN THIS BAR ********* //
-				
-				numVoicesInThisBar = voicesArray[currentBarNum-1][currentStaffNum][0] + voicesArray[currentBarNum-1][currentStaffNum][1] + voicesArray[currentBarNum-1][currentStaffNum][2] + voicesArray[currentBarNum-1][currentStaffNum][3];
-				//logError ('bar '+currentBarNum+'; staffNum = '+currentStaffNum+'; numVoicesInThisBar = '+numVoicesInThisBar);
-				
-				// default is beatLength = crotchet
 				beatLength = division;
 				isCompound = !(timeSigNum % 3);
 				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
@@ -988,9 +970,13 @@ MuseScore {
 					var isMMR = mmrs[currentBarNum] != null;
 					if (stretch != 1 && doCheckBarStretches && !isMMR) {
 						addError("The stretch for this bar is set to "+stretch+";\nits spacing may not be consistent with other bars.\nYou can reset it by choosing Format→Stretch→Reset Layout Stretch.",currentBar);
-						//logError ('stretch != 1 — isMMR = '+isMMR+' because currentBar = '+currentBar+' parent = '+currentBar.parent);
 					}
 				}
+				
+				// ********* COUNT HOW MANY VOICES THERE ARE IN THIS BAR ********* //
+				numVoicesInThisBar = voicesArray[currentBarNum-1][currentStaffNum][0] + voicesArray[currentBarNum-1][currentStaffNum][1] + voicesArray[currentBarNum-1][currentStaffNum][2] + voicesArray[currentBarNum-1][currentStaffNum][3];
+				
+				// ********** TO DO — MAYBE DON'T NEED TO DO THIS? ******** //				
 				var tempSystem = currentBar.parent;
 				if (tempSystem == null) {
 					currentSystem = null;
@@ -1031,13 +1017,6 @@ MuseScore {
 				
 				// ************ CHECK UNTERMINATED TEMPO CHANGE (e.g. rit/accel without a final tempo marking) ************ //
 				if (doCheckTempoMarkings) {
-					/*if (lastTempoChangeMarkingBar != -1 && tempoChangeMarkingEnd == -1 && lastTempoChangeMarking != null && currentBarNum >= lastTempoChangeMarkingBar + 8 && lastTempoChangeMarking.type != Element.GRADUAL_TEMPO_CHANGE) {
-						// check here for textual tempo change markings that are not a special 'gradual tempo change' element
-						// NB: Gradual tempo change elements are checked later, so we can check the whole bar for any terminating markings
-						addError("You have indicated a tempo change here,\nbut I couldn’t find a new tempo marking, nor\nan ‘a tempo’ or ‘tempo primo’ marking.",lastTempoChangeMarking);
-						lastTempoChangeMarkingBar = -1;
-						tempoChangeMarkingEnd = -1;
-					}*/
 					
 					// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 					if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 2 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
@@ -1055,6 +1034,7 @@ MuseScore {
 					prevClefType = firstClefTypeInBar;
 				}
 				
+				// ****  MAIN TRACK LOOP HERE  **** //
 				for (currentTrack = startTrack; currentTrack < startTrack + 4; currentTrack ++) {
 					var numNotesInThisTrack = 0;
 					var numNoteRestsInThisTrack = 0;
@@ -1105,7 +1085,7 @@ MuseScore {
 								if (tempoText.length > 0) t = tempoText[0];
 							}
 						}
-						//if (currTick == barEndTick) logError ('Wont calc because currTick == barEndTick');
+
 						if (currTick != barEndTick) {
 							
 							// ** CHECK IF MELISMA IS STILL GOING ** //
@@ -1197,18 +1177,16 @@ MuseScore {
 								
 								if (isRest) {
 									
-									// ************ CHECK DYNAMICS UNDER RESTS ********** //
-									//logError ('doCheckDynamics = '+doCheckDynamics+'; tickHasDynamic = '+tickHasDynamic()+'; isGrandStaff = '+isGrandStaff[currentStaffNum]);
+									// ************ CHECK DYNAMICS WITH SIGNIFICANT HORIZONTAL OFFSETS 	********** //
+									// ************ AND DYNAMICS UNDER RESTS							********** //
 									if (doCheckDynamics && tickHasDynamic() && !isGrandStaff[currentStaffNum]) {
-										//logError ('allTracksHaveRestsAtCurrTick = '+allTracksHaveRestsAtCurrTick());
 										if (theDynamic.offsetX < -1.5) {
 											addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
 										} else {
 											if (theDynamic.offsetX > 1.5) {
 												addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
-												} else {
-													if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
-												}
+											} else {
+												if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
 											}
 										}
 									}
@@ -1402,17 +1380,13 @@ MuseScore {
 							if (isNote) {
 								if (isFirstNote) {
 									isFirstNote = false;
-									//logError('firstDynamic = '+firstDynamic);
 									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
 									if (doCheckDynamics && !firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.\n(If there is a dynamic underneath, it may be too far to the right.)",noteRest);
 								
 								} else {
 								
 									// ************ CHECK DYNAMIC RESTATEMENT ************ //
-									if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic() && !isGrandStaff[currentStaffNum] ) {
-										addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
-										//logError (barsSincePrevNote +' tickHasDynamic is now '+tickHasDynamic());
-									}
+									if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic() && !isGrandStaff[currentStaffNum] ) addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
 								}
 							}
 						}
@@ -1438,6 +1412,7 @@ MuseScore {
 						prevSlurNumOnTrack[currentTrack] = currentSlurNumOnTrack[currentTrack];
 						prevTick[currentTrack] = currTick;
 					} // end while processingThisBar
+					
 					if (numNoteRestsInThisTrack > 0) {
 						numTracksWithNoteRests ++;
 					} else {
@@ -1446,7 +1421,6 @@ MuseScore {
 					}
 					if (numNotesInThisTrack > 0) numTracksWithNotes ++;
 				} // end track loop
-			
 				
 				if (doCheckOrchestralSharedStaves && isWindOrBrassInstrument && isSharedStaff) {
 					if (numTracksWithNoteRests > 1 || isChord) {
@@ -2656,9 +2630,9 @@ MuseScore {
 				if (full1l === 'violas 2' || full1l === 'viola 2') addError ("Change the long name of staff "+displaystaffnum+" to ‘Viola II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
 				if (full1l === 'cellos 2' || full1l === 'cello 2') addError ("Change the long name of staff "+displaystaffnum+" to ‘Cello II’\n(see ‘Behind Bars’, p. 509 &amp; 515)", "system1 "+staffnum);
 				
-				if (full1l === 'violas') addError ("Change the long name of staff "+displaystaffnum+" to ‘Viola’ (see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
-				if (full1l === 'violoncellos' || full1l === 'violoncello') addError ("Change the long name of staff "+displaystaffnum+" to ‘Cello’ (see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
-				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+displaystaffnum+" to ‘Double Bass’ or ‘D. Bass’ (see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
+				if (full1l === 'violas') addError ("Change the long name of staff "+displaystaffnum+" to ‘Viola’\n(see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
+				if (full1l === 'violoncellos' || full1l === 'violoncello') addError ("Change the long name of staff "+displaystaffnum+" to ‘Cello’\n(see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
+				if (full1l === 'contrabasses' || full1 === 'Double basses' || full1l === 'contrabass') addError ("Change the long name of staff "+displaystaffnum+" to ‘Double Bass’ or ‘D. Bass’\n(see ‘Behind Bars’, p. 509)", "system1 "+staffnum);
 				if (full1l === 'classical guitar') addError ("Change the long name of staff "+displaystaffnum+" to just ‘Guitar’", "system1 "+staffnum);
 				
 				// search for numbers for Roman Numerals
@@ -2679,9 +2653,9 @@ MuseScore {
 				if (short1l === 'vlas. 2' || short1l === 'vla. 2' || short1l === 'vlas 2' || short1l === 'vla 2' || short1l === 'va 2' || short1l === 'va. 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vla. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
 				if (short1l === 'vcs. 2' || short1l === 'vc. 2' || short1l === 'vcs 2' || short1l === 'vc 2') addError ("Change the short name of staff "+(i+1)+" to ‘Vc. II’\n(see ‘Behind Bars’, p. 509 & 515)", "system2 "+i);
 				
-				if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
-				if (short1l === 'vcs.') addError ("Change the short name of staff "+(i+1)+" to ‘Vc.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
-				if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’ (see ‘Behind Bars’, p. 509)", "system2 "+i);
+				if (short1l === 'vlas.') addError ("Change the short name of staff "+(i+1)+" to ‘Vla.’\n(see ‘Behind Bars’, p. 509)", "system2 "+i);
+				if (short1l === 'vcs.') addError ("Change the short name of staff "+(i+1)+" to ‘Vc.’\n(see ‘Behind Bars’, p. 509)", "system2 "+i);
+				if (short1l === 'cbs.' || short1l === 'dbs.' || short1l === 'd.bs.' || short1l === 'cb.') addError ("Change the short name of staff "+(i+1)+" to ‘D.B.’\n(see ‘Behind Bars’, p. 509)", "system2 "+i);
 				// search for numbers for Roman Numerals
 				if (!numberRegex.test(short1l)) {
 					for (var x = 0; x < pluralWindsAndBrassShort.length; x++) {
@@ -5170,12 +5144,12 @@ MuseScore {
 		
 		// if str is not null, then it's a standard ensemble where all the staff lines should be connected
 		if (str != null) {
-			for (var i = 0; i < lastVisibleStaff-1; i++) {
+			for (var i = 0; i < lastVisibleStaff; i++) {
 				if (staffVisible[i]) {
 					var staff = curScore.staves[i];
 					//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
 					if (staff.staffBarlineSpan == 0) {
-						addError ("The barlines should go through all of the staves for a "+str,"system1 0");
+						addError ("In a "+str+", the barlines should go through all staves.\nClick and drag the bottom of a barline to extend down through the entire score.","system1 0");
 						return;
 					}
 				}
@@ -5184,7 +5158,7 @@ MuseScore {
 		
 		// check vocal staves and grand staff instruments that have been incorrectly connected
 		var prevBarlineSpan = 0;
-		for (var i = 0; i < lastVisibleStaff-1; i++) {
+		for (var i = 0; i < lastVisibleStaff; i++) {
 			if (staffVisible[i]) {
 				var staff = curScore.staves[i];
 				var barlineSpan = staff.staffBarlineSpan;
@@ -5923,7 +5897,7 @@ MuseScore {
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (theArticulationArray[i].visible) {
 					if (staccatoArray.includes(theArticulationArray[i].symbol)) {
-						addError("It’s not recommended to have a staccato articulation on a pizzicato note.", noteRest);
+						addError("It’s not recommended to have a\nstaccato articulation on a pizzicato note.", noteRest);
 						lastPizzIssueBar = currentBarNum;
 						lastPizzIssueStaff = currentStaffNum;
 						return;
@@ -7001,7 +6975,6 @@ MuseScore {
 			// as such, we should probably avoid highlighting beams until this is fixed
 			logError ('Found beam: tick = '+e.tick);
 		}
-		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
 		if (e.spanner != undefined) {
 			return e.spanner.spannerTick.ticks;
 		} else {
