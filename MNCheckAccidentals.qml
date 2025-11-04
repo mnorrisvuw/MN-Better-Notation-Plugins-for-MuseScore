@@ -1139,18 +1139,31 @@ MuseScore {
 		errorObjects.push(element);
 	}
 	
+	//---------------------------------------------------------
+	//	getTick
+	//	returns the tick of the element
+	//---------------------------------------------------------
+	
 	function getTick (e) {
-		var tick = 0;
+		if (e == null) {
+			logError ("getTick() — tried to get tick of null");
+			return 0;
+		}
 		var eType = e.type;
-		var spannerArray = [Element.HAIRPIN, Element.SLUR, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
-		if (spannerArray.includes(eType)) {
-			tick = e.spannerTick.ticks;
+		if (eType == Element.BEAM) {
+			// In MS 4.6 currently, there's no way to get the tick of a beam, or to get its child elements to get their ticks
+			// as such, we should probably avoid highlighting beams until this is fixed
+			logError ('Found beam: tick = '+e.tick);
+		}
+		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
+		if (e.spanner != undefined) {
+			return e.spanner.spannerTick.ticks;
 		} else {
 			if (eType == Element.MEASURE) {
-				tick = e.firstSegment.tick;
+				return e.firstSegment.tick;
 			} else {
 				if (e.parent == undefined || e.parent == null) {
-					logError("showAllErrors() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
+					logError("getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
 				} else {
 					var p;
 					if (eType == Element.TUPLET) {
@@ -1158,12 +1171,18 @@ MuseScore {
 					} else {
 						p = e.parent;
 					}
-					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) p = p.parent;
-					if (p.type == Element.SEGMENT) tick = p.tick;
+					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) {
+						if (p.parent == null) {
+							logError ("getTick() — Parent of "+e.name+" was null");
+							return 0;
+						}
+						p = p.parent;
+					}
+					if (p.type == Element.SEGMENT) return p.tick;
 				}
 			}
 		}
-		return tick;
+		return 0;
 	}
 	
 	//---------------------------------------------------------
