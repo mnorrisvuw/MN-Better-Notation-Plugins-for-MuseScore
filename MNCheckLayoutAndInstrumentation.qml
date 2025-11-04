@@ -6690,6 +6690,8 @@ MuseScore {
 	//---------------------------------------------------------
 	//	showAllErrors
 	//	goes through array of errors, setting up comment boxes
+	//	and automatically positioning them to avoid
+	//	collisions
 	//---------------------------------------------------------
 	
 	function showAllErrors () {
