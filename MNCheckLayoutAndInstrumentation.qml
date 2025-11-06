@@ -349,6 +349,7 @@ MuseScore {
 	property var currentPedalEnd: -1
 	property var flaggedPedalLocation: false
 	property var isFirstPedal: false
+	property var pedalStaffNum: 0
 	
 	// ** LV ** //
 	property var isLv: false
@@ -855,8 +856,12 @@ MuseScore {
 			currentPedalNum = 0;
 			currentPedalEnd = -1;
 			prevPedalEnd = -1;
-			numPedals = pedals[currentStaffNum].length;
-			nextPedalStart = (numPedals == 0) ? 0 : pedals[currentStaffNum][0].spanner.spannerTick.ticks;
+			pedalStaffNum = currentStaffNum;
+			// for grand staff instruments, pedals are attached to the top staff
+			// if this is a grand staff stave, but not the top one, then go upwards until we find the top one
+			while (isGrandStaff[pedalStaffNum] && !isTopOfGrandStaff[pedalStaffNum] && pedalStaffNum >= 0) pedalStaffNum --;
+			numPedals = pedals[pedalStaffNum].length;
+			nextPedalStart = (numPedals == 0) ? 0 : pedals[pedalStaffNum][0].spanner.spannerTick.ticks;
 			
 			// ** hairpins
 			currentHairpin = null;
@@ -1590,6 +1595,7 @@ MuseScore {
 		isEndOfSlur = isSlurred ? currTick == currentSlurEnd : false;
 		
 		// ************ PEDAL? ************ //
+		
 		if (currentPedalNum < numPedals) {
 			if (isPedalled) {
 				if (currTick > currentPedalEnd) {
@@ -1599,12 +1605,12 @@ MuseScore {
 					currentPedal = null;
 					isPedalled = false;
 					currentPedalNum ++;
-					if (currentPedalNum < numPedals) nextPedalStart = pedals[currentStaffNum][currentPedalNum].spanner.spannerTick.ticks;
+					if (currentPedalNum < numPedals) nextPedalStart = pedals[pedalStaffNum][currentPedalNum].spanner.spannerTick.ticks;
 				}
 			}
 			if (!isPedalled && currTick >= nextPedalStart && currentPedalNum < numPedals) {
 				isPedalled = true;
-				currentPedal = pedals[currentStaffNum][currentPedalNum];
+				currentPedal = pedals[pedalStaffNum][currentPedalNum];
 				if (!isFirstPedal) {
 					isFirstPedal = true;
 					// check first pedal has the 'ped' text in it
@@ -1627,22 +1633,21 @@ MuseScore {
 							}
 						}
 					}
-			
 					currentPedalEnd = currentPedal.spanner.spannerTick.ticks + currentPedal.spanner.spannerTicks.ticks;
 				}
 				//logError("Pedal started at "+currTick+" & ends at "+currentPedalEnd);
 				if (isPedalInstrument) {
-					if (isTopOfGrandStaff[currentStaffNum] && !flaggedPedalLocation && currentPedal.staffIdx == currentStaffNum) {
+					if (isTopOfGrandStaff[currentStaffNum] && !flaggedPedalLocation && currentPedal.staffIdx == currentStaffNum && doCheckPianoHarpAndPercussion) {
 						flaggedPedalLocation = true;
 						addError("Pedal markings should go below the bottom staff of a grand staff.",currentPedal);
 					}
 				} else {
-					if (!flaggedPedalIssue) {
+					if (!flaggedPedalIssue && doCheckPianoHarpAndPercussion) {
 						addError("This instrument does not have a sustain pedal.",currentPedal);
 						flaggedPedalIssue = true;
 					}
 				}
-				nextPedalStart = (currentPedalNum < numPedals - 1) ? pedals[currentStaffNum][currentPedalNum+1].spanner.spannerTick.ticks : 0;
+				nextPedalStart = (currentPedalNum < numPedals - 1) ? pedals[pedalStaffNum][currentPedalNum+1].spanner.spannerTick.ticks : 0;
 			}
 		}
 		
@@ -6016,9 +6021,7 @@ MuseScore {
 						if (chordMatches) for (var i = 0; i < numNotes && chordMatches; i++) if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
 
 						if (chordMatches && noteheadStyle == prevNoteheadStyle) {
-							//logError ("here1");
 							if (getArticulations(noteRest).length == 0) {
-								//logError ("here2");
 								if (isEndOfSlur && prevWasStartOfSlur) {
 									addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie, or do you need to add articulation?",currentSlur);
 								} else {
@@ -6132,6 +6135,7 @@ MuseScore {
 					if (noteRest.duration.ticks < division*2 && !isTied) {
 						// is the next note in the same bar?
 						var flagError = nextNoteRest.parent.parent.is(noteRest.parent.parent);
+						
 						// if this is a pedal instrument, is the pedal down?
 						if (flagError && isPedalInstrument) flagError = isPedalled;
 						if (flagError) {

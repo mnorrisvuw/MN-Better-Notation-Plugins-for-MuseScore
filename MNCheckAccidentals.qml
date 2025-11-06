@@ -1491,6 +1491,18 @@ MuseScore {
 		var clefsBeforeOrAtThisTick = clefs[staffIdx].filter (e => e.parent.tick <= tick);
 		return clefsBeforeOrAtThisTick.pop(); // return last array
 	}
+	
+	function getPage (e) {
+		var p = e.parent;
+		var ptype = null;
+		if (p != null && p != undefined) ptype = p.type;
+		while ((p != null && p != undefined) && ptype != Element.PAGE) {
+			p = p.parent;
+			if (p != null && p != undefined) ptype = p.type;
+		}
+		if (p == undefined) p = null;
+		return p;
+	}
 		
 	function getPageNumber (e) {
 		var p = e.parent;
