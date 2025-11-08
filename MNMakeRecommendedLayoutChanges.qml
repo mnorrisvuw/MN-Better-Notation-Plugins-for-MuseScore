@@ -54,11 +54,11 @@ MuseScore {
 	
 	onRun: {
 		if (!curScore) return;
-		
 		var versionNumber = versionnumberfile.read().trim();
 		dialog.titleText = 'MN MAKE RECOMMENDED LAYOUT CHANGES '+versionNumber;
 		if (Qt.platform.os !== "osx") dialog.fontSize = 12;
 		// Show the options window
+
 		// **** VERSION CHECK **** //
 		var version46 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 5);
 		if (!version46) {
@@ -83,7 +83,7 @@ MuseScore {
 		removeManualTextFormattingOption = options.removeManualFormatting;
 		
 		options.close();
-	
+		updateLayout();
 		numStaves = curScore.nstaves;
 		
 		// *** REMOVE ANY COMMENTS AND HIGHLIGHTS THAT MIGHT BE LEFT OVER FROM OTHER PLUGINS ***
@@ -152,6 +152,8 @@ MuseScore {
 			if (finalMsg != '') dialogMsg = dialogMsg + '<p>' + finalMsg + '</p>';
 		}
 		dialog.msg = dialogMsg;
+		
+		updateLayout();
 		dialog.show();
 	}
 	
@@ -172,8 +174,11 @@ MuseScore {
 		// ************  								DESELECT AND FORCE REDRAW 							************ //
 		curScore.startCmd();
 		cmd('escape');
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
 		curScore.endCmd();
+	}
+	
+	function updateLayout () {
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1))
 	}
 	
 	function removeLayoutBreaksAndStretches () {

@@ -520,6 +520,10 @@ MuseScore {
 		
 	}
 	
+	function updateLayout () {
+		curScore.doLayout(fraction(0, 1), fraction(-1, 1))
+	}
+	
 	function checkScore() {
 		
 		if (options.numOptionsChecked == 0) {
@@ -528,6 +532,8 @@ MuseScore {
 			dialog.show();
 			return;
 		}
+		
+		updateLayout();
 		
 		// ************  	INITIALISE LOCAL VARIABLES 	************ //
 		var prevBarNum = 0, numBarsProcessed = 0;
@@ -628,7 +634,6 @@ MuseScore {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
-		curScore.startCmd();
 
 		setProgress (1);
 		
@@ -1285,7 +1290,7 @@ MuseScore {
 									}
 									
 									// ************ CHECK TRILL ************ //
-									if (isTrill && currTick == trillStartTick) checkTrill(noteRest);
+									//if (isTrill && currTick == trillStartTick) checkTrill(noteRest);
 															
 									// ************ CHECK LYRICS ************ //
 									if (doCheckVoice && isVoice) checkLyrics(noteRest);
@@ -1515,7 +1520,7 @@ MuseScore {
 		
 		// ** SELECT NONE ** //
 		selectNone();
-		curScore.endCmd();
+		updateLayout();
 
 		// ** SHOW INFO DIALOG ** //
 		showFinalDialog();
@@ -1771,6 +1776,7 @@ MuseScore {
 					currentTrill = trills[currentStaffNum][currentTrillNum];
 					trillStartTick = currentTrill.spanner.spannerTick.ticks;
 					var trillDur = currentTrill.spanner.spannerTicks.ticks;
+					checkTrill();
 			
 					currentTrillEnd = trillStartTick + trillDur;
 					if (currentTrillNum == trills[currentStaffNum].length - 1){
@@ -4027,13 +4033,15 @@ MuseScore {
 		}
 	}
 	
-	function checkTrill (noteRest) {
+	function checkTrill () {
 		// wait until MS 4.6.?
-		//logError ('Found trill: type = '+currentTrill.type+'; ornament = '+currentTrill.ornament);
+		//logError ('Found trill: '+currentTrill+'; type = '+currentTrill.type);
 		/*if (noteRest.articulations.length > 0) {
 			logError ('Artic = '+noteRest.articulations[0].type);
-		}
-		logError ('Found trill: show acc = '+currentTrill.ornamentShowAccidental+'; show cue = '+currentTrill.ornamentShowCueNote);*/	
+		}*/
+		//logError ('Found trill: psanner = '+currentTrill.spanner+'; orn = '+currentTrill.spanner.ornament);	
+
+		//logError ('Found trill: show acc = '+currentTrill.spanner.ornamentShowAccidental+'; show cue = '+currentTrill.spanner.showCueNote);	
 	}
 	
 	function checkOttava (noteRest,ottava) {
@@ -6678,8 +6686,11 @@ MuseScore {
 		var firstStaffNum = 0;
 		var comments = [];
 		var commentPages = [];
+		var commentPageNumbers = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
+		var pages = curScore.pages;
+		
 		for (var i = 0; i < (curScore.nstaves-1) && !curScore.staves[i].part.show; i++) firstStaffNum ++;
 		
 		// limit the number of errors shown to 100 to avoid a massive wait
@@ -6688,12 +6699,10 @@ MuseScore {
 		
 		// create new cursor to add the comments
 		var commentCursor = curScore.newCursor();
-		commentCursor.inputStateMode = Cursor.INPUT_STATE_SYNC_WITH_SCORE;
 		commentCursor.filter = Segment.ChordRest;
-		commentCursor.next();
 		
 		// save undo state
-		//curScore.startCmd();
+		curScore.startCmd();
 
 		for (var i = 0; i < numErrors; i++) {
 
@@ -6704,7 +6713,6 @@ MuseScore {
 			
 			for (var j = 0; j < objectArray.length; j++) {
 
-				var checkObjectPage = false;
 				element = objectArray[j];
 				var eType = element.type;
 				var isString = eType == undefined;
@@ -6763,7 +6771,6 @@ MuseScore {
 				if (j == 0) {
 					var tick = 0;		
 					if (isString) {
-						//logError ('Attaching comment '+i+' to '+theLocation);
 						if (theLocation.includes("pagetop")) {
 							desiredPosX = 2.5;
 							desiredPosY = 2.5;
@@ -6775,7 +6782,6 @@ MuseScore {
 							} else {
 								if (theLocation !== 'system1') {
 									var sysNum = parseInt(theLocation.substring(6));
-									//logError ('theLocation = '+theLocation+'; sysNum = '+sysNum);
 									tick = curScore.systems[sysNum-1].firstMeasure.firstSegment.tick;
 								}
 							}
@@ -6809,30 +6815,44 @@ MuseScore {
 					currentZ ++;
 					comments.push (comment);
 					var commentPage = getPage(comment);
-					commentPages.push (commentPage);
-					if (theLocation === "pagetopright" && commentPage != null) desiredPosX = commentPage.bbox.width - comment.bbox.width - 2.5;
+					// NOTE: I had tried pushing the page to an array, but that caused
+					// all sorts of crashes further down the line. Instead, I push the page number
+					// and just refer to that instead
+					if (commentPage == null) {
+						commentPageNumbers.push(0);
+					} else {
+						commentPageNumbers.push(commentPage.pagenumber);
+					}
 					commentsDesiredPosX.push (desiredPosX);
 					commentsDesiredPosY.push (desiredPosY);
 				}
 			}
 		} // var i
-		curScore.endCmd();
 
 		// NOW TWEAK LOCATIONS OF COMMENTS
 		var offx = [];
 		var offy = [];
+		var checkObjectPage = false;
 		
 		for (var i = 0; i < comments.length; i++) {
-			var commentOffset = 1.0;
+			
+			var commentOffset = 1.0; // how much to shift it by each time
 			var comment = comments[i];
 			offx.push(0);
-			offy.push(-(comment.bbox.height) - 2.5);
+			offy.push(-(comment.bbox.height) - 2.5);			
 			desiredPosX = commentsDesiredPosX[i];
 			desiredPosY = commentsDesiredPosY[i];
 			var commentHeight = comment.bbox.height;
 			var commentWidth = comment.bbox.width;
-			var element = errorObjects[i];
-			var eType = element.type;
+			var element = null;
+			var eType = 0;
+			if (errorObjects.length < i-1) {
+				logError ('errorObjects too short');
+				element = null;
+			} else {
+				element = errorObjects[i];
+				eType = element.type;
+			}
 			var isString = eType == undefined;
 			var eSubtype = isString ? '' : element.subtypeName();
 
@@ -6849,15 +6869,17 @@ MuseScore {
 			if (placedX + offx[i] < 0) offx[i] = -placedX;
 			if (placedY + offy[i] < 0) offy[i] = -placedY;
 			
-			var commentPage = getPage(comment);
-			if (commentPage) {
+			var pageNumber = commentPageNumbers[i];
+			var commentPage = pages[pageNumber];
 			
+			if (commentPage) {
+				//logError ('commentPageWidth = '+commentPage.bbox.width);
 				var commentPageWidth = commentPage.bbox.width;
 				var commentPageHeight = commentPage.bbox.height;
-				var commentPageNum = commentPage.pagenumber; // get page number
+				var commentPageNumber = commentPageNumbers[i];
 				
 				// move over to the top right of the page if needed
-				if (isString && theLocation === "pagetopright") comment.offsetX = commentPageWidth - commentWidth - 2.5 - placedX;
+				if (isString && theLocation === "pagetopright") offx[i] = commentPageWidth - commentWidth - 2.5 - placedX;
 			
 				// FIX IN 4.6 — Composer pagePos currently returning the wrong location
 				if (eSubtype === 'Composer') {
@@ -6877,23 +6899,23 @@ MuseScore {
 				if (placedX < 0) offx[i] -= placedX; // LEFT HAND SIDE
 				if (commentRHS > commentPageWidth) offx[i] -= (commentRHS - commentPageWidth); // RIGHT HAND SIDE
 				if (placedY < 0) offy[i] -= placedY; // TOP
-				if (commentB > commentPageHeight) offy[i] -= (commentB - commentPageHeight); // BOTTOM
+				if (commentB > commentPageHeight) offy[i] -= (commentB - commentPageHeight); // BOTTOM*/
 				
 				for (var k = 0; k < i; k++) {
-					
 					var otherComment = comments[k];
-					var otherCommentPage = commentPages[k];
+					var otherCommentPageNumber = commentPageNumbers[k];
+					var otherCommentPage = pages[k];
 					var otherCommentX = otherComment.pagePos.x + offx[k];
 					var otherCommentY = otherComment.pagePos.y + offy[k];
 					var actualCommentX = placedX + offx[i];
 					var actualCommentRHS = commentRHS + offx[i];
 					var actualCommentY = placedY + offy[i];
 					var actualCommentB = commentB + offy[i];
-					if (commentPage.pagenumber == otherCommentPage.pagenumber) {
+
+					if (commentPageNumber == otherCommentPageNumber) {
 						var dx = Math.abs(actualCommentX - otherCommentX);
 						var dy = Math.abs(actualCommentY - otherCommentY);
 						if (dx <= minOffset || dy <= minOffset) {
-							//logError ('here');
 							var otherCommentRHS = otherCommentX + otherComment.bbox.width;
 							var otherCommentB = otherCommentY + otherComment.bbox.height;
 							var overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
@@ -6918,7 +6940,6 @@ MuseScore {
 								generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
 								isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
 								isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
-								
 								//logError ("Too close: shifting comment.offsetX = "+offx[i]+" comment.offsetY = "+offy[i]+" tooClose = "+isCloseToOtherComment);				
 							}
 						}
@@ -6952,17 +6973,16 @@ MuseScore {
 				if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
 			}
 		}
-		
+
 		// now reposition all the elements
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
-			curScore.startCmd();
 			comment.offsetX = offx[i];
 			comment.offsetY = offy[i];
-			curScore.endCmd();
 		}
+		curScore.endCmd();
 	}
-	
+
 	//---------------------------------------------------------
 	//	getTick
 	//	returns the tick of the element
@@ -7049,11 +7069,7 @@ MuseScore {
 	}
 		
 	function selectNone () {
-		// ************  								DESELECT AND FORCE REDRAW 							************ //
-		//curScore.startCmd();
 		cmd('escape');
-		//curScore.doLayout(fraction(0, 1), fraction(-1, 1));
-		//curScore.endCmd();
 	}
 	
 	
