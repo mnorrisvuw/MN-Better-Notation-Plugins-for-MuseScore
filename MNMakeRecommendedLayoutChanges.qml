@@ -15,6 +15,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin automatically makes recommended layout changes to the score, based on preferences curated by Michael Norris"
+    categoryCode: "MN-BetterNotation"
 	menuPath: "Plugins.MNMakeRecommendedLayoutChanges"
 	requiresScore: true
 	title: "MN Make Recommended Layout Changes"
@@ -50,7 +51,20 @@ MuseScore {
 	property var instrumentCalcIds: []
 	property var frames: []
 	property var firstVisibleStaff: 0
-	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
+	function getAssetPath(filename) {
+        if (Qt.platform.os === "linux") {
+            return Qt.resolvedUrl("./assets/" + filename).toString();
+        } else {
+            return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
+        }
+    }
+
+    FileIO { 
+        id: versionnumberfile; 
+        source: getAssetPath("versionnumber.txt")
+        onError: function(msg) { console.log("Error:", msg); } 
+    }
+
 	
 	onRun: {
 		if (!curScore) return;

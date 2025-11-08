@@ -16,6 +16,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin automatically creates a title page based on the horizontal frame at the top of the page"
+    categoryCode: "MN-BetterNotation"
 	menuPath: "Plugins.MNCreateTitlePage"
 	requiresScore: true
 	title: "MN Create Title Page"
@@ -33,14 +34,24 @@ MuseScore {
 	property var isMac: false
 	property var frontMatterText: "INSTRUMENTATION\n\nFor ensemble and orchestral works, list the instruments required here in score order,\nincluding all doubling instruments and lists of percussion instruments.\n\n\n\nPERFORMANCE INSTRUCTIONS\n\nInclude a list of any unconventional notation used and their meanings,\nand/or any required instrument preparations or other special aspects\nof the piece that can’t be explained on the score.\n\n\n\nDEDICATION\n\nDedicated to ....\n\n\n\nDURATION\n\nApprox. duration: x mins\n\n\n\n(Delete one) Transposed score / Score in C\n\n\n\nPROGRAMME NOTE\n\nInclude a short programme note here\n\n\n\n© Composer Name, 20xx"
 	
-	FileIO { id: stylesfile;
-		source: Qt.resolvedUrl("./assets/styles.json").toString().slice(8);
-		onError: { console.log(msg); }
-	}
-	FileIO { id: versionnumberfile;
-		source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8);
-		onError: { console.log(msg); }
-	}
+	function getAssetPath(filename) {
+        if (Qt.platform.os === "linux") {
+            return Qt.resolvedUrl("./assets/" + filename).toString();
+        } else {
+            return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
+        }
+    }
+
+    FileIO { 
+        id: stylesfile;
+        source: getAssetPath("styles.json")
+        onError: function(msg) { console.log("Error:", msg); }
+    }
+    FileIO { 
+        id: versionnumberfile;
+        source: getAssetPath("versionnumber.txt")
+        onError: function(msg) { console.log("Error:", msg); }
+    }
 
 
   onRun: {

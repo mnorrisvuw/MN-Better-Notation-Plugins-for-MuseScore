@@ -16,6 +16,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin checks your score for common music layout, notation and instrumentation issues"
+    categoryCode: "MN-BetterNotation"
 	requiresScore: true
 	title: "MN Check Layout and Instrumentation"
 	id: mnchecklayoutandinstrumentation
@@ -23,18 +24,28 @@ MuseScore {
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation"
 	
 	// **** TEXT FILE DEFINITIONS **** //
-	FileIO { id: techniquesfile; source: Qt.resolvedUrl("./assets/techniques.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: canbeabbreviatedfile; source: Qt.resolvedUrl("./assets/canbeabbreviated.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: instrumentrangesfile; source: Qt.resolvedUrl("./assets/instrumentranges.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: metronomemarkingsfile; source: Qt.resolvedUrl("./assets/metronomemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: shouldbelowercasefile; source: Qt.resolvedUrl("./assets/shouldbelowercase.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: shouldhavefullstopfile; source: Qt.resolvedUrl("./assets/shouldhavefullstop.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: spellingerrorsanywherefile; source: Qt.resolvedUrl("./assets/spellingerrorsanywhere.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: spellingerrorsatstartfile; source: Qt.resolvedUrl("./assets/spellingerrorsatstart.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: tempomarkingsfile; source: Qt.resolvedUrl("./assets/tempomarkings.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: tempochangemarkingsfile; source: Qt.resolvedUrl("./assets/tempochangemarkings.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
-	FileIO { id: hyphenationfile; source: Qt.resolvedUrl("./assets/EnglishHyphDict.txt").toString().slice(8); onError: { console.log(msg); } }
+    // on Linux, slice(8) does not work
+    function getAssetPath(filename) {
+        if (Qt.platform.os === "linux") {
+            return Qt.resolvedUrl("./assets/" + filename).toString();
+        } else {
+            return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
+        }
+    }
+
+    FileIO { id: techniquesfile; source: getAssetPath("techniques.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: canbeabbreviatedfile; source: getAssetPath("canbeabbreviated.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: instrumentrangesfile; source: getAssetPath("instrumentranges.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: metronomemarkingsfile; source: getAssetPath("metronomemarkings.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: shouldbelowercasefile; source: getAssetPath("shouldbelowercase.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: shouldhavefullstopfile; source: getAssetPath("shouldhavefullstop.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: spellingerrorsanywherefile; source: getAssetPath("spellingerrorsanywhere.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: spellingerrorsatstartfile; source: getAssetPath("spellingerrorsatstart.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: tempomarkingsfile; source: getAssetPath("tempomarkings.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: tempochangemarkingsfile; source: getAssetPath("tempochangemarkings.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: versionnumberfile; source: getAssetPath("versionnumber.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    FileIO { id: hyphenationfile; source: getAssetPath("EnglishHyphDict.txt"); onError: function(msg) { console.log("Error:", msg); } }
+    
 
 	// ** DEBUG **
 	property var debug: true
@@ -7382,179 +7393,178 @@ MuseScore {
 				Layout.columnSpan: 3
 				color: ui.theme.fontPrimaryColor
 			}
-			CheckBox {
-				text: "Check optimal score style settings"
-				checked: options.scoreStyle
-				onClicked: options.scoreStyle = !options.scoreStyle
-			}
-			CheckBox {
-				text: "Check optimal part style settings"
-				checked: options.partStyle
-				onClicked: options.partStyle = !options.partStyle
-			}
-			CheckBox {
-				text: "Check optimal page settings"
-				checked: options.pageSettings
-				onClicked: options.pageSettings = !options.pageSettings
-			}
-			CheckBox {
-				text: "Check names, order & brackets"
-				checked: options.staffNamesAndOrder
-				onClicked: options.staffNamesAndOrder = !options.staffNamesAndOrder
-			}
-			CheckBox {
-				text: "Check fonts"
-				checked: options.fonts
-				onClicked: options.fonts = !options.fonts
-			}
-			CheckBox {
-				text: "Check music spacing"
-				checked: options.musicSpacing
-				onClicked: options.musicSpacing = !options.musicSpacing
-			}
-			
-			Text {
-				text: "Fundamentals"
-				font.bold: true
-				Layout.columnSpan: 3
-				color: ui.theme.fontPrimaryColor
-			}
-			CheckBox {
-				text: "Check clefs"
-				checked: options.clefs
-				onClicked: options.clefs = !options.clefs
-			}
-			CheckBox {
-				text: "Check time signatures"
-				checked: options.timeSignatures
-				onClicked: options.timeSignatures = !options.timeSignatures
-			}
-			CheckBox {
-				text: "Check key signatures"
-				checked: options.keySignatures
-				onClicked: options.keySignatures = !options.keySignatures
-			}
-			CheckBox {
-				text: "Check ottavas"
-				checked: options.ottavas
-				onClicked: options.ottavas = !options.ottavas
-			}
-			CheckBox {
-				text: "Check slurs & ties"
-				checked: options.slursAndTies
-				onClicked: options.slursAndTies = !options.slursAndTies
-			}
-			CheckBox {
-				text: "Check articulation"
-				checked: options.articulation
-				onClicked: options.articulation = !options.articulation
-				
-			}
-			CheckBox {
-				text: "Check arpeggios"
-				checked: options.arpeggios
-				onClicked: options.arpeggios = !options.arpeggios
-			}
-			CheckBox {
-				text: "Check tremolos & fermatas"
-				checked: options.tremolosAndFermatas
-				onClicked: options.tremolosAndFermatas = !options.tremolosAndFermatas
-			}
-			CheckBox {
-				text: "Check grace notes"
-				checked: options.graceNotes
-				onClicked: options.graceNotes = !options.graceNotes
-			}
-			CheckBox {
-				text: "Check stems, noteheads & beams"
-				checked: options.stemsAndBeams
-				onClicked: options.stemsAndBeams = !options.stemsAndBeams
-			}
-			CheckBox {
-				text: "Check expressive detail"
-				checked: options.expressiveDetail
-				onClicked: options.expressiveDetail = !options.expressiveDetail
-			}
-			CheckBox {
-				text: "Check bar stretches"
-				checked: options.barStretches
-				onClicked: options.barStretches = !options.barStretches
-			}
-			
-			Text {
-				text: "Text and dynamics"
-				font.bold: true
-				Layout.columnSpan: 3
-				color: ui.theme.fontPrimaryColor
-			}
-			
-			CheckBox {
-				text: "Check dynamics"
-				checked: options.dynamics
-				onClicked: options.dynamics = !options.dynamics
-			}
-			CheckBox {
-				text: "Check tempo markings"
-				checked: options.tempoMarkings
-				onClicked: options.tempoMarkings = !options.tempoMarkings
-			}
-			CheckBox {
-				text: "Check title, subtitle & composer"
-				checked: options.titleAndSubtitle
-				onClicked: options.titleAndSubtitle = !options.titleAndSubtitle
-			}
-			CheckBox {
-				text: "Check spelling & formatting errors"
-				checked: options.spellingAndFormat
-				onClicked: options.spellingAndFormat = !options.spellingAndFormat
-			}
-			CheckBox {
-				text: "Check rehearsal marks"
-				checked: options.rehearsalMarks
-				onClicked: options.rehearsalMarks = !options.rehearsalMarks
-			}
-			CheckBox {
-				text: "Check text object positions"
-				checked: options.textPositions
-				onClicked: options.textPositions = !options.textPositions
-			}
-			
-			Text {
-				text: "Instrumentation"
-				font.bold: true
-				Layout.columnSpan: 3
-				color: ui.theme.fontPrimaryColor
-			}
-			CheckBox {
-				text: "Check range/register issues"
-				checked: options.rangeRegister
-				onClicked: options.rangeRegister = !options.rangeRegister
-			}
-			CheckBox {
-				text: "Check orchestral shared staves"
-				checked: options.orchestralSharedStaves
-				onClicked: options.orchestralSharedStaves = !options.orchestralSharedStaves
-			}
-			CheckBox {
-				text: "Check voice typesetting"
-				checked: options.voice
-				onClicked: options.voice = !options.voice
-			}
-			CheckBox {
-				text: "Check winds & brass"
-				checked: options.windsAndBrass
-				onClicked: options.windsAndBrass = !options.windsAndBrass
-			}
-			CheckBox {
-				text: "Check piano, harp & percussion"
-				checked: options.pianoHarpAndPercussion
-				onClicked: options.pianoHarpAndPercussion = !options.pianoHarpAndPercussion
-			}
-			CheckBox {
-				text: "Check strings"
-				checked: options.strings
-				onClicked: options.strings = !options.strings
-			}
+            CheckBox {
+                text: "Check optimal score style settings"
+                checked: options.scoreStyle
+                onClicked: { options.scoreStyle = !options.scoreStyle; checked = options.scoreStyle; }
+            }
+            CheckBox {
+                text: "Check optimal part style settings"
+                checked: options.partStyle
+                onClicked: { options.partStyle = !options.partStyle; checked = options.partStyle; }
+            }
+            CheckBox {
+                text: "Check optimal page settings"
+                checked: options.pageSettings
+                onClicked: { options.pageSettings = !options.pageSettings; checked = options.pageSettings; }
+            }
+            CheckBox {
+                text: "Check names, order & brackets"
+                checked: options.staffNamesAndOrder
+                onClicked: { options.staffNamesAndOrder = !options.staffNamesAndOrder; checked = options.staffNamesAndOrder; }
+            }
+            CheckBox {
+                text: "Check fonts"
+                checked: options.fonts
+                onClicked: { options.fonts = !options.fonts; checked = options.fonts; }
+            }
+            CheckBox {
+                text: "Check music spacing"
+                checked: options.musicSpacing
+                onClicked: { options.musicSpacing = !options.musicSpacing; checked = options.musicSpacing; }
+            }
+
+            Text {
+                text: "Fundamentals"
+                font.bold: true
+                Layout.columnSpan: 3
+                color: ui.theme.fontPrimaryColor
+            }
+            CheckBox {
+                text: "Check clefs"
+                checked: options.clefs
+                onClicked: { options.clefs = !options.clefs; checked = options.clefs; }
+            }
+            CheckBox {
+                text: "Check time signatures"
+                checked: options.timeSignatures
+                onClicked: { options.timeSignatures = !options.timeSignatures; checked = options.timeSignatures; }
+            }
+            CheckBox {
+                text: "Check key signatures"
+                checked: options.keySignatures
+                onClicked: { options.keySignatures = !options.keySignatures; checked = options.keySignatures; }
+            }
+            CheckBox {
+                text: "Check ottavas"
+                checked: options.ottavas
+                onClicked: { options.ottavas = !options.ottavas; checked = options.ottavas; }
+            }
+            CheckBox {
+                text: "Check slurs & ties"
+                checked: options.slursAndTies
+                onClicked: { options.slursAndTies = !options.slursAndTies; checked = options.slursAndTies; }
+            }
+            CheckBox {
+                text: "Check articulation"
+                checked: options.articulation
+                onClicked: { options.articulation = !options.articulation; checked = options.articulation; }
+            }
+            CheckBox {
+                text: "Check arpeggios"
+                checked: options.arpeggios
+                onClicked: { options.arpeggios = !options.arpeggios; checked = options.arpeggios; }
+            }
+            CheckBox {
+                text: "Check tremolos & fermatas"
+                checked: options.tremolosAndFermatas
+                onClicked: { options.tremolosAndFermatas = !options.tremolosAndFermatas; checked = options.tremolosAndFermatas; }
+            }
+            CheckBox {
+                text: "Check grace notes"
+                checked: options.graceNotes
+                onClicked: { options.graceNotes = !options.graceNotes; checked = options.graceNotes; }
+            }
+            CheckBox {
+                text: "Check stems, noteheads & beams"
+                checked: options.stemsAndBeams
+                onClicked: { options.stemsAndBeams = !options.stemsAndBeams; checked = options.stemsAndBeams; }
+            }
+            CheckBox {
+                text: "Check expressive detail"
+                checked: options.expressiveDetail
+                onClicked: { options.expressiveDetail = !options.expressiveDetail; checked = options.expressiveDetail; }
+            }
+            CheckBox {
+                text: "Check bar stretches"
+                checked: options.barStretches
+                onClicked: { options.barStretches = !options.barStretches; checked = options.barStretches; }
+            }
+
+            Text {
+                text: "Text and dynamics"
+                font.bold: true
+                Layout.columnSpan: 3
+                color: ui.theme.fontPrimaryColor
+            }
+
+            CheckBox {
+                text: "Check dynamics"
+                checked: options.dynamics
+                onClicked: { options.dynamics = !options.dynamics; checked = options.dynamics; }
+            }
+            CheckBox {
+                text: "Check tempo markings"
+                checked: options.tempoMarkings
+                onClicked: { options.tempoMarkings = !options.tempoMarkings; checked = options.tempoMarkings; }
+            }
+            CheckBox {
+                text: "Check title, subtitle & composer"
+                checked: options.titleAndSubtitle
+                onClicked: { options.titleAndSubtitle = !options.titleAndSubtitle; checked = options.titleAndSubtitle; }
+            }
+            CheckBox {
+                text: "Check spelling & formatting errors"
+                checked: options.spellingAndFormat
+                onClicked: { options.spellingAndFormat = !options.spellingAndFormat; checked = options.spellingAndFormat; }
+            }
+            CheckBox {
+                text: "Check rehearsal marks"
+                checked: options.rehearsalMarks
+                onClicked: { options.rehearsalMarks = !options.rehearsalMarks; checked = options.rehearsalMarks; }
+            }
+            CheckBox {
+                text: "Check text object positions"
+                checked: options.textPositions
+                onClicked: { options.textPositions = !options.textPositions; checked = options.textPositions; }
+            }
+
+            Text {
+                text: "Instrumentation"
+                font.bold: true
+                Layout.columnSpan: 3
+                color: ui.theme.fontPrimaryColor
+            }
+            CheckBox {
+                text: "Check range/register issues"
+                checked: options.rangeRegister
+                onClicked: { options.rangeRegister = !options.rangeRegister; checked = options.rangeRegister; }
+            }
+            CheckBox {
+                text: "Check orchestral shared staves"
+                checked: options.orchestralSharedStaves
+                onClicked: { options.orchestralSharedStaves = !options.orchestralSharedStaves; checked = options.orchestralSharedStaves; }
+            }
+            CheckBox {
+                text: "Check voice typesetting"
+                checked: options.voice
+                onClicked: { options.voice = !options.voice; checked = options.voice; }
+            }
+            CheckBox {
+                text: "Check winds & brass"
+                checked: options.windsAndBrass
+                onClicked: { options.windsAndBrass = !options.windsAndBrass; checked = options.windsAndBrass; }
+            }
+            CheckBox {
+                text: "Check piano, harp & percussion"
+                checked: options.pianoHarpAndPercussion
+                onClicked: { options.pianoHarpAndPercussion = !options.pianoHarpAndPercussion; checked = options.pianoHarpAndPercussion; }
+            }
+            CheckBox {
+                text: "Check strings"
+                checked: options.strings
+                onClicked: { options.strings = !options.strings; checked = options.strings; }
+            }
 		}
 		
 		ButtonBox {
@@ -7578,7 +7588,7 @@ MuseScore {
 						if (e.toString().includes('CheckBox')) {
 							if (!e.checked) {
 								e.checked = true;
-								e.clicked(null);
+								e.clicked();
 							}
 						}
 					}
@@ -7597,7 +7607,7 @@ MuseScore {
 						if (e.toString().includes('CheckBox')) {
 							if (e.checked) {
 								e.checked = false;
-								e.clicked(null);
+								e.clicked();
 							}
 						}
 					}

@@ -16,10 +16,23 @@ MuseScore {
 	description: "bob"
 	requiresScore: true
 	title: "MN Check Rhythmic Notation"
+    categoryCode: "MN-BetterNotation"
 	id: mncheckrhythmicnotation
 	thumbnailName: "MNCheckRhythmicNotation.png"
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation"
-	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
+		function getAssetPath(filename) {
+        if (Qt.platform.os === "linux") {
+            return Qt.resolvedUrl("./assets/" + filename).toString();
+        } else {
+            return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
+        }
+    }
+
+    FileIO { 
+        id: versionnumberfile; 
+        source: getAssetPath("versionnumber.txt")
+        onError: function(msg) { console.log("Error:", msg); } 
+    }
 
 	// **** GLOBALS **** //
 	property var numLogs: 0

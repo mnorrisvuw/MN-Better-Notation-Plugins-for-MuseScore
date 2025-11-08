@@ -14,12 +14,26 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin checks your score for common accidental spelling issues"
+    categoryCode: "MN-BetterNotation"
 	menuPath: "Plugins.MNCheckAccidentals";
 	requiresScore: true
 	title: "MN Check Accidentals"
 	id: mncheckaccidentals
 	thumbnailName: "MNCheckAccidentals.png"
-	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
+	function getAssetPath(filename) {
+        if (Qt.platform.os === "linux") {
+            return Qt.resolvedUrl("./assets/" + filename).toString();
+        } else {
+            return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
+        }
+    }
+
+    FileIO { 
+        id: versionnumberfile; 
+        source: getAssetPath("versionnumber.txt")
+        onError: function(msg) { console.log("Error:", msg); } 
+    }
+
 
 	
 	// ** DEBUG **
