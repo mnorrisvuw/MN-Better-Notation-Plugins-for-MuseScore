@@ -91,10 +91,7 @@ MuseScore {
 			dialog.show();
 			return;
 		}
-		
-		updateLayout();
-		saveSelection();
-		
+				
 		if (Qt.platform.os !== "osx") {
 			cmdKey = "ctrl";
 			dialog.fontSize = 12;
@@ -112,11 +109,10 @@ MuseScore {
 		getFrames();
 		deleteAllCommentsAndHighlights();
 		
-		// **** EXTEND SELECTION? **** //
+		// **** SELECT ALL **** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
 		curScore.endCmd();
-		curScore.startCmd();
 
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;
@@ -338,11 +334,9 @@ MuseScore {
 			h += 40;
 		}
 		progress.close();
-		curScore.endCmd();
 		
 		// ************  								DESLECT AND FORCE REDRAW 							************ //
 		selectNone();
-		updateLayout();
 		
 		dialog.height = h;
 		dialog.contentHeight = h;
@@ -376,13 +370,7 @@ MuseScore {
 	}
 
 	function selectNone () {
-		curScore.startCmd();
 		cmd('escape');
-		curScore.endCmd();
-	}
-	
-	function updateLayout () {
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1))
 	}
 	
 	function checkTransposingInstruments() {
@@ -1010,34 +998,6 @@ MuseScore {
 				progress.progressPercent = percentage;
 			}
 		}
-	}
-	
-	function saveSelection () {
-		selectionArray = [];
-		if (curScore.selection.isRange) {
-			selectionArray[0] = curScore.selection.startSegment.tick;
-			if (curScore.selection.endSegment == null) {
-				selectionArray[1] = curScore.lastSegment.tick;
-			} else {
-				selectionArray[1] = curScore.selection.endSegment.tick;
-			}
-			selectionArray[2] = curScore.selection.startStaff;
-			selectionArray[3] = curScore.selection.endStaff;
-		}
-	}
-	
-	function restoreSelection () {
-		curScore.startCmd();
-		if (selectionArray.length == 0) {
-			curScore.selection.clear();
-		} else {
-			var st = selectionArray[0];
-			var et = selectionArray[1];
-			var ss = selectionArray[2];
-			var es = selectionArray[3];
-			curScore.selection.selectRange(st,et+1,ss,es + 1);
-		}
-		curScore.endCmd();
 	}
 	
 	function deleteAllCommentsAndHighlights () {
