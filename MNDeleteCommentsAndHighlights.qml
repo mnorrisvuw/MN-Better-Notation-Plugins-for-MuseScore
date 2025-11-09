@@ -11,7 +11,6 @@ import QtQuick.Controls 2.15
 import Muse.UiComponents 1.0
 import FileIO 3.0
 
-
 MuseScore {
 	version:  "1.0"
 	description: "This plugin removes any comments and highlights from your score that were added by the MN Plugins"

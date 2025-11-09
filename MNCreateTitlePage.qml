@@ -3,7 +3,7 @@
  *
  */
 
-// this version requires MuseScore Studio 4.4 or later
+// this version requires MuseScore Studio 4.6 or later
 
 import MuseScore 3.0
 import QtQuick 2.9
