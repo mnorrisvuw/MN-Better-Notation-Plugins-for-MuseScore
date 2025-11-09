@@ -6682,7 +6682,6 @@ MuseScore {
 	
 	function showAllErrors () {
 		
-		var objectPageNum = 0;
 		var firstStaffNum = 0;
 		var comments = [];
 		var commentPages = [];
@@ -6833,6 +6832,7 @@ MuseScore {
 		var offx = [];
 		var offy = [];
 		var checkObjectPage = false;
+		var objectPageNumber = 0;
 		
 		for (var i = 0; i < comments.length; i++) {
 			
@@ -6859,7 +6859,7 @@ MuseScore {
 			checkObjectPage = false;
 			if (eType == Element.TEXT) {
 				checkObjectPage = true;
-				objectPageNum = getPageNumber(element);
+				objectPageNumber = getPageNumber(element);
 			}
 			theLocation = element;
 			var placedX = comment.pagePos.x;
@@ -6873,7 +6873,6 @@ MuseScore {
 			var commentPage = pages[pageNumber];
 			
 			if (commentPage) {
-				//logError ('commentPageWidth = '+commentPage.bbox.width);
 				var commentPageWidth = commentPage.bbox.width;
 				var commentPageHeight = commentPage.bbox.height;
 				var commentPageNumber = commentPageNumbers[i];
@@ -6883,8 +6882,8 @@ MuseScore {
 			
 				// FIX IN 4.6 — Composer pagePos currently returning the wrong location
 				if (eSubtype === 'Composer') {
-					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth;
-					offy[i] += 8.0;
+					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth + 10.0;
+					offy[i] += 4.0;
 				}
 
 				// check to see if this comment has been placed too close to other comments
@@ -6970,7 +6969,7 @@ MuseScore {
 						}
 					} */
 				}
-				if (checkObjectPage && commentPageNum != objectPageNum) comment.text = '[The object this comment refers to is on p. '+(objectPageNum+1)+']\n' +comment.text;
+				if (checkObjectPage && commentPageNumber != objectPageNumber) comment.text = '[The object this comment refers to is on p. '+(objectPageNumber+1)+']\n' +comment.text;
 			}
 		}
 
