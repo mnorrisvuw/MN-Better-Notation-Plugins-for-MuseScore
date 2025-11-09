@@ -520,10 +520,6 @@ MuseScore {
 		
 	}
 	
-	function updateLayout () {
-		curScore.doLayout(fraction(0, 1), fraction(-1, 1))
-	}
-	
 	function checkScore() {
 		
 		if (options.numOptionsChecked == 0) {
@@ -532,9 +528,7 @@ MuseScore {
 			dialog.show();
 			return;
 		}
-		
-		updateLayout();
-		
+				
 		// ************  	INITIALISE LOCAL VARIABLES 	************ //
 		var prevBarNum = 0, numBarsProcessed = 0;
 		var isTied = false;
@@ -1520,7 +1514,6 @@ MuseScore {
 		
 		// ** SELECT NONE ** //
 		selectNone();
-		updateLayout();
 
 		// ** SHOW INFO DIALOG ** //
 		showFinalDialog();
