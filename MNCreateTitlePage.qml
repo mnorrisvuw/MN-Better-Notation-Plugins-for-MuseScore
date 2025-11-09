@@ -16,7 +16,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin automatically creates a title page based on the horizontal frame at the top of the page"
-    categoryCode: "MN-BetterNotation"
+    categoryCode: "MN Better Notation Plugins"
 	menuPath: "Plugins.MNCreateTitlePage"
 	requiresScore: true
 	title: "MN Create Title Page"

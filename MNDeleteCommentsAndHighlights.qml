@@ -15,7 +15,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin removes any comments and highlights from your score that were added by the MN Plugins"
-    categoryCode: "MN-BetterNotation"
+    categoryCode: "MN Better Notation Plugins"
 	menuPath: "Plugins.MNDeleteCommentsAndHighlights";
 	requiresScore: true
 	title: "MN Delete Comments and Highlights"

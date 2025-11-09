@@ -16,7 +16,7 @@ MuseScore {
 	description: "bob"
 	requiresScore: true
 	title: "MN Check Rhythmic Notation"
-    categoryCode: "MN-BetterNotation"
+    categoryCode: "MN Better Notation Plugins"
 	id: mncheckrhythmicnotation
 	thumbnailName: "MNCheckRhythmicNotation.png"
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation"

@@ -14,7 +14,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin checks your score for common accidental spelling issues"
-    categoryCode: "MN-BetterNotation"
+    categoryCode: "MN Better Notation Plugins"
 	menuPath: "Plugins.MNCheckAccidentals";
 	requiresScore: true
 	title: "MN Check Accidentals"

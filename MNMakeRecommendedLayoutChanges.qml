@@ -15,7 +15,7 @@ import FileIO 3.0
 MuseScore {
 	version:  "1.0"
 	description: "This plugin automatically makes recommended layout changes to the score, based on preferences curated by Michael Norris"
-    categoryCode: "MN-BetterNotation"
+    categoryCode: "MN Better Notation Plugins"
 	menuPath: "Plugins.MNMakeRecommendedLayoutChanges"
 	requiresScore: true
 	title: "MN Make Recommended Layout Changes"
