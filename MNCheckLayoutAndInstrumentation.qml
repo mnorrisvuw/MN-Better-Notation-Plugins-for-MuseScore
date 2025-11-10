@@ -2644,7 +2644,6 @@ MuseScore {
 			var part1 = parts[i];
 			var staff1 = part1.staves[0];
 			var staffnum = staff1.idx;
-			//logError ('staffnum = '+staffnum);
 			var displaystaffnum = staffnum+1;
 			var full1 = part1.longName.trim();
 			var short1 = part1.shortName.trim();
@@ -2786,8 +2785,6 @@ MuseScore {
 			readsAlto = false;
 			readsTenor = false;
 			readsBass = false;
-
-			//logError("Inst check id "+currentInstrumentId+" isString "+isStringInstrument+" isVoice "+isVoice);
 			
 			// WINDS
 			if (currentInstrumentId.includes("wind.")) {
@@ -2895,15 +2892,17 @@ MuseScore {
 		}
 	}
 	
-	
+	// ***************************************************************** //
+	// **** 														**** //
+	// **** 		CHECK THE STYLE SETTINGS ON PARTS, IF ANY		**** //
+	// **** 														**** //
+	// ***************************************************************** //
+		
 	function checkPartSettings () {
-		//logError ("checkPartSettings");
 		var maxSize = 7.0;
 		var minSize = 6.6;
 		var excerpts = curScore.excerpts;		
 		if (numExcerpts < 2) return;
-		
-		//logError ("2 or more excerpts");
 		var styleComments = [];
 		var pageSettingsComments = [];
 		var partStyle;
@@ -2920,8 +2919,6 @@ MuseScore {
 		
 		for (var i = 0; i < numExcerpts; i++) {
 			var thePart = excerpts[i];
-			
-		//logError ("checking part "+i);
 			partStyle = thePart.partScore.style;
 			var thePartSpatium = partStyle.value("spatium")*inchesToMM/mscoreDPI;
 			// part should be 6.6-7.0mm
@@ -3069,6 +3066,12 @@ MuseScore {
 			addError(errorStr,"pagetopright");
 		}
 	}
+	
+	// ***************************************************************** //
+	// **** 														**** //
+	// **** 	CHECK THE STYLE SETTINGS FOR THE SCORE AND PAGE		**** //
+	// **** 														**** //
+	// ***************************************************************** //
 	
 	function checkScoreAndPageSettings () {
 		var styleComments = [];
@@ -3394,6 +3397,12 @@ MuseScore {
 		}
 	}
 	
+	// ***************************************************************** //
+	// **** 														**** //
+	// **** 	CHECK THE LOCATION OF THE FINAL BAR IS APPROPRIATE 	**** //
+	// **** 														**** //
+	// ***************************************************************** //
+	
 	function checkLocationOfFinalBar () {
 		var maxDistance = 25;
 		var lastMeasure = curScore.lastMeasure;
@@ -3415,10 +3424,14 @@ MuseScore {
 			addError("Try and arrange the layout so that the final bar is\nin the bottom right-hand corner of the last page.",lastMeasure);
 			return;
 		}
-		if (r < thresholdr) {
-			addError("Try and arrange the layout so that the final bar aligns\nwith the right-hand margin of the page.",lastMeasure);
-		}
+		if (r < thresholdr) addError("Try and arrange the layout so that the final bar aligns\nwith the right-hand margin of the page.",lastMeasure);
 	}
+	
+	// ***************************************************************** //
+	// **** 														**** //
+	// **** CHECK HOW MUCH SPACE IS AT THE BOTTOM OF EACH PAGE	 	**** //
+	// **** 														**** //
+	// ***************************************************************** //
 	
 	function checkLocationsOfBottomSystems () {
 		// get the pages of this score
