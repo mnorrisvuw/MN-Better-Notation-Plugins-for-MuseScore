@@ -760,8 +760,8 @@ MuseScore {
 			}
 			
 			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
-			prevKeySigSharps = -99; // placeholder/dummy variable
-			prevKeySigBarNum = 0;
+			prevKeySigSharps = curScore.keysig; // placeholder/dummy variable
+			prevKeySigBarNum = 1;
 			prevBarNum = 0;
 			prevDynamic = "";
 			prevDynamicObject = null;
@@ -1059,6 +1059,9 @@ MuseScore {
 					cursor.track = currentTrack;
 					cursor.rewindToTick(barStartTick);
 					var processingThisBar = cursor.element && cursor.tick < barEndTick;
+					if (cursor.element) {
+						if (cursor.element.type == Element.KEYSIG) logError ('found ks');
+					}
 					prevNote = prevNotes[currentTrack];
 					prevWasGraceNote = false;
 					
@@ -1088,6 +1091,7 @@ MuseScore {
 						isRest = false;
 						isSforzando = false;
 						var currSeg = cursor.segment;
+						if (currSeg.type == Segment.KeySig) logError ('seg ks');
 						currTick = currSeg.tick;
 
 						// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
@@ -1100,14 +1104,17 @@ MuseScore {
 								if (tempoText.length > 0) t = tempoText[0];
 							}
 						}
+						
+						// ************ CHECK KEY SIGNATURE ************ //
+						
+						var elem = cursor.element;
+						var eType = elem.type;
 
 						if (currTick != barEndTick) {
 							
 							// ** CHECK IF MELISMA IS STILL GOING ** //
 							if (isMelisma[currentTrack] && melismaEndTick[currentTrack] > 0) isMelisma[currentTrack] = currTick <= melismaEndTick[currentTrack];
 							var annotations = currSeg.annotations;
-							var elem = cursor.element;
-							var eType = elem.type;
 													
 							// ************ CHECK IF IT'S A NOTE OR REST FIRST ************ //
 							isNote = eType == Element.CHORD;
@@ -1123,8 +1130,7 @@ MuseScore {
 								if (theTie != null) isLv = theTie.type == Element.LAISSEZ_VIB;
 							}
 							
-							// ************ CHECK KEY SIGNATURE ************ //
-							if (eType == Element.KEYSIG && currentStaffNum == 0) checkKeySignature(elem,cursor.keySignature);
+							
 							
 							// ************ CHECK SPANNERS & DYNAMICS ETC. ************ //
 							checkScoreElements(elem);
@@ -1415,8 +1421,12 @@ MuseScore {
 							tempoChangeMarkingEnd = -1;
 						}
 						
-						processingThisBar = cursor.next() ? (cursor.measure.is(currentBar) && cursor.tick < barEndTick) : false;
-						
+						processingThisBar = cursor.next() ? cursor.measure.is(currentBar) : false;
+						if (cursor.element) {
+							if (cursor.element.type == Element.KEYSIG && currentStaffNum == 0 && prevKeySigBarNum != currentBarNum) {
+								checkKeySignature(elem,cursor.keySignature);
+							}
+						}
 						if (isNote) {
 							prevNote = noteRest;
 							prevNotes[currentTrack] = noteRest;
@@ -5141,6 +5151,7 @@ MuseScore {
 	}
 	
 	function checkKeySignature (keySig,sharps) {
+		//logError ('Checking key sig: '+sharps+' #s vs. '+prevKeySigSharps+' #s');
 		// *********************** KEY SIGNATURE ERRORS *********************** //
 		if (sharps != prevKeySigSharps) {
 			var errStr = "";
@@ -6311,7 +6322,7 @@ MuseScore {
 						if (Math.abs(minL) < Math.abs(maxL)) calcDir = 1;
 					}
 					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
-						logError ('calcDir = '+calcDir+'; noteRest.notes[0].line = '+noteRest.notes[0].line);
+						//logError ('calcDir = '+calcDir+'; noteRest.notes[0].line = '+noteRest.notes[0].line);
 						addError("Note has had stem direction flipped. If this is not deliberate,\nselect the note and press "+cmdKey+"-R.",noteRest);
 						lastStemDirectionFlagBarNum = currentBarNum;
 					}
