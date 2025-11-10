@@ -783,7 +783,7 @@ MuseScore {
 			isDiv = false;
 			firstDynamic = false;
 			wasHarmonic = false;
-			isArco = false;
+			isArco = true;
 			currentWord = '';
 			currentWordArray = [];
 			
@@ -3695,8 +3695,10 @@ MuseScore {
 				if (!isTremolo) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
 			}
 		}
-		if (lowerCaseText === "arco") isArco = true;
-		if (lowerCaseText === "ord." || lowerCaseText.includes("sticks") || lowerCaseText.includes("mallet")) isArco = false;
+		if (lowerCaseText === "arco") isArco = isStringInstrument;
+		if (!isStringInstrument) {
+			if (lowerCaseText === "ord." || lowerCaseText.includes("sticks") || lowerCaseText.includes("mallet")) isArco = false;
+		}
 		
 		if (isStringInstrument && doCheckStrings) {
 			
@@ -4422,9 +4424,9 @@ MuseScore {
 						var diff = plainText.length-spellingError.length;
 						var correctText = (diff > 0) ? correctSpelling+plainText.substr(spellingError.length) : correctSpelling;
 						if (plainText.length > 50) {
-							addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.",textObject);
+							addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling.trim()+"’.",textObject);
 						} else {
-							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.",textObject);
+							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText.trim()+"’.",textObject);
 						}
 						return;
 					}
@@ -4445,7 +4447,7 @@ MuseScore {
 						if (plainText.length > 50) {
 							addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling+"’.", textObject);
 						} else {
-							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText+"’.", textObject);
+							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText.trim()+"’.", textObject);
 						}
 					}
 				}
