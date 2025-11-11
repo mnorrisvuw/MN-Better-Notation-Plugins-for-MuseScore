@@ -5137,16 +5137,25 @@ MuseScore {
 			}
 			
 			if (isMelisma[theTrack]) {
-				currentWord = (currentWord == '') ? plainText : (currentWord + '-' + plainText);
-				currentWordArray.push(l);
-			} else {
-				if (currentWord !== '') {
+				if (l !== '') {
+					currentWord = (currentWord == '') ? plainText : (currentWord + '-' + plainText);
+					//logError ('is melisma: lyric = '+plainText+'; currentWord is now = '+currentWord);
 					currentWordArray.push(l);
-					currentWord = currentWord + '-' + plainText;
-					checkHyphenation(currentWord, currentWordArray);
 				}
-				currentWord = '';
-				currentWordArray = [];
+			} else {
+				if (l !== '') {
+					
+					currentWordArray.push(l);
+					currentWord = (currentWord == '') ? plainText : (currentWord + '-' + plainText);
+					//logError ('not melisma: lyric = '+plainText+'; currentWord is now = '+currentWord);
+
+					if (l.syllabic == Lyrics.SINGLE || l.syllabic == Lyrics.END) {
+						//logError ('CHECKING HYPHENATION OF '+currentWord);
+						checkHyphenation(currentWord, currentWordArray);
+						currentWord = '';
+						currentWordArray = [];
+					}
+				}
 			}
 			if (isSlurred & !isMelisma[theTrack]) {
 				if (currTick < currentSlur.spanner.spannerTick.ticks + currentSlur.spanner.spannerTicks.ticks) addError ("This note is slurred, but is not a melisma.",noteRest);
@@ -5155,15 +5164,18 @@ MuseScore {
 			//logError ('lyrics not found');
 			// no lyrics found
 			var isTiedBack = noteRest.notes[0].tieBack != null;
-				//logError ('!isTiedBack; met = '+melismaEndTick[theTrack]);
+			//logError ('!isTiedBack; met = '+melismaEndTick[theTrack]);
 			var endOfMelisma = false;
 			if (melismaEndTick[theTrack] > 0) {
 				endOfMelisma = noteRest.parent.tick >= melismaEndTick[theTrack];
 				//logError ('end of melisma = '+endOfMelisma+'; tick = '+noteRest.parent.tick+' endOfMelismaTick = '+melismaEndTick[theTrack]);
 				if (endOfMelisma) {
-					if (currentWord !== '') checkHyphenation(currentWord, currentWordArray);
-					currentWord = '';
-					currentWordArray = [];
+					//logError ('currentWord = '+currentWord);
+					if (currentWord !== '') {
+						checkHyphenation(currentWord, currentWordArray);
+						currentWord = '';
+						currentWordArray = [];
+					}
 				}
 			}
 			if (!isTiedBack) {
@@ -5194,9 +5206,12 @@ MuseScore {
 	
 	function checkHyphenation (str, wordArray) {
 		var unhyphenatedStr = str.replace(/-/g,"").toLowerCase();
+		logError ('checking ‘'+str+'’ → ‘'+unhyphenatedStr+'’');
 		var index = unhyphenatedWordsLower.indexOf(unhyphenatedStr);
 		if (index != -1) {
 			var correctlyHyphenatedStr = hyphenatedWords[index];
+			logError ('correctlyHyphenatedStr = ‘'+correctlyHyphenatedStr+'’');
+
 			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) {
 				addError ('‘'+str + '’ is not correctly hyphenated. It should be ‘'+correctlyHyphenatedStr+'’',wordArray);
 			}
