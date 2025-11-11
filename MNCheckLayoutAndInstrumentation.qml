@@ -747,17 +747,22 @@ MuseScore {
 		// ************ 					START LOOP THROUGH WHOLE SCORE 						************ //
 		for (currentStaffNum = 0; currentStaffNum < numStaves; currentStaffNum ++) {
 			
-			currentStaff = curScore.staves[currentStaffNum];
-			currentBar = firstBarInScore;
-			currentBarNum = 1;
-			currentSystemNum = 0;
-			displayOffset = 0;
-
 			//don't process if this part is hidden
 			if (!staffVisible[currentStaffNum]) {
 				loop += numBars * 4;
 				continue;
 			}
+			
+			// **** SET VARIABLES FOR THIS STAFF **** //
+			currentStaff = curScore.staves[currentStaffNum];
+			currentBar = firstBarInScore;
+			currentBarNum = 1;
+			currentSystemNum = 0;
+			displayOffset = 0;
+			currentInstrumentId = currentStaff.part.musicXmlId;
+			currentInstrumentName = currentStaff.part.longName;
+			calculateCalcId();
+			setInstrumentVariables();
 			
 			// INITIALISE VARIABLES BACK TO DEFAULTS A PER-STAFF BASIS
 			prevKeySigSharps = curScore.keysig; // placeholder/dummy variable
@@ -808,6 +813,8 @@ MuseScore {
 			currentDynamic = null;
 			nextDynamicTick = -1;
 			numDynamics = dynamics[currentStaffNum].length;
+			
+			// *** DO THIS AFTER CHECKING THE INSTRUMENT *** //
 			if (numDynamics == 0) {
 				// no dynamics marked!
 				nextDynamic = null;
@@ -899,14 +906,6 @@ MuseScore {
 			currentOttavaEnd = 0;
 			numOttavas = ottavas[currentStaffNum].length;
 			nextOttavaStart = (numOttavas == 0) ? 0 : ottavas[currentStaffNum][0].spanner.spannerTick.ticks;
-			
-			// **** GET INSTRUMENT ID & NAME OF THIS STAFF **** //
-			currentInstrumentId = currentStaff.part.musicXmlId;
-			currentInstrumentName = currentStaff.part.longName;
-			// sometimes the instrument id is vague ('strings.group'), so we need to do a bit more detective work and calculate what the actual instrument is — this routine does that
-			calculateCalcId();
-			// set any specific variables for the current instrument
-			setInstrumentVariables();
 			
 			// ** clefs
 			numClefs = clefs[currentStaffNum].length;
@@ -3581,6 +3580,14 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function checkFermata (noteRest) {
+		var nonStandardFermatas = [SymId.fermataLongHenzeAbove,
+			SymId.fermataLongHenzeBelow,
+			SymId.fermataShortHenzeAbove,
+			SymId.fermataShortHenzeBelow,
+			SymId.fermataVeryShortAbove,
+			SymId.fermataVeryShortBelow,
+			SymId.fermataShortAbove,
+			SymId.fermataShortBelow];
 		isFermata = false;
 		if (isNote || isRest) {
 			var theSeg = noteRest.parent;
@@ -3594,6 +3601,10 @@ MuseScore {
 				for (var i = 0; i < n; i++) {
 					var theElem = theAnnotations[i];
 					if (theElem.type == Element.FERMATA) {
+						if (nonStandardFermatas.includes(theElem.symbol)) {
+							//logError ('ts = '+theElem.timeStretch);
+							addError ("This fermata is non-standard and may not\nbe understood by most musicians. Consider\nreplacing with a standard fermata and duration,\nor provide clear performance instructions", theElem);
+						}
 						isFermata = true;
 						return;
 					}
