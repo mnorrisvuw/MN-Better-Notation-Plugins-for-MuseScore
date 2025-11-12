@@ -156,6 +156,7 @@ MuseScore {
 	property var flaggedOneStrokeTrem: false
 	property var flaggedManualSlurBarNum: -1
 	property var flaggedBravuraHarmonics: false
+	property var flaggedMoodDescriptor: false
 
  	property var firstVisibleStaff: 0
 	property var staffVisible: []
@@ -931,10 +932,12 @@ MuseScore {
 			
 			// **** MAIN MEASURE LOOP HERE **** //
 			for (currentBarNum = 1; currentBarNum <= numBars && currentBar; currentBarNum ++) {
-				if (currentStaffNum == 0) {
+				if (currentStaffNum == 0 && !flaggedMoodDescriptor) {
 					if (currentBarNum > 1 && currentBarNum < 4) {
-						if (barContainsMetronome && !barContainsTempo && lastTempoMarking != null) {
-							addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",lastTempoMarking);
+						//logError ('barContainsMetronome = '+barContainsMetronome+'; barContainsTempo = '+barContainsTempo);
+						if (barContainsMetronome && !barContainsTempo && lastMetronomeMarking != null) {
+							addError ("For original compositions, it’s good to add a tempo phrase or mood descriptor\nin addition to the metronome marking at the start of a work.",lastMetronomeMarking);
+							flaggedMoodDescriptor = true;
 						}
 					} 
 				}
@@ -962,6 +965,7 @@ MuseScore {
 				// **** GET CURRENT TIME SIGNATURE OF THIS BAR	**** //
 				// **** AND CALCULATE THE BEAT LENGTH			**** //
 				currentTimeSig = currentBar.timesigNominal;
+				//logError ('currentTimeSig is now '+currentTimeSig.str);
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
 				beatLength = division;
@@ -1090,19 +1094,7 @@ MuseScore {
 						isRest = false;
 						isSforzando = false;
 						var currSeg = cursor.segment;
-						if (currSeg.type == Segment.KeySig) logError ('seg ks');
 						currTick = currSeg.tick;
-
-						// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
-						if (tempoText.length > 0) {
-							var t = tempoText[0];
-							while (checkTempoObjectNow(t) && tempoText.length > 0) {
-								//logError ('Checking tempo marking '+t.text);
-								checkTextObject(t);
-								tempoText.shift();
-								if (tempoText.length > 0) t = tempoText[0];
-							}
-						}
 						
 						// ************ CHECK KEY SIGNATURE ************ //
 						
@@ -1111,7 +1103,18 @@ MuseScore {
 
 						if (currTick != barEndTick) {
 							
-							// ** CHECK IF MELISMA IS STILL GOING ** //
+							// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
+							if (tempoText.length > 0) {
+								var t = tempoText[0];
+								while (checkTempoObjectNow(t) && tempoText.length > 0) {
+									//logError ('Checking tempo marking '+t.text);
+									checkTextObject(t);
+									tempoText.shift();
+									if (tempoText.length > 0) t = tempoText[0];
+								}
+							}
+							
+							// ************ CHECK IF MELISMA IS STILL GOING ************  //
 							if (isMelisma[currentTrack] && melismaEndTick[currentTrack] > 0) isMelisma[currentTrack] = currTick <= melismaEndTick[currentTrack];
 							var annotations = currSeg.annotations;
 													
@@ -1128,8 +1131,6 @@ MuseScore {
 								var theTie = elem.notes[0].tieForward;
 								if (theTie != null) isLv = theTie.type == Element.LAISSEZ_VIB;
 							}
-							
-							
 							
 							// ************ CHECK SPANNERS & DYNAMICS ETC. ************ //
 							checkScoreElements(elem);
@@ -1153,6 +1154,7 @@ MuseScore {
 							// **            FOUND A CHORD OR REST           ** //
 							// **											 ** //
 							// ************************************************ //
+							
 							var isHidden = !elem.visible;
 							if (isNote && !isHidden) {
 								var numHiddenNoteheads = 0;
@@ -1160,7 +1162,6 @@ MuseScore {
 								for (var ni = 0; ni < numNoteheads; ni++) if (!elem.notes[ni].visible) numHiddenNoteheads ++
 								if (numHiddenNoteheads == numNoteheads) isHidden = true;
 							}
-							//if (isHidden) logError ('Found hidden note');
 
 							if ((isNote || isRest) && !isHidden) {
 								
@@ -1168,9 +1169,9 @@ MuseScore {
 								numNoteRestsInThisSystem ++;
 								var noteRest = elem;
 								if (firstNoteInThisBar == null) firstNoteInThisBar = noteRest;
-								var displayDur = noteRest.duration.ticks;
+								//var displayDur = noteRest.duration.ticks;
 								var soundingDur = noteRest.actualDuration.ticks;
-								var tuplet = noteRest.tuplet;
+								//var tuplet = noteRest.tuplet;
 								var barsSincePrevNote = currentBarNum - prevBarNum;
 								
 								if (barsSincePrevNote > 1) {
@@ -1966,10 +1967,18 @@ MuseScore {
 	}
 	
 	function chordsAreIdentical (chord1,chord2) {
+		if (chord1 == null || chord2 == null) return false;
+		if (chord1.notes == null || chord2.notes == null) return false;
 		if (chord1.notes.length != chord2.notes.length) return false;
-		for (var i = 0; i < chord1.notes.length; i++) {
-			if (chord1.notes[i].pitch != chord2.notes[i].pitch) return false;
-		}
+		for (var i = 0; i < chord1.notes.length; i++) if (!notesAreIdentical(chord1.notes[i], chord2.notes[i])) return false;
+		return true;
+	}
+	
+	function notesAreIdentical (note1, note2) {
+		// first check the MIDI pitch
+		if (note1.pitch != note2.pitch) return false;
+		// now check the accidental, as microtones don't affect the MIDI pitch
+		if (note1.accidentalType != note2.accidentalType) return false;
 		return true;
 	}
 		
@@ -4428,8 +4437,8 @@ MuseScore {
 			// ** THIS REGEX ATTEMPTS TO MATCH ALL POSSIBLE PERMUTATIONS OF A METRONOME MARKING **//
 			// ** NB — DON'T CHANGE THIS WITHOUT CHECKING THAT THE AUGMENTATION DOT CAPTURE GROUP IS CORRECT **
 			// ** THIS IS THE INDEX OF THE CAPTURE GROUP (\.|<sym>metAugmentationDot<\/sym>|\uECB7) ** //
-			var metronomeComponentRegex = new RegExp( /(<b>)?\(?(<\/?b>|c|approx|circa|\.|\s)*(<sym>metNote.*?<\/sym>|\uECA5|\uECA7|\uECA3)(\.|<sym>metAugmentationDot<\/sym>|\uECB7)?(<font.*?>.*?<\/font>|<font.*\/>|<b>|<\/b>)*(\s|\u00A0|\u2009)*=(\s|\u00A0|\u2009|<b>|<\/b>)*(c|approx|circa)?\.?(\s|<b>|<\/b>)*[0-9–\-—]*(<b>|<\/b>)*\)?/);
-			var augDotCaptureGroup = 4;
+			var metronomeComponentRegex = new RegExp( /(<[^>]*>|\s)*\(?(<[^>]*>|\s)*(c|c\.|approx|circa|approx\.)?(<[^>]*>|\s)*(metNote[^<]*|\uECA5|\uECA7|\uECA3)(<[^>]*>|\s)*(\.|metAugmentationDot|\uECB7)?(<[^>]*>|\s)*=(<[^>]*>|\s)*(c|c\.|approx|circa|approx\.)?(<[^>]*>|\s)*[0-9–\-—]*(<[^>]*>|\s)*\)?/);
+			var augDotCaptureGroup = 7;
 			
 			if (currentBarNum > 0) {
 				// **** CHECK TO SEE IF THIS CONTAINS A METRONOME MARKING **** //
@@ -4437,7 +4446,7 @@ MuseScore {
 					var theMatch = styledText.match(metronomeComponentRegex);
 					containsMetronomeComponent = theMatch != null;
 					if (containsMetronomeComponent) {
-						metronomeComponent = theMatch[0].replace(/<\/*b>/g,'');
+						metronomeComponent = theMatch[0];
 						//logError ('metroComponent = '+metronomeComponent.replace(/</g,'≤'));
 						if (theMatch[augDotCaptureGroup] != undefined) {
 							augDotComponent = theMatch[augDotCaptureGroup];
@@ -4453,6 +4462,7 @@ MuseScore {
 						if (lowerCaseText.includes(tempomarkings[j])) containsTempoComponent = true;
 					}
 				}
+				//logError ('1: containsTempoComponent = '+containsTempoComponent);
 				// if it doesn't contain a standard tempo marking, we then check to see whether there's any
 				// non-metronome component (only if it's in a tempo text style)
 				if (!containsTempoComponent && isTempoTextStyle) {
@@ -4465,11 +4475,13 @@ MuseScore {
 						//logError ('Found residual text after replacing metronome: '+nonMetronomeComponent.trim().replace(/</g,'≤'));
 					}
 				}
-							
+						//logError ('2: containsTempoComponent = '+containsTempoComponent);
+	
 				// **** CHECK TO SEE IF THIS CONTAINS A TEMPO CHANGE ELEMENT **** //
 				if (!isTempoChangeElement && !lowerCaseText.includes('trill') && !lowerCaseText.includes('trem')) {
 					for (var i = 0; i < tempochangemarkings.length && !containsTempoChangeComponent; i++) if (lowerCaseText.includes(tempochangemarkings[i])) containsTempoChangeComponent = true;
 				}
+				
 			}
 			
 			// ***************************************************** //
@@ -4701,11 +4713,11 @@ MuseScore {
 						// There may be some exceptions to this I haven't thought of, however
 						// (maybe deal with this in a future version) 
 						var strToRightOfMetronomeComponent = styledText.split(metronomeComponent)[1];
+						//logError('strToRightOfMetronomeComponent = '+strToRightOfMetronomeComponent);
 						if (strToRightOfMetronomeComponent != undefined) {
 							strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.trim();
 							if (strToRightOfMetronomeComponent != '') {
 								addError ("In general, you should put the mood/tempo descriptor\nbefore the metronome marking.",textObject);
-								//logError('strToRightOfMetronomeComponent = '+strToRightOfMetronomeComponent);
 							}
 						}
 						
@@ -5076,20 +5088,10 @@ MuseScore {
 		if (numNotes != nextChord.notes.length) return;
 		var numTies = 0;
 		for (var i = 0; i < numNotes; i++) {
-			if (noteRest.notes[i].pitch != nextChord.notes[i].pitch) return;
+			if (!notesAreIdentical(noteRest.notes[i], nextChord.notes[i])) return;
 			if (noteRest.notes[i].tieForward) numTies ++;
 		}
 		if (numTies > 0 && numTies < numNotes) addError ("This chord only has some notes tied to the next chord.\nShould they ALL be tied?",noteRest);
-	}
-	
-	function isSameChord (noteRest1, noteRest2) {
-		if (noteRest1 == null || noteRest2 == null) return false;
-		if (noteRest1.notes == null || noteRest2.notes == null) return false;
-		if (noteRest1.notes.length != noteRest2.notes.length) return false;
-		for (var i = 0; i < noteRest1.notes.length; i++) {
-			if (noteRest1.notes[i].pitch != noteRest2.notes[i].pitch) return false;
-		}
-		return true;
 	}
 	
 	// ***************************************************************** //
@@ -5102,7 +5104,6 @@ MuseScore {
 	function checkLyrics (noteRest) {
 
 		var theTrack = noteRest.track;
-		//logError ('Checking note');
 		if (noteRest.lyrics.length > 0) {
 			//logError ('lyrics found');
 			// lyrics found
@@ -5196,28 +5197,22 @@ MuseScore {
 		}
 	}
 	
-	
 	// ***************************************************************** //
 	// **** 														**** //
 	// **** 	CHECKS LYRICS FOR HYPHENATION ERRORS			 	**** //
 	// **** 														**** //
 	// ***************************************************************** //
 	
-	
 	function checkHyphenation (str, wordArray) {
 		var unhyphenatedStr = str.replace(/-/g,"").toLowerCase();
-		logError ('checking ‘'+str+'’ → ‘'+unhyphenatedStr+'’');
+		// logError ('checking ‘'+str+'’ → ‘'+unhyphenatedStr+'’');
 		var index = unhyphenatedWordsLower.indexOf(unhyphenatedStr);
 		if (index != -1) {
 			var correctlyHyphenatedStr = hyphenatedWords[index];
-			logError ('correctlyHyphenatedStr = ‘'+correctlyHyphenatedStr+'’');
-
-			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) {
-				addError ('‘'+str + '’ is not correctly hyphenated. It should be ‘'+correctlyHyphenatedStr+'’',wordArray);
-			}
+			// logError ('correctlyHyphenatedStr = ‘'+correctlyHyphenatedStr+'’');
+			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) addError ('‘'+str + '’ is not correctly hyphenated. It should be ‘'+correctlyHyphenatedStr+'’',wordArray);
 		}
 	}
-	
 	
 	// ***************************************************************** //
 	// **** 														**** //
@@ -5226,13 +5221,14 @@ MuseScore {
 	// **** 														**** //
 	// ***************************************************************** //
 	
-	
 	function isDynamic (str) {
-		var exceptions = ["p.s.t","p.s.p"];
+		var exceptions = ["p.s.t","p.s.p"]; // ignore poco sul pont, poco sul tasto
 		for (var i = 0; i < exceptions.length; i++) {
 			var word = exceptions[i];
 			if (str.includes(word)) return false;
 		}
+		
+		// look for the presence of any of these strings as separate words
 		var dynamics = ["pppp", "ppp","pp","p", "mp", "mf", "f", "ff", "fff", "ffff","sf", "sfz","sffz","fz","fpppp", "fppp","fpp","fp", "fmp", "fmf", "ffpppp", "ffppp","ffpp","ffp", "ffmp", "sfpppp", "sfppp","sfpp","sfp", "sfmp", "sfzpppp", "sfzppp","sfzpp","sfzp", "sfzmp","mfpppp", "mfppp","mfpp","mfp", "mfmp", "sffpppp", "sffppp","sffpp","sffp", "sffmp", "sffzpppp", "sffzppp","sffzpp","sffzp", "sffzmp", "fzpppp", "fzppp","fzpp","fzp", "fzmp", "n", "niente"];
 		var words = str.split(/[:\s]+/);
 		for (var i = 0; i < words.length; i++) {
@@ -5247,8 +5243,7 @@ MuseScore {
 		return dynamicTicks[currentStaffNum][currTick] != null;
 	}
 	
-	
-	// ***************************************************************** //
+		// ***************************************************************** //
 	// **** 														**** //
 	// **** 	SETS A VARIABLE DEPENDING ON THE CURRENT DYNAMIC 	**** //
 	// **** 	SETTING FOR USE BY OTHER ROUTINES				 	**** //
@@ -5256,10 +5251,14 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function setDynamicLevel (str) {
-		// set multiple dynamics first and return
-		// dynamicLevel — 0 = ppp–p, 1 = mp, 2 = mf, 3 = f, 4 = ff+
+		
+		// sfzs or rfzs on their own don't change the dynamic level
 		if (str === 'sf' || str === 'sfz' || str === 'sffz' || str === 'rf' || str === 'rfz' || str === 'fz') return;
+		
+		// dynamicLevel — 0 = ppp–p, 1 = mp, 2 = mf, 3 = f, 4 = ff+
 		var strWords = str.split(/[,;:-\s.]+/);
+		
+		// set incremental dynamic
 		if (str.includes ('meno f') || str.includes('più p')) {
 			if (currDynamicLevel > 0) currDynamicLevel--;
 			return;
@@ -5268,6 +5267,7 @@ MuseScore {
 			if (currDynamicLevel < 4) currDynamicLevel++;
 			return;
 		}
+		
 		// go in reverse order
 		for (var i = strWords.length-1; i>=0; i--) {
 			var checkStr = strWords[i];
@@ -5293,6 +5293,8 @@ MuseScore {
 				return;
 			}
 		}
+		
+		// there was a dynamic, but I couldn't figure out what it was, so put up an error message
 		logError ('setDynamicLevel() — Can’t find dynamic level for '+str+'; words are: ['+strWords.join('|')+']');
 	}
 	
@@ -5305,40 +5307,49 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function checkKeySignature (keySig,sharps) {
-		//logError ('Checking key sig: '+sharps+' #s vs. '+prevKeySigSharps+' #s');
-		// *********************** KEY SIGNATURE ERRORS *********************** //
-		if (sharps != prevKeySigSharps) {
+		
+		if (sharps == prevKeySigSharps) {
+			
+			// redundant key signature
+			addError("This key signature is the same as the one in bar "+prevKeySigBarNum+".\nPerhaps delete it?",keySig);
+			
+		} else {
 			var errStr = "";
+			
+			// extreme key signature (sharps)
 			if (sharps > 6) errStr = "This key signature has "+sharps+" sharps,\nand would be easier to read if rescored as "+(12-sharps)+" flats.";
+			
+			// extreme key signature (flats)
 			if (sharps < -6) errStr = "This key signature has "+Math.abs(sharps)+" flats,\nand would be easier to read if rescored as "+(12+sharps)+" sharps.";
+			
+			// potential overuse of key signatures
 			if (currentBarNum - prevKeySigBarNum  < 16) errStr = ((errStr !== "") ? errStr + "\nAlso, this" : "This") + " key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps one of them could be avoided by using accidentals instead?";
 			if (errStr !== "") addError(errStr,keySig);
 			prevKeySigSharps = sharps;
 			prevKeySigBarNum = currentBarNum;
-		} else {
-			addError("This key signature is the same as the one in bar "+prevKeySigBarNum+".\nPerhaps delete it?",keySig);
 		}
 	}
 	
-	
-	// ***************************************************************** //
+		// ***************************************************************** //
 	// **** 														**** //
 	// **** 	CHECKS TO SEE WHETHER THE BARLINES IN THE SCORE 	**** //
 	// **** 	ARE CONNECTED OR DISCONNECTED APPROPRIATELY		 	**** //
 	// **** 														**** //
 	// ***************************************************************** //
-	
-	
+		
 	function checkBarlinesConnected (str) {
+		
+		// str parameter is the name of a standard ensemble (e.g. 'string quartet')
+		// that requires all barlines to be connected; or null if it's a non-standard ensemble
+		
 		var lastVisibleStaff = 0;
 		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) lastVisibleStaff = i;
 		
-		// if str is not null, then it's a standard ensemble where all the staff lines should be connected
+		// we have an ensemble that requires all barlines to be connected
 		if (str != null) {
 			for (var i = 0; i < lastVisibleStaff; i++) {
 				if (staffVisible[i]) {
 					var staff = curScore.staves[i];
-					//logError ('staff.staffBarlineSpan = '+staff.staffBarlineSpan);
 					if (staff.staffBarlineSpan == 0) {
 						addError ("In a "+str+", the barlines should go through all staves.\nClick and drag the bottom of a barline to extend down through the entire score.","system1 0");
 						return;
@@ -5347,7 +5358,10 @@ MuseScore {
 			}
 		}
 		
-		// check vocal staves and grand staff instruments that have been incorrectly connected
+		// for non-standard ensembles, we'll just check the following barline settings:
+		// 1) vocal staves are unconnected
+		// 2) grand staff instruments are connected only within the instrument
+		// NB: more we could do here, e.g. orchestral scores, etc.
 		var prevBarlineSpan = 0;
 		for (var i = 0; i < lastVisibleStaff; i++) {
 			if (staffVisible[i]) {
@@ -5375,7 +5389,6 @@ MuseScore {
 		}
 	}
 	
-	
 	// ***************************************************************** //
 	// **** 														**** //
 	// **** 	CHECKS FOR THE PRESENCE OR ABSENCE OF BRACKETS		**** //
@@ -5383,10 +5396,17 @@ MuseScore {
 	// **** 														**** //
 	// ***************************************************************** //
 	
-	
 	function checkBracketsAndBraces (str) {
-		var singleJoinedBracketArray = ["string quartet", "wind quintet", "brass quintet", "string quintet"];
+		
+		// str parameter is the name of a standard ensemble (e.g. 'string quartet')
+		// that requires all barlines to be connected; or null if it's a non-standard ensemble
+		
+		// these ensembles require a single bracket around everything
+		var singleBracketArray = ["string quartet", "wind quintet", "brass quintet", "string quintet"];
+		
+		// these ensembles require no bracket
 		var noBracketArray = ["piano trio", "piano quartet", "duo"];
+		
 		var firstVisibleStaff = -1;
 		var lastVisibleStaff = -1;
 		
@@ -5402,56 +5422,50 @@ MuseScore {
 		// check for brace on grand staves
 		for (var i = firstVisibleStaff; i < lastVisibleStaff; i++) {
 			if (isTopOfGrandStaff[i]) {
-				// check for a brace
+				// check for the presence of a brace
 				var theStaff = curScore.staves[i];
 				if (theStaff.brackets.length == 0) {
 					addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
 				} else {
 					if (theStaff.brackets.length == 1) {
-						if (theStaff.brackets[0].systemBracket != BracketType.BRACE) {
-							addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
-						}
+						// it has a bracket of some type, but it's not a brace
+						if (theStaff.brackets[0].systemBracket != BracketType.BRACE) addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
 					} else {
+						// check brace present
 						var hasBrace = false;
-						for (var j = 0; j < theStaff.brackets.length && !hasBrace; j++) {
-							hasBrace = theStaff.brackets[j].systemBracket == BracketType.BRACE;
-						}
-						if (!hasBrace) {
-							addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
-						}
+						for (var j = 0; j < theStaff.brackets.length && !hasBrace; j++) hasBrace = theStaff.brackets[j].systemBracket == BracketType.BRACE;
+						if (!hasBrace) addError ('Grand staves require a single brace on the left.\nAdd this from the Brackets palette.','system1 '+i);
 					}
 				}
 			}
 		}
 		
 		if (str != null) {
-			if (singleJoinedBracketArray.includes(str)) {
+			if (singleBracketArray.includes(str)) {
 				// this score only needs one bracket
 				var theBrackets = [];
 				for (var i = 0; i < numStaves; i++) {
 					if (staffVisible[i]) {	
 						var theStaff = curScore.staves[i];
 						var numBrackets = theStaff.brackets.length;
-						
 						if (i == firstVisibleStaff) {
 							
-							// *** Check if no brackets have been added *** //
+							// *** Check whether there are no brackets *** //
 							if (numBrackets == 0) addError ('For '+str+'s, there should be a single bracket around the entire system.\nAdd a bracket from the Brackets palette.','system1 0');
 							
 							if (numBrackets == 1) {
 
-								// *** Check if the bracket is a normal system bracket *** //
+								// *** Check that the bracket is a normal system bracket *** //
 								if (theStaff.brackets[0].systemBracket != BracketType.NORMAL) {
 									addError ('This bracket is the wrong kind of bracket for '+str+'.\nDelete it and add a normal bracket instead',theStaff.brackets[0]);
 								} else {
-									// *** Check if the bracket spans the whole system *** //
+									// *** Check that the bracket spans the whole system *** //
 									if (theStaff.brackets[0].bracketSpan != visibleStaffSpan) addError ('For '+str+'s, the staff bracket should span the entire system.\nClick and drag the bottom of the bracket down to the end of the system.',theStaff.brackets[0]);
 								}
 								
 							}
 						}
 						for (var j = 0; j < numBrackets; j++) theBrackets.push(theStaff.brackets[j]);
-						
 					}
 				}
 				if (theBrackets.length > 1) {
@@ -5465,6 +5479,7 @@ MuseScore {
 							bracketsToHighlight.push(theBracket);
 						}
 					}
+					// *** Check whether there are some unnecessary brackets, e.g. between Violin 1 & 2 in string quartet *** //
 					addError ('For '+str+'s, you only need one system bracket.\nSelect all unnecessary brackets and press ‘delete’.',bracketsToHighlight);
 				}
 			}
@@ -5490,14 +5505,12 @@ MuseScore {
 		}
 	}
 	
-	
 	// ***************************************************************** //
 	// **** 														**** //
 	// **** 	CHECKS TIMES SIGNATURES FOR STANDARD ISSUES SUCH 	**** //
-	// **** 	AS REDUNDANCY OR OLD-FASHIONED					 	**** //
+	// **** 	AS REDUNDANCY OR OLD-FASHIONED CUT/COMMON		 	**** //
 	// **** 														**** //
 	// ***************************************************************** //
-	
 	
 	function checkTimeSignatures () {
 		var segment = curScore.firstSegment();
@@ -5520,7 +5533,6 @@ MuseScore {
 		}
 	}
 	
-	
 	// ***************************************************************** //
 	// **** 														**** //
 	// **** 	CHECKS FERMATAS TO SEE WHETHER THERE ARE FERMATAS 	**** //
@@ -5542,7 +5554,7 @@ MuseScore {
 							for (var k = 0; k < numStaves && fermataInAllParts; k++) {
 								if (k != i && staffIsVisibleAtTick(k,theTick)) {
 									fermataInAllParts = fermatas[k].filter (e => e.parent.tick == theTick).length > 0;
-									if (!fermataInAllParts) logError ('Couldnt find a fermata on staff '+k+' at tick '+theTick);
+									//if (!fermataInAllParts) logError ('Couldnt find a fermata on staff '+k+' at tick '+theTick);
 								}	
 							}
 							if (!fermataInAllParts) addError("In general, a fermata should be placed in ALL parts, appearing on the same beat.\nThere are some instances where placing fermatas on different beats is permitted.\nUse your judgement as to whether you may ignore this warning (see ‘Behind Bars’, p. 190)",fermata);
@@ -6268,30 +6280,20 @@ MuseScore {
 				if (!isStartOfSlur && prevNote != null && prevSlurNumOnTrack[currentTrack] == currentSlurNumOnTrack[currentTrack] && noteRest.notes[0].tieBack == null) {
 					var noteheadStyle = noteRest.notes[0].headGroup;
 					var prevNoteheadStyle = prevNote.notes[0].headGroup;
-					if (noteRest.notes.length == prevNote.notes.length) {
-						var numNotes = noteRest.notes.length;
-						var numPrevNotes = prevNote.notes.length;
 						
-						// does it have the same number of notes?
-						var chordMatches = numNotes == numPrevNotes;
-						
-						// are the pitches identical?
-						if (chordMatches) for (var i = 0; i < numNotes && chordMatches; i++) if (noteRest.notes[i].pitch != prevNote.notes[i].pitch) chordMatches = false;
-
-						if (chordMatches && noteheadStyle == prevNoteheadStyle) {
-							if (getArticulations(noteRest).length == 0) {
-								if (isEndOfSlur && prevWasStartOfSlur) {
-									addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie, or do you need to add articulation?",currentSlur);
+					if (chordsAreIdentical (noteRest, prevNote) && noteheadStyle == prevNoteheadStyle) {
+						if (getArticulations(noteRest).length == 0) {
+							if (isEndOfSlur && prevWasStartOfSlur) {
+								addError("A slur has been used between two notes of the same pitch.\nIs this supposed to be a tie, or do you need to add articulation?",currentSlur);
+							} else {
+								var errStr = "";
+								if (numNotes == 1) {
+									errStr = "Don’t repeat the same note under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
 								} else {
-									var errStr = "";
-									if (numNotes == 1) {
-										errStr = "Don’t repeat the same note under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
-									} else {
-										errStr = "Don’t repeat the same chord under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
-									}
-									if (isStringInstrument) errStr += '\n(Ignore this message if these notes are played on different strings)';
-									addError(errStr,noteRest);
+									errStr = "Don’t repeat the same chord under a slur. Either remove the slur,\nor add some articulation (e.g. tenuto/staccato).";
 								}
+								if (isStringInstrument) errStr += '\n(Ignore this message if these notes are played on different strings)';
+								addError(errStr,noteRest);
 							}
 						}
 					}
@@ -6699,12 +6701,9 @@ MuseScore {
 			var theArtic = getArticulations(graceNotes[n-1]);
 			var hasArtic = theArtic != null;
 			var gnIsTied = graceNotes[n-1].notes[0].tieForward != null || graceNotes[n-1].notes[0].tieBack != null;
-			var gnIsSamePitch = false;
-			if (graceNotes[n-1].notes.length > 0 && noteRest.notes.length > 0) gnIsSamePitch = graceNotes[n-1].notes[0].pitch == noteRest.notes[0].pitch;
-			if (!hasArtic && !gnIsTied && !gnIsSamePitch) addError("In general, slur grace-notes to the main note,\nunless you use staccatos or accents.",graceNotes);
+			if (!hasArtic && !gnIsTied && !chordsAreIdentical (graceNotes[n-1], noteRest)) addError("In general, slur grace-notes to the main note,\nunless you use staccatos or accents.",graceNotes);
 		} else {
-			if (graceNotes[n-1].notes.length > 0 && noteRest.notes.length > 0) gnIsSamePitch = graceNotes[n-1].notes[0].pitch == noteRest.notes[0].pitch;
-			if (gnIsSamePitch) addError ("This grace note is the same pitch as the main note,\nbut is slurred. Is that meant to be a tie?",graceNotes[n-1]);
+			if (chordsAreIdentical (graceNotes[n-1], noteRest)) addError ("This grace note is the same pitch as the main note,\nbut is slurred. Is that meant to be a tie?",graceNotes[n-1]);
 		}
 	}
 	
@@ -6951,7 +6950,7 @@ MuseScore {
 						}
 					}
 				}
-				if (isSameChord (noteRest, nextNoteRest)) addError ("This looks like a gliss. between the same note.\nIs that correct?", gliss);
+				if (chordsAreIdentical (noteRest, nextNoteRest)) addError ("This looks like a gliss. between the same note.\nIs that correct?", gliss);
 			}
 		}
 	}
