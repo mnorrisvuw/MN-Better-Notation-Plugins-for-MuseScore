@@ -126476,7 +126476,6 @@ spirelet spire-let
 spiral spir-al
 spiracle spir-a-cle
 spiring spir-ing
-Spirit Spir-it
 spirit spir-it
 spirited spi-ri-ted
 spiritedly spir-it-ed-ly
