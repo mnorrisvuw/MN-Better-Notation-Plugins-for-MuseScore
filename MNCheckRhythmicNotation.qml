@@ -379,7 +379,15 @@ MuseScore {
 						noteStart = cursor.tick - barStart; // offset from the start of the bar
 						noteEnd = noteStart + soundingDur; // the tick at the end of the note
 						lastNoteInBar = noteStart + soundingDur >= barDur; // is this the last note in the bar (in this track?)
-						isTied = isNote ? (noteRest.notes[0].tieBack != null || noteRest.notes[0].tieForward != null) : false; // is this note tied either forwards or backwards?
+						var tieForward = null;
+						var tieBack = null;
+						var isTied = false;
+						if (isNote) {
+							tieForward = noteRest.notes[0].tieForward;
+							if (tieForward.type == Element.LAISSEZ_VIB) tieForward = null; // not tied if it's an l.v.
+							tieBack = noteRest.notes[0].tieBack;
+							isTied = tieBack || tieForward; // is this note tied either forwards or backwards?
+						}
 						noteStartFrac = noteStart % beatLength; // whereabouts this note starts within its beat
 						noteStartBeat = Math.trunc(noteStart/beatLength); // which beat in the bar
 						var noteEndFrac = noteEnd % beatLength;
@@ -489,7 +497,7 @@ MuseScore {
 								tiedNotes.push(noteRest);
 								//if (lastNoteInTie) logError(lastNoteInTie");
 							} else {
-								if (wasTied) tiedNotes = [];
+								if (wasTied) tiedNotes.length = 0;
 							}
 							
 							// ** ————————————————————————————————————————————————— ** //
@@ -551,8 +559,8 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							if (lastNoteInTie && !isGliss) {
 								if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
-								tiedNotes = [];
 							}
+							if (lastNoteInTie) tiedNotes.length = 0;
 							
 							// ** ————————————————————————————————————————————————— ** //
 							// ** 			CHECK 7: COULD BE STACCATO				** //
@@ -687,7 +695,9 @@ MuseScore {
 	}
 	
 	function selectNone () {
+		curScore.startCmd();
 		cmd('escape');
+		curScore.endCmd();
 	}
 	
 	function setInstrumentVariables (thePart) {
@@ -814,6 +824,10 @@ MuseScore {
 						addError ("Never write a dotted minim rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
 						return;
 					}
+					if ((timeSigStr === "6/4" || timeSigStr === "9/4") && noteStartBeat % 3 != 0) {
+						addError ("Don’t write a dotted minim rest on\nbeat "+(noteStartBeat + 1)+" of a "+timeSigStr+" bar.",noteRest);
+						return;
+					}
 				}
 	
 				if (soundingDur == crotchet) {
@@ -829,6 +843,9 @@ MuseScore {
 						return;
 					}
 				} else {
+					if (soundingDur == dottedminim) {
+						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 != 0;
+					}
 					if (soundingDur == minim) {
 						// ok in 4/4 on 1 & 3
 						if (timeSigStr === "3/4") {
@@ -837,7 +854,7 @@ MuseScore {
 						}
 						hidingBeatError = false;
 						if ((timeSigStr === "4/4" || timeSigStr === "5/4" || timeSigStr === "2/2") && noteStartBeat == 1) hidingBeatError = true;
-						if (timeSigStr === "6/4") hidingBeatError = true;
+						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 != 0;
 					}
 					
 					if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
