@@ -309,7 +309,7 @@ MuseScore {
 				canCheckThisBar = false;
 				isCompound = false;
 				if (timeSigDenom == 8 || timeSigDenom == 16) {
-					isCompound = !(timeSigNum % 3);
+					isCompound = timeSigNum % 3 > 0;
 					if (isCompound) beatLength = (division * 12) / timeSigDenom;
 				}
 
@@ -379,15 +379,9 @@ MuseScore {
 						noteStart = cursor.tick - barStart; // offset from the start of the bar
 						noteEnd = noteStart + soundingDur; // the tick at the end of the note
 						lastNoteInBar = noteStart + soundingDur >= barDur; // is this the last note in the bar (in this track?)
-						var tieForward = null;
-						var tieBack = null;
-						var isTied = false;
-						if (isNote) {
-							tieForward = noteRest.notes[0].tieForward;
-							if (tieForward) if (tieForward.type == Element.LAISSEZ_VIB) tieForward = null; // not tied if it's an l.v.
-							tieBack = noteRest.notes[0].tieBack;
-							isTied = tieBack || tieForward; // is this note tied either forwards or backwards?
-						}
+						var tieForward = allNotesTieForward(noteRest);
+						var tieBack = allNotesTieBack(noteRest);
+						var isTied = tieBack || tieForward; // is this note tied either forwards or backwards?
 						noteStartFrac = noteStart % beatLength; // whereabouts this note starts within its beat
 						noteStartBeat = Math.trunc(noteStart/beatLength); // which beat in the bar
 						var noteEndFrac = noteEnd % beatLength;
@@ -479,23 +473,10 @@ MuseScore {
 							// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
 							var lastNoteInTie = false;
 							if (isTied) {
-								lastNoteInTie = noteRest.notes[0].tieForward == null || lastNoteInBar || nextItemHasPause;
-								if (!lastNoteInTie) {
-									// check that the notes are the same as the next
-									if (nextItemIsNote) {
-										if (noteRest.notes.length == nextItem.notes.length) {
-											for (var k = 0; k < noteRest.notes.length && !lastNoteInTie; k ++) {
-												if (noteRest.notes[k].MIDIpitch != nextItem.notes[k].MIDIpitch) lastNoteInTie = true;
-											}
-										} else {
-											lastNoteInTie = true;
-										}
-									} else {
-										lastNoteInTie = true;
-									}
-								}
+								//logError ('isTied')
+								lastNoteInTie = !allNotesTiedForwardsToIdenticalChord(noteRest,nextItem) || lastNoteInBar || nextItemHasPause;
 								tiedNotes.push(noteRest);
-								//if (lastNoteInTie) logError(lastNoteInTie");
+								//if (lastNoteInTie) logError('lastNoteInTie');
 							} else {
 								if (wasTied) tiedNotes.length = 0;
 							}
@@ -565,7 +546,7 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							// ** 			CHECK 7: COULD BE STACCATO				** //
 							// ** ————————————————————————————————————————————————— ** //
-							if (isRest && displayDur == semiquaver && !isOnTheBeat && (noteStart % quaver != 0)) { 
+							if (isRest && displayDur == semiquaver && !isOnTheBeat && noteStart % quaver > 0) { 
 								if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
 									flaggedWrittenStaccato = true;
 									if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
@@ -700,17 +681,64 @@ MuseScore {
 		curScore.endCmd();
 	}
 	
+	function allNotesTiedForwardsToIdenticalChord (noteRest, nextChord) {
+		
+		if (noteRest.notes == null) return false;
+		var numNotes = noteRest.notes.length;
+		if (numNotes == 0) return false;
+		if (numNotes > 0) logError ('checking Chord, has '+numNotes+' notes');
+		if (nextChord == null) return false;
+		if (nextChord.notes == null) return false;
+		//logError ('checking Chord 2, has '+nextChord.notes.length+' notes');
+		if (numNotes != nextChord.notes.length) return false;
+
+		for (var i = 0; i < noteRest.notes.length; i ++) {
+			if (!notesAreIdentical(noteRest.notes[i], nextChord.notes[i])) return false;
+			if (noteRest.notes[i].tieForward == null) {
+				return false;
+			} else {
+				if (noteRest.notes[i].tieForward.type == Element.LAISSEZ_VIB) return false;
+			}
+			//logError ('note '+i+' identical');
+		}
+		return true;
+	}
+	
+	function allNotesTieForward (noteRest) {
+		if (noteRest.notes == null) return false;
+		var numNotes = noteRest.notes.length;
+		if (numNotes == 0) return false;
+		for (var i = 0; i < noteRest.notes.length; i ++) {
+			if (!noteRest.notes[i].tieForward) return false;
+			if (noteRest.notes[i].tieForward.type == Element.LAISSEZ_VIB) return false;
+		}
+		return true;
+	}
+	
+	function allNotesTieBack (noteRest) {
+		if (noteRest.notes == null) return false;
+		var numNotes = noteRest.notes.length;
+		if (numNotes == 0) return false;
+		for (var i = 0; i < noteRest.notes.length; i ++) if (!noteRest.notes[i].tieBack) return false;
+		return true;
+	}
+	
+	function notesAreIdentical (note1, note2) {
+		// first check the MIDI pitch
+		if (note1.pitch != note2.pitch) return false;
+		// now check the accidental, as microtones don't affect the MIDI pitch
+		if (note1.accidentalType != note2.accidentalType) return false;
+		return true;
+	}
+	
 	function setInstrumentVariables (thePart) {
 		var currentInstrumentId = thePart.musicXmlId;
-		//logError(id = "+currentInstrumentId);
 		if (currentInstrumentId != "") {
 			isStringInstrument = currentInstrumentId.includes("strings.");
 			isKeyboardInstrument = currentInstrumentId.includes("keyboard");
 			isWindOrBrassInstrument = currentInstrumentId.includes("wind.") || currentInstrumentId.includes("brass.");
 			isVoice = currentInstrumentId.includes("voice.");
 		}
-	
-		//logError(isStringInstrument = "+isStringInstrument+"); isKeyboardInstrument="+isKeyboardInstrument+"; isKeyboardInstrument="+isKeyboardInstrument+"; isWindOrBrassInstrument="+isWindOrBrassInstrument+"; isVoice="+isVoice;
 	}
 	
 	function checkIllegalDurations (noteRest) {
@@ -824,7 +852,7 @@ MuseScore {
 						addError ("Never write a dotted minim rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
 						return;
 					}
-					if ((timeSigStr === "6/4" || timeSigStr === "9/4") && noteStartBeat % 3 != 0) {
+					if ((timeSigStr === "6/4" || timeSigStr === "9/4") && noteStartBeat % 3 > 0) {
 						addError ("Don’t write a dotted minim rest on\nbeat "+(noteStartBeat + 1)+" of a "+timeSigStr+" bar.",noteRest);
 						return;
 					}
@@ -844,7 +872,7 @@ MuseScore {
 					}
 				} else {
 					if (soundingDur == dottedminim) {
-						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 != 0;
+						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 > 0;
 					}
 					if (soundingDur == minim) {
 						// ok in 4/4 on 1 & 3
@@ -854,7 +882,7 @@ MuseScore {
 						}
 						hidingBeatError = false;
 						if ((timeSigStr === "4/4" || timeSigStr === "5/4" || timeSigStr === "2/2") && noteStartBeat == 1) hidingBeatError = true;
-						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 != 0;
+						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 > 0;
 					}
 					
 					if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
@@ -866,12 +894,12 @@ MuseScore {
 				
 				// ** ON THE BEAT — NOTES ** //
 				if (isCompound) {
-					hidingBeatError = soundingDur % beatLength;
+					hidingBeatError = soundingDur % beatLength > 0;
 				} else {
 					hidingBeatError = false;
 					
 					// no dotted/double-dotted crotchet on beat two in 4/4 or 2/2
-					if ((soundingDur >= dottedcrotchet && soundingDur < minim) && (timeSigStr == "4/4" || timeSigStr == "2/2")) hidingBeatError = noteStartBeat % 2;
+					if ((soundingDur >= dottedcrotchet && soundingDur < minim) && (timeSigStr == "4/4" || timeSigStr == "2/2")) hidingBeatError = noteStartBeat % 2 > 0;
 					
 					// no semibreves in 5/4
 					if (timeSigStr == "5/4") hidingBeatError = (soundingDur == semibreve);
@@ -1136,15 +1164,15 @@ MuseScore {
 								// don't simplify anything tied over a beat that is less than a crotchet
 								if (restActualDur == dottedminim) {
 									canBeCondensed = false;
-									if (timeSigStr === "6/4" || timeSigStr === "9/4") canBeCondensed = !(startBeat % 3);
-									if (timeSigStr === "12/8") canBeCondensed = !(startBeat % 2);
+									if (timeSigStr === "6/4" || timeSigStr === "9/4") canBeCondensed = startBeat % 3 > 0;
+									if (timeSigStr === "12/8") canBeCondensed = startBeat % 2 > 0;
 								}
 								if (restActualDur == semibreve) canBeCondensed = timeSigStr === "4/4" || timeSigStr === "2/2";
-								if (restActualDur == minim) canBeCondensed = (timeSigStr === "4/4" || timeSigStr === "2/2" || timeSigStr === "3/2") && !(startBeat % 2);
-								if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = ((timeSigDenom <= 2) || isCompound) && !(startBeat % 2);
+								if (restActualDur == minim) canBeCondensed = (timeSigStr === "4/4" || timeSigStr === "2/2" || timeSigStr === "3/2") && startBeat % 2 > 0;
+								if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = ((timeSigDenom <= 2) || isCompound) && startBeat % 2 > 0;
 								if (restActualDur == dottedquaver) canBeCondensed = timeSigDenom <= 4;
 								if (restActualDur == dottedsemiquaver) canBeCondensed = timeSigDenom <= 8;
-								if (canBeCondensed && isCompound) canBeCondensed = restActualDur <= beatLength || (restActualDur % beatLength == 0);
+								if (canBeCondensed && isCompound) canBeCondensed = restActualDur <= beatLength || restActualDur % beatLength == 0;
 							
 								if (restActualDur == p && canBeCondensed) {
 									if (k > possibleSimplification) {
@@ -1230,12 +1258,12 @@ MuseScore {
 									//logError((offbeat disp) found match: "+restDisplayDur+" = "+p); 
 									
 									if (p == dottedquaver) canBeCondensed = j == rests.length - 1;
-									var alignsToBeatDivision = ((startPos - tupletStartPos) % beatDivision) == 0;
+									var alignsToBeatDivision = (startPos - tupletStartPos) % beatDivision == 0;
 									if (p == allowedCondensation) canBeCondensed = alignsToBeatDivision;
 									//logError(StartPos = "+startPos+" tupletStartPos="+tupletStartPos+" Aligns to beat division = "+alignsToBeatDivision);
 									if (canBeCondensed && k > possibleSimplification) {
 									
-									//	logError(found a possibleSimplification display dur off beat = "+k); 
+									//logError(found a possibleSimplification display dur off beat = "+k); 
 									
 										possibleSimplification = k;
 										possibleSimplificationLastRestIndex = j;
@@ -1359,13 +1387,12 @@ MuseScore {
 					for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
 						canBeSimplified = true;
 						simplification = possibleOnbeatSimplificationDurs[k];
-						//logError ("Testing simplification "+simplification);
 
 						if (tiedActualDur == simplification) {
 							//logError ("Match ("+tiedActualDur+")");
 
 							if (isCompound) {
-								if (tiedActualDur >= beatLength) canBeSimplified = (tiedActualDur % beatLength) == 0; // can be simplified if it's a multiple of the beat length
+								if (tiedActualDur >= beatLength) canBeSimplified = tiedActualDur % beatLength == 0; // can be simplified if it's a multiple of the beat length
 							} else {
 								if (tiedActualDur == minim) {
 									// Exception for two tied crotchets on beat 2
@@ -1381,7 +1408,9 @@ MuseScore {
 									if (timeSigNum % 2 == 0) canBeSimplified = startBeat % 2 == 0; // for 4/4, 6/4 etc — can be simplified if it's on an even numbered beat (0, 2, etc)
 									if (tempNextItem.actualDuration.ticks != quaver) canBeSimplified = false; 
 								}
-								if (tiedActualDur == semibreve) canBeSimplified = timeSigDenom == 2 || (timeSigDenom == 4 && !(timeSigNum % 3)); // only use a semibreve if we're in 3/2 4/4 or 7/4 etc
+								//logError ('timeSigDenom = '+timeSigDenom+'; timeSigNum = '+timeSigNum);
+								if (tiedActualDur == semibreve) canBeSimplified = timeSigDenom == 2 || (timeSigDenom == 4 && timeSigNum % 3 > 0); // only use a semibreve if we're in 3/2 4/4 or 7/4 etc
+								//logError ('canBeSimplified = '+canBeSimplified);
 							}
 			
 							if (canBeSimplified) {
@@ -1456,7 +1485,7 @@ MuseScore {
 									if (!isCompound) {
 										var offbeatCrotchetException = false;
 										if (prevNoteRest != null && tempNextItem != null && i == 0) offbeatCrotchetException = prevNoteRest.duration.ticks == quaver && prevIsNote && tempNextItem.duration.ticks == quaver && tempNextItemIsNote;
-										if (startBeat % 2) offbeatCrotchetException = false;
+										if (startBeat % 2 > 0) offbeatCrotchetException = false;
 										canBeSimplified = canBeSimplified && offbeatCrotchetException;
 									} // end timeSigDenom
 								}
@@ -1496,8 +1525,12 @@ MuseScore {
 			}
 		}
 		if (simplificationFound) {
+			//logError ('simplificationFound');
 			if (simplificationIsOnBeat) {
+				
+				//logError ('simplificationIsOnBeat');
 				// if this is an odd time signature like 7/4, etc, only check if the first note was on the downbeat
+				//logError ('canCheckThisBar = '+canCheckThisBar+'; possibleSimplificationFirstNoteIndex = '+possibleSimplificationFirstNoteIndex+'; firstNoteIsOnDownbeat = '+firstNoteIsOnDownbeat);
 				if (!canCheckThisBar && (possibleSimplificationFirstNoteIndex != 0 || !firstNoteIsOnDownbeat)) return;
 				var simplificationText = possibleOnbeatSimplificationLabels[possibleSimplification];
 				var tempText = '';
@@ -1699,7 +1732,7 @@ MuseScore {
 		correctlyBeamed = acceptableBeamSettings.includes(currentBeamMode);
 		//logError(beamMode is "+beamMode+"); correctlyBeamed = "+correctlyBeamed;
 		if (!correctlyBeamed) {
-		///	logError(Not correctly beamed");
+		//logError(Not correctly beamed");
 			if (isNote) {
 				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
 				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) {

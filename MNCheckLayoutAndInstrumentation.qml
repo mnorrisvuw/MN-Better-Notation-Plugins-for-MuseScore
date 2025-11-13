@@ -175,6 +175,7 @@ MuseScore {
 	property var grandStaffTops: []
 	property var numParts: 0
 	property var visibleParts: []
+	property var lastVisibleStaffNum: 0
 	property var numStaves: 0
 	property var numTracks: 0
 	property var numVoicesInThisBar: 0
@@ -969,7 +970,7 @@ MuseScore {
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
 				beatLength = division;
-				isCompound = !(timeSigNum % 3);
+				isCompound = timeSigNum % 3 > 0;
 				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
 				// if 6/8, 12/8, etc., beatLength = dotted whatever
 				if (isCompound && timeSigDenom >= 8) beatLength = (division * 1.5) * (8 / timeSigDenom);
@@ -1028,7 +1029,7 @@ MuseScore {
 				var isChord = false;
 				pedalChangesInThisBar = 0;
 				flaggedPedalChangesInThisBar = false;
-				if (currentBarNum % 2) flaggedFastMultipleStops = false;	
+				if (currentBarNum % 2 > 0) flaggedFastMultipleStops = false;	
 			
 				// ************ CHECK HARP ISSUES ************ //
 				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues();
@@ -1738,7 +1739,7 @@ MuseScore {
 							}
 							checkExpressiveSwell (nextHairpin);
 							checkHairpins();
-							if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
+							if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3 > 0;
 						}
 					}
 				}
@@ -2460,6 +2461,7 @@ MuseScore {
 		for (var i = 0; i < numStaves; i++) {
 			if (staffVisible[i]) {
 				numVisibleStaves ++;
+				lastVisibleStaffNum = i;
 				var instrumentType = curScore.staves[i].part.musicXmlId;
 				if (instrumentType.includes("strings.")) scoreHasStrings = true;
 				if (instrumentType.includes("wind.")) scoreHasWinds = true;
@@ -2480,7 +2482,7 @@ MuseScore {
 			if (checkGrandStaffOrder) {
 				for (var i = 0; i < numGrandStaves;i++) {
 					var bottomGrandStaffNum = grandStaffTops[i]+1;
-					if (bottomGrandStaffNum < numStaves-1) {
+					if (bottomGrandStaffNum < lastVisibleStaffNum) {
 						if (!isGrandStaff[bottomGrandStaffNum+1] && staffVisible[bottomGrandStaffNum]) addError("For small ensembles, grand staff instruments should be at the bottom of the score.\nMove ‘"+curScore.staves[bottomGrandStaffNum].part.longName+"’ down using the Layout tab.","pagetop");
 					}
 				}
@@ -3473,7 +3475,7 @@ MuseScore {
 		if (nextHairpin == null) return;
 		
 		// 3) the current hairpin is a crescendo
-		if (currentHairpin.hairpinType % 2 != 0) return;
+		if (currentHairpin.hairpinType % 2 > 0) return;
 		
 		// 4) the next hairpin is a decrescendo 
 		if (nextHairpin.hairpinType %2 != 1) return;
@@ -3551,7 +3553,7 @@ MuseScore {
 		cursor2.track = cursor.track;
 		cursor2.rewindToTick(cursor.tick);
 		cursor2.filter = Segment.ChordRest;
-		var isDecresc = currentHairpin.hairpinType %2 == 1;
+		var isDecresc = currentHairpin.hairpinType % 2 == 1;
 		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
 		var hairpinZoneStartTick = currentHairpinEnd - beatLength;
 		//logError ("Checking hairpin termination");
@@ -3734,7 +3736,7 @@ MuseScore {
 				}
 				
 			} else {
-				if (!isVibraphone) addError ("I’m not sure if this instrument can do vibrato.", textObject);
+				if (!isVibraphone && !isVoice) addError ("I’m not sure if this instrument can do vibrato.", textObject);
 			}
 		}
 		
@@ -4034,7 +4036,7 @@ MuseScore {
 		} else {
 			if (clefTick > clefMeasureStart) {
 				isMidBarClef = true;
-				if ((clefTick - clefMeasureStart) % beatLength != 0) {
+				if ((clefTick - clefMeasureStart) % beatLength > 0) {
 					addError ('If possible, move this clef to the start of the beat.',clef);
 				}
 			}
@@ -4437,7 +4439,7 @@ MuseScore {
 			// ** THIS REGEX ATTEMPTS TO MATCH ALL POSSIBLE PERMUTATIONS OF A METRONOME MARKING **//
 			// ** NB — DON'T CHANGE THIS WITHOUT CHECKING THAT THE AUGMENTATION DOT CAPTURE GROUP IS CORRECT **
 			// ** THIS IS THE INDEX OF THE CAPTURE GROUP (\.|<sym>metAugmentationDot<\/sym>|\uECB7) ** //
-			var metronomeComponentRegex = new RegExp( /(<[^>]*>|\s)*\(?(<[^>]*>|\s)*(c|c\.|approx|circa|approx\.)?(<[^>]*>|\s)*(metNote[^<]*|\uECA5|\uECA7|\uECA3)(<[^>]*>|\s)*(\.|metAugmentationDot|\uECB7)?(<[^>]*>|\s)*=(<[^>]*>|\s)*(c|c\.|approx|circa|approx\.)?(<[^>]*>|\s)*[0-9–\-—]*(<[^>]*>|\s)*\)?/);
+			var metronomeComponentRegex = new RegExp( /(<[^>]*>|\s)*\(?(<[^>]*>|\s)*(c|\.|approx|circa|approx)*(<[^>]*>|\s)*(metNote[^<]*|\uECA5|\uECA7|\uECA3)(<[^>]*>|\s)*(\.|metAugmentationDot|\uECB7)?(<[^>]*>|\s)*=(<[^>]*>|\s)*(c|\.|approx|circa|approx)*(<[^>]*>|\s)*[0-9–\-—]*(<[^>]*>|\s)*\)?/);
 			var augDotCaptureGroup = 7;
 			
 			if (currentBarNum > 0) {
@@ -4957,7 +4959,9 @@ MuseScore {
 						if (isVoice) {
 							if (textObject.placement == Placement.BELOW ) addError("For vocal staves, dynamics should appear above the staff.\nCheck it is attached to the right staff.",textObject);
 						} else {
-							if (textObject.placement == Placement.ABOVE) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
+							if (!isGrandStaff[currentStaffNum]) {
+								if (textObject.placement == Placement.ABOVE) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
+							}
 						}
 					}
 					
@@ -5309,7 +5313,7 @@ MuseScore {
 	function checkKeySignature (keySig,sharps) {
 		
 		if (sharps == prevKeySigSharps) {
-			
+			if (sharps == 0) return; // these are invisible
 			// redundant key signature
 			addError("This key signature is the same as the one in bar "+prevKeySigBarNum+".\nPerhaps delete it?",keySig);
 			
@@ -6271,6 +6275,7 @@ MuseScore {
 			}
 		} else {
 			// Check accent
+			var numNotes = noteRest.notes.length;
 			var n = noteRest.notes[0];
 			var isMiddleOfTie = n.tieBack != null && n.tieForward != null;
 			var isEndOfTie = n.tieBack != null && n.tieForward == null;
