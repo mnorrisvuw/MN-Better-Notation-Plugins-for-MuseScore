@@ -384,7 +384,7 @@ MuseScore {
 						var isTied = false;
 						if (isNote) {
 							tieForward = noteRest.notes[0].tieForward;
-							if (tieForward.type == Element.LAISSEZ_VIB) tieForward = null; // not tied if it's an l.v.
+							if (tieForward) if (tieForward.type == Element.LAISSEZ_VIB) tieForward = null; // not tied if it's an l.v.
 							tieBack = noteRest.notes[0].tieBack;
 							isTied = tieBack || tieForward; // is this note tied either forwards or backwards?
 						}

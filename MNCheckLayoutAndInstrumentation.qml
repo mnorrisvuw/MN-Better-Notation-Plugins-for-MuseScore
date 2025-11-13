@@ -5210,7 +5210,7 @@ MuseScore {
 		if (index != -1) {
 			var correctlyHyphenatedStr = hyphenatedWords[index];
 			// logError ('correctlyHyphenatedStr = ‘'+correctlyHyphenatedStr+'’');
-			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) addError ('‘'+str + '’ is not correctly hyphenated. It should be ‘'+correctlyHyphenatedStr+'’',wordArray);
+			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) addError ('‘'+str + '’ is not correctly hyphenated.\nIt should be ‘'+correctlyHyphenatedStr+'’',wordArray);
 		}
 	}
 	
@@ -6001,6 +6001,7 @@ MuseScore {
 
 		var harmonicCircleIntervals = [12,19,24,28,31,34,36,38,40,42,43,45,46,47,48];
 		var diamondHarmonicIntervals = [3,4,5,7,9,12,16,19,24,28,31,34,36];
+		var diamondNoteheads = [NoteHeadGroup.HEAD_DIAMOND, NoteHeadGroup.HEAD_DIAMOND_OLD, NoteHeadGroup.HEAD_MI];
 		if (noteRest.notes[0].tieBack) return;
 		isStringHarmonic = false;
 		var theArticulationArray = getArticulations(noteRest);
@@ -6030,7 +6031,7 @@ MuseScore {
 			var noteheadStyle2 = theNotes[1].headGroup;
 			
 			// **** ARTIFICIAL HARMONICS **** //
-			if (noteheadStyle1 == NoteHeadGroup.HEAD_NORMAL && (noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle2 == NoteHeadGroup.HEAD_DIAMOND_OLD)) {
+			if (noteheadStyle1 == NoteHeadGroup.HEAD_NORMAL && diamondNoteheads.includes(noteheadStyle2)) {
 				isStringHarmonic = true;
 				
 				// we have a false harmonic
@@ -6085,7 +6086,7 @@ MuseScore {
 					}
 				}
 			}
-			if (noteheadStyle == NoteHeadGroup.HEAD_DIAMOND || noteheadStyle == NoteHeadGroup.HEAD_DIAMOND_OLD) {
+			if (diamondNoteheads.includes(noteheadStyle)) {
 				if (isHarmonicCircle) {
 					addError ("This harmonic has both a diamond notehead and a harmonic circle.\nYou should choose one or the other, but not both.", noteRest);
 					return;
@@ -6211,11 +6212,12 @@ MuseScore {
 	function checkFluteHarmonic (noteRest) {
 		var allowedIntervals = [12,19,24,28,31,34,36];
 		var nn = noteRest.notes.length;
-		
+		var diamondNoteheads = [NoteHeadGroup.HEAD_DIAMOND, NoteHeadGroup.HEAD_DIAMOND_OLD, NoteHeadGroup.HEAD_MI];
+
 		if (nn == 2) {
 			var noteheadStyle1 = noteRest.notes[0].headGroup;
 			var noteheadStyle2 = noteRest.notes[1].headGroup;
-			if (noteheadStyle1 == NoteHeadGroup.HEAD_DIAMOND && noteheadStyle2 == NoteHeadGroup.HEAD_NORMAL) {
+			if (diamondNoteheads.includes(noteheadStyle1) && noteheadStyle2 == NoteHeadGroup.HEAD_NORMAL) {
 				// we have a flute harmonic
 				var np1 = noteRest.notes[0].pitch;
 				var np2 = noteRest.notes[1].pitch;
@@ -6226,7 +6228,6 @@ MuseScore {
 			}
 		}
 	}
-	
 	
 	// ***************************************************************** //
 	// **** 														**** //
