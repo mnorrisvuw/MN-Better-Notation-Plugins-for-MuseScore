@@ -167,6 +167,7 @@ MuseScore {
 	property var flaggedFlz: false
 	property var flaggedPolyphony: false
 	property var lastStemDirectionFlagBarNum: -1;
+	property var numDoubleStopsInSequence: 0
 	
 	// ** PARTS ** //
  	property var isGrandStaff: []
@@ -803,6 +804,7 @@ MuseScore {
 			lastTempoChangeMarking = null;
 			lastTempoChangeMarkingText = '';
 			tempoChangeMarkingEnd = -1;
+			numDoubleStopsInSequence = 0;
 			
 			lastTempoMarking = null;
 			lastTempoMarkingBar = -1;
@@ -1366,6 +1368,7 @@ MuseScore {
 											checkMultipleStop (noteRest);
 										} else {
 											prevIsMultipleStop = false;
+											numDoubleStopsInSequence = 0;
 										}
 									
 									} // end isStringInstrument
@@ -5868,7 +5871,10 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function checkMultipleStop (chord) {
-		if (isStringHarmonic) return;
+		if (isStringHarmonic) {
+			numDoubleStopsInSequence = 0;
+			return;
+		}
 		
 		var iName = "";
 		var maxStretch = 13; // 6 + 7, the maximum stretch in semitones across two adjacent strings
@@ -5883,6 +5889,8 @@ MuseScore {
 				tempPitchArray.push(theNote.pitch);
 			}
 		}
+		if (numNotes < 2) numDoubleStopsInSequence = 0;
+		
 		var prevNoteRest = getPreviousNoteRest(chord);
 		var prevIsChord = (prevNoteRest == null) ? false : (prevNoteRest.type == Element.CHORD);
 		
@@ -5946,7 +5954,9 @@ MuseScore {
 		var p1 = chord.notes[0].pitch;
 		var p2 = chord.notes[1].pitch;
 		var bottomNote = p1 < p2 ? p1: p2;
-		if (!stringsArray.includes(p1) && !stringsArray.includes(p2)) interval = Math.abs(p2-p1);
+		var topNote = p1 < p2 ? p2: p1;
+		logError ('p1 = '+p1+'; p2 = '+p2);
+		if (!stringsArray.includes(p1) && !stringsArray.includes(p2)) interval = Math.abs(topNote - bottomNote);
 		
 		if (numNotes == 2 && interval > maxStretch) addError ("This double-stop appears to be larger than a safe stretch on the "+iName+"\nIt may not be possible: check with a player.",chord);
 		if (bottomNote > stringsArray[2] + 12) {
@@ -5956,20 +5966,29 @@ MuseScore {
 				addError ("This double-stop is quite high, with the bottom note over an octave above II.\nThe intonation may be poor — consider rewriting.",chord);
 			}
 		}
+		//if (prevIsChord) logError ('Checking multiple stop sequence: '+[interval, prevMultipleStopInterval,numNotes].join(', '));
 		if (prevIsChord && prevIsMultipleStop && chord.actualDuration.ticks <= division && prevSoundingDur <= division && interval > 0 && prevMultipleStopInterval > 0 && !flaggedFastMultipleStops) {			
 			var pi1 = interval > 7;
 			var pi2 = prevMultipleStopInterval > 7;
 			if (pi1 != pi2) {
 				addError ("This sequence of double-stops looks very difficult,\nas the hand has to change its position and orientation.",chord);
 				flaggedFastMultipleStops = true;
-			} else {				
+			} else {
+				//logError ('chords = '+[chord.notes[0].pitch,chord.notes[1].pitch,prevMultipleStop.notes[0].pitch,prevMultipleStop.notes[1].pitch].join(', '));
+				//logError ('chordsAreIdentical = '+chordsAreIdentical(chord,prevMultipleStop));
 				if (!chordsAreIdentical (chord,prevMultipleStop)) {
-					if (interval == 7 && !isCello) {
-						addError ("This looks like a sequence of relatively quick perfect fifths,\nwhich is challenging to play accurately.",chord);
+					if (interval == 7 && prevMultipleStopInterval == 7) {
+						if (!isCello) {
+							addError ("This looks like a sequence of relatively quick perfect fifths,\nwhich may be challenging to play accurately.\nCheck with a player.",chord);
+							flaggedFastMultipleStops = true;
+						}
 					} else {
-						addError ("This looks like a sequence of relatively quick double-stops,\nwhich might be challenging to play accurately.",chord);
+						numDoubleStopsInSequence ++;
+						if (numDoubleStopsInSequence > 1) {
+							addError ("This looks like a sequence of relatively quick double-stops,\nwhich may be challenging to play accurately.\nCheck with a player.",chord);
+							flaggedFastMultipleStops = true;
+						}
 					}
-					flaggedFastMultipleStops = true;
 				}
 			}
 		}
