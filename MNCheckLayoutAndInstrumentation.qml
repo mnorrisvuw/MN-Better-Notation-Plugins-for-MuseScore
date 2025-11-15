@@ -1043,7 +1043,7 @@ MuseScore {
 					// ************ CHECK TEMPO MARKING WITHOUT A METRONOME ************ //
 					if (lastTempoMarkingBar != -1 && currentBarNum == lastTempoMarkingBar + 2 && lastMetronomeMarkingBar < lastTempoMarkingBar) {
 						//logError("lastTempoMarkingBar = "+lastTempoMarkingBar+" lastMetronomeMarkingBar = "+lastMetronomeMarkingBar);
-						addError("This tempo marking doesn’t seem to have a metronome marking.\nIt can be helpful to indicate the specific metronome marking or provide a range.",lastTempoMarking);
+						addError("This tempo marking doesn’t seem to have a\nmetronome marking. It can be helpful to indicate the\nspecific metronome marking, or provide a tempo range.",lastTempoMarking);
 					}
 				}
 				
@@ -4733,7 +4733,10 @@ MuseScore {
 						if (strToRightOfMetronomeComponent != undefined) {
 							strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.trim();
 							if (strToRightOfMetronomeComponent != '') {
-								addError ("In general, you should put the mood/tempo descriptor\nbefore the metronome marking.",textObject);
+								var maxLength = 22;
+								if (strToRightOfMetronomeComponent.length > maxLength) strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.slice(0, maxLength) + "...";
+
+								addError ("It’s usually best to put the mood/tempo descriptor\n(‘"+strToRightOfMetronomeComponent+"’) before the metronome marking.",textObject);
 							}
 						}
 						
@@ -4779,7 +4782,7 @@ MuseScore {
 						// *** NB: THIS DOESN'T YET HANDLE METRIC MODULATION MARKINGS		*** //
 						// *** SOMETHING FOR A FUTURE RELEASE!								*** //
 						if (hasParentheses && !resetTempo) {
-							addError ('You don’t normally need brackets around metronome markings\nexcept for (e.g.) Tempo Primo/Tempo Secondo/a tempo etc.\nSee ‘Behind Bars’, p. 183',textObject);
+							addError ('You don’t normally need brackets around\nmetronome markings except for markings\nsuch as ‘Tempo I°’, ‘a tempo’, etc.\n(See ‘Behind Bars’, p. 183)',textObject);
 						}
 						
 						// *** CHECK FOR UNNECESSARY ‘APPROX’ OR ‘CIRCA’ *** //
@@ -4792,7 +4795,7 @@ MuseScore {
 							if (metroIsBold) {
 								addError ("The metronome marking component of this tempo marking\nwill look better in a plain font style, rather than bold.\n(See ‘Behind Bars’ p. 183)",textObject);
 							} else {
-								if (!tempoMarkingIsBold) addError ("Tempo markings are better formatted bold, rather than plain.\n(See ‘Behind Bars’ p. 183", textObject);
+								if (!tempoMarkingIsBold) addError ("Tempo markings are better formatted bold,\nrather than plain. (See ‘Behind Bars’ p. 183)", textObject);
 							}
 						} else {
 							if (!containsTempoChangeComponent && metroIsBold) {

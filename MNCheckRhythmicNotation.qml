@@ -816,9 +816,7 @@ MuseScore {
 						var d = noteRest.duration.ticks;
 						var tupletDivision = theTuplet.actualDuration.ticks / theTuplet.normalNotes;
 						//logError ("d = "+d+"; tupletDiv = "+tupletDivision);
-						if (d != tupletDivision) {
-							addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet)
-						} else {
+						if (d == tupletDivision) {
 							for (var i = 0; i < theTuplet.elements.length; i ++) {
 								var e = theTuplet.elements[i];
 								if (e.type == Element.CHORD && e.duration.ticks != d) hidingBeatError = true;
@@ -1072,33 +1070,105 @@ MuseScore {
 		}
 	}
 	
-	function checkTupletSettings (tuplet) {
+	function checkTupletSettings (theTuplet) {
+		// these are the second part of 'normal' tuplet ratios, e.g. 0:0, 1:0, 2:3, 3:2, 4:3 etc
 		var normalSettings = [0,0,3,2,3,4,4,4,12,8,8,8,8,8,8,8,8];
-		var a = tuplet.actualNotes;
-		// check ratio is on
-		if (tuplet.numberType == 0 && a < normalSettings.length) {
-			var normalRatio = normalSettings[tuplet.actualNotes];
-			if (tuplet.normalNotes != normalRatio) addError ("This tuplet is non-standard, and should therefore show the ratio.\nIn Properties, switch Number to ‘Ratio’", tuplet);
+		var a = theTuplet.actualNotes;
+		var b = theTuplet.normalNotes;
+		
+		// *** CHECK FOR A RATIO WHERE NUMERATOR AND DENOMINATOR ARE THE SAME ***
+		if (a == b) {
+			addError ("This tuplet has the ratio "+a+":"+b+", which is\nnonsensical. The tuplet can be deleted.", theTuplet);
+			return;
 		}
-		var l = tuplet.elements.length;
+		
+		// *** CHECK FOR NON-STANDARD RATIOS ***
+		if (theTuplet.numberType == 0 && a < normalSettings.length) {
+			var normalRatio = normalSettings[a];
+			if (b != normalRatio) addError ("This tuplet is non-standard, and should therefore show the ratio.\nIn Properties, switch Number to ‘Ratio’", theTuplet);
+		}
+		var theNotes = theTuplet.elements;
+		var numNotes = theNotes.length;
+		var tupletDur = theTuplet.actualDuration.ticks;
+		if (numNotes == 1) {
+			var lStr = "";
+			
+			if (tupletDur == semiquaver) lStr = "semiquaver";
+			if (tupletDur == quaver) lStr = "quaver";
+			if (tupletDur == dottedquaver) lStr = "dotted quaver";
+			if (tupletDur == crotchet) lStr = "crotchet";
+			if (tupletDur == dottedcrotchet) lStr = "dotted crotchet";
+			if (tupletDur == minim) lStr = "minim";
+			if (tupletDur == dottedminim) lStr = "dotted minim";
+			if (tupletDur == semibreve) lStr = "semibreve";
+			if (lStr == "") {
+				addError ("A tuplet with only one note in it is nonsensical.\nRewrite without the tuplet.", theTuplet);
+			} else {
+				addError ("A tuplet with only one note in it is nonsensical.\nDelete the tuplet, and rewrite as a "+lStr, theTuplet);
+			}
+			return;
+		}
 		var nn = 0;
-		for (var i = 0; i < l; i++) nn += tuplet.elements[i].type == Element.CHORD || tuplet.elements[i].type == Element.REST;
+		for (var i = 0; i < numNotes; i++) nn += theNotes[i].type == Element.CHORD || theNotes[i].type == Element.REST;
 		if (nn >= a * 2) {
 			if (nn == 6 && a == 3) {
 				//logError ('actualDuration = ' + tuplet.actualDuration.ticks);
-				if (tuplet.actualDuration.ticks <= beatLength) {
+				if (tupletDur <= beatLength) {
 					var allNotesEqual = true;
 					
 					//logError ('tuplet.duration.ticks / 6 = ' + (tuplet.duration.ticks / 6));
 					for (var i = 0; i < 6 && allNotesEqual; i++) {
 						//logError ('tuplet.elements[i].actualDuration.ticks = ' + tuplet.elements[i].actualDuration.ticks);
-						if (tuplet.elements[i].actualDuration.ticks != tuplet.duration.ticks / 6) allNotesEqual = false;
+						if (theNotes[i].actualDuration.ticks != theTuplet.duration.ticks / 6) allNotesEqual = false;
 					}
-					if (allNotesEqual) addError ("This triplet should be a sextuplet", tuplet);
+					if (allNotesEqual) addError ("This triplet should be a sextuplet", theTuplet);
 				}
 			} else {
-				addError ("This tuplet is meant to have "+a+" notes/rests,\nbut instead contains "+nn+".\nConsider rewriting the tuplet",tuplet);
+				addError ("This tuplet is meant to have "+a+" notes/rests,\nbut instead contains "+nn+".\nConsider rewriting the tuplet",theTuplet);
 			}
+		}
+		
+		// CHECK FOR DUMB TUPLETS — THESE ARE RIDICULOUS TUPLETS THAT CAN BE REWRITTEN WITHOUT
+		// ACTUALLY REQUIRING A TUPLET
+		
+		// check for two dotted notes in a triplet
+		if (a == 3) {
+			//logError ('a = '+a+'; numNotes = '+numNotes+'; theNotes[0].duration.ticks = '+theNotes[0].duration.ticks); 
+
+			if (numNotes == 2) {
+				
+				if (theNotes[0].duration.ticks == dottedminim && theNotes[1].duration.ticks == dottedminim) {
+					addError ("Two dotted minims under a triplet is the same\nas two minims without a triplet!!!", theTuplet);
+					return;
+				}
+				if (theNotes[0].duration.ticks == dottedcrotchet && theNotes[1].duration.ticks == dottedcrotchet) {
+					addError ("Two dotted crotchets under a triplet is the same\nas two crotchets without a triplet!!!", theTuplet);
+					return;
+				}
+				if (theNotes[0].duration.ticks == dottedquaver && theNotes[1].duration.ticks == dottedquaver) {
+					addError ("Two dotted quavers under a triplet is the same\nas two quavers without a triplet!!!", theTuplet);
+					return;
+				}
+				if (theNotes[0].duration.ticks == dottedsemiquaver && theNotes[1].duration.ticks == dottedsemiquaver) {
+					addError ("Two dotted semiquavers under a triplet is the same\nas two semiquavers without a triplet!!!", theTuplet);
+					return;
+				}
+			}
+		}
+		
+		// check for duplets and quadruplets in non-compound time
+		if ((a == 2 || a == 4) && !isCompound) {
+			var tupletName = "";
+			if (a==2) tupletName = "duplet";
+			if (a==4) tupletName = "quadruplet";
+			addError ("Never use a "+tupletName+" in "+timeSigStr+" time.\nSimplify by deleting the tuplet and rewriting using\ndotted notes instead.", theTuplet);
+			return;
+		}
+		var tupletDivision = theTuplet.actualDuration.ticks / theTuplet.normalNotes;
+
+		// *** CHECK FOR NOTE NOT REALLY MATCHING THE TUPLET DIVISION ***
+		if (tupletDur != tupletDivision) {
+			addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
 		}
 	}
 	
