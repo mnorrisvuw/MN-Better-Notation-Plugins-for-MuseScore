@@ -309,7 +309,7 @@ MuseScore {
 				canCheckThisBar = false;
 				isCompound = false;
 				if (timeSigDenom == 8 || timeSigDenom == 16) {
-					isCompound = timeSigNum % 3 > 0;
+					isCompound = timeSigNum % 3 == 0;
 					if (isCompound) beatLength = (division * 12) / timeSigDenom;
 				}
 
@@ -506,20 +506,19 @@ MuseScore {
 							if (canCheckThisBar) checkBeamedToNotesInNextBeat(noteRest);
 							
 							// ** ————————————————————————————————————————————————— ** //
-							// ** 		CHECK 5: CONDENSE OVERSPECIFIED REST 		** //
+							// ** 		CHECK 5: CONDENSE OVER-SPECIFIED REST 		** //
 							// ** ————————————————————————————————————————————————— ** //
 							
 							if (canCheckThisBar) {
 								// if this is a rest, then start building an array of rests
-								// until you get to the last one, then check whether any of the rests
-								// could be condensed into a single rest
+								// until you get to the last one, then check whether any consecutive rests
+								// in the array could be condensed into a single rest
 								if (isNote || hasPause) {
 									rests = [];
 									restCrossesBeat = false;
 									restStartedOnBeat = false;
 									isLastRest = false;
 									totalRestDur = 0;
-									//logError(Rest length now "+rests.length);
 								} else {
 									rests.push(noteRest);
 									totalRestDur += noteRest.actualDuration.ticks;
@@ -538,9 +537,7 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							// ** 		CHECK 6: CHECK TIE SIMPLIFICATIONS			** //
 							// ** ————————————————————————————————————————————————— ** //
-							if (lastNoteInTie && !isGliss) {
-								if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
-							}
+							if (lastNoteInTie && !isGliss) if (tiedNotes.length > 1) checkTieSimplifications(noteRest);
 							if (lastNoteInTie) tiedNotes.length = 0;
 							
 							// ** ————————————————————————————————————————————————— ** //
@@ -609,7 +606,6 @@ MuseScore {
 						prevDisplayDur = displayDur;
 						prevIsNote = isNote;
 						prevNoteRest = noteRest;
-						//prevNoteWasDoubleTremolo = isDoubleTremolo;
 					} // end while processingThisBar
 					if (totalMusicDurThisTrack > maxMusicDurThisBar) maxMusicDurThisBar = totalMusicDurThisTrack;
 				} // end track loop
@@ -618,7 +614,7 @@ MuseScore {
 				// ** ————————————————————————————————————————————————— ** //
 				// ** 	CHECK 10: CHECK TOO MUCH OR NOT ENOUGH MUSIC	** //
 				// ** ————————————————————————————————————————————————— ** //
-				//logError ("maxMusicDurThisBar = "+maxMusicDurThisBar+" barDur = "+barDur);
+
 				// note I leave a 5 tick buffer here, because certain durations like septuplets are irrational, and their ints don't nicely sum to the bar duration
 				if (maxMusicDurThisBar > 0 && maxMusicDurThisBar > barDur + 5) addError("This bar seems to have too many beats in it for "+timeSigStr, currentBar);
 				if (maxMusicDurThisBar > 0 && maxMusicDurThisBar < barDur - 5) addError("This bar doesn’t seem to have enough beats in it for "+timeSigStr, currentBar);
@@ -628,16 +624,16 @@ MuseScore {
 			} // end for currentBarNum	
 		} // end for currentStaff
 		
-		// ** SHOW ALL OF THE ERRORS ** //
+		// ************ SHOW ALL OF THE ERROR BOXES ************ //
 		showAllErrors();
 		
 		// ************ DESELECT ALL AND FORCE REDRAW ************ //
 		selectNone();
 
-		// ** SHOW INFO DIALOG ** //
+		// ************ SHOW INFO DIALOG ************ //
 		var numErrors = errorStrings.length;
 		
-		// ** PUT THE MESSAGE TOGETHER FROM THE BOTTOM UP ** //
+		// ************ PUT THE INFO MESSAGE TOGETHER FROM THE BOTTOM UP ************ //
 		if (errorMsg != "") errorMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (oddTimeSigPresent) errorMsg = "<p>(NB: some odd time signatures (e.g. 5/4, 5/8, 7/4, 7/8, etc) were detected, which I couldn’t check for all rhythmic errors because they can be subdivided in different ways. Please check that the subdivisions into 2s and 3s match between all instruments in these bars.)</p>" + errorMsg;
 
@@ -646,7 +642,9 @@ MuseScore {
 		if (numErrors > 1 && numErrors <= 100) errorMsg = "<p>CHECK COMPLETED: I found "+numErrors+" issues.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		if (numErrors > 100) errorMsg = "<p>CHECK COMPLETED: I found over 100 issues — I have only flagged the first 100.</p><p>Please check the score for the yellow comment boxes that provide more details on each issue.</p><p>Use the ‘MN Delete Comments And Highlights’ plugin to remove all of these comments and highlights.</p>" + errorMsg;
 		if (progressShowing) progress.close();
-
+		
+		selectNone();
+		
 		var h = 250+numLogs*10;
 		if (oddTimeSigPresent) h += 80;
 		if (h > 500) h =500;
@@ -682,16 +680,12 @@ MuseScore {
 	}
 	
 	function allNotesTiedForwardsToIdenticalChord (noteRest, nextChord) {
-		
 		if (noteRest.notes == null) return false;
 		var numNotes = noteRest.notes.length;
 		if (numNotes == 0) return false;
-		if (numNotes > 0) logError ('checking Chord, has '+numNotes+' notes');
 		if (nextChord == null) return false;
 		if (nextChord.notes == null) return false;
-		//logError ('checking Chord 2, has '+nextChord.notes.length+' notes');
 		if (numNotes != nextChord.notes.length) return false;
-
 		for (var i = 0; i < noteRest.notes.length; i ++) {
 			if (!notesAreIdentical(noteRest.notes[i], nextChord.notes[i])) return false;
 			if (noteRest.notes[i].tieForward == null) {
@@ -699,7 +693,6 @@ MuseScore {
 			} else {
 				if (noteRest.notes[i].tieForward.type == Element.LAISSEZ_VIB) return false;
 			}
-			//logError ('note '+i+' identical');
 		}
 		return true;
 	}

@@ -71,7 +71,7 @@ MuseScore {
 	property var doCheckExpressiveDetail: true
 	property var doCheckTremolosAndFermatas: true
 	property var doCheckGraceNotes: true
-	property var doCheckStemsAndBeams: true
+	property var doCheckStemsNoteheadsAndBeams: true
 	property var doCheckDynamics: true
 	property var doCheckTempoMarkings: true
 	property var doCheckTitleAndSubtitle: true
@@ -278,6 +278,7 @@ MuseScore {
 	property var isVibraphone: false
 	property var isMarimba: false
 	property var isVoice: false
+	property var isTenor: false
 	property var isGuitar: false
 	property var isSoloScore: false
 	property var currentMute: ""
@@ -561,7 +562,7 @@ MuseScore {
 		doCheckKeySignatures = options.keySignatures;
 		doCheckOttavas = options.ottavas;
 		doCheckSlursAndTies = options.slursAndTies;
-		doCheckStemsAndBeams = options.stemsAndBeams;
+		doCheckStemsNoteheadsAndBeams = options.stemsNoteheadsAndBeams;
 		doCheckArticulation = options.articulation;
 		doCheckArpeggios = options.arpeggios;
 		doCheckTremolosAndFermatas = options.tremolosAndFermatas;
@@ -1229,7 +1230,7 @@ MuseScore {
 									var isTiedForward = noteRest.notes[0].tieForward != null;
 									isTied = isTiedBack || isTiedForward;
 
-									if (isNote && !isTremolo) flzFound = false;
+									if (!isTremolo) flzFound = false;
 									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
 										var nextChordRest = getNextNoteRest(elem);
 										if (nextChordRest != null) {
@@ -1303,6 +1304,9 @@ MuseScore {
 										wasHarmonic = false;
 									}
 									
+									// ************ CHECK NOTEHEADS ************ //
+									if (checkStemsNoteheadsAndBeams) checkNoteheads (noteRest);
+									
 									// ************ CHECK TRILL ************ //
 									//if (isTrill && currTick == trillStartTick) checkTrill(noteRest);
 															
@@ -1346,7 +1350,7 @@ MuseScore {
 									if (doCheckOttavas && isOttava) checkOttava(noteRest,currentOttava);
 								
 									// ************ CHECK STEM DIRECTION && BEAM TWEAKS ************ //
-									if (doCheckStemsAndBeams) checkStemsAndBeams(noteRest);
+									if (doCheckStemsNoteheadsAndBeams) checkStemsNoteheadsAndBeams(noteRest);
 								
 									// ************ CHECK LEDGER LINES ************ //
 									if (doCheckRangeRegister) checkInstrumentalRanges(noteRest);
@@ -2789,6 +2793,7 @@ MuseScore {
 			isTrombone = currentInstrumentCalcId === "brass.trombone.tenor";
 			isHarp = currentInstrumentId === "pluck.harp";
 			isVoice = currentInstrumentId.includes("voice.");
+			isTenor = currentInstrumentId.includes("voice.tenor");
 			isGuitar = currentInstrumentId.includes("guitar");
 			isCello = currentInstrumentId.includes("cello");
 			checkInstrumentClefs = false;
@@ -2884,9 +2889,10 @@ MuseScore {
 			
 			// VOICE
 			if (isVoice) {
-				if (currentInstrumentId.includes("bass") || currentInstrumentId.includes("baritone") || currentInstrumentId.includes(".male")) {
+				checkInstrumentClefs = true;
+				if (currentInstrumentId.includes("bass") || currentInstrumentId.includes("baritone")) {
 					readsBass = true;
-					checkInstrumentClefs = true;
+					readsTreble = false;
 				}
 			}
 			
@@ -4101,6 +4107,11 @@ MuseScore {
 			if (clefIs8ba) {
 				if (isTrebleClef && !isGuitar && !isVoice) addError ('This 8ba clef is rarely used.\nAre you sure that’s right?', clef);
 				if (isBassClef) addError ('Don’t use an octave-transposing bass clef.\nUse an 8ba symbol instead.',clef);
+			} else {
+				if (isTenor) {
+					addError ('Tenor voices read treble 8ba clef.', clef);
+					return;
+				}
 			}
 			if (clefIs15mb) addError ('Don’t use a 15mb clef.\nUse a 15mb symbol instead.', clef);
 			if (isTrombone && isTrebleClef) {
@@ -4676,8 +4687,8 @@ MuseScore {
 					// *** CHECK STYLING OF TEMPO MARKING AND METRONOME MARKING					*** //
 					// *** ANALYSE THE TEXT OBJECT AND ITS STYLING TO SEE WHICH COMPONENTS 		*** //
 					// *** ARE BOLD, AND WHICH ARE PLAIN. WE PREFER THAT THE TEMPO DESCRIPTOR 	*** //
-					// *** IS BOLD, AND THE METRONOME MARKING IS PLAIN — SEE EXAMPLES IN 		*** //
-					// *** BEHIND BARS, P. 183													*** //
+					// *** IS BOLD, AND THE METRONOME MARKING IS PLAIN					  		*** //
+					// *** — SEE EXAMPLES IN BEHIND BARS, P. 183								*** //
 					
 					// *** IF THERE IS MANUAL STYLING, THERE WILL BE SOME <B> TAGS				*** //
 					// *** IF NO <B> TAGS, THEN THE STYLE OF THE WHOLE TEXT OBJECT APPLIES		*** //
@@ -4705,8 +4716,8 @@ MuseScore {
 					
 					if (containsMetronomeComponent || containsTempoComponent) {
 						//logError ('Found metronome component');
-						if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
-						if (textObject.offsetX > 4.5) addError ("This tempo marking looks like it is further right than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See Behind Bars, p. 183)", textObject);
+						if (textObject.offsetX < -4.5) addError ("This tempo marking looks like it is further left than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See ‘Behind Bars’, p. 183)", textObject);
+						if (textObject.offsetX > 4.5) addError ("This tempo marking looks like it is further right than it should be.\nThe start of it should align with the time signature (if any) or first beat.\n(See ‘Behind Bars’, p. 183)", textObject);
 					}
 					
 					// *** CHECK ANY METRONOME MARKING COMPONENT *** //
@@ -4999,6 +5010,10 @@ MuseScore {
 							prevDynamicObject = textObject;
 						}
 					} else {
+						prevDynamicBarNum = currentBarNum;
+						prevDynamicDisplayBarNum = currentBarNum + displayOffset;
+						prevDynamic = plainText;
+						prevDynamicObject = textObject;
 						if (plainText === "fmp" || plainText === "sfmp" || plainText === "sfzmp" || plainText === "sffzmp" || plainText === "sfffzmp") {
 							prevDynamicBarNum = currentBarNum;
 							prevDynamic = "p";
@@ -5122,6 +5137,7 @@ MuseScore {
 				isMelisma[theTrack] = false;
 				if (dur > 0) {
 					isMelisma[theTrack] = true;
+					//logError ('Melisma found; dur > 0; beat = '+currTick/480);
 				} else {
 					if (l.syllabic == Lyrics.BEGIN || l.syllabic == Lyrics.MIDDLE) {
 						// check for presence of lyric on next note — if there is none, then it's a melisma
@@ -5129,9 +5145,15 @@ MuseScore {
 						if (nextNote) {
 							if (nextNote.lyrics.length == 0) {
 								isMelisma[theTrack] = true;
+								//logError ('Melisma found; beat = '+currTick/480+'; syllabic = '+l.syllabic);
 							}
 						}
 					}
+					if (l.syllabic == Lyrics.SINGLE && noteRest.notes[0].tieForward != null) {
+						//logError ('Single lyric plus tie found; beat = '+currTick/480);
+						addError ("This lyric needs a lyric extender for the duration of the tie.\nUse an underscore character to extend the syllable.\n(See ‘Behind Bars’, p. 447)", l);
+					}
+
 				}
 				//logError ('track '+theTrack+'; text = '+plainText+'; dur = '+dur+'; syllabic = '+l.syllabic+' isSlurred = '+isSlurred+'; isMelisma = '+isMelisma[theTrack]);
 				if (dur > 0) {
@@ -5238,6 +5260,7 @@ MuseScore {
 		// look for the presence of any of these strings as separate words
 		var dynamics = ["pppp", "ppp","pp","p", "mp", "mf", "f", "ff", "fff", "ffff","sf", "sfz","sffz","fz","fpppp", "fppp","fpp","fp", "fmp", "fmf", "ffpppp", "ffppp","ffpp","ffp", "ffmp", "sfpppp", "sfppp","sfpp","sfp", "sfmp", "sfzpppp", "sfzppp","sfzpp","sfzp", "sfzmp","mfpppp", "mfppp","mfpp","mfp", "mfmp", "sffpppp", "sffppp","sffpp","sffp", "sffmp", "sffzpppp", "sffzppp","sffzpp","sffzp", "sffzmp", "fzpppp", "fzppp","fzpp","fzp", "fzmp", "n", "niente"];
 		var words = str.split(/[:\s]+/);
+		if (words.length > 3) return false; // assume that anything with more than 3 words in it is NOT a dynamic
 		for (var i = 0; i < words.length; i++) {
 			var word = words[i];
 			if (word === 'f' && str.includes('in f')) continue;
@@ -5370,6 +5393,7 @@ MuseScore {
 		// 2) grand staff instruments are connected only within the instrument
 		// NB: more we could do here, e.g. orchestral scores, etc.
 		var prevBarlineSpan = 0;
+		var flaggedBarlineConnection = false;
 		for (var i = 0; i < lastVisibleStaff; i++) {
 			if (staffVisible[i]) {
 				var staff = curScore.staves[i];
@@ -5377,19 +5401,16 @@ MuseScore {
 				
 				// *** CHECK VOCAL STAFF INSTRUMENT BARLINES *** //
 				if (staff.part.musicXmlId.includes('voice')) {
-					if (barlineSpan > 0) {
-						addError ("Vocal staves should not have their barlines\nconnected to other staves. Click each\nconnected barline and drag up to disconnect.","system1 "+i);
+					if (barlineSpan > 0 && !flaggedBarlineConnection) {
+						addError ("Vocal staves should not have their barlines\nconnected to other staves. Click the\nconnected barline and drag up to disconnect.","system1 "+i);
+						flaggedBarlineConnection = true;
 					}
 				}
 				
 				// *** CHECK GRAND STAFF INSTRUMENT BARLINES *** //
 				if (isTopOfGrandStaff[i]) {
-					if (i > 0 && prevBarlineSpan > 0) {
-						addError ("Grand staff instruments should not have their barlines\nconnected to other instruments.","system1 "+i);
-					}
-					if (barlineSpan == 0) {
-						addError ("Grand staff instruments should have their barlines\nconnected between the staves.","system1 "+i);
-					}
+					if (i > 0 && prevBarlineSpan > 0) addError ("Grand staff instruments should not have their barlines\nconnected to other instruments.","system1 "+i);
+					if (barlineSpan == 0) addError ("Grand staff instruments should have their barlines\nconnected between the staves.","system1 "+i);
 				}
 				prevBarlineSpan = barlineSpan;
 			}
@@ -5955,7 +5976,7 @@ MuseScore {
 		var p2 = chord.notes[1].pitch;
 		var bottomNote = p1 < p2 ? p1: p2;
 		var topNote = p1 < p2 ? p2: p1;
-		logError ('p1 = '+p1+'; p2 = '+p2);
+		//logError ('p1 = '+p1+'; p2 = '+p2);
 		if (!stringsArray.includes(p1) && !stringsArray.includes(p2)) interval = Math.abs(topNote - bottomNote);
 		
 		if (numNotes == 2 && interval > maxStretch) addError ("This double-stop appears to be larger than a safe stretch on the "+iName+"\nIt may not be possible: check with a player.",chord);
@@ -6012,6 +6033,14 @@ MuseScore {
 		return a;
 	}
 	
+	function checkNoteheads (noteRest) {
+		for (var i = 0; i < noteRest.notes.length; i ++) {
+			var theNote = noteRest.notes[i];
+			// check for Bravura harmonics
+			checkBravuraDiamond (theNote);
+		}
+	}
+	
 	
 	// ***************************************************************** //
 	// **** 														**** //
@@ -6036,15 +6065,6 @@ MuseScore {
 			if (!theNote.hasParentheses) {
 				numNotes ++;
 				theNotes.push(theNote);
-			}
-			// check for Bravura harmonics
-			if (!flaggedBravuraHarmonics) {
-				if (curScore.style.value('musicalSymbolFont') === 'Bravura') {
-					if (theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND || theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND_OLD) {
-						flaggedBravuraHarmonics = true;
-						addError ("Diamond noteheads in the ‘Bravura’ font don’t meet standard notation guidelines.\nThey are too small and oddly shaped — see ‘Behind Bars’ p. 11.\nConsider changing the music font to ‘Leland’ instead,\nor use the ‘Mi’ notehead option.", noteRest);
-					}
-				}
 			}
 		}
 		
@@ -6149,6 +6169,22 @@ MuseScore {
 		}
 	}
 	
+	// ***************************************************************** //
+	// **** 														**** //
+	// **** 	CHECKS PRESENCE OF DIAMOND IN BRAVURA FONT		 	**** //
+	// **** 														**** //
+	// ***************************************************************** //
+	
+	function checkBravuraDiamond (theNote) {
+		if (!flaggedBravuraHarmonics) {
+			if (curScore.style.value('musicalSymbolFont') === 'Bravura') {
+				if (theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND || theNote.headGroup == NoteHeadGroup.HEAD_DIAMOND_OLD) {
+					flaggedBravuraHarmonics = true;
+					addError ("Diamond noteheads in the ‘Bravura’ font don’t meet standard notation guidelines.\nThey are too small and oddly shaped (see ‘Behind Bars’, p. 11).\nEither use the ‘Mi’ notehead, or change the music font to ‘Leland’ instead.", theNote);
+				}
+			}
+		}
+	}
 	
 	// ***************************************************************** //
 	// **** 														**** //
@@ -6557,7 +6593,7 @@ MuseScore {
 	// **** 														**** //
 	// ***************************************************************** //
 	
-	function checkStemsAndBeams (noteRest) {
+	function checkStemsNoteheadsAndBeams (noteRest) {
 		// REINSTATE THIS ONCE THE API SUPPORTS USER_MODIFIED PROPERTY
 		/*if (noteRest.beam) {
 			var theBeam = noteRest.beam;
@@ -7619,7 +7655,7 @@ MuseScore {
 			property alias settingsArpeggios: options.arpeggios
 			property alias settingsTremolosAndFermatas: options.tremolosAndFermatas
 			property alias settingsGraceNotes: options.graceNotes
-			property alias settingsStemsAndBeams: options.stemsAndBeams
+			property alias settingsStemsNoteheadsAndBeams: options.stemsNoteheadsAndBeams
 			property alias settingsExpressiveDetail: options.expressiveDetail
 			property alias settingsBarStretches: options.barStretches
 			
@@ -7655,7 +7691,7 @@ MuseScore {
 		property var arpeggios: true
 		property var tremolosAndFermatas: true
 		property var graceNotes: true
-		property var stemsAndBeams: true
+		property var stemsNoteheadsAndBeams: true
 		property var expressiveDetail: true
 		property var barStretches: true
 		
@@ -7802,8 +7838,8 @@ MuseScore {
             }
             CheckBox {
                 text: "Check stems, noteheads & beams"
-                checked: options.stemsAndBeams
-                onClicked: { options.stemsAndBeams = !options.stemsAndBeams; checked = options.stemsAndBeams; }
+                checked: options.stemsNoteheadsAndBeams
+                onClicked: { options.stemsNoteheadsAndBeams = !options.stemsNoteheadsAndBeams; checked = options.stemsNoteheadsAndBeams; }
             }
             CheckBox {
                 text: "Check expressive detail"

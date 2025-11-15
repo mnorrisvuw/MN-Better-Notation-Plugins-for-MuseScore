@@ -98,3 +98,7 @@ flautundo
 flautando
 riccochet
 ricochet
+tremollando
+tremolando
+tounge
+tongue
