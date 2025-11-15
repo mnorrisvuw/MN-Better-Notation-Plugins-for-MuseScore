@@ -530,7 +530,7 @@ MuseScore {
 									}
 									isLastRest = (lastNoteInBar || nextItemIsNote || nextItem == null || nextItemHasPause || nextItemIsHidden);
 									//logError("Found a rest: there have now been "+rests.length+" rests; totalRestDur = "+totalRestDur+"; isLastRest = "+isLastRest+" isHidden = "+isHidden);
-									if (isLastRest && rests.length > 1) condenseOverSpecifiedRest(noteRest);
+									if (isLastRest && rests.length > 1) condenseOverSpecifiedRest();
 								}
 							}
 							
@@ -1164,15 +1164,21 @@ MuseScore {
 			addError ("Never use a "+tupletName+" in "+timeSigStr+" time.\nSimplify by deleting the tuplet and rewriting using\ndotted notes instead.", theTuplet);
 			return;
 		}
-		var tupletDivision = theTuplet.actualDuration.ticks / theTuplet.normalNotes;
-
-		// *** CHECK FOR NOTE NOT REALLY MATCHING THE TUPLET DIVISION ***
-		if (tupletDur != tupletDivision) {
-			addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
+		
+		if (tupletDur > beatLength) {
+			var firstNoteDur = theNotes[0].actualDuration.ticks;
+			var tupletDivision = tupletDur / theTuplet.actualNotes;
+			
+			//logError ('firstNoteDur = '+firstNoteDur+'; tupletDivision = '+tupletDivision);
+	
+			// *** CHECK FOR NOTE NOT REALLY MATCHING THE TUPLET DIVISION ***
+			if (firstNoteDur != tupletDivision) {
+				addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
+			}
 		}
 	}
 	
-	function condenseOverSpecifiedRest (noteRest) {
+	function condenseOverSpecifiedRest () {
 		//logError(*** CHECKING CONDENSING OVER-SPECIFIED REST ***"); 
 		
 		var possibleSimplification = -1;
@@ -1193,7 +1199,7 @@ MuseScore {
 			
 			for (var i = 0; i < rests.length-1 && !maxSimplificationFound; i++) {
 				var startRest = rests[i];
-				var startRestTick = startRest.parent.tick;
+				// var startRestTick = startRest.parent.tick;
 				var restDisplayDur = startRest.duration.ticks;
 				var restActualDur = startRest.actualDuration.ticks
 				var startPos = getPositionInBar(startRest);
@@ -1227,12 +1233,13 @@ MuseScore {
 								// don't simplify anything tied over a beat that is less than a crotchet
 								if (restActualDur == dottedminim) {
 									canBeCondensed = false;
-									if (timeSigStr === "6/4" || timeSigStr === "9/4") canBeCondensed = startBeat % 3 > 0;
-									if (timeSigStr === "12/8") canBeCondensed = startBeat % 2 > 0;
+									if (timeSigStr === "6/4" || timeSigStr === "9/4") canBeCondensed = startBeat % 3 == 0;
+									if (timeSigStr === "12/8") canBeCondensed = startBeat % 2 == 0;
 								}
+								if (restActualDur > semibreve) canBeCondensed = false;
 								if (restActualDur == semibreve) canBeCondensed = timeSigStr === "4/4" || timeSigStr === "2/2";
-								if (restActualDur == minim) canBeCondensed = (timeSigStr === "4/4" || timeSigStr === "2/2" || timeSigStr === "3/2") && startBeat % 2 > 0;
-								if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = ((timeSigDenom <= 2) || isCompound) && startBeat % 2 > 0;
+								if (restActualDur == minim) canBeCondensed = (timeSigStr === "4/4" || timeSigStr === "2/2" || timeSigStr === "3/2") && startBeat % 2 == 0;
+								if (restActualDur == dottedcrotchet && !isCompound) canBeCondensed = false;
 								if (restActualDur == dottedquaver) canBeCondensed = timeSigDenom <= 4;
 								if (restActualDur == dottedsemiquaver) canBeCondensed = timeSigDenom <= 8;
 								if (canBeCondensed && isCompound) canBeCondensed = restActualDur <= beatLength || restActualDur % beatLength == 0;
@@ -1457,6 +1464,11 @@ MuseScore {
 							if (isCompound) {
 								if (tiedActualDur >= beatLength) canBeSimplified = tiedActualDur % beatLength == 0; // can be simplified if it's a multiple of the beat length
 							} else {
+								if (tiedActualDur == semibreve) {
+									// only simplify if we're in, say, 4/4, 3/2, 6/4, etc., but not 5/4
+									var isASimpleTimeSig = (timeSigDenom == 2 || timeSigDenom == 4) && (timeSigNum != 5);
+									canBeSimplified = isASimpleTimeSig && startBeat % 2 == 0;
+								}					
 								if (tiedActualDur == minim) {
 									// Exception for two tied crotchets on beat 2
 									//logError (noteRest.track+' '+startBeat+' '+startFrac+' '+timeSigDenom+' '+timeSigNum);
@@ -1472,7 +1484,6 @@ MuseScore {
 									if (tempNextItem.actualDuration.ticks != quaver) canBeSimplified = false; 
 								}
 								//logError ('timeSigDenom = '+timeSigDenom+'; timeSigNum = '+timeSigNum);
-								if (tiedActualDur == semibreve) canBeSimplified = timeSigDenom == 2 || (timeSigDenom == 4 && timeSigNum % 3 > 0); // only use a semibreve if we're in 3/2 4/4 or 7/4 etc
 								//logError ('canBeSimplified = '+canBeSimplified);
 							}
 			
