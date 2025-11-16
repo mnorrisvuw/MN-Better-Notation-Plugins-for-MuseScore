@@ -97,6 +97,7 @@ MuseScore {
 	property var restStartBeat: 0.875
 	property var currentBeam: null
 	property var currentBeamMode: 0
+	property var prevBeamMode: 0
 	property var currentBeamPos: 0
 	property var nextBeam: null
 	property var nextBeamMode: 0
@@ -362,6 +363,7 @@ MuseScore {
 						tieIndex = 0;
 						lastRest = false;
 						cursor2.track = currentTrack;
+						prevBeamMode = 0;
 					}
 					
 					while (processingThisBar) {
@@ -606,6 +608,7 @@ MuseScore {
 						prevDisplayDur = displayDur;
 						prevIsNote = isNote;
 						prevNoteRest = noteRest;
+						prevBeamMode = currentBeamMode;
 					} // end while processingThisBar
 					if (totalMusicDurThisTrack > maxMusicDurThisBar) maxMusicDurThisBar = totalMusicDurThisTrack;
 				} // end track loop
@@ -763,7 +766,7 @@ MuseScore {
 		if (isPickupBar) return;
 		isBarRest = isRest && soundingDur == barDur;
 		isManuallyEnteredBarRest = isBarRest && noteRest.durationTypeWithDots.type < 14;
-		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered, and is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to create a correctly positioned bar rest.",noteRest);
+		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered,\nand is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to\ncreate a correctly positioned bar rest.",noteRest);
 	}
 	
 	function isTwoNoteTremolo(noteRest) {
@@ -809,7 +812,7 @@ MuseScore {
 					// yes it crosses a beat
 					// if it's offbeat, don't allow it
 					if (startBeatOffset != 0) {
-						addError ("Offbeat tuplets that cross beats can be difficult to read and are not recommended.\nEither split up the tuplet, or consider rewriting.",theTuplet);
+						addError ("Offbeat tuplets that cross beats can be difficult\nto read and are not recommended.\nEither split up the tuplet, or consider rewriting.",theTuplet);
 					} else {
 						// it's on-beat, but lasts longer than one beat
 						hidingBeatError = false;
@@ -1161,7 +1164,7 @@ MuseScore {
 			var tupletName = "";
 			if (a==2) tupletName = "duplet";
 			if (a==4) tupletName = "quadruplet";
-			addError ("Never use a "+tupletName+" in "+timeSigStr+" time.\nSimplify by deleting the tuplet and rewriting using\ndotted notes instead.", theTuplet);
+			addError ("Never use a "+tupletName+" in "+timeSigStr+" time. Simplify by\ndeleting the tuplet and rewriting\nusing dotted notes instead.", theTuplet);
 			return;
 		}
 		
@@ -1613,7 +1616,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError (tempText+'These tied notes can be simplified to a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
+				addError (tempText+'These tied notes can be simplified as a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
 			} else {
 				if (!canCheckThisBar) return;
 				var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
@@ -1623,7 +1626,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError(tempText+'These tied notes can be simplified to a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
+				addError(tempText+'These tied notes can be simplified as a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
 			}
 		} else {
 			// check for two note ties wrong way around
@@ -1633,8 +1636,7 @@ MuseScore {
 				if (note1.tuplet == null && note2.tuplet == null) {
 					var startPos = getPositionInBar(note1);
 					var startBeat = Math.trunc(startPos/beatLength);
-					var startFrac = startPos % beatLength;
-					checkTiedPair (note1,note2,startPos,startBeat,startFrac);
+					checkTiedPair (note1,note2,startBeat,startFrac);
 				}
 			}
 		}
@@ -1649,7 +1651,7 @@ MuseScore {
 		return false;
 	}
 	
-	function checkTiedPair (note1,note2,startPos,startBeat,startFrac) {
+	function checkTiedPair (note1,note2,startBeat,startFrac) {
 		var d1 = note1.actualDuration.ticks;
 		var d2 = note2.actualDuration.ticks;
 		var onBeat = startFrac == 0;
@@ -1660,15 +1662,16 @@ MuseScore {
 			if (beatLength == crotchet) {
 				if (d1 < crotchet && d2 == crotchet) addError ("Consider putting the crotchet first in this tie.",noteArray);
 				if (d1 < crotchet && d2 == minim) addError ("Consider putting the minim first in this tie.",noteArray);
-				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting this tied note as a minim tied to a quaver.",noteArray);
-				if (d1 == dottedcrotchet && d2 == crotchet) addError ("Consider rewriting this tied note as a minim tied to a quaver.",noteArray);
-				if (d1 == minim && d2 == dottedcrotchet) addError ("Consider rewriting this tied note as a dotted minim tied to a quaver.",noteArray);
-				if (d1 == dottedcrotchet && d2 == semiquaver) addError ("Consider rewriting this tied note as a crotchet tied to a dotted quaver.", noteArray);
+				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting these tied notes as\na minim tied to a quaver.",noteArray);
+				if (d1 == dottedcrotchet && d2 == crotchet) addError ("These tied notes are easier to read as\na minim tied to a quaver.",noteArray);
+				if (d1 == minim && d2 == dottedcrotchet) addError ("These tied notes are easier to read as\na dotted minim tied to a quaver.",noteArray);
+				if (d1 == dottedcrotchet && d2 == semiquaver) addError ("These tied notes are easier to read as\na crotchet tied to a dotted quaver.", noteArray);
 			} 
 		} else {
 			if (beatLength == crotchet) {
-				if (d1 == dottedcrotchet && d2 == minim) addError ("Consider rewriting this tied note as a quaver tied to a dotted minim",noteArray);
-				if (startFrac == division / 2 && d1 == crotchet && d2 == semiquaver) addError ("Consider rewriting this tied note as a quaver tied to a dotted quaver.\n(Select both notes and choose Tools→Regroup rhythms)",noteArray);
+				if (d1 == dottedcrotchet && d2 == minim) addError ("These tied notes are easier to read as\na quaver tied to a dotted minim",noteArray);
+				if (startFrac == division / 2 && d1 == crotchet && d2 == semiquaver) addError ("These tied notes are easier to read as\na quaver tied to a dotted quaver.\n(Select both notes and choose Tools→Regroup rhythms)",noteArray);
+				if (startFrac == semiquaver && d1 == semiquaver && d2 == dottedcrotchet) addError ("These tied notes are easier to read as\na dotted quaver tied to a crotchet.",noteArray);
 			}
 		}
 	}
@@ -1764,7 +1767,7 @@ MuseScore {
 		if (isNote && !prevIsNote && haveHadFirstNote && !isFirstNoteInBeat) {
 			if (isLastItemInBeat) haveHadFirstNote = false;
 			if (hasBeam) {
-				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32) addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
+				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32 && prevBeamMode == Beam.MID) addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
 				return;
 			} else {
 				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
@@ -1773,7 +1776,7 @@ MuseScore {
 						addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
 						return;
 					} else {
-						if (currentBeamMode != Beam.MID && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+						if (currentBeamMode != Beam.MID && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to ‘AUTO’.",noteRest);
 						return;
 					}
 				}
@@ -1783,10 +1786,10 @@ MuseScore {
 		
 		if (isMiddleNoteInBeat) {
 			if (!hasBeam) {
-				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nSet its ‘Beam type’ property to ‘AUTO’.",noteRest);
 			} else {
 				if (prevIsNote) {
-					if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to ‘AUTO’.",noteRest);
+					if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to ‘AUTO’.",noteRest);
 				} else {
 					if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
 				}
@@ -1795,7 +1798,7 @@ MuseScore {
 		}
 		
 		if (isMiddleRestInBeat) {
-			if (!hasBeam) addError("This rest should be included in a beam with\nall other notes and rests in this beat.\nSet the ‘Beam type’ property of this note to ‘Join beams’.",noteRest);
+			if (!hasBeam) addError("This rest should be included in a beam with\nall other notes and rests in this beat.\nSet its ‘Beam type’ property to ‘Join beams’.",noteRest);
 			return;
 		}
 		
@@ -1808,9 +1811,9 @@ MuseScore {
 		if (!correctlyBeamed) {
 		//logError(Not correctly beamed");
 			if (isNote) {
-				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note\nSet its ‘Beam type’ property to AUTO",noteRest);
 				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) {
-					addError("This note should be beamed to the previous note\nSet the ‘Beam type’ property of this note to AUTO",noteRest);
+					addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to AUTO",noteRest);
 				}
 			} else {
 				if (isLastRestBeforeNote) addError("This rest should not be beamed to the next note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
@@ -1846,10 +1849,10 @@ MuseScore {
 						if (specificDumbMuseScoreBreakCase) {
 							addError( "This note should not be beamed to the next note.\nSet the ‘Beam type’ property of the following note to ‘No beam’.",noteRest);
 						} else {
-							addError( "This note should not be beamed to the next note.\nSet the ‘Beam type’ property of this note and the following to AUTO.",noteRest);
+							addError( "This note should not be beamed to the next note.\nSet its ‘Beam type’ property and the following to AUTO.",noteRest);
 						}
 					} else {
-						addError( "This rest should not be included in the beam group of the next beat\nSet the ‘Beam type’ property of this note to AUTO.", noteRest);
+						addError( "This rest should not be included in the beam group of the next beat\nSet its ‘Beam type’ property to AUTO.", noteRest);
 					}
 				}
 			}
