@@ -3189,6 +3189,9 @@ MuseScore {
 			var instrumentChangeFramePadding = style.value("instrumentChangeFramePadding");
 			var rehearsalMarkFontSize = style.value("rehearsalMarkFontSize");
 			var lyricsMinDistance = style.value("lyricsMinDistance");
+			var lyricsOddFontSize = style.value("lyricsOddFontSize");
+			var lyricsEvenFontSize = style.value("lyricsEvenFontSize");
+
 			var mergeMatchingRests = style.value("mergeMatchingRests");
 			var measureNumberPlacementMode = style.value("measureNumberPlacementMode");
 			
@@ -3383,6 +3386,8 @@ MuseScore {
 				if (instrumentChangeFrameType != 1) styleComments.push("(Text Styles→Instrument Change) Set Frame to ‘Rectangle’");
 				if (instrumentChangeFramePadding != 0.4) styleComments.push("(Text Styles→Instrument Change) Set Frame Padding to 0.4");
 			}
+			if (lyricsOddFontSize != 10) styleComments.push("(Text Styles→Lyrics odd lines) Set font size to 10pt");
+			if (lyricsEvenFontSize != 10) styleComments.push("(Text Styles→Lyrics even lines) Set font size to 10pt");
 		}
 		
 		// ** OTHER STYLE ISSUES ** //
@@ -4074,9 +4079,9 @@ MuseScore {
 		var bassClefs = [ClefType.F,ClefType.F15_MB,ClefType.F8_VB,ClefType.F_8VA,ClefType.F_15MA,ClefType.F_B,ClefType.F_C,ClefType.F_F18C,ClefType.F_19C];
 		var ottavaClefs = [ClefType.G8_VA,ClefType.F_8VA];
 		var quintissimaClefs = [ClefType.G15_MA, ClefType.F_15MA];
-		var ottavaBassaClefs = [ClefType.G8_VB_P,ClefType.F8_VB,ClefType.C4_8VB];
+		var ottavaBassaClefs = [ClefType.G8_VB, ClefType.G8_VB_O, ClefType.G8_VB_P,ClefType.F8_VB,ClefType.C4_8VB];
 		var quintissimaBassaClefs = [ClefType.G15_MB, ClefType.F15_MB];
-		
+		//logError ('cleftype = '+clefType+'; 
 		var clefType = clef.transposingClefType;
 		isTrebleClef = trebleClefs.includes(clefType);
 		isAltoClef = clefType == ClefType.C3;
@@ -5241,6 +5246,12 @@ MuseScore {
 		var index = unhyphenatedWordsLower.indexOf(unhyphenatedStr);
 		if (index != -1) {
 			var correctlyHyphenatedStr = hyphenatedWords[index];
+			// match the capitalisation of the input word
+			if (unhyphenatedStr.charAt(0) === unhyphenatedStr.charAt(0).toUpperCase()) {
+				correctlyHyphenatedStr = correctlyHyphenatedStr.charAt(0).toUpperCase() + correctlyHyphenatedStr.slice(1);
+			} else {
+				correctlyHyphenatedStr =  correctlyHyphenatedStr.charAt(0).toLowerCase() + correctlyHyphenatedStr.slice(1);
+			}
 			// logError ('correctlyHyphenatedStr = ‘'+correctlyHyphenatedStr+'’');
 			if (str.toLowerCase() !== correctlyHyphenatedStr.toLowerCase()) addError ('‘'+str + '’ is not correctly hyphenated.\nIt should be ‘'+correctlyHyphenatedStr+'’',wordArray);
 		}
