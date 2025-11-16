@@ -7258,7 +7258,8 @@ MuseScore {
 				}
 				
 				// check comment box is not covering the element
-				if (!isString) {
+				var dontMove = [Element.HBOX, Element.VBOX, Element.TBOX, Element.FBOX, Element.MEASURE, Element.STAFF, Element.KEYSIG, Element.TIMESIG, Element.SYSTEM];
+				if (!isString && !dontMove.includes(eType)) {
 					var r1x = placedX + offx[i];
 					var r1y = placedY + offy[i];
 					var r1r = r1x + commentWidth;
