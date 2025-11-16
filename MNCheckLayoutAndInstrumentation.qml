@@ -2920,7 +2920,7 @@ MuseScore {
 	function checkPartSettings () {
 		var maxSize = 7.0;
 		var minSize = 6.6;
-		var excerpts = curScore.excerpts;		
+		//var excerpts = curScore.excerpts;		
 		if (numExcerpts < 2) return;
 		var styleComments = [];
 		var pageSettingsComments = [];
@@ -2969,21 +2969,23 @@ MuseScore {
 				var maxSystemSpread = partStyle.value("maxSystemSpread");
 				var enableVerticalSpread = partStyle.value("enableVerticalSpread");
 				if (enableVerticalSpread) {
-					if (minSystemSpread < 6 || minSystemSpread > 8) {
-						styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
-						flaggedSystemSpacing = true;
-					}
-					if (maxSystemSpread < 10 || maxSystemSpread > 14) {
-						styleComments.push("(PSpacingage tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
-						flaggedSystemSpacing = true;
-					}
-				} else {
 					if (minSystemDistance < 6 || minSystemDistance > 8) {
 						styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–7.0sp");
 						flaggedSystemSpacing = true;
 					}
 					if (maxSystemDistance < 10 || maxSystemDistance > 14) {
 						styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
+						flaggedSystemSpacing = true;
+					}
+				} else {
+					
+					logError ('!enableVerticalSpread: maxSystemDistance = '+maxSystemDistance+'; maxSystemSpread = '+maxSystemSpread);
+					if (minSystemSpread < 6 || minSystemSpread > 8) {
+						styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
+						flaggedSystemSpacing = true;
+					}
+					if (maxSystemSpread < 10 || maxSystemSpread > 14) {
+						styleComments.push("(PSpacingage tab) Set the ‘Max. system distance’ to between 10.0–14.0sp");
 						flaggedSystemSpacing = true;
 					}
 				}
@@ -3303,11 +3305,11 @@ MuseScore {
 						if (maxSystemSpread < 12 || maxSystemSpread > 16) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 12.0–16.0sp");				
 					} else {
 						if (minSystemSpread < 12 || minSystemSpread > 14) styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-						if (maxSystemSpread < 24 || maxSystemSpread > 36) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
+						if (maxSystemSpread < 16 || maxSystemSpread > 24) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 16.0–24.0sp");
 					}
 				} else {
 					if (minSystemDistance < 12 || minSystemDistance > 16) styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 12.0–14.0sp");
-					if (maxSystemDistance < 24 || maxSystemDistance > 36) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 24.0–36.0sp");
+					if (maxSystemDistance < 16 || maxSystemDistance > 24) styleComments.push("(Spacing tab) Set the ‘Max. system distance’ to between 16.0–24.0sp");
 				}
 			}
 			

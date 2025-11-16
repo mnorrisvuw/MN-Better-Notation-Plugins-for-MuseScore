@@ -548,7 +548,7 @@ MuseScore {
 		
 		// SYSTEM SPACING
 		setSetting ("minSystemSpread", isSoloScore ? 6 : 12);
-		setSetting ("maxSystemSpread", isSoloScore ? 14 : 32);	
+		setSetting ("maxSystemSpread", isSoloScore ? 14 : 24);
 		curScore.endCmd();	
 	}
 	
