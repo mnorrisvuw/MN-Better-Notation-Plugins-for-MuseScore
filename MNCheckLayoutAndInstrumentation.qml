@@ -7044,7 +7044,7 @@ MuseScore {
 		
 		var firstStaffNum = 0;
 		var comments = [];
-		var commentPages = [];
+		//var commentPages = [];
 		var commentPageNumbers = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
@@ -7245,6 +7245,32 @@ MuseScore {
 					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth + 10.0;
 					offy[i] += 4.0;
 				}
+				
+				// check comment box is not covering the element
+				if (!isString) {
+					var r1x = placedX + offx[i];
+					var r1y = placedY + offy[i];
+					var r1r = r1x + commentWidth;
+					var r1b = r1y + commentHeight;
+					var margin = commentOffset;
+					var r2x = element.pagePos.x - margin;
+					var r2y = element.pagePos.y - margin;
+					var r2r = r2x + element.bbox.width + 2 * margin;
+					var r2b = r2y + element.bbox.height + 2 * margin;
+					/*if (element.type == Element.SLUR_SEGMENT) {
+						logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1r)+" "+Math.floor(r1b)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2r)+" "+Math.floor(r2b)+"}");
+					}*/
+					//logError ("Comment at: {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\nElement at: {"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+					var overlaps = (r1x <= r2r) && (r1r >= r2x) && (r1y <= r2b) && (r1b >= r2y);
+					var repeats = 0;
+					while (overlaps && repeats < 12) {
+						offy[i] -= commentOffset;
+						r1y -= commentOffset;
+						r1b -= commentOffset;
+						repeats ++;
+						overlaps = (r1x <= r2r) && (r1r >= r2x) && (r1y <= r2b) && (r1b >= r2y);
+					}
+				}
 
 				// check to see if this comment has been placed too close to other comments
 				var maxOffset = 10;
@@ -7263,7 +7289,7 @@ MuseScore {
 				for (var k = 0; k < i; k++) {
 					var otherComment = comments[k];
 					var otherCommentPageNumber = commentPageNumbers[k];
-					var otherCommentPage = pages[k];
+					//var otherCommentPage = pages[k];
 					var otherCommentX = otherComment.pagePos.x + offx[k];
 					var otherCommentY = otherComment.pagePos.y + offy[k];
 					var actualCommentX = placedX + offx[i];
@@ -7303,32 +7329,8 @@ MuseScore {
 							}
 						}
 					}
-					// check comment box is not covering the element
-					/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
-					if (!isString) {
-						var r1x = comment.pagePos.x;
-						var r1y = comment.pagePos.y;
-						var r1w = commentWidth;
-						var r1h = commentHeight;
-						var r2x = element.pagePos.x;
-						var r2y = element.pagePos.y;
-						var r2w = element.bbox.width;
-						var r2h = element.bbox.height;
-						if (element.type == Element.SLUR_SEGMENT) {
-							logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-						}
-						
-						var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-						var repeats = 0;
-						while (overlaps && repeats < 20) {
-							logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-							comment.offsetY -= commentOffset;
-							r1y -= 1.0;
-							repeats ++;
-							overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-						}
-					} */
 				}
+				
 				if (checkObjectPage && commentPageNumber != objectPageNumber) comment.text = '[The object this comment refers to is on p. '+(objectPageNumber+1)+']\n' +comment.text;
 			}
 		}
