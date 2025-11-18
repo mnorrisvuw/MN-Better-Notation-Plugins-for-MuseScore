@@ -238,6 +238,7 @@ MuseScore {
 	property var prevDynamic: ""
 	property var prevDynamicObject: null
 	property var prevDynamicBarNum: 0
+	property var prevNoteRest: null
 	property var prevDynamicDisplayBarNum: 0
 	property var prevIsMultipleStop: false
 	property var prevSoundingDur: 0
@@ -418,7 +419,9 @@ MuseScore {
 	
 	property var prevNote: null
 	property var prevNotes: []
+	property var prevNoteRests: []
 	property var selectionArray: []
+	property var theArticulationArray: []
 	property var isTremolo: false
 	property var prevWasGraceNote: false
 	property var firstDynamic: false
@@ -633,6 +636,8 @@ MuseScore {
 			glisses[i] = [];
 			melismaEndTick[i] = 0;
 			prevTick[i] = -1;
+			prevNoteRests[i] = null;
+			prevNotes[i] = null;
 		}
 				
 		// ************  		DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS 		************ //
@@ -781,6 +786,8 @@ MuseScore {
 			prevIsMultipleStop = false;
 			prevMultipleStopInterval = 0;
 			prevBeam = null;
+			prevNote = null;
+			prevNoteRest = null;
 			currentMute = "senza";
 			currentPlayingTechnique = "arco";
 			currentContactPoint = "ord";
@@ -1070,6 +1077,7 @@ MuseScore {
 						if (cursor.element.type == Element.KEYSIG) logError ('found ks');
 					}
 					prevNote = prevNotes[currentTrack];
+					prevNoteRest = prevNoteRests[currentTrack];
 					prevWasGraceNote = false;
 					
 					// ** slurs
@@ -1238,6 +1246,9 @@ MuseScore {
 										}
 									}
 									
+									// ************ GET ARTICULATIONS ********** //
+									theArticulationArray = getArticulations(noteRest);
+									
 									// ************ CHECK CLEF ********** //
 									if (!firstNoteSinceClefChange && currentClefTick > 0) {
 										firstNoteSinceClefChange = true;
@@ -1248,7 +1259,6 @@ MuseScore {
 									}
 									
 									// ************ CHECK ARTICULATION ON TIED NOTES ********** //
-									var theArticulationArray = getArticulations(noteRest);
 									if (flaggedStaccatoOnShortDecayInstrumentBarNum > 0 && flaggedStaccatoOnShortDecayInstrumentBarNum < currentBarNum - 4) flaggedStaccatoOnShortDecayInstrumentBarNum = 0;
 									if (theArticulationArray.length > 0) {
 										lastArticulationTick = currTick;
@@ -1295,7 +1305,9 @@ MuseScore {
 											}
 											if (isTiedBack && doCheckSlursAndTies && !hasStaccato && !hasHarmonic) addError("This note has articulation in the middle of a tie.\nDid you mean that to be slurred instead?",noteRest);
 										}
-										if (!hasHarmonic && wasHarmonic && !isHorn) {
+										var chordsIdentical = false;
+										if (prevNoteRest != null) chordsIdentical = chordsAreIdentical(prevNoteRest, noteRest);
+										if (!hasHarmonic && wasHarmonic && !isHorn && chordsIdentical) {
 											hasHarmonic = true;
 											addError ("Put harmonic circles on all notes in a tied harmonic.",noteRest);
 										}
@@ -1326,8 +1338,7 @@ MuseScore {
 									isChord = nn > 1;
 									
 									if (doCheckWindsAndBrass && isChord && isWindOrBrassInstrument && !isSharedStaff && !flaggedPolyphony) {
-										addError ('This is a chord in a monophonic instrument.\nIf this is not a multiphonic, is this an error?',noteRest);
-										flaggedPolyphony = true;
+										checkMultiphonic (noteRest);
 									}
 									
 									// ************ CHECK WHETHER CHORD NOTES ARE TIED ************ //
@@ -1435,6 +1446,8 @@ MuseScore {
 								checkKeySignature(elem,cursor.keySignature);
 							}
 						}
+						prevNoteRest = noteRest;
+						prevNoteRests[currentTrack] = noteRest;
 						if (isNote) {
 							prevNote = noteRest;
 							prevNotes[currentTrack] = noteRest;
@@ -3558,11 +3571,10 @@ MuseScore {
 		if (hairpinStartsOnRest && !isGrandStaff[cursor.staffIdx]) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);		
 		var startOffset = Math.abs(currentHairpin.offset.x);
 		var endOffset = currentHairpin.userOff2.x;
-		//logError ("off: "+startOffset+" "+endOffset);
-		var m = 1.0;
-		if (startOffset >= m && endOffset < m) addError ("This hairpin’s start has been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
-		if (startOffset < m && endOffset >= m) addError ("This hairpin’s end has been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
-		if (startOffset >= m && endOffset >= m) addError ("This hairpin’s start &amp; end have been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
+		var maxOffset = 1.5;
+		if (startOffset >= maxOffset && endOffset < maxOffset) addError ("This hairpin’s start has been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
+		if (startOffset < maxOffset && endOffset >= maxOffset) addError ("This hairpin’s end has been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
+		if (startOffset >= maxOffset && endOffset >= maxOffset) addError ("This hairpin’s start &amp; end have been moved from the default.\nThis may result in poor positioning if bars are resized.\nSelect the hairpin and press "+cmdKey+"-R.",currentHairpin);
 		
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = cursor.staffIdx;
@@ -3646,7 +3658,7 @@ MuseScore {
 	// **** 															**** //
 	// ********************************************************************* //
 	
-	function checkArticulation (noteRest, theArticulationArray) {
+	function checkArticulation (noteRest) {
 		
 		var numArtic = theArticulationArray.length;
 		
@@ -5928,7 +5940,6 @@ MuseScore {
 		}
 		if (numNotes < 2) numDoubleStopsInSequence = 0;
 		
-		var prevNoteRest = getPreviousNoteRest(chord);
 		var prevIsChord = (prevNoteRest == null) ? false : (prevNoteRest.type == Element.CHORD);
 		
 		if (numNotes > 4) {
@@ -6072,7 +6083,6 @@ MuseScore {
 		var diamondNoteheads = [NoteHeadGroup.HEAD_DIAMOND, NoteHeadGroup.HEAD_DIAMOND_OLD, NoteHeadGroup.HEAD_MI];
 		if (noteRest.notes[0].tieBack) return;
 		isStringHarmonic = false;
-		var theArticulationArray = getArticulations(noteRest);
 		var numNotes = 0;
 		var theNotes = [];
 		
@@ -6237,7 +6247,6 @@ MuseScore {
 		if (currentStaffNum == lastPizzIssueStaff && currentBarNum - lastPizzIssueBar < 5) return;
 		
 		// check staccato		
-		var theArticulationArray = getArticulations(noteRest);
 		if (theArticulationArray.length > 0) {
 			for (var i = 0; i < theArticulationArray.length; i++) {
 				if (theArticulationArray[i].visible) {
@@ -6275,6 +6284,22 @@ MuseScore {
 			return;
 		}
 		
+	}
+	
+	function checkMultiphonic (noteRest) {
+		var isHarmonicCircle = false;
+		for (var i = 0; i < theArticulationArray.length; i++) {
+			if (theArticulationArray[i].symbol == SymId.stringsHarmonic) {
+				if (theArticulationArray[i].visible) {
+					isHarmonicCircle = true;
+					break;
+				}
+			}
+		}
+		if (!isHarmonicCircle) {
+			addError ('This is a chord in a monophonic instrument.\nIf this is not a multiphonic, is this an error?',noteRest);
+			flaggedPolyphony = true;
+		}
 	}
 	
 	
@@ -6404,7 +6429,6 @@ MuseScore {
 			}
 			
 			if (!isStartOfSlur && !isEndOfSlur) {
-				var theArticulationArray = getArticulations(noteRest);
 				if (theArticulationArray.length > 0) {
 					for (var i = 0; i < theArticulationArray.length; i++) {
 						if (theArticulationArray[i].visible) {
@@ -6903,7 +6927,6 @@ MuseScore {
 			flaggedFlz = true;
 		}
 		var hasStaccato = false;
-		var theArticulationArray = getArticulations(noteRest)
 		for (var i = 0; i < theArticulationArray.length; i++) {
 			if (theArticulationArray[i].visible) {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) {
@@ -6966,7 +6989,6 @@ MuseScore {
 		}
 		
 		var hasStaccato = false;
-		var theArticulationArray = getArticulations(noteRest);
 		for (var i = 0; i < theArticulationArray.length; i++) {
 			if (theArticulationArray[i].visible) {
 				if (staccatoArray.includes(theArticulationArray[i].symbol)) {

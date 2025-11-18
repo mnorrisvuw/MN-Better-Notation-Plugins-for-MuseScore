@@ -385,6 +385,7 @@ MuseScore {
 
 	function selectNone () {
 		cmd('escape');
+		cmd('escape');
 	}
 	
 	function checkTransposingInstruments() {
@@ -417,10 +418,9 @@ MuseScore {
 		var accidentals = ["bb",kFlatStr,kNaturalStr,kSharpStr,"x"];
 		var accidentalNames = ["double flat","flat","natural","sharp","double sharp"];
 		var isBadAcc = false;
-		var isProblematic, accidentalName, currentAccidental, prevAccidental;
+		var isProblematic, currentAccidental, prevAccidental;
 		var notes = chord.notes;
 		var numNotes = notes.length;
-		var numAccidentals = 0;
 		var newNoteLabel = '';
 
 		prevPrevNoteHighlighted = prevNoteHighlighted;
@@ -428,13 +428,11 @@ MuseScore {
 		thisNoteHighlighted = false;
 		
 		var currTick = theSegment.tick;
-		var measure = theSegment.parent;
-		var staff = theSegment.staff;
 		var staffIdx = Math.trunc (chord.track / 4);
 		var currClef = clefAtTick(staffIdx, currTick);
 		checkClef (currClef);
 		
-		for (var i = 0; i < numNotes; i ++) {				
+		for (var i = 0; i < numNotes; i ++) {
 			var note = notes[i];
 
 			/// ** GET INFO ON EACH NOTE IN THE CHORD  ** //
@@ -442,23 +440,22 @@ MuseScore {
 			var acc = 0;
 			var accVisible = false;
 			var isDoubleAcc = false;
+			var isMicrotone = false;
 			
-			// NOTE: MIDI Pitch is *sounding* pitchj
+			// NOTE: note.itch is *sounding* pitchj
 			var soundingPitch = note.pitch;
 			var writtenPitch = soundingPitch - transpositionInterval.chromatic;
-			//logError ('soundingPitch = '+soundingPitch+'; writtenPitch = '+writtenPitch);
-			var tpc = note.tpc;
+			var tpc = note.tpc; // tpc of written pitch
 
 			if (note.accidental == null) {
-				accType = accTypes[tpc2alter(tpc)+3];
+				accType = accTypes[tpc2alter(tpc)+3]; // if no visible accidental, use the tpc to work it out
 			} else {
 				accObject = note.accidental; // accObject is the Accidental Object itself
 				accVisible = accObject.visible; // accVisible is whether the accidental is visible
 				accType = note.accidentalType; // this is an int from the Accidental enum
+				isMicrotone = accType > Accidental.SHARP_SHARP;
 				if (accVisible) lastAccidentalBarNum = currentBarNum;
-				if (accObject.accidentalBracket > 0) {
-					addError ('It is unnecessary to use a bracket for a courtesy accidental.\nSee ‘Behind Bars’, p. 83.',accObject);
-				}
+				if (accObject.accidentalBracket > 0) addError ('It is unnecessary to use a bracket for a courtesy accidental.\nSee ‘Behind Bars’, p. 83.',accObject);
 			}
 			
 			switch (accType) {
@@ -480,10 +477,10 @@ MuseScore {
 			
 			// ***** CALCULATE THE PITCH INFORMATION ***** //
 			var dpArray = pitch2absStepByKey (writtenPitch, tpc, currentKeySig);
-			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, octave, alteration, where middle C is 
+			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, where middle C is 35
 			var diatonicPitchClass = diatonicPitch % 7; // step from 0 (C) to 6 (B)
 			
-			//if (currentStaffNum == 3 && currentBarNum > 60 && currentBarNum < 70) logError('staffIdx='+staffIdx+'; MIDIPitch='+MIDIPitch+'; dp='+diatonicPitch+'; pdp='+prevDiatonicPitch+'; dpc='+diatonicPitchClass);
+			//if (currentStaffNum == 3 && currentBarNum > 60 && currentBarNum < 70) logError('staffIdx='+staffIdx+'; writtenPitch='+writtenPitch+'; dp='+diatonicPitch+'; pdp='+prevDiatonicPitch+'; dpc='+diatonicPitchClass);
 
 			var accInKeySig = false;
 			if (currentKeySig == 0 && accType == Accidental.NATURAL) accInKeySig = true;
@@ -539,7 +536,7 @@ MuseScore {
 					// ****		b) if the previous accidental was not a grace note
 					// ****		c) the accidental does not have a bracket around it
 					var otherAccFlags = accVisible && !wasGraceNote[diatonicPitchClass] && accObject.accidentalBracket == 0;
-					if ((situation1 || situation2 || situation3 ) && otherAccFlags) {
+					if ((situation1 || situation2 || situation3 ) && otherAccFlags && !isMicrotone) {
 						addError("This was already a "+accidentalNames[acc+2]+".",note);
 						//logError (situation1+' '+situation2+' '+situation3+' '+otherAccFlags);
 					}
@@ -622,7 +619,7 @@ MuseScore {
 						
 						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
 						if (prevPrevWrittenPitch != -1) {
-							//logError(prevprevWrittenPitch = "+prevprevWrittenPitch+"); prevWrittenPitch="+prevWrittenPitch+" MIDIPitch="+MIDIPitch;
+							//logError(prevprevWrittenPitch = "+prevprevWrittenPitch+"); prevWrittenPitch="+prevWrittenPitch+" writtenPitch="+writtenPitch;
 							if (prevWrittenPitch - prevPrevWrittenPitch == 1 && writtenPitch - prevWrittenPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
 								//logError(Found Chromatic Ascent");
 								
@@ -684,6 +681,7 @@ MuseScore {
 						// **** THOUGH NOT IF CURRENT INTERVAL IS A TRITONE ****
 						
 						doShowError = isAugDim && prevIsAugDim && !(isTritone && prevIsTritone);
+						//logError ('barNum = '+currentBarNum+'; doShowError = '+doShowError+'; isAugDim = '+isAugDim+'; prevIsAugDim = '+prevIsAugDim+'; isTritone = '+isTritone+'; prevIsTritone = '+prevIsTritone);
 						
 						// **** EXCEPTIONS
 						// **** IGNORE AUG UNISON IF FOLLOWED BY ANOTHER ONE OR A TRITONE
@@ -726,7 +724,7 @@ MuseScore {
 						
 						if (doShowError) {
 							
-							//logError('***** SHOW ERROR because isAugDim='+isAugDim+'; prevIsAugDim='+prevIsAugDim+'; midipitch='+MIDIPitch+'; username='+note.userName()+'; tpc='+tpc+'; prevWrittenPitch='+prevWrittenPitch+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch);
+							//logError('***** SHOW ERROR @ '+theSegment.tick+'; writtenPitch='+writtenPitch+'; acc='+acc+'; tpc='+tpc+'; prevWrittenPitch='+prevWrittenPitch+'; dpc = '+diatonicPitchClass+'; cic='+chromaticIntervalClass+'; pcic='+prevChromaticIntervalClass+'; dp='+diatonicPitch+'; pdp = '+prevDiatonicPitch+'; whichNoteToRewrite = '+whichNoteToRewrite);
 															
 							// DOES THIS OR PREV GO AGAINST THE WEIGHT?
 							scalarIntervalLabel = intervalNames[scalarIntervalAbs];
@@ -785,7 +783,7 @@ MuseScore {
 								}
 								//logError('Choosing prev note: theAccToChange='+theAccToChange+' pc2change='+thePitchClassToChange);
 							}
-							
+							//logError ('theAccToChange = '+theAccToChange);
 							var j = 0;
 							switch (theAccToChange) {
 								case -2:
@@ -817,6 +815,8 @@ MuseScore {
 									break;
 					
 								case 0:
+									//logError ('currentLabel = '+pitchLabels[thePitchClassToChange]);
+
 									if (flatten) {
 										j = thePitchClassToChange - 1;
 										if (j < 0) j += 7;
@@ -824,6 +824,7 @@ MuseScore {
 										j = (thePitchClassToChange + 1) % 7;
 									}
 									newNotePitch = pitchLabels[j];
+									//logError ('flatten = '+flatten+'; newNotePitch = '+newNotePitch);
 									if (flatten) {
 										if (newNotePitch === "E" || newNotePitch === "B") {
 											newNoteAccidental = kSharpStr;
@@ -871,9 +872,14 @@ MuseScore {
 								if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
 								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
 							}
-							
-							if (doShowError && !changeIsBad) {
-								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+". (Select the note and press J until you get this "+newNoteLabel+")";
+							if (changeIsBad) {
+								//logError ('changeIsBad because newNoteLabel = '+newNoteLabel);
+								doShowError = false;
+								prevNoteHighlighted = false;
+								prevPrevNoteHighlighted = false;
+								thisNoteHighlighted = false;
+							} else {
+								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press J until you get this "+newNoteLabel+")";
 								if (weightingIsClose && scalarIntervalAbs != 0) t = "[SUGGESTION] "+t+"\n\n[Note: The current spelling may in fact be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.";
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
@@ -898,42 +904,51 @@ MuseScore {
 					noteToHighlight = note;
 					newNotePitch = "";
 					var j = 0;
-					
 					switch (theAccToChange) {
+						
+						// double flat
 						case -2:
 							j = thePitchClassToChange - 1;
-							if (j < 0) j = j + 7;
+							if (j < 0) j += 7;
 							newNotePitch = pitchLabels[j];
+							// Cbb → Bb; Fbb → Eb
 							if (newNotePitch === "B" || newNotePitch === "E") {
 								newNoteAccidental = kFlatStr;
 							} else {
 								newNoteAccidental = kNaturalStr;
 							}
 							break;
+							
+						// flat
 						case -1:
 							j = thePitchClassToChange - 1;
-							if (j < 0) i += 7;
+							if (j < 0) j += 7;
 							newNotePitch = pitchLabels[j];
+							// Cb → B; Fb → E
 							if (newNotePitch === "B" || newNotePitch === "E") {
 								newNoteAccidental = kNaturalStr;
 							} else {
 								newNoteAccidental = kSharpStr;
 							}
 							break;
-			
+						
+						// sharp
 						case 1:
 							j = (thePitchClassToChange + 1) % 7;
 							newNotePitch = pitchLabels[j];
+							// E# → F; B# → C
 							if (newNotePitch === "F" || newNotePitch === "C") {
 								newNoteAccidental = kNaturalStr;
 							} else {
 								newNoteAccidental = kFlatStr;
 							}
 							break;
-			
+						
+						// double sharp
 						case 2:
 							j = (thePitchClassToChange + 1) % 7;
 							newNotePitch = pitchLabels[j];
+							// E## → F#; B## → C#
 							if (newNotePitch === "F" || newNotePitch === "C") {
 								newNoteAccidental = kSharpStr;
 							} else {
@@ -1133,7 +1148,7 @@ MuseScore {
 		if (eType == Element.BEAM) {
 			// In MS 4.6 currently, there's no way to get the tick of a beam, or to get its child elements to get their ticks
 			// as such, we should probably avoid highlighting beams until this is fixed
-			logError ('Found beam: tick = '+e.tick);
+			//logError ('Found beam: tick = '+e.tick);
 		}
 		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
 		if (e.spanner != undefined) {
@@ -1176,7 +1191,7 @@ MuseScore {
 		
 		var firstStaffNum = 0;
 		var comments = [];
-		var commentPages = [];
+		//var commentPages = [];
 		var commentPageNumbers = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
@@ -1377,6 +1392,33 @@ MuseScore {
 					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth + 10.0;
 					offy[i] += 4.0;
 				}
+				
+				// check comment box is not covering the element
+				var dontMove = [Element.HBOX, Element.VBOX, Element.TBOX, Element.FBOX, Element.MEASURE, Element.STAFF, Element.KEYSIG, Element.TIMESIG, Element.SYSTEM];
+				if (!isString && !dontMove.includes(eType)) {
+					var r1x = placedX + offx[i];
+					var r1y = placedY + offy[i];
+					var r1r = r1x + commentWidth;
+					var r1b = r1y + commentHeight;
+					var margin = commentOffset;
+					var r2x = element.pagePos.x - margin;
+					var r2y = element.pagePos.y - margin;
+					var r2r = r2x + element.bbox.width + 2 * margin;
+					var r2b = r2y + element.bbox.height + 2 * margin;
+					/*if (element.type == Element.SLUR_SEGMENT) {
+						logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1r)+" "+Math.floor(r1b)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2r)+" "+Math.floor(r2b)+"}");
+					}*/
+					//logError ("Comment at: {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\nElement at: {"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
+					var overlaps = (r1x <= r2r) && (r1r >= r2x) && (r1y <= r2b) && (r1b >= r2y);
+					var repeats = 0;
+					while (overlaps && repeats < 12) {
+						offy[i] -= commentOffset;
+						r1y -= commentOffset;
+						r1b -= commentOffset;
+						repeats ++;
+						overlaps = (r1x <= r2r) && (r1r >= r2x) && (r1y <= r2b) && (r1b >= r2y);
+					}
+				}
 	
 				// check to see if this comment has been placed too close to other comments
 				var maxOffset = 10;
@@ -1395,7 +1437,7 @@ MuseScore {
 				for (var k = 0; k < i; k++) {
 					var otherComment = comments[k];
 					var otherCommentPageNumber = commentPageNumbers[k];
-					var otherCommentPage = pages[k];
+					//var otherCommentPage = pages[k];
 					var otherCommentX = otherComment.pagePos.x + offx[k];
 					var otherCommentY = otherComment.pagePos.y + offy[k];
 					var actualCommentX = placedX + offx[i];
@@ -1435,32 +1477,8 @@ MuseScore {
 							}
 						}
 					}
-					// check comment box is not covering the element
-					/* CAN'T DO JUST YET AS SLUR_SEGMENT.pagePos is returning wrong info
-					if (!isString) {
-						var r1x = comment.pagePos.x;
-						var r1y = comment.pagePos.y;
-						var r1w = commentWidth;
-						var r1h = commentHeight;
-						var r2x = element.pagePos.x;
-						var r2y = element.pagePos.y;
-						var r2w = element.bbox.width;
-						var r2h = element.bbox.height;
-						if (element.type == Element.SLUR_SEGMENT) {
-							logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-						}
-						
-						var overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-						var repeats = 0;
-						while (overlaps && repeats < 20) {
-							logError ("Element: "+element.subtypeName()+" repeat "+repeats+": {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
-							comment.offsetY -= commentOffset;
-							r1y -= 1.0;
-							repeats ++;
-							overlaps = (r1x <= r2x + r2w) && (r1x + r1w >= r2x) && (r1y <= r2y + r2h) && (r1y + r1h >= r2y);
-						}
-					} */
 				}
+				
 				if (checkObjectPage && commentPageNumber != objectPageNumber) comment.text = '[The object this comment refers to is on p. '+(objectPageNumber+1)+']\n' +comment.text;
 			}
 		}
