@@ -3179,7 +3179,7 @@ MuseScore {
 			if ((pageEvenTopMargin > maxTBMargin) + (pageOddTopMargin > maxTBMargin) + (pageEvenBottomMargin > maxTBMargin) + (pageOddBottomMargin > maxTBMargin)) pageSettingsComments.push("Decrease your top and bottom margins to "+maxTBMargin+"mm");
 		
 			// **** TEST 1B: CHECK STAFF SIZE ****
-			logError ("numVisibleStaves = "+numVisibleStaves);
+			//logError ("numVisibleStaves = "+numVisibleStaves);
 			var maxSize = 6.8;
 			var minSize = 6.5;
 			if (numVisibleStaves == 2) {
