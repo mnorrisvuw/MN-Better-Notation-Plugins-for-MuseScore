@@ -172,6 +172,7 @@ MuseScore {
 	// ** PARTS ** //
  	property var isGrandStaff: []
 	property var isTopOfGrandStaff: []
+	property var isBottomOfGrandStaff: false
 	property var numGrandStaves: []
 	property var grandStaffTops: []
 	property var numParts: 0
@@ -220,6 +221,7 @@ MuseScore {
 	property var lastMetronomeComponent: ''
 	property var numConsecutiveMusicBars: 0
 	property var currentStaffNum: 0
+	property var staffNumToCheckForDynamics: 0
 	property var currentStaff: null;
 	property var currentTrack: 0
 	property var currentTimeSig: null
@@ -802,7 +804,8 @@ MuseScore {
 			isArco = true;
 			currentWord = '';
 			currentWordArray = [];
-			
+			isBottomOfGrandStaff = isGrandStaff[currentStaffNum] && !isTopOfGrandStaff[currentStaffNum];
+			staffNumToCheckForDynamics = getStaffNumToCheckForDynamics();
 			lastMetronomeComponent = '';
 			lastMetronomeMarking = null;
 			lastMetronomeMarkingBar = -1;
@@ -824,7 +827,7 @@ MuseScore {
 			currentDynamicNum = -1;
 			currentDynamic = null;
 			nextDynamicTick = -1;
-			numDynamics = dynamics[currentStaffNum].length;
+			numDynamics = dynamics[staffNumToCheckForDynamics].length;
 			
 			// *** DO THIS AFTER CHECKING THE INSTRUMENT *** //
 			if (numDynamics == 0) {
@@ -836,6 +839,7 @@ MuseScore {
 				if (nextDynamicTick == 0) {
 					currentDynamic = nextDynamic;
 					currentDynamicNum ++;
+					firstDynamic = true;
 					checkTextObject(currentDynamic);
 					getNextDynamic();
 				}
@@ -885,10 +889,8 @@ MuseScore {
 			currentPedalNum = 0;
 			currentPedalEnd = -1;
 			prevPedalEnd = -1;
-			pedalStaffNum = currentStaffNum;
+			pedalStaffNum = staffNumToCheckForDynamics;
 			// for grand staff instruments, pedals are attached to the top staff
-			// if this is a grand staff stave, but not the top one, then go upwards until we find the top one
-			while (isGrandStaff[pedalStaffNum] && !isTopOfGrandStaff[pedalStaffNum] && pedalStaffNum >= 0) pedalStaffNum --;
 			numPedals = pedals[pedalStaffNum].length;
 			nextPedalStart = (numPedals == 0) ? 0 : pedals[pedalStaffNum][0].spanner.spannerTick.ticks;
 			
@@ -1042,7 +1044,7 @@ MuseScore {
 				if (currentBarNum % 2 > 0) flaggedFastMultipleStops = false;	
 			
 				// ************ CHECK HARP ISSUES ************ //
-				if (isHarp && (isTopOfGrandStaff[currentStaffNum] || !isGrandStaff[currentStaffNum])) checkHarpIssues();
+				if (isHarp && isTopOfGrandStaff[currentStaffNum]) checkHarpIssues();
 				
 				// ************ CHECK UNTERMINATED TEMPO CHANGE (e.g. rit/accel without a final tempo marking) ************ //
 				if (doCheckTempoMarkings) {
@@ -1201,26 +1203,33 @@ MuseScore {
 								if (flaggedOttavaTooHigh) if (flaggedOttavaTooHighBarNum < currentBarNum - 4) flaggedOttavaTooHigh = false;
 								
 								// ************ CHECK EXPRESSIVE DETAIL (DYNAMICS) ********** //
-								if (doCheckExpressiveDetail && !isGrandStaff[currentStaffNum]) {
+								if (doCheckExpressiveDetail && !isBottomOfGrandStaff) {
 									if (lastDynamicTick < currTick - division * 32 && numConsecutiveMusicBars >= 8 && isNote) {
 										lastDynamicTick = currTick + 1;
-										addError("This passage has had no dynamic markings for the last 8 or more bars.\nConsider adding more dynamic detail to this passage.",noteRest);
+										addError("This passage has had no dynamic markings for the last 8 or more bars.\nConsider adding more dynamic detail to this passage.",currentBar);
+									}
+								}
+								
+								// ************ CHECK DYNAMICS WITH SIGNIFICANT HORIZONTAL OFFSETS 	********** //
+								
+								var maxDynamicOffset = 1.5;
+								if (doCheckDynamics && tickHasDynamic()) {
+									if (theDynamic.offsetX < -maxDynamicOffset) {
+										addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+									} else {
+										if (theDynamic.offsetX > maxDynamicOffset) {
+											addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+										}
 									}
 								}
 								
 								if (isRest) {
 									
-									// ************ CHECK DYNAMICS WITH SIGNIFICANT HORIZONTAL OFFSETS 	********** //
-									// ************ AND DYNAMICS UNDER RESTS							********** //
-									if (doCheckDynamics && tickHasDynamic() && !isGrandStaff[currentStaffNum]) {
-										if (theDynamic.offsetX < -1.5) {
-											addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
-										} else {
-											if (theDynamic.offsetX > 1.5) {
-												addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
-											} else {
-												if (allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic markings under rests.", theDynamic);
-											}
+									// ************ CHECK DYNAMICS UNDER RESTS ********** //
+									if (doCheckDynamics && tickHasDynamic()) {
+										if (theDynamic.offsetX > -maxDynamicOffset && theDynamic.offsetX < maxDynamicOffset) {
+											// TO DO: CHECK ALL STAVES OF GRAND STAFF INSTRUMENT
+											if (!isBottomOfGrandStaff && allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic\nmarkings under rests.", theDynamic);
 										}
 									}
 									maxLLSinceLastRest = 0;
@@ -1253,7 +1262,6 @@ MuseScore {
 									if (!firstNoteSinceClefChange && currentClefTick > 0) {
 										firstNoteSinceClefChange = true;
 										var ticksSinceLastClef = currTick - currentClefTick;
-										//logError ('firstNote: ticksSinceLastClef = '+ticksSinceLastClef+'; isEndOfBarClef = '+isEndOfBarClef+'; currentBarNum = '+currentBarNum+'; currentClefBarNum = '+currentClefBarNum);
 										if (isMidBarClef && ticksSinceLastClef >= division) addError ('Try moving this mid-bar clef closer to the next note.',currentClef);
 										if (isEndOfBarClef && currentBarNum != currentClefBarNum) addError ('Don’t put a clef before an empty bar.\nTry moving it closer to the next note.',currentClef);
 									}
@@ -1270,14 +1278,11 @@ MuseScore {
 													if (staccatoArray.includes(theArticulationArray[i].symbol)) numStaccatos++;
 												}
 											}
-											if (numStaccatos > 0) checkStaccatoIssues (noteRest);
-											if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
+											if (numStaccatos > 0) checkStaccatoIssues (noteRest, numStaccatos);
 											if (isSforzando){
 												var isAccented = false;
 												for (var i = 0; i < theArticulationArray.length && !isAccented; i++) {
-													if (theArticulationArray[i].visible) {
-														isAccented = accentsArray.includes(theArticulationArray[i].symbol);
-													}
+													if (theArticulationArray[i].visible) isAccented = accentsArray.includes(theArticulationArray[i].symbol);
 												}
 												if (!isAccented) addError("This note is marked as some kind of sforzando,\nbut has no accent articulation. Consider\nadding an accent to aid the performer.",noteRest);
 											}
@@ -1287,7 +1292,7 @@ MuseScore {
 											if (lastArticulationTick < currTick - division * 32 && numConsecutiveMusicBars >= 8) {
 												if (isStringInstrument || isWindOrBrassInstrument) {
 													lastArticulationTick = currTick + 1;
-													addError("This passage has had no articulation for the 8 or more bars.\nConsider adding more detail to this passage.",noteRest);
+													addError("This passage has had no articulation for the 8 or more bars.\nConsider adding more detail to this passage.",currentBar);
 												}
 											}
 											if (isSforzando) addError("This note is marked as some kind of sforzando,\nbut has no accent articulation. Consider\nadding an accent to aid the performer.",noteRest);
@@ -1404,6 +1409,18 @@ MuseScore {
 									// ************ CHECK RANGE ************ //
 									if (doCheckRangeRegister) checkInstrumentRange(noteRest);
 									
+									// ************ CHECK DYNAMIC ISSUES ************ //
+
+									if (isFirstNote) {
+										isFirstNote = false;
+										//logError ('first note — firstDynamic = '+firstDynamic);
+										// ************ CHECK IF INITIAL DYNAMIC SET ************ //
+										if (doCheckDynamics && !firstDynamic) addError("This note should have an initial dynamic.\n(If there is in fact a dynamic underneath, it\nmay be too far to the right.)",noteRest);
+									} else {
+										// ************ CHECK DYNAMIC RESTATEMENT ************ //
+										if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic() && !isBottomOfGrandStaff ) addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
+									}
+									
 									prevBarNum = currentBarNum;
 								
 								} // end is rest
@@ -1418,16 +1435,7 @@ MuseScore {
 							} // end if eType == Element.Chord || .Rest
 							
 							if (isNote) {
-								if (isFirstNote) {
-									isFirstNote = false;
-									// ************ CHECK IF INITIAL DYNAMIC SET ************ //
-									if (doCheckDynamics && !firstDynamic && !isGrandStaff[currentStaffNum]) addError("This note should have an initial dynamic level set.\n(If there is a dynamic underneath, it may be too far to the right.)",noteRest);
 								
-								} else {
-								
-									// ************ CHECK DYNAMIC RESTATEMENT ************ //
-									if (doCheckDynamics && barsSincePrevNote > 4 && !tickHasDynamic() && !isGrandStaff[currentStaffNum] ) addError("Restate a dynamic here, after the "+(barsSincePrevNote-1)+" bars’ rest.",noteRest);
-								}
 							}
 						}
 						
@@ -1769,19 +1777,20 @@ MuseScore {
 				if (currTick >= nextDynamicTick) {
 					currentDynamic = nextDynamic;
 					currentDynamicNum ++;
-					checkTextObject(currentDynamic);
-					//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic()+'; firstDynamic = '+firstDynamic);
-					if (currTick == nextDynamicTick && isNote) {
-						if (noteRest.actualDuration.ticks < division) {
-							var loudArray = ['dynamicForte','dynamicSforzando','dynamicZ','sf'];
-							var isLoud = false, isSoft = false;
-							for (var i = 0; i < loudArray.length && !isLoud; i++) isLoud = nextDynamic.text.includes(loudArray[i]);
-							var softArray = ['dynamicPiano'];
-							
-							for (var i = 0; i < softArray.length && !isSoft; i++) isSoft = nextDynamic.text.includes(softArray[i]);
-							//logError (nextDynamic.text+' isLoud:'+isLoud+' isSoft:'+isSoft);
-							if (isLoud && isSoft) {
-								addError ("This is a compound dynamic with loud and soft elements,\nwhich doesn’t make sense for a short note.\nConsider lengthening the note or changing the dynamic.",nextDynamic);
+					firstDynamic = true;
+					if (staffNumToCheckForDynamics == currentStaffNum) {
+						checkTextObject(currentDynamic);
+						//logError ('checking dynamic at '+nextDynamicTick+' (currtick = '+currTick+') tickHasDynamic is now '+tickHasDynamic()+'; firstDynamic = '+firstDynamic);
+						if (currTick == nextDynamicTick && isNote) {
+							if (noteRest.actualDuration.ticks < division) {
+								var loudArray = ['dynamicForte','dynamicSforzando','dynamicZ','sf'];
+								var isLoud = false, isSoft = false;
+								for (var i = 0; i < loudArray.length && !isLoud; i++) isLoud = nextDynamic.text.includes(loudArray[i]);
+								var softArray = ['dynamicPiano'];
+								
+								for (var i = 0; i < softArray.length && !isSoft; i++) isSoft = nextDynamic.text.includes(softArray[i]);
+								//logError (nextDynamic.text+' isLoud:'+isLoud+' isSoft:'+isSoft);
+								if (isLoud && isSoft) addError ("This is a compound dynamic with loud and soft elements,\nwhich doesn’t make sense for a short note.\nConsider lengthening the note or changing the dynamic.",nextDynamic);
 							}
 						}
 					}
@@ -1937,6 +1946,14 @@ MuseScore {
 		}
 	}
 	
+	function getStaffNumToCheckForDynamics() {
+		if (!isGrandStaff[currentStaffNum] || isTopOfGrandStaff[currentStaffNum]) return currentStaffNum;
+		for (var i = currentStaffNum - 1; i >= 0; i--) {
+			if (isTopOfGrandStaff[currentStaffNum]) return currentStaffNum;
+		}
+		return 0;
+	}
+	
 	function getNoteRestAtTick(targetTick) {
 		// get the measure
 		var theMeasure = curScore.tick2measure(fractionFromTicks(targetTick));
@@ -2034,7 +2051,7 @@ MuseScore {
 	
 	function getNextDynamic () {
 		if (currentDynamicNum < numDynamics-1) {
-			nextDynamic = dynamics[currentStaffNum][currentDynamicNum+1];
+			nextDynamic = dynamics[staffNumToCheckForDynamics][currentDynamicNum+1];
 			if (nextDynamic == null || nextDynamic == undefined) {
 				logError ('nextDynamic was '+nextDyanmic);
 			} else {
@@ -2302,9 +2319,14 @@ MuseScore {
 			// *** FERMATAS, DYNAMICS & CLEFS *** //
 			if (etype == Element.FERMATA) fermatas[staffIdx].push(e);
 			if (etype == Element.DYNAMIC) {
-				dynamics[staffIdx].push(e);
+				var staffNum = staffIdx;
+				if (isGrandStaff[staffIdx]) {
+					// push into the top staff only of grand staves, so we can pick it up
+					while (staffNum > 0 && !isTopOfGrandStaff[staffNum]) staffNum --;
+				}
+				dynamics[staffNum].push(e);
 				var theTick = e.parent.tick;
-				dynamicTicks[staffIdx][theTick] = e;
+				dynamicTicks[staffNum][theTick] = e;
 			}
 			if (etype == Element.CLEF) clefs[staffIdx].push(e);
 			
@@ -2312,6 +2334,17 @@ MuseScore {
 		
 		// sort the tempo text array
 		tempoText.sort( orderTempoText );
+		
+		// sort the dynamics array — could sort other things here too
+		for (var i = 0; i < numStaves; i++) {
+			dynamics[i].sort (orderByTick);
+		}
+	}
+	
+	function orderByTick (a, b) {
+		var aTick = getTick (a);
+		var bTick = getTick (b);
+		return aTick - bTick;
 	}
 	
 	function orderTempoText (a, b) {
@@ -2933,7 +2966,7 @@ MuseScore {
 	function checkPartSettings () {
 		var maxSize = 7.0;
 		var minSize = 6.6;
-		//var excerpts = curScore.excerpts;		
+		var excerpts = curScore.excerpts;		
 		if (numExcerpts < 2) return;
 		var styleComments = [];
 		var pageSettingsComments = [];
@@ -3556,12 +3589,24 @@ MuseScore {
 		prevDynamic = '';
 		prevDynamicBarNum = currentBarNum;
 		var hairpinStartTick = currentHairpin.spanner.spannerTick.ticks;	
-		
+		var y = currentHairpin.offsetY;
+		var p = currentHairpin.placement;
 		// **** Check vertical placement of hairpin **** //
 		if (isVoice) {
-			if (currentHairpin.placement == Placement.BELOW) addError ("In vocal staves, hairpins should appear\nabove the staff.", currentHairpin);
+			var isBelow = y > (p == Placement.BELOW ? 0 : 5);
+			if (isBelow) addError ("In vocal staves, hairpins should appear\nabove the staff.", currentHairpin);
 		} else {
-			if (currentHairpin.placement == Placement.ABOVE) addError ("Hairpins should appear\nbelow the staff.",currentHairpin);
+			var isAbove = p == Placement.ABOVE; // can't actually get hairpin above the staff if it's set to auto or below
+			var isBelow = y > (p == Placement.ABOVE ? 5 : 0);
+			if (isGrandStaff[currentStaffNum]) {
+				if (isTopOfGrandStaff[currentStaffNum]) {
+					if (isAbove) addError ("Hairpins should appear between the\nstaves of a grand staff instrument,\nunless it only applies to the top staff.",currentHairpin);
+				} else {
+					if (isBelow) addError ("Hairpins should appear between the\nstaves of a grand staff instrument,\nunless it only applies to the bottom staff.",currentHairpin); 
+				}
+			} else {
+				if (isAbove) addError ("Hairpins should appear\nbelow the staff.",currentHairpin);
+			}
 		}	
 		
 		// **** Does the hairpin start under a rest? **** //
@@ -4984,7 +5029,6 @@ MuseScore {
 					addError ('This dynamic marking is unusual, or has an extraneous character in it somewhere',textObject);
 				}
 				if ((includesADynamic || stringIsDynamic) && elemPage.pagenumber >= firstPageOfMusicNum) {
-					firstDynamic = true;
 
 					theDynamic = textObject;
 					lastDynamicTick = currTick;
@@ -4992,12 +5036,18 @@ MuseScore {
 					
 					// *** Check location of dynamics is correct *** //
 					if (doCheckTextPositions) {
+						var isBelow = false, isAbove = false;
+						var placement = textObject.placement;
 						if (isVoice) {
-							if (textObject.placement == Placement.BELOW ) addError("For vocal staves, dynamics should appear above the staff.\nCheck it is attached to the right staff.",textObject);
+							isBelow = textObject.offsetY > (placement == Placement.BELOW ? 1 : 5);
+							isAbove = textObject.offsetY < (placement == Placement.BELOW ? -4 : 0); 
+							if (isBelow ) addError("For vocal staves, dynamics should appear above the staff.\nCheck it is attached to the right staff.",textObject);
 						} else {
-							if (!isGrandStaff[currentStaffNum]) {
-								if (textObject.placement == Placement.ABOVE) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
-							}
+							isBelow = textObject.offsetY > (placement == Placement.ABOVE ? 5 : 1);
+							isAbove = textObject.offsetY < (placement == Placement.ABOVE ? 0 : -4);
+							if (!isGrandStaff[currentStaffNum] && isAbove) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
+							if (isBottomOfGrandStaff && isBelow) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the bottom staff only.",textObject);
+							if (isTopOfGrandStaff[currentStaffNum] && isAbove) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the top staff only.",textObject);
 						}
 					}
 					
@@ -5106,11 +5156,23 @@ MuseScore {
 	function allTracksHaveRestsAtCurrTick () {
 		
 		var startTrack = currentTrack - (currentTrack % 4);
+		var endTrack = startTrack + 4;
+		if (isTopOfGrandStaff[currentStaffNum]) {
+			var staffNum = currentStaffNum + 1;
+			while (staffNum < numStaves) {
+				if (isGrandStaff[staffNum] && !isTopOfGrandStaff[staffNum]) {
+					endTrack += 4;
+				} else {
+					break;
+				}
+				staffNum ++;
+			}
+		}
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = startTrack / 4;
 		cursor2.filter = Segment.ChordRest;
 		
-		for (var theTrack = startTrack; theTrack < startTrack + 4; theTrack ++) {
+		for (var theTrack = startTrack; theTrack < endTrack; theTrack ++) {
 			cursor2.track = theTrack;
 			cursor2.rewindToTick(currTick);
 			var processingThisBar = true;
@@ -5641,10 +5703,16 @@ MuseScore {
 	// **** 														**** //
 	// ***************************************************************** //
 	
-	function checkStaccatoIssues (noteRest) {
+	function checkStaccatoIssues (noteRest, numStaccatos) {
+		
+		// *** Flag multiple staccatos *** //
+		if (numStaccatos > 1) addError ("It looks like you have multiple staccato dots on this note.\nYou should delete one of them.", noteRest);
 		
 		// *** Flag staccato notes with fermatas over them *** //
-		if (isFermata) 	addError ("Don’t put a fermata over a staccato note.", noteRest);
+		if (isFermata) 	{
+			addError ("Don’t put a fermata over a staccato note.", noteRest);
+			return;
+		}
 		
 		// *** Flag any long notes with staccato dots on them *** //
 		if (noteRest.duration.ticks >= division * 2) {
@@ -5691,12 +5759,12 @@ MuseScore {
 					if (isStringInstrument) {
 						var portatoOK = (pitch == prevPitch || pitch == nextPitch);
 						if (!portatoOK && noteRest.duration.ticks >= division) {
-							addError ("Slurred staccatos are not common as string articulations,\nexcept to mark portato (repeated notes under a slur).\nDid you want to consider rewriting them as legato?",noteRest);
+							addError ("Slow slurred staccatos are not common for strings,\nexcept to mark portato (repeated notes under a slur).\nPerhaps delete the staccato markings?",noteRest);
 							flaggedSlurredStaccatoBar = currentBarNum;
 						}
 					} else {
 						if (isHarp || isPercussion) {
-							addError ('Slurred staccatos don’t really make sense for '+currentInstrumentName.toLowerCase()+'.\nConsider removing the staccato articulations.',noteRest);
+							addError ("Slurred staccatos don’t really make sense for "+currentInstrumentName.toLowerCase()+".\nPerhaps delete the staccato markings.",noteRest);
 						}
 					}
 				}

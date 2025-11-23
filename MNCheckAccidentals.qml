@@ -405,8 +405,9 @@ MuseScore {
 	
 	function checkChord (chord,theSegment,isGraceNote, currentStaff) {
 		//logError("checking chord");
-		
-		var transpositionInterval = currentStaff.transpose(fractionFromTicks(theSegment.tick));
+		var currTick = theSegment.tick;
+
+		var transpositionInterval = currentStaff.transpose(fractionFromTicks(currTick));
 		//logError ('transpositionInterval = '+transpositionInterval.chromatic);
 		var defaultChromaticInterval = [0,2,4,5,7,9,11];
 		var accTypes = [Accidental.FLAT3, Accidental.FLAT2, Accidental.FLAT, Accidental.NATURAL, Accidental.SHARP, Accidental.SHARP2, Accidental.SHARP3];
@@ -427,7 +428,6 @@ MuseScore {
 		prevNoteHighlighted = thisNoteHighlighted;
 		thisNoteHighlighted = false;
 		
-		var currTick = theSegment.tick;
 		var staffIdx = Math.trunc (chord.track / 4);
 		var currClef = clefAtTick(staffIdx, currTick);
 		checkClef (currClef);
@@ -580,6 +580,9 @@ MuseScore {
 				var isAug = false;
 				var isDim = false;
 				var isAugDim = false;
+				var isDoubleAug = false;
+				var isDoubleDim = false;
+				var isDoubleAugDim = false;
 				var isTritone = false;
 				var whichNoteToRewrite = 2;
 				var article, noteToHighlight, theAccToChange, thePitchClassToChange;
@@ -611,14 +614,20 @@ MuseScore {
 						chromaticIntervalAbs = Math.abs(chromaticInterval);
 						chromaticIntervalClass = chromaticIntervalAbs % 12;
 						
-						
-						if (scalarIntervalAbs == 7 && chromaticIntervalClass > 9) chromaticIntervalClass = chromaticIntervalClass - 12;
+						// Expand the chromatic interval class out so we can account for augmented sevenths and weird octaves
+						if ((scalarIntervalAbs == 6 || scalarIntervalAbs == 7) && chromaticIntervalClass < 3) chromaticIntervalClass += 12;
+
+						//if (scalarIntervalAbs == 7 && chromaticIntervalClass > 9) chromaticIntervalClass = chromaticIntervalClass - 12;
+						//logError ('chromaticIntervalAbs = '+chromaticIntervalAbs+'; chromaticIntervalClass = '+chromaticIntervalClass);
+
 						var dci = defaultChromaticInterval[scalarIntervalClass];
 						var alteration = chromaticIntervalClass - dci;
+						
+						//logError ('dci = '+dci+'; chromaticIntervalClass = '+chromaticIntervalClass);
 						isTritone = (chromaticIntervalClass == 6);
 						
 						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
-						if (prevPrevWrittenPitch != -1) {
+						if (prevPrevNote != null) {
 							//logError(prevprevWrittenPitch = "+prevprevWrittenPitch+"); prevWrittenPitch="+prevWrittenPitch+" writtenPitch="+writtenPitch;
 							if (prevWrittenPitch - prevPrevWrittenPitch == 1 && writtenPitch - prevWrittenPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
 								//logError(Found Chromatic Ascent");
@@ -642,14 +651,21 @@ MuseScore {
 						if (isFourthFifthOrUnison) {
 							alterationLabel = perfectIntervalAlts[alteration+3];
 							isDim = alteration < 0;
+							isDoubleDim = alteration < -1;
 							isAug = alteration > 0;
+							isDoubleAug = alteration > 1;
 						} else {
 							alterationLabel = majorIntervalAlts[alteration+3];
+							
+							//logError ("alteration = "+alteration+"; alterationLabel = "+alterationLabel);
 							isDim = alteration < -1;
+							isDoubleDim = alteration < -2;
 							isAug = alteration > 0;
+							isDoubleAug = alteration > 1;
 						}
 						isAugDim = isAug || isDim;
-						//logError("isAugDim: "+isAugDim+" scalarIntervalClass = "+scalarIntervalClass+" alteration = "+alteration+" is450 = "+isFourthFifthOrUnison);
+						isDoubleAugDim = isDoubleAug || isDoubleDim;
+						//logError("isAugDim: "+isAugDim+"; isDoubleAugDim: "+isDoubleAugDim+"; scalarIntervalClass = "+scalarIntervalClass+" alteration = "+alteration+" is450 = "+isFourthFifthOrUnison);
 						
 						// **** IF WE ONLY JUST HIGHLIGHTED A NOTE, THEN DON'T DO ANOTHER ONE JUST YET **** //
 						if (numNotes == 1 && (prevNoteHighlighted || prevPrevNoteHighlighted)) {
@@ -677,11 +693,23 @@ MuseScore {
 							return;
 						}
 						
+						var chordError = false;
+						
+						// **** CHECK MELODIC INTERVAL ISSUE FIRST
 						// **** SHOW AN ERROR IF BOTH THE CURRENT AND PREVIOUS INTERVAL WERE AUG/DIM **** //
 						// **** THOUGH NOT IF CURRENT INTERVAL IS A TRITONE ****
-						
-						doShowError = isAugDim && prevIsAugDim && !(isTritone && prevIsTritone);
+						if (prevPrevNote != null) {
+							var timeSincePrevPrevNote = currTick - getTick(prevPrevNote);
+							if (timeSincePrevPrevNote < 4 * division) doShowError = ((isAugDim && prevIsAugDim) || (isDoubleAugDim)) && !(isTritone && prevIsTritone);
+						}
 						//logError ('barNum = '+currentBarNum+'; doShowError = '+doShowError+'; isAugDim = '+isAugDim+'; prevIsAugDim = '+prevIsAugDim+'; isTritone = '+isTritone+'; prevIsTritone = '+prevIsTritone);
+						
+						// **** IF THIS IS A CHORD, HOWEVER, HIGHLIGHT ANY AUG DIM INTERVALS **** //
+						// **** THOUGH NOT IF CURRENT INTERVAL IS A TRITONE ****
+						if (!doShowError & i > 0) {
+							doShowError = isAugDim && !isTritone;
+							chordError = true;
+						}
 						
 						// **** EXCEPTIONS
 						// **** IGNORE AUG UNISON IF FOLLOWED BY ANOTHER ONE OR A TRITONE
@@ -710,7 +738,7 @@ MuseScore {
 								var w2dist = Math.abs(weightingAverage - weighting2);
 								var w3dist = Math.abs(weightingAverage - weighting3);
 								// rewrite the one that is the most outlying
-								whichNoteToRewrite = 0;
+								whichNoteToRewrite = chordError? 1: 0;
 								if (w2dist > w1dist && w2dist > w3dist) whichNoteToRewrite = 1;
 								if (w3dist > w1dist && w3dist > w2dist) whichNoteToRewrite = 2;
 								var maxWeightingDist = Math.max (w1dist, w2dist, w3dist);

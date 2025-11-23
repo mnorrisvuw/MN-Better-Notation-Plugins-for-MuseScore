@@ -330,7 +330,7 @@ MuseScore {
 					if (instrumentType.includes("strings.")) scoreHasStrings = true;
 					if (instrumentType.includes("wind.")) scoreHasWinds = true;
 					if (instrumentType.includes("brass.")) scoreHasBrass = true;
-					if (instrumentType.includes("voice.")) scoreHasVoice = true;
+					if (instrumentType.includes("voice.")) scoreHasVoices = true;
 				}
 			}
 			// do we need to check the order of grand staff instruments?
