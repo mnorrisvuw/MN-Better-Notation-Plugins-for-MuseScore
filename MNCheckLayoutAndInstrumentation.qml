@@ -803,7 +803,7 @@ MuseScore {
 			isDiv = false;
 			firstDynamic = false;
 			wasHarmonic = false;
-			isArco = true;
+			isArco = isStringInstrument; // default is that strings are arco; all other instruments not (though percussion could be)
 			currentWord = '';
 			currentWordArray = [];
 			isBottomOfGrandStaff = isGrandStaff[currentStaffNum] && !isTopOfGrandStaff[currentStaffNum];
@@ -6548,7 +6548,7 @@ MuseScore {
 	function checkDecayInstrumentIssues(noteRest) {
 		var dur = noteRest.duration.ticks;
 		var n = noteRest.notes[0];
-		
+		//logError ('checking Decay Instrument Issue');
 		// don't check decay instrument issues if this instrument is marked as arco
 		// or if this is a note with a tie going backwards
 		if (isArco || n.tieBack != null) return;
@@ -6559,9 +6559,7 @@ MuseScore {
 			}
 		} else {
 			if (!isPiano) {
-				if ((dur > division * 4 || (dur > division * 3 && isTied)) && !isTremolo && !isTrill) {
-					addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that can’t sustain\nthe same dynamic for very long. Consider shortening it.",noteRest);
-				}
+				if ((dur > division * 4 || (dur > division * 3 && isTied)) && !isTremolo && !isTrill) addError ("This note looks like a long duration without a tremolo or trill,\nwhich may be confusing for an instrument that can’t sustain\nthe same dynamic for very long. Consider shortening it.",noteRest);
 			}
 		}
 		var nextNoteRest = getNextNoteRest(noteRest);
