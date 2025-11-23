@@ -25,6 +25,7 @@ MuseScore {
 	property var firstMeasure: null
 	property var numParts: 0
 	property var numStaves: 0
+	property var numVisibleStaves: 0
 	property var isSoloScore: false
 	property var inchesToMM: 25.4
 	property var mmToInches: 0.039370079
@@ -99,7 +100,8 @@ MuseScore {
 		options.close();
 		updateLayout();
 		numStaves = curScore.nstaves;
-		
+		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) numVisibleStaves ++;
+
 		// *** REMOVE ANY COMMENTS AND HIGHLIGHTS THAT MIGHT BE LEFT OVER FROM OTHER PLUGINS ***
 		getFrames();
 		deleteAllCommentsAndHighlights();
@@ -501,7 +503,7 @@ MuseScore {
 		// change min and max system distance
 		curScore.startCmd();
 		setSetting ("minSystemDistance", 6.0);
-		setSetting ("maxSystemDistance", 9.0);
+		setSetting ("maxSystemDistance", 10.0);
 		var lrMargin = 12.;
 		var tbMargin = 15.;
 		var lrIn = lrMargin*mmToInches;
@@ -522,13 +524,15 @@ MuseScore {
 		// TO DO: SET SPATIUM
 		// **** TEST 1B: CHECK STAFF SIZE ****)
 		var staffSize = 6.8;
-		if (numParts == 2) staffSize = 6.3;
-		if (numParts == 3) staffSize = 6.2;
-		if (numParts > 3 && numParts < 8) staffSize = 5.6 - Math.floor((numParts - 4) * 0.5) / 10.;
-		if (numParts > 7) {
-			staffSize = 5.2 - Math.floor((numParts - 8) * 0.5) / 10.;
+		if (numVisibleStaves == 2) staffSize = 6.3;
+		if (numVisibleStaves == 3) staffSize = 6.2;
+		if (numVisibleStaves > 3 && numVisibleStaves < 8) staffSize = 5.6 - Math.floor((numVisibleStaves - 4) * 0.5) / 10.;
+		if (numVisibleStaves > 7) {
+			staffSize = 5.2 - Math.floor((numVisibleStaves - 8) * 0.5) / 10.;
 			if (staffSize < 3.7) staffSize = 3.7;
 		}
+		
+		
 		var newSpatium = staffSize / 4.0;
 		
 		setSetting ("spatium",newSpatium/inchesToMM*mscoreDPI);

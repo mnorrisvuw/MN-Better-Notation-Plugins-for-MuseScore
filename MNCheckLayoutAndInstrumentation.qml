@@ -179,6 +179,7 @@ MuseScore {
 	property var visibleParts: []
 	property var lastVisibleStaffNum: 0
 	property var numStaves: 0
+	property var numVisibleStaves: 0
 	property var numTracks: 0
 	property var numVoicesInThisBar: 0
 	property var numExcerpts: 0
@@ -477,6 +478,7 @@ MuseScore {
 		// **** INITIALISE MAIN VARIABLES **** //
 		var staves = curScore.staves;
 		numStaves = curScore.nstaves;
+		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) numVisibleStaves ++;
 		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
 		//logError ('bar name = '+firstBarInScore.userName());
@@ -725,7 +727,7 @@ MuseScore {
 		if (numPagesOfMusic > 1) checkLocationsOfBottomSystems();
 		
 		// ************ 								CHECK FOR FERMATA ISSUES 							************ ///
-		if (!isSoloScore && numStaves > 2) checkFermatas();
+		if (!isSoloScore && numVisibleStaves > 2) checkFermatas();
 		
 		setProgress (3);
 		
@@ -2510,10 +2512,8 @@ MuseScore {
 	function checkStaffOrderAndBrackets () {
 		
 		var numVocalParts = 0;
-		var numVisibleStaves = 0;
 		for (var i = 0; i < numStaves; i++) {
 			if (staffVisible[i]) {
-				numVisibleStaves ++;
 				lastVisibleStaffNum = i;
 				var instrumentType = curScore.staves[i].part.musicXmlId;
 				if (instrumentType.includes("strings.")) scoreHasStrings = true;
@@ -3180,19 +3180,19 @@ MuseScore {
 			// **** TEST 1B: CHECK STAFF SIZE ****
 			var maxSize = 6.8;
 			var minSize = 6.5;
-			if (numStaves == 2) {
+			if (numVisibleStaves == 2) {
 				maxSize = 6.7;
 				minSize = 6.2;
 			}
-			if (numStaves == 3) {
+			if (numVisibleStaves == 3) {
 				maxSize = 6.5;
 				minSize = 5.4;
 			}
-			if (numStaves > 3 && numStaves < 8) {
-				maxSize = 6.5 - ((numStaves - 3) * 0.1);
-				minSize = 5.4 - ((numStaves - 3) * 0.1);
+			if (numVisibleStaves > 3 && numVisibleStaves < 8) {
+				maxSize = 6.5 - ((numVisibleStaves - 3) * 0.1);
+				minSize = 5.4 - ((numVisibleStaves - 3) * 0.1);
 			}
-			if (numStaves > 7) {
+			if (numVisibleStaves > 7) {
 				maxSize = 5.4;
 				minSize = 3.7;
 			}
@@ -3610,10 +3610,7 @@ MuseScore {
 		}	
 		
 		// **** Does the hairpin start under a rest? **** //
-		var noteAtHairpinStart = getNoteRestAtTick(hairpinStartTick);
-		var hairpinStartsOnRest = (noteAtHairpinStart == null) ? true : noteAtHairpinStart.type == Element.REST;
-		//logError ('hairpinStartsOnRest = '+hairpinStartsOnRest+'; noteAtHairpinStart = '+noteAtHairpinStart);
-		if (hairpinStartsOnRest && !isGrandStaff[cursor.staffIdx]) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);		
+		if (allTracksHaveRestsAtCurrTick (hairpinStartTick)) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);		
 		var startOffset = Math.abs(currentHairpin.offset.x);
 		var endOffset = currentHairpin.userOff2.x;
 		var maxOffset = 1.5;
@@ -3714,7 +3711,7 @@ MuseScore {
 				
 				// CHECK USE OF WIGGLE VIBRATO
 				if (theSymbol >= SymId.wiggleVibrato && theSymbol <= SymId.wiggleWavyWide) {
-					addError ("These vibrato articulations are non-standard.\nIt’s usually better to just write (e.g.)\n‘molto vib.’ or ‘slow, wide vibrato’.", theArticulation);
+					addError ("These vibrato markings are non-standard.\nIt’s usually better to just write (e.g.)\n‘molto vib.’ or ‘slow, wide vibrato’.", theArticulation);
 					continue;
 				}
 				
@@ -3722,7 +3719,7 @@ MuseScore {
 				var hasBowMarking = stringArticulationsArray.includes(theSymbol);
 				if (hasBowMarking) {
 					if (!isStringInstrument) {
-						addError ('This is a string articulation, but this is not a string instrument.', theArticulation);
+						addError ('This is a string articulation,\nbut this is not a string instrument.', theArticulation);
 					} else {
 						var prevNoteHasBowMarking = false;
 						var nextNoteHasBowMarking = false;
@@ -4395,7 +4392,7 @@ MuseScore {
 
 		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
 		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
-		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
+		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetopright");
 	}
 	
 	// ***************************************************************** //
@@ -5038,16 +5035,28 @@ MuseScore {
 					if (doCheckTextPositions) {
 						var isBelow = false, isAbove = false;
 						var placement = textObject.placement;
+						var actualStaffNum = textObject.staffIdx; // use this rather than currentStaffNum, as for grand staves, dynamics are categorised by the top staff index, but for placement, we need to know the actual staff that they're attached to
 						if (isVoice) {
-							isBelow = textObject.offsetY > (placement == Placement.BELOW ? 1 : 5);
-							isAbove = textObject.offsetY < (placement == Placement.BELOW ? -4 : 0); 
-							if (isBelow ) addError("For vocal staves, dynamics should appear above the staff.\nCheck it is attached to the right staff.",textObject);
+							if (placement == Placement.BELOW) {
+								isBelow = textObject.offsetY >= 1;
+								isAbove = textObject.offsetY < -4;
+							} else {
+								isBelow = textObject.offsetY > 5;
+								isAbove = textObject.offsetY < 0;
+							}
+							if (isBelow) addError("For vocal staves, dynamics should appear above the staff.\nCheck it is attached to the right staff.",textObject);
 						} else {
-							isBelow = textObject.offsetY > (placement == Placement.ABOVE ? 5 : 1);
-							isAbove = textObject.offsetY < (placement == Placement.ABOVE ? 0 : -4);
-							if (!isGrandStaff[currentStaffNum] && isAbove) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
-							if (isBottomOfGrandStaff && isBelow) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the bottom staff only.",textObject);
-							if (isTopOfGrandStaff[currentStaffNum] && isAbove) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the top staff only.",textObject);
+							//logError ('Checking dynamic position');
+							if (placement == Placement.ABOVE) {
+								isBelow = textObject.offsetY >= 5;
+								isAbove = textObject.offsetY <= 0;
+							} else {
+								isBelow = textObject.offsetY >= 1;
+								isAbove = textObject.offsetY <= -4;
+							}
+							if (!isGrandStaff[actualStaffNum] && isAbove) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
+							if (isGrandStaff[actualStaffNum] && !isTopOfGrandStaff[actualStaffNum] && isBelow) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the bottom staff only.",textObject);
+							if (isTopOfGrandStaff[actualStaffNum] && isAbove) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the top staff only.",textObject);
 						}
 					}
 					
@@ -5716,7 +5725,7 @@ MuseScore {
 		
 		// *** Flag any long notes with staccato dots on them *** //
 		if (noteRest.duration.ticks >= division * 2) {
-			addError ("Don’t put staccato dots on long notes, unless the tempo is very fast.",noteRest);
+			addError ("Don’t put staccato dots on long notes,\nunless the tempo is very fast.",noteRest);
 			return;
 		}
 		
