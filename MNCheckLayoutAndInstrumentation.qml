@@ -478,7 +478,7 @@ MuseScore {
 		// **** INITIALISE MAIN VARIABLES **** //
 		var staves = curScore.staves;
 		numStaves = curScore.nstaves;
-		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) numVisibleStaves ++;
+		for (var i = 0; i < numStaves; i++) if (staves[i].show) numVisibleStaves ++;
 		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
 		//logError ('bar name = '+firstBarInScore.userName());
@@ -3025,7 +3025,7 @@ MuseScore {
 					}
 				} else {
 					
-					logError ('!enableVerticalSpread: maxSystemDistance = '+maxSystemDistance+'; maxSystemSpread = '+maxSystemSpread);
+					//logError ('!enableVerticalSpread: maxSystemDistance = '+maxSystemDistance+'; maxSystemSpread = '+maxSystemSpread);
 					if (minSystemSpread < 6 || minSystemSpread > 8) {
 						styleComments.push("(Spacing tab) Set the ‘Min. system distance’ to between 6.0–8.0sp");
 						flaggedSystemSpacing = true;
@@ -3130,6 +3130,7 @@ MuseScore {
 		}
 		if (styleComments.length + pageSettingsComments.length > 0) {
 			var errorStr = ["PARTS SETTINGS","(These suggestions apply only to the parts, not the score. This comment box will remain\nuntil all parts have been changed; to quickly change the settings for all parts, change one part,\nthen click ‘Apply to all parts’).",styleCommentsStr,pageSettingsCommentsStr].join("\n\n").replace(/\n\n\n\n/g, '\n\n').trim();
+			errorStr += "\n\nNOTE: the MN Make Recommended Layout Changes plugin can automatically change these settings for you.";
 			addError(errorStr,"pagetopright");
 		}
 	}
@@ -3178,6 +3179,7 @@ MuseScore {
 			if ((pageEvenTopMargin > maxTBMargin) + (pageOddTopMargin > maxTBMargin) + (pageEvenBottomMargin > maxTBMargin) + (pageOddBottomMargin > maxTBMargin)) pageSettingsComments.push("Decrease your top and bottom margins to "+maxTBMargin+"mm");
 		
 			// **** TEST 1B: CHECK STAFF SIZE ****
+			logError ("numVisibleStaves = "+numVisibleStaves);
 			var maxSize = 6.8;
 			var minSize = 6.5;
 			if (numVisibleStaves == 2) {

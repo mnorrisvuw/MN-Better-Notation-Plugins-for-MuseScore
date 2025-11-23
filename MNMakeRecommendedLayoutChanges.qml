@@ -52,6 +52,8 @@ MuseScore {
 	property var instrumentCalcIds: []
 	property var frames: []
 	property var firstVisibleStaff: 0
+	property var errorMsg: ''
+	
 	function getAssetPath(filename) {
         if (Qt.platform.os === "linux") {
             return Qt.resolvedUrl("./assets/" + filename).toString();
@@ -100,7 +102,7 @@ MuseScore {
 		options.close();
 		updateLayout();
 		numStaves = curScore.nstaves;
-		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) numVisibleStaves ++;
+		for (var i = 0; i < numStaves; i++) if (curScore.staves[i].show) numVisibleStaves ++;
 
 		// *** REMOVE ANY COMMENTS AND HIGHLIGHTS THAT MIGHT BE LEFT OVER FROM OTHER PLUGINS ***
 		getFrames();
@@ -161,10 +163,11 @@ MuseScore {
 		selectNone();
 		
 		var dialogMsg = '';
+		if (errorMsg != "") dialogMsg = "<p>————————————<p><p>ERROR LOG (for developer use):</p>" + errorMsg;
 		if (amendedParts) {
-			dialogMsg = '<p>Changes to the layout of the score and parts were made successfully.</p><p><b>NOTE</b>: If your parts were open, you may need to close and re-open them if the layout changes have not been updated.</p><p>Note that some changes may not be optimal, and further tweaks are likely to be required.</p>';
+			dialogMsg = '<p>Changes to the layout of the score and parts were made successfully.</p><p><b>NOTE</b>: If your parts were open, you may need to close and re-open them if the layout changes have not been updated.</p><p>Note that some changes may not be optimal, and further tweaks are likely to be required.</p>'+dialogMsg;
 		} else {
-			dialogMsg = '<p>Changes to the layout of the score were made successfully.</p><p>Note that some changes may not be optimal, and further tweaks are likely to be required.</p>';
+			dialogMsg = '<p>Changes to the layout of the score were made successfully.</p><p>Note that some changes may not be optimal, and further tweaks are likely to be required.</p>'+dialogMsg;
 			if (finalMsg != '') dialogMsg = dialogMsg + '<p>' + finalMsg + '</p>';
 		}
 		dialog.msg = dialogMsg;
@@ -531,7 +534,7 @@ MuseScore {
 			staffSize = 5.2 - Math.floor((numVisibleStaves - 8) * 0.5) / 10.;
 			if (staffSize < 3.7) staffSize = 3.7;
 		}
-		
+		//logError ('staffSize = '+staffSize+'; numVisibleStaves = '+numVisibleStaves);
 		
 		var newSpatium = staffSize / 4.0;
 		
@@ -554,6 +557,10 @@ MuseScore {
 		setSetting ("minSystemSpread", isSoloScore ? 6 : 12);
 		setSetting ("maxSystemSpread", isSoloScore ? 14 : 24);
 		curScore.endCmd();	
+	}
+	
+	function logError (str) {
+		errorMsg += "<p>"+str+"</p>";
 	}
 	
 	function setOtherStyleSettings() {
@@ -2162,6 +2169,7 @@ MuseScore {
 				setPartSetting (thePart, "enableVerticalSpread", 1);
 				setPartSetting (thePart, "minSystemSpread", 6);
 				setPartSetting (thePart, "maxSystemSpread", 11);
+				setPartSetting (thePart, "maxSystemDistance", 10);
 				setPartSetting (thePart, "minStaffSpread", 6);
 				setPartSetting (thePart, "maxStaffSpread", 11);
 				setPartSetting (thePart, "frameSystemDistance", 8);
