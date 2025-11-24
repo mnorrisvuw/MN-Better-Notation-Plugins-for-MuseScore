@@ -984,7 +984,7 @@ MuseScore {
 				var timeSigNum = currentTimeSig.numerator;
 				var timeSigDenom = currentTimeSig.denominator;
 				beatLength = division;
-				isCompound = timeSigNum % 3 > 0;
+				isCompound = timeSigNum % 3 == 0;
 				if (timeSigDenom <= 4) isCompound = isCompound && (timeSigNum > 3);
 				// if 6/8, 12/8, etc., beatLength = dotted whatever
 				if (isCompound && timeSigDenom >= 8) beatLength = (division * 1.5) * (8 / timeSigDenom);
@@ -1949,10 +1949,9 @@ MuseScore {
 	}
 	
 	function getStaffNumToCheckForDynamics() {
+		//logError ('currentStaffNum = '+currentStaffNum+'; isGrandStaff[currentStaffNum] = '+isGrandStaff[currentStaffNum]+'; isTopOfGrandStaff[currentStaffNum] = '+isTopOfGrandStaff[currentStaffNum]);
 		if (!isGrandStaff[currentStaffNum] || isTopOfGrandStaff[currentStaffNum]) return currentStaffNum;
-		for (var i = currentStaffNum - 1; i >= 0; i--) {
-			if (isTopOfGrandStaff[currentStaffNum]) return currentStaffNum;
-		}
+		for (var i = currentStaffNum - 1; i >= 0; i--) if (isTopOfGrandStaff[i]) return i;
 		return 0;
 	}
 	
@@ -1960,9 +1959,7 @@ MuseScore {
 		// get the measure
 		var theMeasure = curScore.tick2measure(fractionFromTicks(targetTick));
 		var theSeg = theMeasure.firstSegment;
-		//logError ('getNoteRestAtTick '+targetTick);
 		while (theSeg) {
-			//logError ('segType = '+theSeg.segmentType);
 			if (theSeg.segmentType == Segment.ChordRest) {
 				for (var i = 0; i < 4; i++) {
 					var theTrack = currentStaffNum * 4 + i;
@@ -1970,18 +1967,13 @@ MuseScore {
 					if (theElem != null) {
 						var theElemStart = theSeg.tick;
 						var theElemEnd = theElemStart + theElem.actualDuration.ticks;
-						//logError ('here1 start = '+theElemStart+' end = '+theElemEnd+' target = '+targetTick);
-						if (targetTick >= theElemStart && targetTick < theElemEnd) {
-							//logError ('returning element on track '+i+': isRest = '+(theElem.type == Element.REST));
-							return theElem;
-						}
+						if (targetTick >= theElemStart && targetTick < theElemEnd) return theElem;
 					}
 				}
 			}
 			theSeg = theSeg.nextInMeasure;
 		}
 		return null;
-			
 	}
 		
 	function getPreviousNoteRest (noteRest) {
@@ -2055,19 +2047,17 @@ MuseScore {
 		if (currentDynamicNum < numDynamics-1) {
 			nextDynamic = dynamics[staffNumToCheckForDynamics][currentDynamicNum+1];
 			if (nextDynamic == null || nextDynamic == undefined) {
-				logError ('nextDynamic was '+nextDyanmic);
+				logError ('nextDynamic was '+nextDynamic);
 			} else {
 				var p = nextDynamic.parent;
 				while (p.type != Element.SEGMENT) p = p.parent;
 				nextDynamicTick = p.tick;
-				//logError ('next Dynamic is '+nextDynamic.text+' at '+nextDynamicTick);
 			}
 		} else {
 			nextDynamic = null;
 			nextDynamicTick = endOfScoreTick;
 		}
 	}
-	
 	
 	// ***************************************************************** //
 	// **** 														**** //
@@ -2117,7 +2107,6 @@ MuseScore {
 			}
 		}
 	}
-	
 	
 	// ***************************************************************** //
 	// **** 														**** //
@@ -3593,13 +3582,29 @@ MuseScore {
 		var hairpinStartTick = currentHairpin.spanner.spannerTick.ticks;	
 		var y = currentHairpin.offsetY;
 		var p = currentHairpin.placement;
+		var c = currentHairpin.centerBetweenStaves;
+		var isAbove = false, isBelow = false;
+		
 		// **** Check vertical placement of hairpin **** //
 		if (isVoice) {
-			var isBelow = y > (p == Placement.BELOW ? 0 : 5);
+			isBelow = y > (p == Placement.BELOW ? 0 : 5);
 			if (isBelow) addError ("In vocal staves, hairpins should appear\nabove the staff.", currentHairpin);
 		} else {
-			var isAbove = p == Placement.ABOVE; // can't actually get hairpin above the staff if it's set to auto or below
-			var isBelow = y > (p == Placement.ABOVE ? 5 : 0);
+			if (p == Placement.ABOVE) {
+				// the hairpin can go below the staff if it's got a big offset
+				isAbove = y < 5;
+				isBelow = y >= 5;
+			}
+			if (p == Placement.AUTO) {
+				isAbove = false;
+				if (isBottomOfGrandStaff) isAbove = c == AutoOnOff.ON && y < 5;
+				isBelow = !isAbove;
+			}
+			if (p == Placement.BELOW) {i
+				// no way to get the hairpin above the staff if it's set to below
+				isAbove = false;
+				isBelow = true;
+			}
 			if (isGrandStaff[currentStaffNum]) {
 				if (isTopOfGrandStaff[currentStaffNum]) {
 					if (isAbove) addError ("Hairpins should appear between the\nstaves of a grand staff instrument,\nunless it only applies to the top staff.",currentHairpin);
@@ -3626,8 +3631,10 @@ MuseScore {
 		cursor2.rewindToTick(cursor.tick);
 		cursor2.filter = Segment.ChordRest;
 		var isDecresc = currentHairpin.hairpinType % 2 == 1;
-		var hairpinZoneEndTick = currentHairpinEnd + beatLength; // allow a terminating dynamic within a beat of the end of the hairpin
+		
+		// look for a terminating dynamic within a beat either side of the end of the hairpin
 		var hairpinZoneStartTick = currentHairpinEnd - beatLength;
+		var hairpinZoneEndTick = currentHairpinEnd + beatLength; 
 		//logError ("Checking hairpin termination");
 		
 		// allow an expressive swell
@@ -3637,11 +3644,13 @@ MuseScore {
 		if (isDecresc && currentBarNum == numBars) return;
 		
 		// cycle through the dynamics in the staff, looking to see whether there is one near the end of the hairpin
-		for (var i = 0;i < dynamics[currentStaffNum].length; i++) {
-			var dynamicTick = dynamics[currentStaffNum][i].parent.tick;
+		//logError ('searching for dynamic between '+hairpinZoneStartTick+'–'+hairpinZoneEndTick);
+		for (var i = 0; i < dynamics[staffNumToCheckForDynamics].length; i++) {
+			var dynamicTick = dynamics[staffNumToCheckForDynamics][i].parent.tick;
+			//logError ('staffNumToCheckForDynamics = '+staffNumToCheckForDynamics+'; dynamicTick = '+dynamicTick);
 			if (dynamicTick >= hairpinZoneStartTick && dynamicTick <= hairpinZoneEndTick) return;
 		}
-				
+		
 		// allow a decrescendo going to a rest without needing a terminating dynamic
 		if (isDecresc) {
 			while (cursor2 != null) {
@@ -4835,7 +4844,7 @@ MuseScore {
 						// if it's not compound it could be either the beat or the beat/2
 						var metronomeOption1 = division * 4 / currentTimeSig.denominator;
 						var metronomeOption2 = isCompound ? (metronomeOption1 * 3) : (metronomeOption1 / 2);
-							
+						//logError ('currentTimeSig = '+currentTimeSig.str+'; isCompound = '+isCompound+'; metOpt1 = '+metronomeOption1+'; metOpt2 = '+metronomeOption2+'; metDur = '+metronomeDuration);
 						if (metronomeDuration != metronomeOption1 && metronomeDuration != metronomeOption2) {
 							addError ("The metronome marking of "+metroStr+" does\nnot match the time signature of "+currentTimeSig.str+".\nAre you sure this is correct?",textObject);
 						}
@@ -5036,25 +5045,35 @@ MuseScore {
 					// *** Check location of dynamics is correct *** //
 					if (doCheckTextPositions) {
 						var isBelow = false, isAbove = false;
-						var placement = textObject.placement;
+						var p = textObject.placement;
+						var c = textObject.centreBetweenStaves;
+						var y = textObject.offsetY;
 						var actualStaffNum = textObject.staffIdx; // use this rather than currentStaffNum, as for grand staves, dynamics are categorised by the top staff index, but for placement, we need to know the actual staff that they're attached to
 						if (isVoice) {
 							if (placement == Placement.BELOW) {
-								isBelow = textObject.offsetY >= 1;
-								isAbove = textObject.offsetY < -4;
+								isBelow = y >= 1;
+								isAbove = y < -4;
 							} else {
-								isBelow = textObject.offsetY > 5;
-								isAbove = textObject.offsetY < 0;
+								isBelow = y > 5;
+								isAbove = y < 0;
 							}
 							if (isBelow) addError("For vocal staves, dynamics should appear above the staff.\nCheck it is attached to the right staff.",textObject);
 						} else {
 							//logError ('Checking dynamic position');
-							if (placement == Placement.ABOVE) {
-								isBelow = textObject.offsetY >= 5;
-								isAbove = textObject.offsetY <= 0;
-							} else {
-								isBelow = textObject.offsetY >= 1;
-								isAbove = textObject.offsetY <= -4;
+							if (p == Placement.ABOVE) {
+								// the dynamic can go below the staff if it's got a big offset
+								isAbove = y <= 0;
+								isBelow = y >= 5;
+							}
+							if (p == Placement.AUTO) {
+								isAbove = false;
+								if (isBottomOfGrandStaff) isAbove = c == AutoOnOff.ON && y < 5;
+								isBelow = !isAbove;
+							}
+							if (p == Placement.BELOW) {i
+								// no way to get the hairpin above the staff if it's set to below
+								isAbove = y < -4;
+								isBelow = true;
 							}
 							if (!isGrandStaff[actualStaffNum] && isAbove) addError("Dynamics should appear below the staff.\nCheck it is attached to the right staff.",textObject);
 							if (isGrandStaff[actualStaffNum] && !isTopOfGrandStaff[actualStaffNum] && isBelow) addError("Dynamics should appear between the\nstaves of a grand staff, unless you want it to\napply to the bottom staff only.",textObject);
@@ -6421,6 +6440,8 @@ MuseScore {
 		if (isEndOfSlur && isRest) addError ("This slur seems to end on a rest.\nWas it supposed to be an l.v. tie instead?",currentSlur);
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
+		
+		//logError ('tick = '+currentSlur.spanner.spannerTick.ticks+'; bbox = '+currentSlur.bbox+'; canvasPos = '+currentSlur.canvasPos+'; offY = '+currentSlur.offsetY+'; offX = '+currentSlur.offsetX+' off1 = '+currentSlur.spanner.slurUoff1+'; off2 = '+currentSlur.spanner.slurUoff2+'; off3 = '+currentSlur.spanner.slurUoff3+'; off4 = '+currentSlur.spanner.slurUoff4+'; pos = '+currentSlur.pos+'; pagePos = '+currentSlur.pagePos+'; isStartOfSlur = '+isStartOfSlur); 
 		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 4)) {
 			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
 				addError ("This slur looks like it has been dragged from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
@@ -6875,13 +6896,17 @@ MuseScore {
 		
 		// ** CHECK WHETHER THE GRACE-NOTES ARE SLURRED TO THE MAIN NOTE OR NOT ** //
 		// ** EXCEPTIONS ARE: ARTICULATION, SAME NOTE							** //
+		var ident = chordsAreIdentical (graceNotes[n-1], noteRest);
 		if (!isSlurred) {
-			var theArtic = getArticulations(graceNotes[n-1]);
-			var hasArtic = theArtic != null;
+			var hasArtic = getArticulations(graceNotes[n-1]).length > 0;
 			var gnIsTied = graceNotes[n-1].notes[0].tieForward != null || graceNotes[n-1].notes[0].tieBack != null;
-			if (!hasArtic && !gnIsTied && !chordsAreIdentical (graceNotes[n-1], noteRest)) addError("In general, slur grace-notes to the main note,\nunless you use staccatos or accents.",graceNotes);
+			//logError ('hasArtic = '+hasArtic+'; gnIsTied = '+gnIsTied+'; ident = '+ident);
+			if (!hasArtic && !gnIsTied && !ident) {
+				//logError ('here: graceNotes = '+graceNotes.length);
+				addError("In general, slur grace-notes to the main note,\nunless you use staccatos or accents.",graceNotes);
+			}
 		} else {
-			if (chordsAreIdentical (graceNotes[n-1], noteRest)) addError ("This grace note is the same pitch as the main note,\nbut is slurred. Is that meant to be a tie?",graceNotes[n-1]);
+			if (ident) addError ("This grace note is the same pitch as the main note,\nbut is slurred. Is that meant to be a tie?",graceNotes[n-1]);
 		}
 	}
 	
@@ -7179,10 +7204,11 @@ MuseScore {
 
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
-			var objectArray = (Array.isArray(element)) ? element : [element];
+			var objectArray = (element.length == undefined) ? [element] : element;
 			desiredPosX = desiredPosY = 0;
-			
-			for (var j = 0; j < objectArray.length; j++) {
+			var numObj = objectArray.length;
+			//if (numObj > 1) logError ('Found array of length +'+numObj+'; elem[0] = '+objectArray[0].type+'; CHORD = '+Element.CHORD+'; GNG = '+Element.GRACE_NOTES_GROUP);
+			for (var j = 0; j < numObj; j++) {
 
 				element = objectArray[j];
 				var eType = element.type;
@@ -7211,8 +7237,7 @@ MuseScore {
 						logError("showAllErrors() — bbox undefined — elem type is "+element.name);
 					} else {
 						if (eType != Element.MEASURE) {
-							var elemStaff = element.staff;
-							if (elemStaff == undefined) {
+							if (element.staff == undefined) {
 								isString = true;
 								theLocation = "";
 								desiredPosX = element.pagePos.x;
