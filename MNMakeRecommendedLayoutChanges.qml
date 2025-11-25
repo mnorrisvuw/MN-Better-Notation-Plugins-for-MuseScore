@@ -2408,17 +2408,19 @@ MuseScore {
 			}
 		}
 		
-		// ** CHECK HEADER CLEFS FOR HIGHLIGHTS ** //
+		// ** CHECK HEADER CLEFS AND KEY SIGS FOR HIGHLIGHTS ** //
 		var headerCursor = curScore.newCursor();
-		headerCursor.filter = Segment.HeaderClef;
+		headerCursor.filter = Segment.HeaderClef | Segment.KeySig | Segment.BarLineType;
 		for (var staffIdx = 0; staffIdx < curScore.nstaves; staffIdx ++) {
 			headerCursor.staffIdx = staffIdx;
 			headerCursor.voice = 0;
 			headerCursor.rewind(Cursor.SCORE_START);
-			if (headerCursor.element != undefined && headerCursor.element != null) {
+			var keepProcessing = headerCursor.element != undefined && headerCursor.element != null;
+			while (keepProcessing) {
 				var e = headerCursor.element;
 				var c = e.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+				keepProcessing = headerCursor.next();
 			}
 		}
 		

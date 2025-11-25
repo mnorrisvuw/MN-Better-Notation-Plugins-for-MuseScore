@@ -1769,7 +1769,7 @@ MuseScore {
 							}
 							checkExpressiveSwell (nextHairpin);
 							checkHairpins();
-							if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3 > 0;
+							if (expressiveSwell) expressiveSwell = (expressiveSwell + 1) % 3;
 						}
 					}
 				}
@@ -4117,9 +4117,7 @@ MuseScore {
 		} else {
 			if (clefTick > clefMeasureStart) {
 				isMidBarClef = true;
-				if ((clefTick - clefMeasureStart) % beatLength > 0) {
-					addError ('If possible, move this clef to the start of the beat.',clef);
-				}
+				if ((clefTick - clefMeasureStart) % beatLength > 0) addError ('If possible, move this clef to the start of the beat.',clef);
 			}
 		}
 			
@@ -4309,6 +4307,8 @@ MuseScore {
 	
 	function checkInstrumentRange(noteRest) {
 		if (lowestPitchPossible == 0 && highestPitchPossible == 0) return;
+		// don't check if it's tied back
+		if (noteRest.notes[0].tieBack != null) return;
 		// the currentInstrumentRange array is formatted thus:
 		//[instrumentId,lowestSoundingPitchPossible,quietRegisterThresholdPitch,highestSoundPitchPossible,highLoudRegisterThreshold,lowLoudRegisterThreshold] 
 		var lowestPitch = getLowestConcertPitch(noteRest);
@@ -4318,7 +4318,7 @@ MuseScore {
 				addError ('This note is very low and may not\nbe possible on this instrument.\nCheck with a player.',noteRest);
 				return;
 			} else {
-				addError ('This note appears to be below the\nlowest note possible on this instrument.',noteRest);
+				addError ('This note is below the lowest note\npossible on this instrument.',noteRest);
 				return;
 			}
 		}
@@ -4327,7 +4327,11 @@ MuseScore {
 				addError ('This note appears to be above the\nhighest note possible on this instrument.',noteRest);
 				return;
 			} else {
-				addError ('This note is very high and may not\nbe possible on this instrument.\nCheck with a player.',noteRest);
+				if (highestPitch < highestPitchPossible + 5 || isStringInstrument) {
+					addError ('This note is very high and may not\nbe possible on this instrument.\nCheck with a player.',noteRest);
+				} else {
+					addError ('This note is above the highest note\npossible on this instrument', noteRest);
+				}
 				return;
 			}
 		}
@@ -4355,11 +4359,57 @@ MuseScore {
 	}
 	
 	function getLowestConcertPitch(chord) {
-		return Math.min(chord.notes.map (e => e.pitch ));
+		var p = Math.min(chord.notes.map (e => e.pitch));
+		if (isOttava && currentOttava != null) {
+			switch (currentOttava.ottavaType) {
+				case OttavaType.OTTAVA_8VA:
+					p = p + 12;
+					break;
+				case OttavaType.OTTAVA_8VB:
+					p = p - 12;
+					break;
+				case OttavaType.OTTAVA_15MA:
+					p = p + 24;
+					break;
+				case OttavaType.OTTAVA_15MB:
+					p = p - 24;
+					break;
+				case OttavaType.OTTAVA_22MA:
+					p = p + 36;
+					break;
+				case OttavaType.OTTAVA_22MB:
+					p = p - 36;
+					break;
+			}
+		}
+		return p;	
 	}
 	
 	function getHighestConcertPitch(chord) {
-		return Math.max(chord.notes.map (e => e.pitch ));
+		var p = Math.max(chord.notes.map (e => e.pitch));
+		if (isOttava && currentOttava != null) {
+			switch (currentOttava.ottavaType) {
+				case OttavaType.OTTAVA_8VA:
+					p = p + 12;
+					break;
+				case OttavaType.OTTAVA_8VB:
+					p = p - 12;
+					break;
+				case OttavaType.OTTAVA_15MA:
+					p = p + 24;
+					break;
+				case OttavaType.OTTAVA_15MB:
+					p = p - 24;
+					break;
+				case OttavaType.OTTAVA_22MA:
+					p = p + 36;
+					break;
+				case OttavaType.OTTAVA_22MB:
+					p = p - 36;
+					break;
+			}
+		}
+		return p;
 	}
 	
 	// ***************************************************************** //
@@ -5473,7 +5523,7 @@ MuseScore {
 			if (sharps < -6) errStr = "This key signature has "+Math.abs(sharps)+" flats,\nand would be easier to read if rescored as "+(12+sharps)+" sharps.";
 			
 			// potential overuse of key signatures
-			if (currentBarNum - prevKeySigBarNum  < 16) errStr = ((errStr !== "") ? errStr + "\nAlso, this" : "This") + " key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps one of them could be avoided by using accidentals instead?";
+			if (prevKeySigBarNum > 1 && currentBarNum - prevKeySigBarNum  < 16) errStr = ((errStr !== "") ? errStr + "\nAlso, this" : "This") + " key change comes only "+ (currentBarNum - prevKeySigBarNum) +" bars after the previous one.\nPerhaps one of them could be avoided by using accidentals instead?";
 			if (errStr !== "") addError(errStr,keySig);
 			prevKeySigSharps = sharps;
 			prevKeySigBarNum = currentBarNum;
@@ -6440,7 +6490,7 @@ MuseScore {
 		if (isEndOfSlur && isRest) addError ("This slur seems to end on a rest.\nWas it supposed to be an l.v. tie instead?",currentSlur);
 
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
-		
+		//logError ('tick = '+currentSlur.spanner.spannerTick.ticks+'; off1 = '+currentSlur.slurUoff1);
 		//logError ('tick = '+currentSlur.spanner.spannerTick.ticks+'; bbox = '+currentSlur.bbox+'; canvasPos = '+currentSlur.canvasPos+'; offY = '+currentSlur.offsetY+'; offX = '+currentSlur.offsetX+' off1 = '+currentSlur.spanner.slurUoff1+'; off2 = '+currentSlur.spanner.slurUoff2+'; off3 = '+currentSlur.spanner.slurUoff3+'; off4 = '+currentSlur.spanner.slurUoff4+'; pos = '+currentSlur.pos+'; pagePos = '+currentSlur.pagePos+'; isStartOfSlur = '+isStartOfSlur); 
 		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 4)) {
 			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
@@ -7181,7 +7231,6 @@ MuseScore {
 		
 		var firstStaffNum = 0;
 		var comments = [];
-		//var commentPages = [];
 		var commentPageNumbers = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
@@ -7204,12 +7253,12 @@ MuseScore {
 
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
-			var objectArray = (element.length == undefined) ? [element] : element;
-			desiredPosX = desiredPosY = 0;
+			var objectArray = (element.length == undefined || element.type == undefined) ? [element] : element;
 			var numObj = objectArray.length;
-			//if (numObj > 1) logError ('Found array of length +'+numObj+'; elem[0] = '+objectArray[0].type+'; CHORD = '+Element.CHORD+'; GNG = '+Element.GRACE_NOTES_GROUP);
+			
 			for (var j = 0; j < numObj; j++) {
-
+				desiredPosX = 0;
+				desiredPosY = 0;
 				element = objectArray[j];
 				var eType = element.type;
 				var isString = eType == undefined;
@@ -7285,7 +7334,6 @@ MuseScore {
 					} else {
 						tick = getTick(element);
 					}
-					
 					commentCursor.staffIdx = staffNum;
 					commentCursor.track = staffNum * 4;
 					commentCursor.rewindToTick(tick);
@@ -7377,7 +7425,6 @@ MuseScore {
 				// move over to the top right of the page if needed
 				if (isString && theLocation === "pagetopright") offx[i] = commentPageWidth - commentWidth - 2.5 - placedX;
 			
-				// FIX IN 4.6 — Composer pagePos currently returning the wrong location
 				if (eSubtype === 'Composer') {
 					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth + 10.0;
 					offy[i] += 4.0;
@@ -7395,10 +7442,6 @@ MuseScore {
 					var r2y = element.pagePos.y - margin;
 					var r2r = r2x + element.bbox.width + 2 * margin;
 					var r2b = r2y + element.bbox.height + 2 * margin;
-					/*if (element.type == Element.SLUR_SEGMENT) {
-						logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1r)+" "+Math.floor(r1b)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2r)+" "+Math.floor(r2b)+"}");
-					}*/
-					//logError ("Comment at: {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\nElement at: {"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
 					var overlaps = (r1x <= r2r) && (r1r >= r2x) && (r1y <= r2b) && (r1b >= r2y);
 					var repeats = 0;
 					while (overlaps && repeats < 12) {
@@ -7427,7 +7470,6 @@ MuseScore {
 				for (var k = 0; k < i; k++) {
 					var otherComment = comments[k];
 					var otherCommentPageNumber = commentPageNumbers[k];
-					//var otherCommentPage = pages[k];
 					var otherCommentX = otherComment.pagePos.x + offx[k];
 					var otherCommentY = otherComment.pagePos.y + offy[k];
 					var actualCommentX = placedX + offx[i];
@@ -7446,7 +7488,6 @@ MuseScore {
 							var generalProximity = dx + dy < maxOffset;
 							var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
 							var isNotTooFarFromOriginalPosition = true;
-							//logError ("text = "+comment.text+"; otherText = "+otherComment.text+"; close = "+isCloseToOtherComment+"; far = "+isNotTooFarFromOriginalPosition+'; rhs = '+(actualCommentRHS < commentPageWidth)+' y = '+(actualCommentY > 0));
 							var shiftAttempts = 0;
 							while (isCloseToOtherComment && isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0 && shiftAttempts < 5) {
 								shiftAttempts ++;
@@ -7463,7 +7504,6 @@ MuseScore {
 								generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
 								isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
 								isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
-								//logError ("Too close: shifting comment.offsetX = "+offx[i]+" comment.offsetY = "+offy[i]+" tooClose = "+isCloseToOtherComment);				
 							}
 						}
 					}
@@ -7600,17 +7640,19 @@ MuseScore {
 			}
 		}
 		
-		// ** CHECK HEADER CLEFS FOR HIGHLIGHTS ** //
+		// ** CHECK HEADER CLEFS AND KEY SIGS FOR HIGHLIGHTS ** //
 		var headerCursor = curScore.newCursor();
-		headerCursor.filter = Segment.HeaderClef;
+		headerCursor.filter = Segment.HeaderClef | Segment.KeySig | Segment.BarLineType;
 		for (var staffIdx = 0; staffIdx < curScore.nstaves; staffIdx ++) {
 			headerCursor.staffIdx = staffIdx;
 			headerCursor.voice = 0;
 			headerCursor.rewind(Cursor.SCORE_START);
-			if (headerCursor.element != undefined && headerCursor.element != null) {
+			var keepProcessing = headerCursor.element != undefined && headerCursor.element != null;
+			while (keepProcessing) {
 				var e = headerCursor.element;
 				var c = e.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+				keepProcessing = headerCursor.next();
 			}
 		}
 		

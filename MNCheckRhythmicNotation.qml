@@ -1875,7 +1875,6 @@ MuseScore {
 		
 		var firstStaffNum = 0;
 		var comments = [];
-		//var commentPages = [];
 		var commentPageNumbers = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
@@ -1898,11 +1897,12 @@ MuseScore {
 	
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
-			var objectArray = (Array.isArray(element)) ? element : [element];
-			desiredPosX = desiredPosY = 0;
+			var objectArray = (element.length == undefined || element.type == undefined) ? [element] : element;
+			var numObj = objectArray.length;
 			
-			for (var j = 0; j < objectArray.length; j++) {
-	
+			for (var j = 0; j < numObj; j++) {
+				desiredPosX = 0;
+				desiredPosY = 0;
 				element = objectArray[j];
 				var eType = element.type;
 				var isString = eType == undefined;
@@ -1930,8 +1930,7 @@ MuseScore {
 						logError("showAllErrors() — bbox undefined — elem type is "+element.name);
 					} else {
 						if (eType != Element.MEASURE) {
-							var elemStaff = element.staff;
-							if (elemStaff == undefined) {
+							if (element.staff == undefined) {
 								isString = true;
 								theLocation = "";
 								desiredPosX = element.pagePos.x;
@@ -1979,7 +1978,6 @@ MuseScore {
 					} else {
 						tick = getTick(element);
 					}
-					
 					commentCursor.staffIdx = staffNum;
 					commentCursor.track = staffNum * 4;
 					commentCursor.rewindToTick(tick);
@@ -2071,7 +2069,6 @@ MuseScore {
 				// move over to the top right of the page if needed
 				if (isString && theLocation === "pagetopright") offx[i] = commentPageWidth - commentWidth - 2.5 - placedX;
 			
-				// FIX IN 4.6 — Composer pagePos currently returning the wrong location
 				if (eSubtype === 'Composer') {
 					offx[i] = commentPageWidth - desiredPosX - placedX - commentWidth + 10.0;
 					offy[i] += 4.0;
@@ -2089,10 +2086,6 @@ MuseScore {
 					var r2y = element.pagePos.y - margin;
 					var r2r = r2x + element.bbox.width + 2 * margin;
 					var r2b = r2y + element.bbox.height + 2 * margin;
-					/*if (element.type == Element.SLUR_SEGMENT) {
-						logError ("Found slur — {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1r)+" "+Math.floor(r1b)+"}\n{"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2r)+" "+Math.floor(r2b)+"}");
-					}*/
-					//logError ("Comment at: {"+Math.floor(r1x)+" "+Math.floor(r1y)+" "+Math.floor(r1w)+" "+Math.floor(r1h)+"}\nElement at: {"+Math.floor(r2x)+" "+Math.floor(r2y)+" "+Math.floor(r2w)+" "+Math.floor(r2h)+"}");
 					var overlaps = (r1x <= r2r) && (r1r >= r2x) && (r1y <= r2b) && (r1b >= r2y);
 					var repeats = 0;
 					while (overlaps && repeats < 12) {
@@ -2121,7 +2114,6 @@ MuseScore {
 				for (var k = 0; k < i; k++) {
 					var otherComment = comments[k];
 					var otherCommentPageNumber = commentPageNumbers[k];
-					//var otherCommentPage = pages[k];
 					var otherCommentX = otherComment.pagePos.x + offx[k];
 					var otherCommentY = otherComment.pagePos.y + offy[k];
 					var actualCommentX = placedX + offx[i];
@@ -2140,7 +2132,6 @@ MuseScore {
 							var generalProximity = dx + dy < maxOffset;
 							var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
 							var isNotTooFarFromOriginalPosition = true;
-							//logError ("text = "+comment.text+"; otherText = "+otherComment.text+"; close = "+isCloseToOtherComment+"; far = "+isNotTooFarFromOriginalPosition+'; rhs = '+(actualCommentRHS < commentPageWidth)+' y = '+(actualCommentY > 0));
 							var shiftAttempts = 0;
 							while (isCloseToOtherComment && isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0 && shiftAttempts < 5) {
 								shiftAttempts ++;
@@ -2157,7 +2148,6 @@ MuseScore {
 								generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
 								isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
 								isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
-								//logError ("Too close: shifting comment.offsetX = "+offx[i]+" comment.offsetY = "+offy[i]+" tooClose = "+isCloseToOtherComment);				
 							}
 						}
 					}
@@ -2290,17 +2280,19 @@ MuseScore {
 			}
 		}
 		
-		// ** CHECK HEADER CLEFS FOR HIGHLIGHTS ** //
+		// ** CHECK HEADER CLEFS AND KEY SIGS FOR HIGHLIGHTS ** //
 		var headerCursor = curScore.newCursor();
-		headerCursor.filter = Segment.HeaderClef;
+		headerCursor.filter = Segment.HeaderClef | Segment.KeySig | Segment.BarLineType;
 		for (var staffIdx = 0; staffIdx < curScore.nstaves; staffIdx ++) {
 			headerCursor.staffIdx = staffIdx;
 			headerCursor.voice = 0;
 			headerCursor.rewind(Cursor.SCORE_START);
-			if (headerCursor.element != undefined && headerCursor.element != null) {
+			var keepProcessing = headerCursor.element != undefined && headerCursor.element != null;
+			while (keepProcessing) {
 				var e = headerCursor.element;
 				var c = e.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(e);
+				keepProcessing = headerCursor.next();
 			}
 		}
 		
