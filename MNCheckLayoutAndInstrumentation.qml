@@ -6078,7 +6078,7 @@ MuseScore {
 		var numNotes = 0;
 		var tempPitchArray = [];
 		
-		// ignore any bracketed notes, as they're probably just harmonic sounding
+		// ignore any bracketed notes, as they're probably just the indication of a sounding harmonic pitch
 		for (var i = 0; i < chord.notes.length; i ++) {
 			var theNote = chord.notes[i];
 			if (!theNote.hasParentheses) {
@@ -6100,16 +6100,12 @@ MuseScore {
 			addError (str+" is too long to hear all strings playing at the same time\nYou should rewrite it with 1 or 2 of the notes as grace notes\nso that no more than 2 notes are sustained.",chord);
 			return;
 		}
-		if (currentInstrumentId.includes("violin") || currentInstrumentName.toLowerCase().includes("violin")) {
-			iName = "violin";
-		}
+		if (currentInstrumentId.includes("violin") || currentInstrumentName.toLowerCase().includes("violin")) iName = "violin";
 		if (currentInstrumentId.includes("viola") || currentInstrumentName.toLowerCase().includes("viola")) {
 			iName = "viola";
 			maxStretch = 12;
 		}
-		if (currentInstrumentId.includes("cello") || currentInstrumentName.toLowerCase().includes("cello")) {
-			iName = "cello";
-		}
+		if (currentInstrumentId.includes("cello") || currentInstrumentName.toLowerCase().includes("cello")) iName = "cello";
 		if (currentInstrumentId.includes("bass") || currentInstrumentName.toLowerCase().includes("bass")) {
 			iName = "double bass";
 			maxStretch = 9;
@@ -6152,20 +6148,19 @@ MuseScore {
 		var bottomNote = p1 < p2 ? p1: p2;
 		var topNote = p1 < p2 ? p2: p1;
 		//logError ('p1 = '+p1+'; p2 = '+p2);
-		if (!stringsArray.includes(p1) && !stringsArray.includes(p2)) interval = Math.abs(topNote - bottomNote);
-		
+		if (!stringsArray.includes(bottomNote)) interval = Math.abs(topNote - bottomNote);
 		if (numNotes == 2 && interval > maxStretch) addError ("This double-stop appears to be larger than a safe stretch on the "+iName+"\nIt may not be possible: check with a player.",chord);
 		if (bottomNote > stringsArray[2] + 12) {
 			if (interval < 7) {
-				addError ("In general, avoid double-stops less than a fifth in a high position,\nas the bottom note is over an octave above the open string.\nThe intonation may be poor; consider increasing the interval to greater than a fifth.",chord);
+				addError ("In general, avoid double-stops less than a fifth in a high position,\nas the bottom note is over an octave above the open string, and\ntherefore the intonation may be poor; consider rewriting",chord);
 			} else {
-				addError ("This double-stop is quite high, with the bottom note over an octave above II.\nThe intonation may be poor — consider rewriting.",chord);
+				addError ("This double-stop is quite high, with the\nbottom note over an octave above II.\nThe intonation may be poor; consider rewriting.",chord);
 			}
 		}
 		//if (prevIsChord) logError ('Checking multiple stop sequence: '+[interval, prevMultipleStopInterval,numNotes].join(', '));
 		if (prevIsChord && prevIsMultipleStop && chord.actualDuration.ticks <= division && prevSoundingDur <= division && interval > 0 && prevMultipleStopInterval > 0 && !flaggedFastMultipleStops) {			
-			var pi1 = interval > 7;
-			var pi2 = prevMultipleStopInterval > 7;
+			var pi1 = Math.min(Math.max(interval, 6), 8); // clamps interval to either 6 (less than a fifth) 7 (a fifth) or 8 (greater than a fifth), because each of these have a different hand shape
+			var pi2 = Math.min(Math.max(prevMultipleStopInterval, 6), 8);
 			if (pi1 != pi2) {
 				addError ("This sequence of double-stops looks very difficult,\nas the hand has to change its position and orientation.",chord);
 				flaggedFastMultipleStops = true;
