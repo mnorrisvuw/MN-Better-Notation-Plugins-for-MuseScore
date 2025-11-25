@@ -1243,7 +1243,8 @@ MuseScore {
 	
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
-			var objectArray = (element.length == undefined || element.type == undefined) ? [element] : element;
+			var isString = typeof element === "string";
+			var objectArray = (element.length == undefined || isString) ? [element] : element;
 			var numObj = objectArray.length;
 			
 			for (var j = 0; j < numObj; j++) {
@@ -1251,7 +1252,7 @@ MuseScore {
 				desiredPosY = 0;
 				element = objectArray[j];
 				var eType = element.type;
-				var isString = eType == undefined;
+				isString = typeof element === "string";
 				var eSubtype = isString ? '' : element.subtypeName();
 				var staffNum = firstStaffNum;
 			
