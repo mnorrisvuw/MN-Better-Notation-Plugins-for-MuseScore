@@ -60,6 +60,8 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
   * Non-standard tuplets that require the ratio to be shown
   * Overly complex or misleading tuplets
   * Inner beams that should be broken
+  * Tuplets where the numerator and denominator are the same
+  * ‘Dumb tuplets’ (i.e. tuplets that are unnecessary, such as two dotted crotchets under a triplet bracket that can be rewritten as two crotchets)
 
 ***
 
@@ -67,23 +69,23 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
 
 ### <img width="200px" src="MNCheckLayoutAndInstrumentation.png" alt="Check Layout and Instrumentation" style="vertical-align:top; margin-right:10px"> MN CHECK LAYOUT AND INSTRUMENTATION
 
-* **MN Check Layout & Instrumentation** checks for over 150 different layout, notation and instrumentation problems, such as:
-  * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio, note spacing too wide or narrow, some style settings not optimal, bar number on first bar, staff spacing not optimal, system spacing not optimal, page size not A3 or A4, last system not finishing in bottom right-hand corner of page, barlines not going through all staves of standard small ensemble, stretch factors applied inappropriately, no title page for work longer than 2 pages, name of work missing from first page of music, subtitle missing for solo works, non-optimal page layout settings for the parts, incorrect brackets/braces on left-hand side
-  * **Staff names and order**: non-standard staff names, missing staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font, non-optimal page number font, tempo size too small 
-  * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest, ‘dim.’/‘cresc.’ used instead of hairpins, long passages without dynamics, dynamics or hairpins placed under a rest, hairpins dragged away from their correct location, sforzando markings without accents
-  * **Tempo markings**: tempo marking not entered in Tempo text, rit./accel. without a terminating metronome mark/tempo indication/a tempo/tempo primo, tempo marking too large, metronome marking in bold, tempo marking not in bold, missing tempo marking, ‘approx.’ rather than ‘c.’, redundant (repeated) metronome marks, two rits or accels in a row without an intervening tempo marking, unnecessary parentheses in metronome marking, opening metronome marking without a ‘mood descriptor’
+* **MN Check Layout & Instrumentation** checks for over 170 different layout, notation and instrumentation problems, such as:
+  * **Spacing and layout**: inappropriate staff size, inappropriate margins, barline width too thick, bar spacing too wide or too narrow, minimum bar width too small, inappropriate spacing ratio, note spacing too wide or narrow, some style settings not optimal, bar number on first bar, staff spacing not optimal, system spacing not optimal, page size not A3 or A4, last system not finishing in bottom right-hand corner of page, barlines not going through all staves of standard small ensemble, stretch factors applied inappropriately, no title page for work longer than 2 pages, name of work missing from first page of music, subtitle missing for solo works, non-optimal page layout settings for the parts, unnecessary or incorrect brackets/braces on left-hand side, barlines not connected correctly
+  * **Staff names and order**: non-standard staff names, missing staff names, non-standard staff name visibility, incorrect staff order, duplicate staff names, staff name indicates plural but not quantity  * **Fonts and styles**: non-optimal tuplets font, incorrectly styled text, incorrect dynamics font, non-optimal page number font, tempo size too small 
+  * **Dynamics**: missing first dynamic, redundant dynamics, long hairpins not ‘terminated’, incorrect location for dynamics, dynamic needing restating after long rest, ‘dim.’/‘cresc.’ used instead of hairpins, long passages without dynamics, dynamics or hairpins placed under a rest, hairpins dragged away from their correct location, sforzando markings without accents, compound dynamics (e.g. sfzp) that are unrealisable, dynamics attached to the wrong object
+  * **Tempo markings**: tempo marking not entered in Tempo text, rit./accel. without a terminating metronome mark/tempo indication/a tempo/tempo primo, tempo marking too large, metronome marking in bold, tempo marking not in bold, missing tempo marking, ‘approx.’ rather than ‘c.’, redundant (repeated) metronome marks, two rits or accels in a row without an intervening tempo marking, unnecessary parentheses in metronome marking, opening metronome marking without a ‘mood descriptor’, tempo marking not attached to beat 1
   * **Text objects**: common misspellings, incorrectly capitalised text, space or non-alphanumeric character at start, text could be abbreviated, incorrect location for expressions, straight quotes instead of curly, default title/subtitle/composer not changed, techniques placed over rests
-  * **Rehearsal marks**: missing rehearsal marks, rehearsal marks placed in first two bars, rehearsal marks out of sequence
-  * **Vocal music**: checks correct hyphenation of common lyrics, notes lacking lyrics, notes lacking melismatic extensions, melismata lacking slurs, multiple syllables under one slur, correct positioning of dynamics
+  * **Rehearsal marks**: missing rehearsal marks, rehearsal marks placed in first two bars, rehearsal marks out of sequence, rehearsal mark not attached to beat 1
+  * **Vocal music**: incorrect hyphenation of common lyrics, notes lacking lyrics, notes lacking melismatic extensions, melismata lacking slurs, multiple syllables under one one, incorrect positioning of dynamics, no lyrics extender on tied notes, incorrect lyrics font size
   * **Orchestral parts issues**: monophonic line on a shared wind/brass staff missing player indication (e.g. 1./a 2 etc.); monophonic orchestral string part lacking ‘unis.’ after ‘div.’ marking
   * **String-specific issues**: redundant arco/pizz./col legno/tasto/pont/ord. markings, passage that looks arco but is marked pizz., incorrect notation for string harmonics, string harmonic does not exist, artificial harmonic interval incorrect, overly long slurs, long pizz. notes, staccato pizz. notes, slurs that may be too long for one bow stroke, fingered tremolos not slurred, bowed tremolos slurred, multiple-stops where two notes have to be played on the same string, triple- or quadruple-stops written with all strings sustained, potentially impossible double-stops, difficult passages of fast multiple-stops, slurs that are too long for stated dynamic, inappropriate slurred staccato, artificial harmonics too high, incorrect fluttertounge notation, queries potentially unnecessary isolated bow markings, bow markings in non-string instruments, harmonics written with both diamond noteheads and harmonic circles
   * **Harp-specific issues**: double flats/sharps, impossible chords, too many notes in a chord, too many quick pedal changes, slurred staccato
-  * **Instrument-specific issues**: redundant mute indications, piano stretches too wide, flute harmonics incorrectly notated, fluttertongue incorrectly notated, flags dynamics that may be inappropriate for certain registers, flags notes that may be out-of-range or requiring a professional, missing pedal markings, multiple full pedal markings in a row (that could just be retakes), no 'Ped.' symbol used, smooth or wiggly glissandi used incorrectly, trombone glisses impossible, polyphony in monophonic instrument, long notes on drums without trill/tremolo, staccato dots on drums, clef changes in harp/marimba, redundant vibrato markings  * **Pitch**: incorrect use of clefs, clef change needed, incorrect or unnecessary use of 8va/8vb, 8va/8vb needed, horn written in bass clef unnecessarily, unnecessary use of 22ma/22ba
+  * **Instrument-specific issues**: redundant mute indications, piano stretches too wide, flute harmonics incorrectly notated, fluttertongue incorrectly notated, flags dynamics that may be inappropriate for certain registers, flags notes that may be out-of-range or requiring a professional, missing pedal markings, multiple full pedal markings in a row (that could just be retakes), no 'Ped.' symbol used, smooth or wiggly glissandi used incorrectly, trombone glisses impossible, polyphony in monophonic instrument, long notes on drums without trill/tremolo, staccato dots on drums, potentially unnecessary clef changes in harp/marimba, redundant vibrato markings, ambiguous short notes on sustaining instruments  * **Pitch**: incorrect use of clefs, clef change needed, incorrect or unnecessary use of 8va/8vb, 8va/8vb needed, horn written in bass clef unnecessarily, unnecessary use of 22ma/22ba
   * **Key signatures**: extreme key signatures (6 or more sharps/flats), rapid key signature change, redundant key signature change
   * **Time signatures**: missing first time signature, redundant time signatures
-  * **Clefs**: instrument doesn’t read given clef, redundant clef, clef change would improve readability
+  * **Clefs**: instrument doesn’t read given clef, redundant clef, missing a clef change that would improve readability, poorly positioned clef change, incorrect clef for voice type
   * **Slurs**: slurs incorrectly begin/end on tied note, repeated notes under a slur without articulation, slur used instead of tie, accented notes in middle of a slur, slurs over rests, slurs within slurs, slurs attached to the same note, long passages without slurs or articulation, slurs entered manually rather than automatically, slurs dragged away from their automatic position, slurs missing from two-note tremolos
-  * **Other**: fermatas inconsistent or missing across parts, tremolos incorrectly written, incorrect notation of grace notes, stems incorrectly flipped, note tied to different pitch, pickup bars with inconsistent rests, transposing score not switched on, unnecessarily complex key signatures, short key signature changes, redundant time signature changes, staccato on dotted notes, ties across rests, identical chords with some but not all notes tied, beams manually dragged away from default position, double staccatos, tremolos with staccatos, harmonics without harmonic circles on tied notes, arpeggios with unnecessary up arrows, noteheads manually flipped direction, glissandi between notes of the same pitch***
+  * **Other**: fermatas inconsistent or missing across parts, fermatas written over staccato notes, tremolos incorrectly written, incorrect notation of grace notes, stems incorrectly flipped, note tied to different pitch, pickup bars with inconsistent rests, transposing score not switched on, unnecessarily complex key signatures, short key signature changes, redundant time signature changes, staccato on dotted notes, ties across rests, identical chords with some but not all notes tied, beams manually dragged away from default position, double staccatos, tremolos with staccatos, harmonics without harmonic circles on tied notes, arpeggios with unnecessary up arrows, noteheads manually flipped direction, glissandi between notes of the same pitch, non-standard articulations and fermatas***
 
 <a id="plugin3"></a>
 
@@ -113,9 +115,9 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
 ### <img width="200px" src="MNMakeRecommendedLayoutChanges.png" alt="Check Make Recommended Layout Changes" style="vertical-align:top; margin-right:10px"> MN MAKE RECOMMENDED LAYOUT CHANGES
 
 * **MN Make Recommended Layout Changes** automatically applies some key layout settings, as recommended by composer Michael Norris, such as:
-  * **Spacing and layout**: staff size (based on the number of instruments), page margins, barline width, minimum bar width, spacing ratio, some style settings not optimal, bar number on first bar, staff spacing, system spacing, removes any manually added layout breaks, first system indentation
+  * **Spacing and layout**: staff size (based on the number of instruments), page margins, barline width, minimum bar width, spacing ratio, some style settings not optimal, bar number on first bar, staff spacing, system spacing, removes any manually added layout breaks, first system indentation, barline connection/disconnection
   * **Parts**: staff size (based on the number of instruments), page margins, barline width, minimum bar width, spacing ratio, some style settings not optimal, bar number on first bar, staff spacing, system spacing, first system indentation, multimeasure rests, multirest width
-  * **Staff names and order**: Sets staff name visibility appropriate to ensemble size  * **Fonts**: sets music font to Bravura, sets all tuplet, bar number, technique, expression font to Times New Roman, part name frame and padding, page number style to plain
+  * **Staff names and order**: Sets staff name visibility appropriate to ensemble size  * **Fonts**: sets all tuplet, bar number, technique, expression font to Times New Roman, part name frame and padding, page number style to plain
   * **Other**: slur line width, title frame height and distance to music
 ***
 
@@ -137,7 +139,7 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
 * For each of the four MN plugins, click on their icon and click ‘**Enable**’
 * The plugins should now be available from the **Plugins** menu
 
-## <a id="fonts"></a>Installing fonts:
+## <a id="fonts"></a>Installing fonts
 The templates in the **MN Create Title Page** plugin use the following freely available fonts. Many of these fonts come bundled with the Windows and/or Mac OS operating systems; all are available as a free download.
 
 Depending on your particular combination of OS and other software, you may or may not already have them installed. If you need to install them, below is a list of download links:
@@ -185,11 +187,12 @@ Direct downloads of the Zip file can be found on the [releases page](https://git
 
 * **MN Make Recommended Layout Changes**:
     * You can run this plug-in at any time; however, it’s recommended that you have added all of the instruments you will need, and have at least two systems of music entered.
+    * Also if your piece has parts, create the parts by selecting the Parts button in the top-middle of your score, then click the ‘Open All’ button in the dialog that opens.
     
 * **MN Check Rhythmic Notation**,
 **MN Check Layout and Instrumentation**,
 **MN Check Accidentals**:
-    * Select the passage you wish to check for errors, or, to check the whole score, either select all or have nothing selected. Then  select the name of the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
+    * Select the plugin you wish to run from the Plugins menu. *(If you can’t see the names of the plugins, check that you have enabled them — see installation instructions above)*
 
     * Note that the *Check Layout and Instrumentation* plugin **always** checks the entire score, regardless of the current selection.
     
@@ -201,23 +204,17 @@ Direct downloads of the Zip file can be found on the [releases page](https://git
     
     * It can be a good idea to delete each comment box as you fix the relevant issue to keep track of what you have done.
     
-    * If there are a lot of comments, sometimes a comment box can end up some distance away from the object it is referring to. If you can’t work out what a comment is referring to, click and drag the box around a bit: you will see an ‘attachment line’ that shows the location of the object to which it is referring.
+    * If there are a lot of comments, sometimes a comment box can end up some distance away from the object it is referring to.
     
     * Each time you run a plugin, it will remove any previous comments or highlights.
     
-    * To manually remove all comments and highlights from a score, please run the ‘MN Delete Comments and Highlights’ plugin
+    * To manually remove all comments and highlights from a score, please run the ‘**MN Delete Comments and Highlights**’ plugin
     
     * Some comments refer to a specific page in [*Behind Bars* by Elaine Gould](https://www.amazon.com.au/dp/0571514561). This is simply to provide a level of evidence behind some of my comments, in case you think them overly pedantic or plain wrong! 😄
 
 
 ## Warning about usage
-* Note that these plugins use the styles of their comment boxes (yellow fill, black border) to distinguish them from normal text objects and highlights.
-
-* As such, if you select ‘Format→Reset Text Style Overrides’ or ‘Format→Reset Entire Score to Default Layout’ while you still have comments on the score, MuseScore will revert them all to standard black-and-white text
-
-* If this happens, the ‘MN Delete Comments and Highlights’ will not be able to detect them to delete them, and you will have to go through and manually delete each one.
-
-* Therefore, it is recommended that you do not use these commands while there are still comments on your score.
+* Note that these plugins use the styles of their comment boxes (yellow fill, black border) to distinguish them from normal text objects and highlights. As such, if you select ‘Format→Reset Text Style Overrides’ or ‘Format→Reset Entire Score to Default Layout’ while you still have comments on the score, MuseScore will revert them all to standard black-and-white text. If this happens, the ‘MN Delete Comments and Highlights’ will not be able to detect them to delete them, and you will have to go through and manually delete each one. Therefore, it is recommended that you do not use these commands while there are still comments on your score.
 
 ## Wait! Nothing happened!!!
 
