@@ -1003,7 +1003,7 @@ MuseScore {
 					addError("Never use a semibreve in 5/4\nsplit the note to show the bar division of either 2+3 or 3+2",noteRest);
 				} else {
 					if (numBeatsHidden == 1) {
-						addError("This note is hiding beat "+(noteStartBeat + 2)+"\nSplit the note with a tie, so that it shows beat "+(noteStartBeat + 2),noteRest);
+						addError("This note is hiding beat "+(noteStartBeat + 2)+".\nSplit the note with a tie, so that it shows beat "+(noteStartBeat + 2),noteRest);
 					} else {
 						var errStr = "This note is hiding beats ";
 	
@@ -1016,7 +1016,7 @@ MuseScore {
 								if (i == numBeatsHidden - 2) {
 									errStr += " &amp; ";									
 								} else {
-									errStr += "\nSplit it with a tie, so that the beats are shown";
+									errStr += ".\nSplit it with a tie, so that the beats are shown";
 									
 								}
 							}
@@ -1029,7 +1029,7 @@ MuseScore {
 					addError("Never use a semibreve rest in 5/4\nSplit it to show the bar division of either 2+3 or 3+2 crotchets",noteRest);
 				} else {
 					if (numBeatsHidden == 1) {
-						addError( "This rest is hiding beat "+(noteStartBeat + 2)+"\nSplit it into two rests, so that beat "+(noteStartBeat + 2)+" is shown.",noteRest);
+						addError( "This rest is hiding beat "+(noteStartBeat + 2)+".\nSplit it into two rests, so that beat "+(noteStartBeat + 2)+" is shown.",noteRest);
 					} else {
 						var errStr = "This rest is hiding beats ";
 	
@@ -1042,7 +1042,7 @@ MuseScore {
 								if (i == numBeatsHidden - 2) {
 									errStr += " &amp; ";
 								} else {
-									errStr += "\nSplit it so that the beats are shown";
+									errStr += ".\nSplit it so that the beats are shown";
 								}
 							}
 						}
@@ -1164,7 +1164,7 @@ MuseScore {
 			var tupletName = "";
 			if (a==2) tupletName = "duplet";
 			if (a==4) tupletName = "quadruplet";
-			addError ("Never use a "+tupletName+" in "+timeSigStr+" time. Simplify by\ndeleting the tuplet and rewriting\nusing dotted notes instead.", theTuplet);
+			addError ("Never use a "+tupletName+" in "+timeSigStr+" time. Simplify by\ndeleting the tuplet and rewriting using\ndotted notes instead.", theTuplet);
 			return;
 		}
 		

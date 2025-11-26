@@ -5100,7 +5100,7 @@ MuseScore {
 						var y = textObject.offsetY;
 						var actualStaffNum = textObject.staffIdx; // use this rather than currentStaffNum, as for grand staves, dynamics are categorised by the top staff index, but for placement, we need to know the actual staff that they're attached to
 						if (isVoice) {
-							if (placement == Placement.BELOW) {
+							if (p == Placement.BELOW) {
 								isBelow = y >= 1;
 								isAbove = y < -4;
 							} else {
