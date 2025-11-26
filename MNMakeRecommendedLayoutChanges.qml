@@ -2717,6 +2717,7 @@ MuseScore {
 				margins: 10
 			}
 			buttons: [ ButtonBoxModel.Cancel, ButtonBoxModel.Ok ]
+			
 			navigationPanel.section: dialog.navigationSection
 			onStandardButtonClicked: function(buttonId) {
 				if (buttonId === ButtonBoxModel.Cancel) {

@@ -431,6 +431,8 @@ MuseScore {
 		var staffIdx = Math.trunc (chord.track / 4);
 		var currClef = clefAtTick(staffIdx, currTick);
 		checkClef (currClef);
+		var prevLine = -99;
+		var flaggedSharedLineSpace = false;
 		
 		for (var i = 0; i < numNotes; i ++) {
 			var note = notes[i];
@@ -442,10 +444,18 @@ MuseScore {
 			var isDoubleAcc = false;
 			var isMicrotone = false;
 			
-			// NOTE: note.itch is *sounding* pitchj
+			// NOTE: note.pitch is *sounding* pitch
 			var soundingPitch = note.pitch;
 			var writtenPitch = soundingPitch - transpositionInterval.chromatic;
 			var tpc = note.tpc; // tpc of written pitch
+			var theLine = note.line;
+			
+			if (i > 0 && theLine == prevLine && !flaggedSharedLineSpace) {
+				addError ("Try and avoid having two noteheads\non the same line/space.", [notes[i], notes[i-1]]);
+				flaggedSharedLineSpace = true;
+				continue;
+			}
+			prevLine = theLine;
 
 			if (note.accidental == null) {
 				accType = accTypes[tpc2alter(tpc)+3]; // if no visible accidental, use the tpc to work it out
@@ -622,8 +632,13 @@ MuseScore {
 
 						var dci = defaultChromaticInterval[scalarIntervalClass];
 						var alteration = chromaticIntervalClass - dci;
+						if (alteration > 6) {
+							dci += 12;
+							alteration = chromaticIntervalClass - dci;
+							logError ('dci = '+dci+'; chromaticIntervalClass = '+chromaticIntervalClass+'; alteration = '+alteration);
+
+						}
 						
-						//logError ('dci = '+dci+'; chromaticIntervalClass = '+chromaticIntervalClass);
 						isTritone = (chromaticIntervalClass == 6);
 						
 						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
