@@ -24,13 +24,9 @@ MuseScore {
 	menuPath: "Plugins.MNCheckLayoutAndInstrumentation"
 	
 	// **** TEXT FILE DEFINITIONS **** //
-    // on Linux, slice(8) does not work
     function getAssetPath(filename) {
-        if (Qt.platform.os === "linux") {
-            return Qt.resolvedUrl("./assets/" + filename).toString();
-        } else {
-            return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
-        }
+		var assetPath = "./assets/" + filename;
+        return Qt.resolvedUrl(assetPath).toString();
     }
 
     FileIO { id: techniquesfile; source: getAssetPath("techniques.txt"); onError: function(msg) { console.log("Error:", msg); } }
@@ -158,7 +154,7 @@ MuseScore {
 	property var flaggedBravuraHarmonics: false
 	property var flaggedMoodDescriptor: false
 
- 	property var firstVisibleStaff: 0
+ 	property var firstVisibleStaffNum: 0
 	property var staffVisible: []
 	property var haveHadPlayingIndication: false
 	property var flaggedSlurredStaccatoBar: -10
@@ -463,7 +459,6 @@ MuseScore {
 			
 		// **** READ IN TEXT FILES **** //
 		loadTextFiles();
-		
 		// ** SET DIALOG HEADER ** //
 		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
 		
@@ -1214,21 +1209,13 @@ MuseScore {
 								
 								// ************ CHECK DYNAMICS WITH SIGNIFICANT HORIZONTAL OFFSETS 	********** //
 								
-								var maxDynamicOffset = 1.5;
-								if (doCheckDynamics && tickHasDynamic()) {
-									if (theDynamic.offsetX < -maxDynamicOffset) {
-										addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
-									} else {
-										if (theDynamic.offsetX > maxDynamicOffset) {
-											addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
-										}
-									}
-								}
+								
 								
 								if (isRest) {
 									
 									// ************ CHECK DYNAMICS UNDER RESTS ********** //
 									if (doCheckDynamics && tickHasDynamic()) {
+										var theDynamic = dynamicAtCurrTick();
 										if (theDynamic.offsetX > -maxDynamicOffset && theDynamic.offsetX < maxDynamicOffset) {
 											// TO DO: CHECK ALL STAVES OF GRAND STAFF INSTRUMENT
 											if (!isBottomOfGrandStaff && allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic\nmarkings under rests.", theDynamic);
@@ -1451,9 +1438,9 @@ MuseScore {
 						}
 						
 						processingThisBar = cursor.next() ? cursor.measure.is(currentBar) : false;
-						if (cursor.element) {
-							if (cursor.element.type == Element.KEYSIG && currentStaffNum == 0 && prevKeySigBarNum != currentBarNum) {
-								checkKeySignature(elem,cursor.keySignature);
+						if (currentStaffNum == firstVisibleStaffNum && cursor.element) {
+							if (cursor.element.type == Element.KEYSIG && !cursor.element.generated) {
+								checkKeySignature(cursor.element,cursor.keySignature);
 							}
 						}
 						prevNoteRest = noteRest;
@@ -2081,13 +2068,6 @@ MuseScore {
 				actualSystemNum ++;
 				var system = systems[j];
 				// get first visible staff
-				var firstVisibleStaffIdx = -1, lastVisibleStaffIdx = -1;
-				for (var k = 0; k < curScore.nstaves; k++) {
-					if (system.show(k)) {
-						if (firstVisibleStaffIdx == -1) firstVisibleStaffIdx = k;
-						lastVisibleStaffIdx = k;
-					}
-				}
 				if (system.firstMeasure != null) { // ignore frames
 					var systemTop = system.canvasPos.y;
 					var systemHeight = system.firstMeasure.bbox.height; // to get the height of a system, get the height of its first measure
@@ -2205,7 +2185,7 @@ MuseScore {
 						if (mmrBar == null) break;
 					}
 					if (mmrBar) {
-						if (e.staff.is(curScore.staves[firstVisibleStaff])) {
+						if (e.staff.is(curScore.staves[firstVisibleStaffNum])) {
 							while (mmrBar.firstSegment.tick >= startTick && mmrBar.lastSegment.tick <= endTick) {
 								mmrs[mmrBarNum] = e;
 								var theSys = e.parent.parent.parent;
@@ -2365,10 +2345,10 @@ MuseScore {
 			staffVisible[i] = staff.show;
 			// don't process if the part is hidden
 			if (!staffVisible[i]) continue;
-			
+			lastVisibleStaffNum = i;
 			if (!visibleStaffFound) {
 				visibleStaffFound = true;
-				firstVisibleStaff = i;
+				firstVisibleStaffNum = i;
 			}
 			currentInstrumentId = part.musicXmlId;
 			calculateCalcId();
@@ -2503,7 +2483,6 @@ MuseScore {
 		var numVocalParts = 0;
 		for (var i = 0; i < numStaves; i++) {
 			if (staffVisible[i]) {
-				lastVisibleStaffNum = i;
 				var instrumentType = curScore.staves[i].part.musicXmlId;
 				if (instrumentType.includes("strings.")) scoreHasStrings = true;
 				if (instrumentType.includes("wind.")) scoreHasWinds = true;
@@ -3771,7 +3750,7 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function checkInstrumentalTechniques (textObject, plainText, lowerCaseText) {
-		var isBracketed = lowerCaseText.substr(0,1) === "(";
+		var isBracketed = lowerCaseText.substring(0,1) === "(";
 		
 		if (isRest) {
 			for (var i = 0; i < techniques.length; i ++) {
@@ -3826,7 +3805,7 @@ MuseScore {
 			if (lowerCaseText.includes("unis.")) addError("Don’t use ‘unis.’ for winds and brass;\nwrite ‘a 2’/‘a 3’ etc. instead.",textObject);
 			if (lowerCaseText.includes("div.")) addError("Don’t use ‘div.’ for winds and brass.",textObject);
 			
-			if (lowerCaseText.substr(0,3) === "flz") {
+			if (lowerCaseText.substring(0,3) === "flz") {
 				// check trem
 				flzFound = true;
 				if (!isTremolo) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
@@ -3857,10 +3836,10 @@ MuseScore {
 			}
 			
 			// **** CHECK ALREADY PLAYING ORD. **** .//
-			if (lowerCaseText.substr(0,5) === "(ord." ) {
+			if (lowerCaseText.substring(0,5) === "(ord." ) {
 				if (currentContactPoint != "ord") addError ("This looks like it’s an indication to change to ord.\nIf so, you don’t need the parentheses.",textObject)
 			}
-			if (lowerCaseText.substr(0,4) === "ord." || lowerCaseText === "pos. nat.") {
+			if (lowerCaseText.substring(0,4) === "ord." || lowerCaseText === "pos. nat.") {
 				if (currentContactPoint === "ord" && (currentPlayingTechnique === "arco" || currentPlayingTechnique === "pizz")) {
 					if (currentVibrato != 'con') {
 						addError("Instrument is already playing ord?\nIs that meant to refer to the vibrato (i.e. vib. norm.?)",textObject);
@@ -4202,9 +4181,9 @@ MuseScore {
 		/*if (noteRest.articulations.length > 0) {
 			logError ('Artic = '+noteRest.articulations[0].type);
 		}*/
-		//logError ('Found trill: psanner = '+currentTrill.spanner+'; orn = '+currentTrill.spanner.ornament);	
+		//logError ('Found elem type: '+currentTrill.type+'; spanner type = '+currentTrill.spanner.type+'; trill type = '+Element.TRILL+'; trill seg type = '+Element.TRILL_SEGMENT+'; orn = '+currentTrill.spanner.ornament);	
 
-		//logError ('Found trill: show acc = '+currentTrill.spanner.ornamentShowAccidental+'; show cue = '+currentTrill.spanner.showCueNote);	
+		//logError ('Found trill: show acc = '+currentTrill.spanner.ornament.ornamentShowAccidental+'; show cue = '+currentTrill.spanner.ornament.showCueNote);
 	}
 	
 	// ***************************************************************** //
@@ -4527,12 +4506,12 @@ MuseScore {
 				
 				// check if the subtitle is lower-case
 				// the only exception is SATB-like choral descriptions (SSA, TTBB, etc.)
-				if (plainText != lowerCaseText && lowerCaseText.substr(0,4) === "for " && lowerCaseText.length < 20) {
+				if (plainText != lowerCaseText && lowerCaseText.substring(0,4) === "for " && lowerCaseText.length < 20) {
 					var isSATB = plainText.match(/\b(S*A*T*B*)\b/) != null;
 					if (!isSATB) addError( "The subtitle can be all lower-case, unless it includes people’s names.", textObject);
 				}
 				if (elemPage !== null) {
-					if (hasTitlePage && lowerCaseText.substr(0,3) === 'for' && elemPage.pagenumber == firstPageOfMusicNum) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
+					if (hasTitlePage && lowerCaseText.substring(0,3) === 'for' && elemPage.pagenumber == firstPageOfMusicNum) addError ( "If you have a title page that lists the forces/instrumentation,\nyou don’t need to repeat them on the first page of music.", textObject);
 				}
 			}
 			
@@ -4636,33 +4615,41 @@ MuseScore {
 				if (c == 32) addError("‘"+plainText+"’ begins with a space, which could be deleted.", textObject);
 				if (c < 32 && c != 10 && c != 13) addError("‘"+plainText+"’ does not seem to begin with a letter: is that correct?" ,textObject);
 
-				// **** CHECK COMMON SPELLING ERRORS & ABBREVIATIONS **** //
+				// **** CHECK TEXT WITH SPELLING ERROR AT START OF STRING **** //
 				var isSpellingError = false;
-				for (var i = 0; i < spellingerrorsatstart.length / 2; i++) {
-					var spellingError = spellingerrorsatstart[i*2];
-					if (lowerCaseText.substr(0,spellingError.length) === spellingError) {
-						isSpellingError = true;
-						var correctSpelling = spellingerrorsatstart[i*2+1];
-						var diff = plainText.length-spellingError.length;
-						var correctText = (diff > 0) ? correctSpelling+plainText.substr(spellingError.length) : correctSpelling;
-						if (plainText.length > 50) {
-							addError("This text includes the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling.trim()+"’.",textObject);
-						} else {
-							addError("‘"+plainText+"’ contains a misspelling;\nit should be ‘"+correctText.trim()+"’.",textObject);
+				for (var i = 0; i < spellingerrorsatstart.length; i+=2) {
+					var spellingError = spellingerrorsatstart[i];
+					if (spellingError.length > 0) {
+						var textStart = lowerCaseText.substring(0,spellingError.length);
+						if (textStart === spellingError) {
+							logError ('textStart = '+textStart+'; spellingError = '+spellingError);
+							isSpellingError = true;
+							var correctSpelling = spellingerrorsatstart[i+1];
+							var diff = plainText.length-spellingError.length;
+							var correctText = (diff > 0) ? correctSpelling+plainText.substring(spellingError.length) : correctSpelling;
+							if (plainText.length > 50) {
+								addError("This text starts with the following misspelling: "+spellingError+";\nit should be ‘"+correctSpelling.trim()+"’.",textObject);
+							} else {
+								addError("‘"+plainText+"’ starts with a misspelling;\nit should be ‘"+correctText.trim()+"’.",textObject);
+							}
+							return;
 						}
-						return;
+					} else {
+						logError ('spellingError.length was 0; i is '+i+'; len = '+spellingerrorsatstart.length);
 					}
 				}
 
 				// **** CHECK TEXT WITH SPELLING ERRORS ANYWHERE **** //
 				if (!isSpellingError) {
 					var correctText = plainText;
-					for (var i = 0; i < spellingerrorsanywhere.length / 2; i++) {
-						var spellingError = spellingerrorsanywhere[i*2];
-						if (correctText.includes(spellingError)) {
-							isSpellingError = true;
-							var correctSpelling = spellingerrorsanywhere[i*2+1];
-							correctText = correctText.replace(spellingError,correctSpelling);
+					for (var i = 0; i < spellingerrorsanywhere.length; i+=2) {
+						var spellingError = spellingerrorsanywhere[i];
+						if (spellingError.length > 0) {
+							if (lowerCaseText.includes(spellingError)) {
+								isSpellingError = true;
+								var correctSpelling = spellingerrorsanywhere[i+1];
+								correctText = correctText.replace(spellingError,correctSpelling);
+							}
 						}
 					}
 					if (isSpellingError) {
@@ -4680,7 +4667,7 @@ MuseScore {
 					for (var i = 0; i < dontCap.length; i++) {
 						var theWord = dontCap[i];
 						var l = theWord.length;
-						if (lowerCaseText.substr(0,l) === theWord && plainText.substr(0,l) !== theWord) {
+						if (lowerCaseText.substring(0,l) === theWord && plainText.substring(0,l) !== theWord) {
 							addError ( "‘"+theWord+"’ can be lower-case.", textObject);
 							return;
 						}
@@ -4710,8 +4697,8 @@ MuseScore {
 						var theMatch = lowerCaseText.match(r);
 						if (theMatch != null) {
 							var theIndex = theMatch.index;
-							if (plainText.substr(theIndex,1) !== lowerCaseText.substr(theIndex,1)) {
-								//logError ('lowercaseMarking = '+lowercaseMarking+' theIndex = '+theIndex+' ps = '+plainText.substr(theIndex,1)+' lcs = '+lowerCaseText.substr(theIndex,1));
+							if (plainText.substring(theIndex,1) !== lowerCaseText.substring(theIndex,1)) {
+								//logError ('lowercaseMarking = '+lowercaseMarking+' theIndex = '+theIndex+' ps = '+plainText.substring(theIndex,1)+' lcs = '+lowerCaseText.substring(theIndex,1));
 								addError("‘"+lowercaseMarking+"’ should not have a capital first letter.",textObject);
 								return;
 							}
@@ -4746,8 +4733,8 @@ MuseScore {
 				if (lowerCaseText === "with vibrato") addError( "This can be abbreviated to ‘con vib.’",textObject);
 				if (lowerCaseText === "no vibrato") addError( "This can be abbreviated to ‘senza vib.’",textObject);
 				if (lowerCaseText === "much vibrato" || lowerCaseText === "a lot of vibrato") addError( "This can be abbreviated to ‘molto vib.’",textObject);
-				if (lowerCaseText.substr(0,5) === "arco.") addError( "‘arco’ should not have a full-stop at the end.",textObject);
-				if (lowerCaseText.substr(0,10) === "sul tasto.") addError( "‘tasto’ should not have a full-stop at the end.",textObject);
+				if (lowerCaseText.substring(0,5) === "arco.") addError( "‘arco’ should not have a full-stop at the end.",textObject);
+				if (lowerCaseText.substring(0,10) === "sul tasto.") addError( "‘tasto’ should not have a full-stop at the end.",textObject);
 				if (lowerCaseText === "norm") addError( "‘norm’ should have a full-stop at the end\n(but is more commonly written as ‘ord.’).",textObject);
 				if (lowerCaseText.includes("sul. ")) addError( "‘sul’ should not have a full-stop after it.",textObject);
 				if (lowerCaseText.includes("  ")) addError( "This text has a double-space in it.",textObject);
@@ -4969,7 +4956,7 @@ MuseScore {
 						}
 						//logError ('Found gradual tempo change: end is '+tempoChangeMarkingEnd+'; currTick = '+currTick);
 
-						if (plainText.substr(0,1) != lowerCaseText.substr(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
+						if (plainText.substring(0,1) != lowerCaseText.substring(0,1)) addError("‘"+plainText+"’ looks like it is a temporary change of tempo.\nIf it is, it should not have a capital first letter (see ‘Behind Bars’, p. 182)",textObject);
 					}
 		
 					// *** CHECK TEMPO MARKINGS (BUT NOT TEMPO CHANGES) *** //
@@ -4996,7 +4983,7 @@ MuseScore {
 						tempoChangeMarkingEnd = -1;
 				
 						// **** CHECK WHETHER TEMPO SHOULD BE CAPITALISED **** //
-						if (plainText.substr(0,1) === lowerCaseText.substr(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substr(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
+						if (plainText.substring(0,1) === lowerCaseText.substring(0,1) && lowerCaseText != "a tempo" && lowerCaseText.charCodeAt(0)>32 && !lowerCaseText.substring(0,4).includes("=")) addError("‘"+plainText+"’ looks like it is establishing a new tempo;\nif it is, it should have a capital first letter. (See ‘Behind Bars’, p. 182)",textObject);
 						
 						// *** CHECK TEMPO DOES NOT HAVE A DOT AT THE END *** //
 						if (plainText.slice(-1) === '.' && !lowerCaseText.includes('mouv') && !lowerCaseText.includes('rit') && !lowerCaseText.includes('accel')) addError ("Tempo markings do not need a full-stop at the end.",textObject);
@@ -5091,6 +5078,17 @@ MuseScore {
 					theDynamic = textObject;
 					lastDynamicTick = currTick;
 					setDynamicLevel (plainText);
+					
+					var maxDynamicOffset = 1.5;
+					
+					// *** Check offset of dynamic *** //
+					if (theDynamic.offsetX < -maxDynamicOffset) {
+						addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+					} else {
+						if (theDynamic.offsetX > maxDynamicOffset) {
+							addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+						}
+					}
 					
 					// *** Check location of dynamics is correct *** //
 					if (doCheckTextPositions) {
@@ -5443,6 +5441,10 @@ MuseScore {
 		return dynamicTicks[currentStaffNum][currTick] != null;
 	}
 	
+	function dynamicAtCurrTick () {
+		return dynamicTicks[currentStaffNum][currTick];
+	}
+	
 		// ***************************************************************** //
 	// **** 														**** //
 	// **** 	SETS A VARIABLE DEPENDING ON THE CURRENT DYNAMIC 	**** //
@@ -5507,7 +5509,6 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function checkKeySignature (keySig,sharps) {
-		
 		if (sharps == prevKeySigSharps) {
 			if (sharps == 0) return; // these are invisible
 			// redundant key signature
@@ -5542,12 +5543,9 @@ MuseScore {
 		// str parameter is the name of a standard ensemble (e.g. 'string quartet')
 		// that requires all barlines to be connected; or null if it's a non-standard ensemble
 		
-		var lastVisibleStaff = 0;
-		for (var i = 0; i < numStaves; i++) if (staffVisible[i]) lastVisibleStaff = i;
-		
 		// we have an ensemble that requires all barlines to be connected
 		if (str != null) {
-			for (var i = 0; i < lastVisibleStaff; i++) {
+			for (var i = 0; i < lastVisibleStaffNum; i++) {
 				if (staffVisible[i]) {
 					var staff = curScore.staves[i];
 					if (staff.staffBarlineSpan == 0) {
@@ -5564,7 +5562,7 @@ MuseScore {
 		// NB: more we could do here, e.g. orchestral scores, etc.
 		var prevBarlineSpan = 0;
 		var flaggedBarlineConnection = false;
-		for (var i = 0; i < lastVisibleStaff; i++) {
+		for (var i = 0; i < lastVisibleStaffNum; i++) {
 			if (staffVisible[i]) {
 				var staff = curScore.staves[i];
 				var barlineSpan = staff.staffBarlineSpan;
@@ -5605,20 +5603,10 @@ MuseScore {
 		// these ensembles require no bracket
 		var noBracketArray = ["piano trio", "piano quartet", "duo"];
 		
-		var firstVisibleStaff = -1;
-		var lastVisibleStaff = -1;
-		
-		for (var i = 0; i < numStaves; i++) {
-			if (staffVisible[i]) {
-				if (firstVisibleStaff == -1) firstVisibleStaff = i;
-				lastVisibleStaff = i;
-			}
-		}
-		
-		var visibleStaffSpan = lastVisibleStaff - firstVisibleStaff + 1;
+		var visibleStaffSpan = lastVisibleStaffNum - firstVisibleStaffNum + 1;
 		
 		// check for brace on grand staves
-		for (var i = firstVisibleStaff; i < lastVisibleStaff; i++) {
+		for (var i = firstVisibleStaffNum; i < lastVisibleStaffNum; i++) {
 			if (isTopOfGrandStaff[i]) {
 				// check for the presence of a brace
 				var theStaff = curScore.staves[i];
@@ -5646,7 +5634,7 @@ MuseScore {
 					if (staffVisible[i]) {	
 						var theStaff = curScore.staves[i];
 						var numBrackets = theStaff.brackets.length;
-						if (i == firstVisibleStaff) {
+						if (i == firstVisibleStaffNum) {
 							
 							// *** Check whether there are no brackets *** //
 							if (numBrackets == 0) addError ('For '+str+'s, there should be a single bracket around the entire system.\nAdd a bracket from the Brackets palette.','system1 0');
@@ -6965,7 +6953,7 @@ MuseScore {
 	
 	function checkRehearsalMark (textObject) {
 		
-		if (currentStaffNum != firstVisibleStaff) return;
+		if (currentStaffNum != firstVisibleStaffNum) return;
 		//logError("Found reh mark "+textObject.text);
 		if (!isOnFirstBeatOfBar(textObject)) addError ("This rehearsal mark is not attached to beat 1.\nAll rehearsal marks should be above the first beat of the bar.",textObject);
 		//logError ("Checking rehearsal mark");
