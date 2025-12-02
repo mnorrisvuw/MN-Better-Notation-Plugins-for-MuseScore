@@ -1214,6 +1214,7 @@ MuseScore {
 									// ************ CHECK DYNAMICS UNDER RESTS ********** //
 									if (doCheckDynamics && tickHasDynamic()) {
 										var theDynamic = dynamicAtCurrTick();
+										var maxDynamicOffset = 1.5;
 										if (theDynamic.offsetX > -maxDynamicOffset && theDynamic.offsetX < maxDynamicOffset) {
 											// TO DO: CHECK ALL STAVES OF GRAND STAFF INSTRUMENT
 											if (!isBottomOfGrandStaff && allTracksHaveRestsAtCurrTick()) addError ("In general, don’t put dynamic\nmarkings under rests.", theDynamic);
