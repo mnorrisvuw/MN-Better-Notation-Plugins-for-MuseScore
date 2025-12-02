@@ -6766,14 +6766,7 @@ MuseScore {
 	// ***************************************************************** //
 	
 	function checkStemsNoteheadsAndBeams (noteRest) {
-		// REINSTATE THIS ONCE THE API SUPPORTS USER_MODIFIED PROPERTY
-		/*if (noteRest.beam) {
-			var theBeam = noteRest.beam;
-			if (!theBeam.is(prevBeam)) {
-				if (!theBeam.generated) addError ("This beam seems to have been moved away from its\ndefault position. If this was not deliberate, you can reset it\nby selecting it and pressing "+cmdKey+"-R",noteRest);
-				prevBeam = theBeam;
-			}
-		}*/
+		
 		//logError ('Checking stems and beams');
 		for (var i = 0; i < noteRest.notes.length; i ++) {
 			var theNote = noteRest.notes[i];
@@ -6820,6 +6813,10 @@ MuseScore {
 					// is this the start of the beam?
 					var currBeam = noteRest.beam;
 					if (!currBeam.is(prevBeam)) {
+						
+						// FLAG MANUALLY TWEAKED BEAM
+						if (currBeam.userModified) addError ("This beam seems to have been moved away from its\ndefault position. If this was not deliberate, you can reset it\nby selecting it and pressing "+cmdKey+"-R",noteRest);
+						
 						// beamPos tells you where the exactly the top left-hand part of the beam is
 						// A measurement of 0 is the top line
 						// A negative measurement means above the top line
@@ -7519,8 +7516,7 @@ MuseScore {
 		}
 		var eType = e.type;
 		if (eType == Element.BEAM) {
-			// In MS 4.6 currently, there's no way to get the tick of a beam, or to get its child elements to get their ticks
-			// as such, we should probably avoid highlighting beams until this is fixed
+			// Coming in MS 4.7: beam.elements
 			logError ('Found beam: tick = '+e.tick);
 		}
 		if (e.spanner != undefined) {
