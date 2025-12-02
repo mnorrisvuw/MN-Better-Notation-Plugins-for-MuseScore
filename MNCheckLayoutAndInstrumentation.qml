@@ -463,9 +463,9 @@ MuseScore {
 		dialog.titleText = 'MN CHECK LAYOUT AND INSTRUMENTATION '+versionNumber;
 		
 		// **** VERSION CHECK **** //
-		var version461 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 6) || (mscoreMajorVersion == 4 && mscoreMinorVersion == 6 && mscoreUpdateVersion >= 1);
-		if (!version461) {
-			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6.1 or later.</p> ";
+		var version464 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 6) || (mscoreMajorVersion == 4 && mscoreMinorVersion == 6 && mscoreUpdateVersion >= 4);
+		if (!version464) {
+			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6.4 or later. Please update through MuseHub.</p> ";
 			dialog.show();
 			return;
 		}
@@ -476,7 +476,6 @@ MuseScore {
 		for (var i = 0; i < numStaves; i++) if (staves[i].show) numVisibleStaves ++;
 		numTracks = numStaves * 4;
 		firstBarInScore = curScore.firstMeasure;
-		//logError ('bar name = '+firstBarInScore.userName());
 		lastBarInScore = curScore.lastMeasure;
 		endOfScoreTick = curScore.lastSegment.tick+1;
 		
@@ -495,7 +494,6 @@ MuseScore {
 		
 		// ************  	SHOW THE OPTIONS WINDOW 	************ //
 		options.open();
-		
 		
 	}
 	
@@ -3579,7 +3577,7 @@ MuseScore {
 				if (isBottomOfGrandStaff) isAbove = c == AutoOnOff.ON && y < 5;
 				isBelow = !isAbove;
 			}
-			if (p == Placement.BELOW) {i
+			if (p == Placement.BELOW) {
 				// no way to get the hairpin above the staff if it's set to below
 				isAbove = false;
 				isBelow = true;
@@ -4176,13 +4174,9 @@ MuseScore {
 	}
 	
 	function checkTrill () {
-		// wait until MS 4.6.?
-		//logError ('Found trill: '+currentTrill+'; type = '+currentTrill.type);
-		/*if (noteRest.articulations.length > 0) {
-			logError ('Artic = '+noteRest.articulations[0].type);
-		}*/
-		//logError ('Found elem type: '+currentTrill.type+'; spanner type = '+currentTrill.spanner.type+'; trill type = '+Element.TRILL+'; trill seg type = '+Element.TRILL_SEGMENT+'; orn = '+currentTrill.spanner.ornament);	
-
+		// coming in MS 4.7
+		
+		//logError ('Found elem type: '+currentTrill.type+'; spanner type = '+currentTrill.spanner.type+'; trill type = '+Element.TRILL+'; trill seg type = '+Element.TRILL_SEGMENT+'; orn = '+currentTrill.spanner.ornament);
 		//logError ('Found trill: show acc = '+currentTrill.spanner.ornament.ornamentShowAccidental+'; show cue = '+currentTrill.spanner.ornament.showCueNote);
 	}
 	
@@ -6472,25 +6466,32 @@ MuseScore {
 		if (isStartOfSlur && isStringInstrument && currentSlurLength > division * 8) addError("This slur looks very long for a string instrument,\n and may need to be broken into multiple slurs.",currentSlur);
 		if (isEndOfSlur && isRest) addError ("This slur seems to end on a rest.\nWas it supposed to be an l.v. tie instead?",currentSlur);
 
+		var thresholdMove = 0.5;
+		
 		// **** CHECK WHETHER SLUR HAS BEEN MANUALLY SHIFTED **** //
-		//logError ('tick = '+currentSlur.spanner.spannerTick.ticks+'; off1 = '+currentSlur.slurUoff1);
-		//logError ('tick = '+currentSlur.spanner.spannerTick.ticks+'; bbox = '+currentSlur.bbox+'; canvasPos = '+currentSlur.canvasPos+'; offY = '+currentSlur.offsetY+'; offX = '+currentSlur.offsetX+' off1 = '+currentSlur.spanner.slurUoff1+'; off2 = '+currentSlur.spanner.slurUoff2+'; off3 = '+currentSlur.spanner.slurUoff3+'; off4 = '+currentSlur.spanner.slurUoff4+'; pos = '+currentSlur.pos+'; pagePos = '+currentSlur.pagePos+'; isStartOfSlur = '+isStartOfSlur); 
-		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 4)) {
+		if (isStartOfSlur && (flaggedManualSlurBarNum == -1 || flaggedManualSlurBarNum < currentBarNum - 1)) {
 			if (currentSlur.offsetY != 0 && currentSlur.offsetX != 0) {
-				addError ("This slur looks like it has been dragged from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
+				addError ("This slur has been dragged from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
 				flaggedManualSlurBarNum = currentBarNum;
 			} else {
 				if (currentSlur.offsetY != 0) {
-					addError ("This slur looks like it has been dragged vertically from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
+					addError ("This slur has been dragged vertically from its default position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
 					flaggedManualSlurBarNum = currentBarNum;
 				}
 				if (currentSlur.offsetX != 0) {
-					addError ("This slur looks like it has been dragged horizontally from its correct position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
+					addError ("This slur has been dragged horizontally from its default position.\nIf this was not deliberate, you can reset its position by\nselecting the slur and pressing "+cmdKey+"-R.",currentSlur);
 					flaggedManualSlurBarNum = currentBarNum;
 				}
 			}
-			if (Math.abs(currentSlur.spanner.slurUoff1.x) > 0.5 || Math.abs(currentSlur.spanner.slurUoff4.x) > 0.5) {
-				addError ("This slur looks like it has been manually positioned by dragging an endpoint.\nIt’s usually best to use the automatic positioning of MuseScore by first\nselecting all of the notes under the slur, and then adding the slur.",currentSlur);
+			
+			// These are now available in MuseScore 4.6.4
+			var off1 = currentSlur.slurUoff1;
+			var off2 = currentSlur.slurUoff2;
+			var off3 = currentSlur.slurUoff3;
+			var off4 = currentSlur.slurUoff4;
+			
+			if (Math.abs(off1.x) > thresholdMove || Math.abs(off1.y) > thresholdMove || Math.abs(off2.x) > thresholdMove || Math.abs(off2.y) > thresholdMove || Math.abs(off3.x) > thresholdMove || Math.abs(off3.y) > thresholdMove || Math.abs(off4.x) > thresholdMove || Math.abs(off4.y) > thresholdMove) {
+				addError ("One of the anchors of this slur has been moved\nquite far away from its default location. You can\nreset to the default by selecting the slur\nand pressing "+cmdKey+"-R.",currentSlur);
 				flaggedManualSlurBarNum = currentBarNum;
 			}
 		}
