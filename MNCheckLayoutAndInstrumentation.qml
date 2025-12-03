@@ -1207,8 +1207,6 @@ MuseScore {
 								
 								// ************ CHECK DYNAMICS WITH SIGNIFICANT HORIZONTAL OFFSETS 	********** //
 								
-								
-								
 								if (isRest) {
 									
 									// ************ CHECK DYNAMICS UNDER RESTS ********** //
@@ -3595,7 +3593,7 @@ MuseScore {
 		}	
 		
 		// **** Does the hairpin start under a rest? **** //
-		if (allTracksHaveRestsAtCurrTick (hairpinStartTick)) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);		
+		if (allTracksHaveRestsAtCurrTick(hairpinStartTick)) addError ("This hairpin appears to start under a rest.\nAlways start hairpins under notes.",currentHairpin);		
 		var startOffset = Math.abs(currentHairpin.offset.x);
 		var endOffset = currentHairpin.userOff2.x;
 		var maxOffset = 1.5;
@@ -4406,28 +4404,24 @@ MuseScore {
 			for (var j = 0; j < elems.length; j++) {
 				var e = elems[j];
 				if (e.type == Element.TEXT) {
-					//logError ("Found text object in frame: "+e.text);
 					var textStyle = e.subStyle;
 					if (textStyle != Tid.TUPLET) {
 						if (frame.pagePos.y > threshold) hasFooter = true;
 						checkTextObject (e);
 					}
-					if (textStyle == Tid.TITLE) {
-						if (getPageNumber(e) == firstPageOfMusicNum) hasTitleOnFirstPageOfMusic = true;
-					}
-					if (textStyle == Tid.SUBTITLE) {
-						if (getPageNumber(e) == firstPageOfMusicNum) hasSubtitleOnFirstPageOfMusic = true;
-					}
-					if (textStyle == Tid.COMPOSER) {
-						if (getPageNumber(e) == firstPageOfMusicNum) hasComposerOnFirstPageOfMusic = true;
-					}
+					if (textStyle == Tid.TITLE) if (getPageNumber(e) == firstPageOfMusicNum) hasTitleOnFirstPageOfMusic = true;
+					if (textStyle == Tid.SUBTITLE) if (getPageNumber(e) == firstPageOfMusicNum) hasSubtitleOnFirstPageOfMusic = true;
+					if (textStyle == Tid.COMPOSER) if (getPageNumber(e) == firstPageOfMusicNum) hasComposerOnFirstPageOfMusic = true;
 				}
 			}
 		}
-
-		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetop");
-		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the solo instrument\nat the top of the first page of music. (See ‘Behind Bars’, p. 504)","pagetop");
-		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name\nat the top of the first page of music.\n(See ‘Behind Bars’, p. 504)","pagetopright");
+		
+		// *** FLAG IF THERE DOESN’T APPEAR TO BE A TITLE, SUBTITLE OR COMPOSER ON THE FIRST PAGE OF MUSIC *** //
+		if (!hasTitleOnFirstPageOfMusic) addError ("It doesn’t look like you have the title at the top of the first\npage of music. If you do, then it hasn’t been entered as Title Text\n(right-click on the top frame and select Add→Title).\nSee ‘Behind Bars’ p. 504 for details about information on the first page of music","pagetop");
+		
+		if (isSoloScore && !hasSubtitleOnFirstPageOfMusic)  addError ("It doesn’t look like you have a subtitle with the name of the\nsolo instrument at the top of the first page of music.\nIf you do, then it hasn’t been entered as Subtitle Text\n(right-click on the top frame and select Add→Subtitle).\nSee ‘Behind Bars’ p. 504 for details about information on the first page of music","pagetop");
+		
+		if (!hasComposerOnFirstPageOfMusic) addError ("It doesn’t look like you have the composer’s name at the top of the\nfirst page of music. If you do, then it hasn’t been entered as Composer Text\n(right-click on the top frame and select Add→Composer).\nSee ‘Behind Bars’ p. 504 for details about information on the first page of music.","pagetopright");
 	}
 	
 	// ***************************************************************** //
@@ -4442,7 +4436,7 @@ MuseScore {
 		if (!textObject.visible) return;
 		
 		var windAndBrassMarkings = ["1.","2.","3.","4.","5.","6.","7.","8.","a2", "a 2","a3", "a 3","a4", "a 4","a5", "a 5","a6", "a 6","a7","a 7","a8","a 8","solo","1. solo","2. solo","3. solo","4. solo","5. solo","6. solo","7. solo","8. solo"];
-		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","h","metNoteQuarterUp","q","metNote8thUp","e","metNote16thUp","s","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z","dynamicNiente", "n", "","p","","ppp","","pp","","mp","","mf","","f","","ff","","fff","","sf","","sfz","","sffz","","z","","n","&nbsp;"," "," "," "];
+		var replacements = ["accidentalNatural","n","accidentalSharp","#","accidentalFlat","b","metNoteHalfUp","𝅗𝅥","metNoteQuarterUp","♩","metNote8thUp","♪","metNote16thUp","𝅘𝅥𝅯","metAugmentationDot",".","dynamicForte","f","dynamicMezzo","m","dynamicPiano","p","dynamicRinforzando","r","dynamicSubito","s","dynamicSforzando","s","dynamicZ","z","dynamicNiente", "n", "","p","","ppp","","pp","","mp","","mf","","f","","ff","","fff","","sf","","sfz","","sffz","","z","","n","&nbsp;"," "," "," "];
 		
 		var elementType = textObject.type;
 		var isTempoChangeElement = elementType == Element.GRADUAL_TEMPO_CHANGE || elementType == Element.GRADUAL_TEMPO_CHANGE_SEGMENT;
@@ -4455,7 +4449,7 @@ MuseScore {
 		var isComposerTextStyle = textStyle == Tid.COMPOSER;
 		var isTempoTextStyle = textStyle == Tid.TEMPO;
 		var isMetronomeTextStyle = textStyle == Tid.METRONOME;
-		var nonBoldText = '', boldText = '';
+		var boldText;
 		var elemPage = getPage(textObject);
 		
 		// if there's no text available, then bail
@@ -4489,6 +4483,7 @@ MuseScore {
 		}
 		
 		var lowerCaseText = plainText.toLowerCase();
+		boldText = '';
 		
 		if (lowerCaseText != '') {
 
@@ -4549,7 +4544,7 @@ MuseScore {
 			// ** THIS REGEX ATTEMPTS TO MATCH ALL POSSIBLE PERMUTATIONS OF A METRONOME MARKING **//
 			// ** NB — DON'T CHANGE THIS WITHOUT CHECKING THAT THE AUGMENTATION DOT CAPTURE GROUP IS CORRECT **
 			// ** THIS IS THE INDEX OF THE CAPTURE GROUP (\.|<sym>metAugmentationDot<\/sym>|\uECB7) ** //
-			var metronomeComponentRegex = new RegExp( /(<[^>]*>|\s)*\(?(<[^>]*>|\s)*(c|\.|approx|circa|approx)*(<[^>]*>|\s)*(metNote[^<]*|\uECA5|\uECA7|\uECA3)(<[^>]*>|\s)*(\.|metAugmentationDot|\uECB7)?(<[^>]*>|\s)*=(<[^>]*>|\s)*(c|\.|approx|circa|approx)*(<[^>]*>|\s)*[0-9–\-—]*(<[^>]*>|\s)*\)?/);
+			var metronomeComponentRegex = new RegExp( /(<[^>]*>|\s)*\(?(<[^>]*>|\s)*(c|\.|approx|circa|approx)*(<[^>]*>|\s)*(metNote[^<]*|\uECA5|\uECA7|\uECA3)(<[^>]*>|\s)*(\.|metAugmentationDot|\uECB7)?(<[^>]*>|\s)*=(<[^>]*>|\s)*(c|\.|approx|circa|approx)*(metNote[^<]*|\uECA5|\uECA7|\uECA3)*(<[^>]*>|\s)*(\.|metAugmentationDot|\uECB7)?(<[^>]*>|\s)*[0-9–\-—]*(<[^>]*>|\s)*\)?/);
 			var augDotCaptureGroup = 7;
 			
 			if (currentBarNum > 0) {
@@ -4797,21 +4792,12 @@ MuseScore {
 					// *** IF THERE IS MANUAL STYLING, THERE WILL BE SOME <B> TAGS				*** //
 					// *** IF NO <B> TAGS, THEN THE STYLE OF THE WHOLE TEXT OBJECT APPLIES		*** //
 					if (styledText.includes("<b>")) {
-						// strip all <b> tags and their contents, to leave only the plain text
-						nonBoldText = styledText.replace(/<b>.+?<\/b>/g,'').replace(/<[^>]+>/g, "");
 						// strip out anything NOT in between <b> tags
 						boldText = styledText.replace(/^.*?<b>|<\/b>.*?(<b>|$)+/g,'');
 					} else {
 						var textStyleIsBold = textObject.fontStyle == 1;					
-						if (textStyleIsBold) {
-							boldText = plainText;
-							nonBoldText = '';
-						} else {
-							boldText = '';
-							nonBoldText = plainText;
-						}
+						boldText = textStyleIsBold ? plainText : '';
 					}
-					//logError ('nonBoldText = '+nonBoldText.replace(/</g,'≤')+'; boldText = '+boldText.replace(/</g,'≤'));
 					var boldTextStripped = boldText.replace(/<\/?[^>]*?>/g,'');
 					var nonMetronomeComponentStripped = nonMetronomeComponent.replace(/<\/?[^>]*?>/g,'').trim();
 					if (containsMetronomeComponent) metroIsBold = boldTextStripped.includes('=');
@@ -4831,16 +4817,26 @@ MuseScore {
 						// look at the bit to the right of the metronome component we matched
 						// if there's anything over there, it should probably be to left
 						// There may be some exceptions to this I haven't thought of, however
-						// (maybe deal with this in a future version) 
-						var strToRightOfMetronomeComponent = styledText.split(metronomeComponent)[1];
+						// (maybe deal with this in a future version)
+						var tempoSplitByMetronomeComponent = styledText.split(metronomeComponent);
+						var strToLeftOfMetronomeComponent = tempoSplitByMetronomeComponent[0];
+						var strToRightOfMetronomeComponent = tempoSplitByMetronomeComponent[1];
 						//logError('strToRightOfMetronomeComponent = '+strToRightOfMetronomeComponent);
 						if (strToRightOfMetronomeComponent != undefined) {
 							strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.trim();
-							if (strToRightOfMetronomeComponent != '') {
+							// flag if there was nothing to the left of the metronome, but there was something to the right of the metronome
+							if (strToLeftOfMetronomeComponent === '' && strToRightOfMetronomeComponent !== '') {
+								var isResetTempoIndication = false;
+								var minLength = 3;
 								var maxLength = 22;
-								if (strToRightOfMetronomeComponent.length > maxLength) strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.slice(0, maxLength) + "...";
-
-								addError ("It’s usually best to put the mood/tempo descriptor\n(‘"+strToRightOfMetronomeComponent+"’) before the metronome marking.",textObject);
+								if (strToRightOfMetronomeComponent.length > minLength) {
+									// check if the bit to the right of the metronome component was just telling the player that this was Tempo Primo (e.g.)
+									for (var k = 0; k < resetTempoArray.length && !isResetTempoIndication; k++) if (strToRightOfMetronomeComponent.includes(resetTempoArray[k])) isResetTempoIndication = true;
+									if (!isResetTempoIndication) {
+										if (strToRightOfMetronomeComponent.length > maxLength) strToRightOfMetronomeComponent = strToRightOfMetronomeComponent.slice(0, maxLength) + "...";
+										addError ("It’s usually best to put the mood/tempo descriptor\n(‘"+strToRightOfMetronomeComponent+"’) before the metronome marking.",textObject);
+									}
+								}
 							}
 						}
 						
@@ -5074,14 +5070,22 @@ MuseScore {
 					lastDynamicTick = currTick;
 					setDynamicLevel (plainText);
 					
-					var maxDynamicOffset = 1.5;
-					
+					var maxDynamicXOffset = 1.5;
+					var maxDynamicYOffset = 5;
+
 					// *** Check offset of dynamic *** //
-					if (theDynamic.offsetX < -maxDynamicOffset) {
-						addError ("This dynamic has a significant negative x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+					if (theDynamic.offsetX < -maxDynamicXOffset) {
+						addError ("This dynamic has a significant negative horizontal offset.\nThis may cause layout and playback problems.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
 					} else {
-						if (theDynamic.offsetX > maxDynamicOffset) {
-							addError ("This dynamic has a significant positive x offset.\nThis may cause problems in parts and playback.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+						if (theDynamic.offsetX > maxDynamicXOffset) {
+							addError ("This dynamic has a significant positive horizontal offset.\nThis may cause layout and playback problems.\nDrag the dynamic horizontally until its attachment line is more vertical.",theDynamic);
+						}
+					}
+					if (theDynamic.offsetY < -maxDynamicYOffset) {
+						addError ("This dynamic has a significant negative vertical offset.\nThis may cause layout problems in the parts.\nDrag the dynamic closer to the staff.",theDynamic);
+					} else {
+						if (theDynamic.offsetY > maxDynamicYOffset) {
+							addError ("This dynamic has a significant positive vertical offset.\nThis may cause layout problems in the parts.\nDrag the dynamic closer to the staff.",theDynamic);
 						}
 					}
 					
@@ -5230,6 +5234,8 @@ MuseScore {
 		
 		var startTrack = currentTrack - (currentTrack % 4);
 		var endTrack = startTrack + 4;
+		// calculate which tracks we need to check for the presence of rests; if this is a grand
+		// staff, then we also need to check the subsequent systems too
 		if (isTopOfGrandStaff[currentStaffNum]) {
 			var staffNum = currentStaffNum + 1;
 			while (staffNum < numStaves) {
@@ -5244,14 +5250,16 @@ MuseScore {
 		var cursor2 = curScore.newCursor();
 		cursor2.staffIdx = startTrack / 4;
 		cursor2.filter = Segment.ChordRest;
-		
 		for (var theTrack = startTrack; theTrack < endTrack; theTrack ++) {
 			cursor2.track = theTrack;
-			cursor2.rewindToTick(currTick);
+			cursor2.rewindToTick(barStartTick); // rewind to the start of the bar, as we need to check long notes
 			var processingThisBar = true;
 			if (cursor2.segment == null) continue;
 			while (cursor2.segment.tick < currTick + division && processingThisBar ) {
-				if (cursor2.element.type == Element.CHORD) return false;
+				var noteRest = cursor2.element;
+				var startTick = cursor2.segment.tick;
+				var endTick = startTick + noteRest.duration.ticks;
+				if (noteRest.type == Element.CHORD && endTick >= currTick) return false;
 				processingThisBar = cursor2.next() ? cursor2.measure.is(currentBar) : false;
 				if (cursor2.segment == null) break;
 			}
@@ -6804,7 +6812,7 @@ MuseScore {
 					}
 					if ((lastStemDirectionFlagBarNum == -1 || currentBarNum > lastStemDirectionFlagBarNum + 8) && calcDir > 0 && stemDir != calcDir) {
 						//logError ('calcDir = '+calcDir+'; noteRest.notes[0].line = '+noteRest.notes[0].line);
-						addError("Note has had stem direction flipped. If this is not deliberate,\nselect the note and press "+cmdKey+"-R.",noteRest);
+						addError("This note has had its stem direction flipped.\nIf this is not deliberate, select the note and press "+cmdKey+"-R.",noteRest);
 						lastStemDirectionFlagBarNum = currentBarNum;
 					}
 				}
@@ -6816,15 +6824,17 @@ MuseScore {
 					if (!currBeam.is(prevBeam)) {
 						
 						// FLAG MANUALLY TWEAKED BEAM
+						// MS 4.7 — change this to the beam
 						if (currBeam.userModified) addError ("This beam seems to have been moved away from its\ndefault position. If this was not deliberate, you can reset it\nby selecting it and pressing "+cmdKey+"-R",noteRest);
 						
 						// beamPos tells you where the exactly the top left-hand part of the beam is
 						// A measurement of 0 is the top line
 						// A negative measurement means above the top line
-						// A positive measure means below the top line 
+						// A positive measure means below the top line
+						
+						// unfortunately I can't figure out a way to access QPair in Qt, which is why we have to do this weird bit of parsing
 						var beamPosY = parseFloat(currBeam.beamPos.toString().match(/-?[\d\.]+/g)[1]); 
 						
-						// unfortunately I can't figure out a way to access QPair in Qt
 
 						//start of a new beam
 						// collate all beams into an array
@@ -6872,10 +6882,13 @@ MuseScore {
 									calcExtremeNotePos = (4-maxTopOffset) * 0.5;
 								}
 								// 1 is stems down; 2 is stems up
-								// note beamPosY is the of spatiums from the top line of the staff, where negative is further up
+								// note beamPosY is the offset in spatiums from the top line of the staff, where negative is further up
 								var calcDir = (beamPosY < calcExtremeNotePos) ? 2 : 1;
+								
+								// MS 4.7 — change this to the beam
 								if (whichWayStemsShouldGo == 1 && calcDir != 1 && !isCrossStaff) addError ('This beam should be below the notes, but appears to be above.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
-
+								
+								// MS 4.7 — change this to the beam
 								if (whichWayStemsShouldGo == 2 && calcDir != 2 && !isCrossStaff) addError ('This beam should be above the notes, but appears to be below.\nIf not intentional, select the beam and press '+cmdKey+'-R', noteRest);
 							}
 						}
