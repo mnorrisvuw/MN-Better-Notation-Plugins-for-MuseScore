@@ -4751,10 +4751,10 @@ MuseScore {
 								
 					// **** CHECK TEMPO MARKING IS IN TEMPO TEXT **** //
 					if (containsTempoComponent) {
-						if (!isTempoTextStyle) addError("‘"+plainText+"’ looks like a tempo marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
+						if (!isTempoTextStyle && !isTempoChangeElement) addError("‘"+plainText+"’ looks like a tempo marking,\nbut has not been entered as Tempo Text.\nChange in Properties→Show more→Text style→Tempo.",textObject);
 					
 						// does this require a metronome mark?
-						var resetTempoArray = ["a tempo","tempo primo","tempo i","tempo 1","tempo secondo","tempo 2","mouv"];
+						var resetTempoArray = ["a tempo","tempo primo","tempo i","tempo 1","tempo secondo","tempo 2","mouv","movt"];
 					
 						for (var k = 0; k < resetTempoArray.length && !resetTempo; k++) if (lowerCaseText.includes(resetTempoArray[k])) resetTempo = true;
 						
@@ -5223,8 +5223,13 @@ MuseScore {
 	}	
 	
 	function isOnFirstBeatOfBar (e) {
-		var theTick = getTick(e);
-		var theBar = getBar(e);
+		var theTick = 0;
+		if (e.type == Element.GRADUAL_TEMPO_CHANGE || e.type == Element.GRADUAL_TEMPO_CHANGE_SEGMENT) {
+			theTick = e.spanner.spannerTick.ticks;
+		} else {
+			theTick = getTick(e);
+		}
+		var theBar = curScore.tick2measure(fractionFromTicks(theTick));
 		if (theBar == null) return false;
 		var firstBeatOfBarTick = theBar.firstSegment.tick;
 		return (theTick == firstBeatOfBarTick);
@@ -7560,18 +7565,6 @@ MuseScore {
 			}
 		}
 		return 0;
-	}
-	
-	function getBar (e) {
-		var p = e.parent;
-		var ptype = null;
-		if (p != null && p != undefined) ptype = p.type;
-		while ((p != null && p != undefined) && ptype != Element.MEASURE) {
-			p = p.parent;
-			if (p != null && p != undefined) ptype = p.type;
-		}
-		if (p == undefined) p = null;
-		return p;
 	}
 	
 	function getBarNumber (e) {

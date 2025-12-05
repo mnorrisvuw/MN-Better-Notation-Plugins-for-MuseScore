@@ -635,7 +635,7 @@ MuseScore {
 						if (alteration > 6) {
 							dci += 12;
 							alteration = chromaticIntervalClass - dci;
-							logError ('dci = '+dci+'; chromaticIntervalClass = '+chromaticIntervalClass+'; alteration = '+alteration);
+							//logError ('dci = '+dci+'; chromaticIntervalClass = '+chromaticIntervalClass+'; alteration = '+alteration);
 
 						}
 						
