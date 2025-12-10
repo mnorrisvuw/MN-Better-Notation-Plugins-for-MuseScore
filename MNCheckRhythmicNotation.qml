@@ -2369,13 +2369,11 @@ MuseScore {
 	}
 	
 	function checkScoreForTwoNoteTremolos () {
-		var staves = curScore.staves;
 		var elems = curScore.selection.elements;
 		for (var i = 0; i<elems.length; i++) {
 			var e = elems[i];
 			var etype = e.type;
-			var staffIdx = 0;
-			while (!staves[staffIdx].is(e.staff)) staffIdx++;
+			var staffIdx = e.staffIdx;
 			if (etype == Element.TREMOLO_TWOCHORD) twoNoteTremolos[staffIdx][e.parent.parent.tick] = e;
 		}
 	}
