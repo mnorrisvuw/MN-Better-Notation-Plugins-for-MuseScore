@@ -15,7 +15,7 @@ import FileIO 3.0
 
 MuseScore {
 	version:  "1.0"
-	description: "This plugin checks your score for common music layout, notation and instrumentation issues"
+	description: "This plugin checks your score for common music layout, notation and instrumentation issues."
     categoryCode: "MN Better Notation Plugins"
 	requiresScore: true
 	title: "MN Check Layout and Instrumentation"

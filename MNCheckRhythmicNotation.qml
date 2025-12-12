@@ -13,7 +13,7 @@ import FileIO 3.0
 
 MuseScore {
 	version: "1.0"
-	description: "bob"
+	description: "This plugin checks your score for rhythmic notation issues."
 	requiresScore: true
 	title: "MN Check Rhythmic Notation"
     categoryCode: "MN Better Notation Plugins"
