@@ -83,7 +83,6 @@ MuseScore {
 	property var progressStartTime: 0
 	property var currentBarNum: 0
 	property var currentStaffNum: 0
-	property var currentClef: null
 	property var clefOffset: 0
 	property var isPercussionClef: false
 	property var prevAccInKeySig: false
@@ -142,7 +141,7 @@ MuseScore {
 		// GET THE CLEFS
 		for (var i = 0; i < numStaves; i++) {
 			clefs[i] = [];
-			cursor.staffIdx = currentStaffNum;
+			cursor.staffIdx = i;
 			cursor.voice = 0;
 			cursor.rewind(Cursor.SCORE_START);
 			if (cursor.element == null) cursor.next();
@@ -220,13 +219,14 @@ MuseScore {
 		for (currentStaffNum = startStaff; currentStaffNum < endStaff; currentStaffNum ++) {
 			
 			// ** IGNORE IF THIS STAFF IS HIDDEN ** //
-			var theStaff = curScore.staves[currentStaffNum];
-			var part = theStaff.part;
+			var currentStaff = curScore.staves[currentStaffNum];
+			var part = currentStaff.part;
 			var partVisible = part.show;
 			if (!partVisible) continue;
 			var currentInstrumentId = part.instrumentId;
 			var isHarp = currentInstrumentId === "pluck.harp";
 			if (isHarp) hasHarp = true;
+			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevWrittenPitch = -1;
 			prevPrevWrittenPitch = -1;
@@ -261,8 +261,7 @@ MuseScore {
 			cursor.voice = 0;
 			cursor.rewind(Cursor.SCORE_START);
 			if (cursor.element == null) cursor.next();
-			currentClef = cursor.element;
-			checkClef ();
+			checkClef (	currentStaff.clefType(fractionFromTicks(0)));
 			
 			// ** REWIND TO START OF SELECTION ** //
 			cursor.filter = Segment.All;
@@ -279,50 +278,32 @@ MuseScore {
 				var endTrack = startTrack + 4;
 				var barStart = currentBar.firstSegment.tick;
 				var barEnd = currentBar.lastSegment.tick;
-				
-				for (var currentTrack = startTrack; currentTrack < endTrack; currentTrack++) {
-					//logError(\nTrack "+currentTrack);
-					
-					cursor.track = currentTrack;
-					cursor.rewindToTick(barStart);
-					var processingThisBar = cursor.element && cursor.tick < barEnd;
-					
-					while (processingThisBar) {
-						currentKeySig = cursor.keySignature;
-						var eType = cursor.element.type;
-						if (eType == Element.CLEF) {
-							currentClef = cursor.element;
-							checkClef();
-						} else {
-							if (!isPercussionClef && !isHarp) {
-								var noteRest = cursor.element;
-								var noteRestDur = noteRest.actualDuration.ticks;
-								//logError(\nFound "+noteRest.name+" at "+cursor.tick);
-								var isRest = noteRest.type == Element.REST;
-								var graceNoteChords = noteRest.graceNotes;
-								if (graceNoteChords != null) {
-									for (var g in graceNoteChords) {
-										checkChord (graceNoteChords[g],noteRest.parent,true,theStaff);
-									}
-								}
-								if (isRest) {
-									// how long is it?
-									if (noteRestDur >= division * 2) {
-										// forget the last note
-										prevWrittenPitch = -1;
-										prevDiatonicPitch = -1;
-									}
-								} else {
-									checkChord (noteRest,noteRest.parent,false, theStaff);
-								}
+				currentKeySig = currentStaff.key(fractionFromTicks(barStart));
+				//logError ('currentKeySig = '+currentKeySig);
+				var chords = getSortedBarChords(currentBar, startTrack, endTrack);
+				//logError ('Found '+chords.length+' chords in this bar');
+				for (const noteRest of chords) {
+					if (!isPercussionClef && !isHarp) {
+						var noteRestDur = noteRest.actualDuration.ticks;
+						//logError ('noteRest found; dur = '+noteRestDur);
+						var isRest = noteRest.type == Element.REST;
+						var graceNoteChords = noteRest.graceNotes;
+						if (graceNoteChords != null) {
+							for (var g in graceNoteChords) {
+								checkChord (graceNoteChords[g],noteRest.parent,true,currentStaff);
 							}
 						}
-						if (cursor.next()) {
-							processingThisBar = cursor.measure.is(currentBar);
+						if (isRest) {
+							// how long is it?
+							if (noteRestDur >= division * 2) {
+								// forget the last note
+								prevWrittenPitch = -1;
+								prevDiatonicPitch = -1;
+							}
 						} else {
-							processingThisBar = false;
+							checkChord (noteRest,noteRest.parent,false,currentStaff);
 						}
-					} // end while Processing this bar
+					}
 				} // end track loop
 				if (currentBar) currentBar = currentBar.nextMeasure;
 				
@@ -359,20 +340,19 @@ MuseScore {
 		dialog.show();
 	}
 	
-	function checkClef () {
+	function checkClef (theClefType) {
 		
-		var clefId = currentClef.subtypeName();
 		//logError(Checking clef — "+clefId+" "+currentInstrumentName);
-		var isTrebleClef = clefId.includes("Treble clef");
-		var isAltoClef = clefId === "Alto clef";
-		var isTenorClef = clefId === "Tenor clef";
-		var isBassClef = clefId.includes("Bass clef");
-		var clefIs8va = clefId.includes("8va alta");
-		var clefIs15ma = clefId.includes("15ma alta");
-		var clefIs8ba = clefId.includes("8va bassa");
+		var isTrebleClef = theClefType >= ClefType.G && theClefType < ClefType.G_1;
+		var isAltoClef = theClefType == ClefType.C3;
+		var isTenorClef = theClefType == ClefType.C2;
+		var isBassClef = theClefType >= ClefType.F && theClefType < ClefType.F_19C;
+		var clefIs8va = theClefType == ClefType.G8_VA || theClefType == ClefType.F_8VA;
+		var clefIs15ma = theClefType == ClefType.G15_MA || theClefType == ClefType.F_15MA;
+		var clefIs8ba =  theClefType == ClefType.G8_VB || theClefType == ClefType.F8_VB || theClefType == ClefType.C4_8VB || theClefType == ClefType.G8_VB_O || theClefType == ClefType.G8_VB_P;
 		
 		// set this property so that we can ignore any notes
-		isPercussionClef = clefId === "Percussion";
+		isPercussionClef = theClefType == ClefType.PERC || theClefType == ClefType.PERC2;
 		
 		if (isTrebleClef) clefOffset = 0;
 		if (isAltoClef) clefOffset = -6; // C4 = 35
@@ -403,7 +383,29 @@ MuseScore {
 		}
 	}
 	
-	function checkChord (chord,theSegment,isGraceNote, currentStaff) {
+	function getSortedBarChords (currentBar, startTrack, endTrack) {
+		var chordArray = [];
+		var barStart = currentBar.firstSegment.tick;
+		var barEnd = currentBar.lastSegment.tick;
+		for (var i = startTrack; i < endTrack; i++) {
+			var cursor = curScore.newCursor();
+			cursor.rewindToTick(barStart);
+			cursor.track = i;
+			cursor.filter = Segment.ChordRest;
+			var processingThisBar = true;
+			while (processingThisBar) {
+				if (cursor.element) chordArray.push(cursor.element);
+				processingThisBar = cursor.next() ? cursor.measure.is(currentBar) : false;
+			}
+		}
+		// sort array
+		chordArray.sort((a, b) => getTick(a) - getTick(b));
+		//logError ('chordArray '+chordArray.length+' elems');
+		//for (var i = 0; i < chordArray.length; i++) logError (getTick(chordArray[i]));
+		return chordArray;
+	}
+	
+	function checkChord (chord, theSegment, isGraceNote, currentStaff) {
 		//logError("checking chord");
 		var currTick = theSegment.tick;
 
@@ -429,8 +431,7 @@ MuseScore {
 		thisNoteHighlighted = false;
 		
 		var staffIdx = Math.trunc (chord.track / 4);
-		var currClef = clefAtTick(staffIdx, currTick);
-		checkClef (currClef);
+		checkClef (currentStaff.clefType(fractionFromTicks(currTick)));
 		var prevLine = -99;
 		var flaggedSharedLineSpace = false;
 		
@@ -484,6 +485,7 @@ MuseScore {
 					isDoubleAcc = true;
 					break;
 			}
+			//logError ('acc is '+acc);
 			
 			// ***** CALCULATE THE PITCH INFORMATION ***** //
 			var dpArray = pitch2absStepByKey (writtenPitch, tpc, currentKeySig);
@@ -548,7 +550,6 @@ MuseScore {
 					var otherAccFlags = accVisible && !wasGraceNote[diatonicPitchClass] && accObject.accidentalBracket == 0;
 					if ((situation1 || situation2 || situation3 ) && otherAccFlags && !isMicrotone) {
 						addError("This was already a "+accidentalNames[acc+2]+".",note);
-						//logError (situation1+' '+situation2+' '+situation3+' '+otherAccFlags);
 					}
 				}
 				
@@ -579,6 +580,7 @@ MuseScore {
 				}
 				
 				currAccs[diatonicPitch] = acc;
+				//logError ('currAccs['+diatonicPitch+'] = '+acc);
 				currPCAccs[diatonicPitchClass] = acc;
 				wasGraceNote[diatonicPitchClass] = isGraceNote;
 				
@@ -1042,8 +1044,7 @@ MuseScore {
 		progress.close();
 		dialog.msg = errorMsg;
 		dialog.show();
-	}
-	
+	}	
 	
 	function previousNoteRestIsNote (noteRest) {
 		var cursor2 = curScore.newCursor();
@@ -1526,15 +1527,6 @@ MuseScore {
 			comment.offsetY = offy[i];
 		}
 		curScore.endCmd();
-	}
-		
-	function clefAtTick (staffIdx, tick) {
-		if (clefs[staffIdx] == undefined) {
-			logError ('clefAtTick() — clefs['+staffIdx+'] == undefined');
-			return null;
-		}
-		var clefsBeforeOrAtThisTick = clefs[staffIdx].filter (e => e.parent.tick <= tick);
-		return clefsBeforeOrAtThisTick.pop(); // return last array
 	}
 	
 	function getPage (e) {
