@@ -27,9 +27,9 @@ strings.cello,36,,81,,
 strings.contrabass,24,,62,,
 strings.viola,48,,88,,
 strings.violin,55,,112,,
-wind.flutes.flute,59,49,96,94,
-wind.flutes.flute.alto,55,59,84,81,
-wind.flutes.flute.bass,48,52,77,74,
+wind.flutes.flute,59,64,96,94,
+wind.flutes.flute.alto,55,60,84,81,
+wind.flutes.flute.bass,48,53,77,74,
 wind.flutes.flute.piccolo,74,79,107,101,
 wind.reed.bassoon,34,,74,,38
 wind.reed.clarinet,50,,89,84,
@@ -40,8 +40,8 @@ wind.reed.clarinet.eflat,55,,94,89,
 wind.reed.contrabassoon,22,,53,,26
 wind.reed.english-horn,52,,82,,55
 wind.reed.oboe,58,,89,,62
-wind.reed.saxophone,49,40,81,,
-wind.reed.saxophone.alto,49,40,81,,
-wind.reed.saxophone.baritone,37,28,69,,
-wind.reed.saxophone.soprano,56,47,88,,
-wind.reed.saxophone.tenor,44,35,76,,
+wind.reed.saxophone,49,,81,,53
+wind.reed.saxophone.alto,49,,81,,53
+wind.reed.saxophone.baritone,36,,69,,40
+wind.reed.saxophone.soprano,56,,88,,60
+wind.reed.saxophone.tenor,44,,76,,48

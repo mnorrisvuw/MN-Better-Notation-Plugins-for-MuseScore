@@ -220,6 +220,8 @@ MuseScore {
 			
 			// ** IGNORE IF THIS STAFF IS HIDDEN ** //
 			var currentStaff = curScore.staves[currentStaffNum];
+			var isTab = currentStaff.isTabStaff(fractionFromTicks(0));
+			if (isTab) continue;
 			var part = currentStaff.part;
 			var partVisible = part.show;
 			if (!partVisible) continue;

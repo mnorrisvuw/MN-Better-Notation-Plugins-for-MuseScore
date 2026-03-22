@@ -1208,7 +1208,7 @@ MuseScore {
 		"tupletBracketWidth","",
 		"tupletDirection","",
 		"tupletNumberType","",
-		"tupletBracketType","",
+		"tupletBracketType",0,
 		"tupletFontFace","",
 		"tupletFontSize","",
 		"tupletLineSpacing","",

@@ -59,6 +59,7 @@ MuseScore {
 	property var prevIsNote: false
 	property var displayDur: 0
 	property var prevDisplayDur: 0
+	property var prevPrevDisplayDur: 0
 	property var soundingDur: 0
 	property var prevSoundingDur: 0
 	property var noteFinishesBeat: false
@@ -310,7 +311,8 @@ MuseScore {
 				canCheckThisBar = false;
 				isCompound = false;
 				if (timeSigDenom == 8 || timeSigDenom == 16) {
-					isCompound = timeSigNum % 3 == 0;
+					isCompound = (timeSigNum % 3) == 0;
+					//logError ('timeSigDenom = '+timeSigDenom+'; isCompound = '+isCompound+'; timeSigNum = '+timeSigNum);
 					if (isCompound) beatLength = (division * 12) / timeSigDenom;
 				}
 
@@ -352,6 +354,7 @@ MuseScore {
 						tiedNotes = [];
 						prevSoundingDur = 0;
 						prevDisplayDur = 0;
+						prevPrevDisplayDur = 0;
 						prevNoteWasDoubleTremolo = false;
 						numComments = 0;
 						tiedSoundingDur = 0;
@@ -605,6 +608,7 @@ MuseScore {
 							processingThisBar = false;
 						}
 						prevSoundingDur = soundingDur;
+						prevPrevDisplayDur = prevDisplayDur;
 						prevDisplayDur = displayDur;
 						prevIsNote = isNote;
 						prevNoteRest = noteRest;
@@ -765,13 +769,13 @@ MuseScore {
 	function checkManuallyEnteredBarRest (noteRest) {
 		if (isPickupBar) return;
 		isBarRest = isRest && soundingDur == barDur;
-		isManuallyEnteredBarRest = isBarRest && noteRest.durationTypeWithDots.type < 14;
-		if (isManuallyEnteredBarRest) addError ("Bar rest has been manually entered,\nand is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to\ncreate a correctly positioned bar rest.",noteRest);
+		if (!isBarRest) return; 
+		if (noteRest.durationTypeWithDots.type != DurationType.V_MEASURE) addError ("This bar rest has been manually entered,\nand is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to\ncreate a correctly positioned bar rest.",noteRest);
+		if (noteRest.posY !== 1) addError ("This bar rest has been moved vertically\nand is therefore incorrectly positioned.",noteRest);
 	}
 	
 	function isTwoNoteTremolo(noteRest) {
 		if (noteRest.type == Element.REST) return false;
-		var currTick = noteRest.parent.tick;
 		if (twoNoteTremolos[currentStaffNum][currTick] != null) return true;
 		var prevNote = getPreviousNoteRest(noteRest);
 		if (prevNote == null || prevNote == undefined) return false;
@@ -924,7 +928,7 @@ MuseScore {
 						return;
 					}
 				}
-				if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
+				if (soundingDur == dottedcrotchet && timeSigDenom > 2 && !isCompound) {
 					addError ("Never write a dotted crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
 					return;
 				}
@@ -1078,9 +1082,11 @@ MuseScore {
 		var normalSettings = [0,0,3,2,3,4,4,4,12,8,8,8,8,8,8,8,8];
 		var a = theTuplet.actualNotes;
 		var b = theTuplet.normalNotes;
-		
+		var isSwingVM = curScore.staves[currentStaffNum].swing(fractionFromTicks(currTick));
+		var isSwing = isSwingVM["isOn"];
+		//logError ('isSwing = '+isSwing);
 		// *** CHECK FOR A RATIO WHERE NUMERATOR AND DENOMINATOR ARE THE SAME ***
-		if (a == b) {
+		if (a == b && !isSwing) {
 			addError ("This tuplet has the ratio "+a+":"+b+", which is\nnonsensical. The tuplet can be deleted.", theTuplet);
 			return;
 		}
@@ -1767,12 +1773,13 @@ MuseScore {
 		if (isNote && !prevIsNote && haveHadFirstNote && !isFirstNoteInBeat) {
 			if (isLastItemInBeat) haveHadFirstNote = false;
 			if (hasBeam) {
-				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32 && prevBeamMode == Beam.MID) addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
+				// only if previous note was less than a quaver
+				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32 && prevBeamMode == Beam.MID && prevPrevDisplayDur < quaver) addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
 				return;
 			} else {
 				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
 				if (displayDur < quaver) {
-					if (currentBeamMode != Beam.BEGIN32) {
+					if (currentBeamMode != Beam.BEGIN32 && prevIsNote) {
 						addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
 						return;
 					} else {
@@ -1812,7 +1819,7 @@ MuseScore {
 		//logError(Not correctly beamed");
 			if (isNote) {
 				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note\nSet its ‘Beam type’ property to AUTO",noteRest);
-				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) {
+				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID && currentBeamMode != Beam.BEGIN32) {
 					addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to AUTO",noteRest);
 				}
 			} else {
