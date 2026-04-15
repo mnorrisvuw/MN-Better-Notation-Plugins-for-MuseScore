@@ -19,7 +19,7 @@ MuseScore {
     categoryCode: "MN Better Notation Plugins"
 	id: mncheckrhythmicnotation
 	thumbnailName: "MNCheckRhythmicNotation.png"
-	menuPath: "Plugins.MNCheckLayoutAndInstrumentation"
+	menuPath: "Plugins.MNCheckRhythmicNotation"
 		function getAssetPath(filename) {
         if (Qt.platform.os === "linux") {
             return Qt.resolvedUrl("./assets/" + filename).toString();
@@ -135,6 +135,9 @@ MuseScore {
 	property var isKeyboardInstrument: false
 	property var isWindOrBrassInstrument: false
 	property var isVoice: false
+	
+	property var hasMoreThanOneSystem: false
+	property var firstBarInSecondSystem: null
 
 	onRun: {
 		if (!curScore) return;
@@ -175,6 +178,19 @@ MuseScore {
 		possibleOffbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet"];
 		var versionNumber = versionnumberfile.read().trim();
 		getFrames();
+		var actualSystemNum = 0;
+		for (var j = 0; j < curScore.systems.length; j++) {
+			var system = curScore.systems[j];
+			// get first visible staff
+			if (system.firstMeasure != null) { // ignore frames
+				actualSystemNum ++;
+				if (actualSystemNum == 2) {
+					hasMoreThanOneSystem = true;
+					firstBarInSecondSystem = system.firstMeasure;
+					break;
+				}
+			}
+		}
 
 		// **** DELETE ALL EXISTING COMMENTS AND HIGHLIGHTS **** //
 		deleteAllCommentsAndHighlights();

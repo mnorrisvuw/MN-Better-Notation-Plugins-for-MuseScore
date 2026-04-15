@@ -93,6 +93,8 @@ MuseScore {
 	property var scoreIncludesTransposingInstrument: false
 	property var lastAccidentalBarNum: 0
 	property var frames: []
+	property var hasMoreThanOneSystem: false
+	property var firstBarInSecondSystem: null
 
   onRun: {
 		if (!curScore) return;
@@ -117,6 +119,19 @@ MuseScore {
 		var numStaves = curScore.nstaves;
 		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
 		var versionNumber = versionnumberfile.read().trim();
+		var actualSystemNum = 0;
+		for (var j = 0; j < curScore.systems.length; j++) {
+			var system = curScore.systems[j];
+			// get first visible staff
+			if (system.firstMeasure != null) { // ignore frames
+				actualSystemNum ++;
+				if (actualSystemNum == 2) {
+					hasMoreThanOneSystem = true;
+					firstBarInSecondSystem = system.firstMeasure;
+					break;
+				}
+			}
+		}
 
 		// ************ DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS ************ //
 		getFrames();
@@ -378,8 +393,10 @@ MuseScore {
 			if (part.show) {
 				var id = part.instrumentId;
 				for (var j = 0; j < transposingInstruments.length; j++) {
-					if (id.includes(transposingInstruments[j])) scoreIncludesTransposingInstrument = true;
-					return;
+					if (id.includes(transposingInstruments[j])) {
+						scoreIncludesTransposingInstrument = true;
+						return;
+					}
 				}
 			}
 		}
@@ -725,7 +742,7 @@ MuseScore {
 						
 						// **** IF THIS IS A CHORD, HOWEVER, HIGHLIGHT ANY AUG DIM INTERVALS **** //
 						// **** THOUGH NOT IF CURRENT INTERVAL IS A TRITONE ****
-						if (!doShowError & i > 0) {
+						if (!doShowError && i > 0) {
 							doShowError = isAugDim && !isTritone;
 							chordError = true;
 						}
@@ -926,8 +943,8 @@ MuseScore {
 								prevPrevNoteHighlighted = false;
 								thisNoteHighlighted = false;
 							} else {
-								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+".\n(Select the note and press J until you get this "+newNoteLabel+")";
-								if (weightingIsClose && scalarIntervalAbs != 0) t = "[SUGGESTION] "+t+"\n\n[Note: The current spelling may in fact be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.";
+								var t = "Interval with "+prevNext+" is "+article+" "+alterationLabel+" "+scalarIntervalLabel+".\nConsider respelling as "+newNoteLabel+". (Select the note\nand press J until you get this "+newNoteLabel+")";
+								if (weightingIsClose && scalarIntervalAbs != 0) t = "[SUGGESTION] "+t+"\n\n(Note: The current spelling may in fact be OK, but depends on\nthe wider tonal/scalar context which I can’t analyse.)";
 								addError(t,noteToHighlight);
 								//logError("Added error — now thisNoteHighlighted = "+thisNoteHighlighted+" prevNoteHighlighted = "+prevNoteHighlighted+" prevPrevNoteHighlighted = "+prevPrevNoteHighlighted);
 							}
@@ -1043,9 +1060,6 @@ MuseScore {
 			} // if !note.tieBack
 		} // end var i in notes
 		
-		progress.close();
-		dialog.msg = errorMsg;
-		dialog.show();
 	}	
 	
 	function previousNoteRestIsNote (noteRest) {

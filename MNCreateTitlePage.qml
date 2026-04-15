@@ -32,6 +32,16 @@ MuseScore {
 	property var titlePageHeight: 0
 	property var inchesToMM: 25.4
 	property var isMac: false
+	property var fontList: Qt.fontFamilies()
+	property var titleStyle: null
+	property var subtitleStyle: null
+	property var composerStyle: null
+	property var lineStyle: null
+	property var line2Style: null
+	property var chosenTitlePageStyle: null
+	property var notInstalledFonts: []
+
+
 	property var frontMatterText: "INSTRUMENTATION\n\nFor ensemble and orchestral works, list the instruments required here in score order,\nincluding all doubling instruments and lists of percussion instruments.\n\n\n\nPERFORMANCE INSTRUCTIONS\n\nInclude a list of any unconventional notation used and their meanings,\nand/or any required instrument preparations or other special aspects\nof the piece that can’t be explained on the score.\n\n\n\nDEDICATION\n\nDedicated to ....\n\n\n\nDURATION\n\nApprox. duration: x mins\n\n\n\n(Delete one) Transposed score / Score in C\n\n\n\nPROGRAMME NOTE\n\nInclude a short programme note here\n\n\n\n© Composer Name, 20xx"
 	
 	function getAssetPath(filename) {
@@ -62,7 +72,10 @@ MuseScore {
 		isMac = Qt.platform.os === 'osx';
 		var versionNumber = versionnumberfile.read().trim();
 		dialog.titleText = 'MN CREATE TITLE PAGE '+versionNumber;
-		if (!isMac) dialog.fontSize = 12;
+		if (!isMac) {
+			dialog.fontSize = 12;
+			fontissuedialog.fontSize = 12;
+		}
 		
 		// **** VERSION CHECK **** //
 		var version46 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 5);
@@ -140,31 +153,73 @@ MuseScore {
 	}
 	
 	function buttonClicked (chosenLabel) {
-		
-		var doFrontMatter = styles.createFrontMatter;
-		var doChangeAllFonts = styles.changeAllFonts;
-		var titlePageBox = null;
-		var frontMatterBox = null;
-		styles.close ();
-		var spatium = curScore.style.value("spatium")*inchesToMM/mscoreDPI;
-		titlePageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
-		var hasBottom = false;
 
-		var chosenTitlePageStyle = null;
-		for (var i = 0; i < titlePageStyles.length && chosenTitlePageStyle == null; i++) {
+		styles.close ();
+		titlePageHeight = Math.round(curScore.style.value("pageHeight")*inchesToMM);
+
+		for (var i = 0; i < titlePageStyles.length && !chosenTitlePageStyle; i++) {
 			if (titlePageStyles[i].label === chosenLabel) chosenTitlePageStyle = titlePageStyles[i];
 		}
-		if (chosenTitlePageStyle == null) {
+		if (!chosenTitlePageStyle) {
 			dialog.msg = 'Couldn’t find chosen title page style.';
 			dialog.show();
 			return;
 		}
-		var composerStyle = chosenTitlePageStyle.composer;
-		var titleStyle = chosenTitlePageStyle.title;
-		var subtitleStyle = chosenTitlePageStyle.subtitle;
-		var lineStyle = ("line" in chosenTitlePageStyle) ? chosenTitlePageStyle.line : null;
-		var line2Style = ("line2" in chosenTitlePageStyle) ? chosenTitlePageStyle.line2 : null;	
 		
+		titleStyle = chosenTitlePageStyle.title;
+		subtitleStyle = chosenTitlePageStyle.subtitle;
+		composerStyle = chosenTitlePageStyle.composer;
+		lineStyle = ("line" in chosenTitlePageStyle) ? chosenTitlePageStyle.line : null;
+		line2Style = ("line2" in chosenTitlePageStyle) ? chosenTitlePageStyle.line2 : null;	
+		
+		// ** CHECK IF THE FONTS ARE INSTALLED **
+		if (titleStyle) {
+			if ("font" in titleStyle) {
+				if (!isFontInstalled(titleStyle.font) && !notInstalledFonts.includes(titleStyle.font)) notInstalledFonts.push(titleStyle.font);
+			}
+			if ("frontmatterfont" in chosenTitlePageStyle) {
+				if (!isFontInstalled(chosenTitlePageStyle.frontmatterfont) && !notInstalledFonts.includes(chosenTitlePageStyle.frontmatterfont)) notInstalledFonts.push(chosenTitlePageStyle.frontmatterfont);
+			}
+		}
+		if (subtitleStyle) {
+			if ("font" in subtitleStyle) {
+				if (!isFontInstalled(subtitleStyle.font) && !notInstalledFonts.includes(subtitleStyle.font)) notInstalledFonts.push(subtitleStyle.font);
+			}
+		}
+		if (composerStyle) {
+			if ("font" in composerStyle) {
+				if (!isFontInstalled(composerStyle.font) && !notInstalledFonts.includes(composerStyle.font)) notInstalledFonts.push(composerStyle.font);
+			}
+		}
+		if (lineStyle) {
+			if ("font" in lineStyle) {
+				if (!isFontInstalled(lineStyle.font) && !notInstalledFonts.includes(lineStyle.font)) notInstalledFonts.push(lineStyle.font);
+			}
+			
+		}
+		if (line2Style) {
+			if ("font" in line2Style) {
+				if (!isFontInstalled(line2Style.font) && !notInstalledFonts.includes(line2Style.font)) notInstalledFonts.push(line2Style.font);
+			}
+		}
+		
+		// ** PUT UP A DIALOG BOX IF THE FONT IS NOT INSTALLED ** //
+		if (notInstalledFonts.length > 0) {		
+			fontissuedialog.msg = "🛑 <b>COULD NOT CREATE TITLE PAGE</b><br><br>Your selected title page template requires the ‘"+notInstalledFonts[0]+"’ font which is not installed on your computer.<br><br>In order to create this title page, please go to <a href='"+chosenTitlePageStyle.fonturl+"'>"+chosenTitlePageStyle.fonturl+"</a>, and download and install this font. Once you have done so, restart MuseScore and try to create the title page again."; 
+			fontissuedialog.show();
+		} else {
+			createTitlePage();
+		}
+	}
+		
+	function createTitlePage() {
+		var hasBottom = false;
+		var titlePageBox = null;
+		var frontMatterBox = null;
+			var doFrontMatter = styles.createFrontMatter;
+			var doChangeAllFonts = styles.changeAllFonts;
+			var excludeFromParts = styles.excludeFromParts;
+			
 		// ** SELECT ALL ** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
@@ -192,6 +247,7 @@ MuseScore {
 			frontMatter.align = Align.HCENTER;
 			frontMatter.fontSize = 10;
 			if ("frontmatterfont" in chosenTitlePageStyle) frontMatter.fontFace = chosenTitlePageStyle.frontmatterfont;
+			if (excludeFromParts) frontMatterBox.excludeFromParts = true;
 			//curScore.endCmd();
 		}
 		
@@ -200,14 +256,15 @@ MuseScore {
 		cmd ("insert-vbox");
 		//curScore.endCmd();
 		titlePageBox = curScore.selection.elements[0];
+		if (excludeFromParts) titlePageBox.excludeFromParts = true;
 		cmd ("page-break");
 		var newTitle = null;
 		var titleLines = 0;
 		var fontStyles = {'PLAIN' : 0, 'BOLD' : 1, 'ITALIC' : 2};
 		var alignStyles = {'LEFT' : Align.LEFT, 'HCENTER' : Align.HCENTER, 'RIGHT' : Align.RIGHT, 'RIGHT VCENTER' : (Align.RIGHT | Align.VCENTER), 'HCENTER BOTTOM' : (Align.HCENTER | Align.BOTTOM), 'LEFT VCENTER' : (Align.LEFT | Align.VCENTER) };
-		
+		var longestStringLength = 0;
 		// ***** ADD TITLE TEXT ***** //
-		if (theTitle !== '') {
+		if (theTitle !== '' && titleStyle) {
 			var theText = theTitle;
 			if ("case" in titleStyle) if (titleStyle.case == "UPPER") theText = theText.toUpperCase();
 			if ("space" in titleStyle) theText = theText.replace(/(.)/g,'$1\u2009'); // 2009 is a thin space
@@ -243,11 +300,12 @@ MuseScore {
 			}
 			if ("offsetx" in titleStyle) newTitle.offsetX = titleStyle.offsetx / spatium;		
 			//curScore.endCmd();
+			if (theText.length > longestStringLength) longestStringLength = theText.length;
 		}
 		
 		// ***** ADD SUBTITLE TEXT ***** //
 		var newSubtitle = null;
-		if (theSubtitle != '') {
+		if (theSubtitle != '' && subtitleStyle) {
 			var theText = theSubtitle;
 			if ("case" in subtitleStyle) if (subtitleStyle.case == "UPPER") theText = theText.toUpperCase();
 			//curScore.startCmd();
@@ -259,6 +317,7 @@ MuseScore {
 			if ("font" in subtitleStyle) {
 				newSubtitle.fontFace = subtitleStyle.font;
 				if (doChangeAllFonts) curScore.style.setValue("subTitleFontFace",subtitleStyle.font);
+				if (!isFontInstalled(subtitleStyle.font) && !notInstalledFonts.includes(subtitleStyle.font)) notInstalledFonts.push(subtitleStyle.font);
 			}
 			if ("fontstyle" in subtitleStyle) {
 				newSubtitle.fontStyle = fontStyles[subtitleStyle.fontstyle];
@@ -273,12 +332,13 @@ MuseScore {
 			if ("offsety" in subtitleStyle) newSubtitle.offsetY = subtitleStyle.offsety / spatium;
 			if ("offsetx" in subtitleStyle) newSubtitle.offsetX = subtitleStyle.offsetx / spatium;
 			//curScore.endCmd();
+			if (theText.length > longestStringLength) longestStringLength = theText.length;
 		}
 		
 		// ***** ADD COMPOSER TEXT ***** //
 		var newComposer = null;
 		var composerLines = 0;
-		if (theComposer != '') {
+		if (theComposer != '' && composerStyle) {
 			var theText = theComposer.replace(/<[^>]+>/g, ""); // strip out any styles
 			var composerIsUpperCase = theText === theText.toUpperCase();
 			var composerGoingToUpperCase = false;
@@ -299,7 +359,10 @@ MuseScore {
 			composerLines = theComposer.split(/\n/).length;
 			//curScore.startCmd();
 			newComposer.fontSize = ("fontsize" in composerStyle) ? composerStyle.fontsize : 32.0;
-			if ("font" in composerStyle) newComposer.fontFace = composerStyle.font;
+			if ("font" in composerStyle) {
+				newComposer.fontFace = composerStyle.font;
+				if (!isFontInstalled(composerStyle.font) && !notInstalledFonts.includes(composerStyle.font)) notInstalledFonts.push(composerStyle.font);
+			}
 			if ("fontstyle" in composerStyle) newComposer.fontStyle = fontStyles[composerStyle.fontstyle];
 			if ("align" in composerStyle) {
 				newComposer.align = alignStyles[composerStyle.align];
@@ -309,7 +372,7 @@ MuseScore {
 			}
 			if ("offsety" in composerStyle) {
 				var accountForMultipleLines = true;
-				if ("align" in composerStyle) if (!composerStyle.align.includes ("VCENTER") && composerStyle.offsetY < 40) accountForMultipleLines = false;
+				if ("align" in composerStyle) if (!composerStyle.align.includes ("VCENTER") && composerStyle.offsety < 40) accountForMultipleLines = false;
 				if (accountForMultipleLines) {
 					newComposer.offsetY = (composerStyle.offsety - ((composerLines - 1) * newComposer.fontSize / 2)) / spatium;
 				} else {
@@ -318,10 +381,11 @@ MuseScore {
 			}
 			if ("offsetx" in composerStyle) newComposer.offsetX = composerStyle.offsetx / spatium;
 			//curScore.endCmd();
+			if (theText.length > longestStringLength) longestStringLength = theText.length;
 		}
 		
 		// ***** ADD LINE 1 ***** //
-		if (lineStyle != null) {
+		if (lineStyle) {
 			var theChar = ("char" in lineStyle) ? lineStyle.char : "—";
 			var repeats = ("repeats" in lineStyle) ? lineStyle.repeats : 23;
 			var theText = theChar.repeat(repeats);
@@ -332,7 +396,10 @@ MuseScore {
 			
 			//curScore.startCmd();
 			newLine.fontSize = ("fontsize" in lineStyle) ? lineStyle.fontsize : 22.0;
-			if ("font" in lineStyle) newLine.fontFace = lineStyle.font;
+			if ("font" in lineStyle) {
+				newLine.fontFace = lineStyle.font;
+				if (!isFontInstalled(line1Style.font) && !notInstalledFonts.includes(line1Style.font)) notInstalledFonts.push(line1Style.font);
+			}
 			if ("fontstyle" in lineStyle) newLine.fontStyle = fontStyles[lineStyle.fontstyle];
 			if ("align" in lineStyle) {
 				newLine.align = alignStyles[lineStyle.align];
@@ -345,7 +412,7 @@ MuseScore {
 			//curScore.endCmd();
 		}
 		// ***** ADD LINE 2 ***** //
-		if (line2Style != null) {
+		if (line2Style) {
 			var theChar = ("char" in line2Style) ? line2Style.char : "—";
 			var repeats = ("repeats" in line2Style) ? line2Style.repeats : 23;
 			var theText = theChar.repeat(repeats);
@@ -356,7 +423,10 @@ MuseScore {
 			
 			//curScore.startCmd();
 			newLine2.fontSize = ("fontsize" in line2Style) ? line2Style.fontsize : 22.0;
-			if ("font" in line2Style) newLine.fontFace = line2Style.font;
+			if ("font" in line2Style) {
+				newLine.fontFace = line2Style.font;
+				if (!isFontInstalled(line2Style.font) && !notInstalledFonts.includes(line2Style.font)) notInstalledFonts.push(line2Style.font);
+			}
 			if ("fontstyle" in line2Style) newLine.fontStyle = fontStyles[line2Style.fontstyle];
 			if ("align" in line2Style) {
 				newLine.align = alignStyles[line2Style.align];
@@ -384,16 +454,19 @@ MuseScore {
 			//curScore.endCmd();
 			theMsg = '<p>Title page and front matter page created.';
 		}
-		theMsg += ' Any long titles, subtitles or composers’ names may require additional manual adjustment.</p>';
-		
+		if (longestStringLength > 18) theMsg += ' Any long titles, subtitles or composers’ names may require you to manually reduce their font size.</p>';
+		if (curScore.staves.length > 1) {
+			if (excludeFromParts) {
+				theMsg += '<p>Note that you selected to <b>exclude the title page from any parts</b>. If you ever want to change this, get the properties of the title page frame, and deselect ‘Exclude from Parts’.';
+			} else {
+				theMsg += '<p>Note that you selected to <b>include the title page in any parts</b>. If you ever want to change this, get the properties of the title page frame, and select ‘Exclude from Parts’';
+			}
+		}
 		// FORCE LAYOUT
-		//selectNone();
 		curScore.endCmd();
-		var displayFontMessage = "fonturl" in chosenTitlePageStyle;
-		if (("os" in chosenTitlePageStyle) && isMac) displayFontMessage = false;
-		if (displayFontMessage) theMsg += '<p><b>NOTE</b>: This template requires the font ‘'+composerStyle.font+'’. If it is not already installed, download from <a href = "'+chosenTitlePageStyle.fonturl+'">'+chosenTitlePageStyle.fonturl+'</a>.</p>';
 		
-		theMsg += '<p><b>IMPORTANT</b>: If you wish to exclude the title page from the parts, please select the title page frame and tick ‘Properties→Exclude from parts’ (I cannot do this automatically).</p>';
+		
+
 		dialog.msg = theMsg; 
 		dialog.show();
 	}
@@ -412,6 +485,11 @@ MuseScore {
 		curScore.startCmd();
 		curScore.doLayout(fraction(0, 1), fraction(-1, 1));
 		curScore.endCmd();*/
+	}
+	
+	
+	function isFontInstalled (fontName) {
+		return fontList.includes(fontName);
 	}
 
 	
@@ -485,6 +563,87 @@ MuseScore {
 	}
 	
 	StyledDialogView {
+		id: fontissuedialog
+		title: "FONTS ISSUE"
+		contentHeight: 282
+		contentWidth: 466
+		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
+	
+		Text {
+			width: parent.width-40
+			x: 20
+			y: 20
+	
+			text: "Font not installed"
+			font.bold: true
+			font.pointSize: fontissuedialog.fontSize
+			color: ui.theme.fontPrimaryColor
+		}
+		
+		Rectangle {
+			x:20
+			width: parent.width-45
+			y:45
+			height: 1
+			color: ui.theme.fontPrimaryColor
+		}
+	
+		ScrollView {
+			id: fontissuesview
+			x: 20
+			y: 60
+			height: parent.height-100
+			width: parent.width-40
+			leftInset: 0
+			leftPadding: 0
+			ScrollBar.vertical.policy: ScrollBar.AsNeeded
+			TextArea {
+				height: parent.height
+				textFormat: Text.RichText
+				text: fontissuedialog.msg
+				wrapMode: TextEdit.Wrap
+				leftInset: 0
+				leftPadding: 0
+				readOnly: true
+				onLinkActivated: Qt.openUrlExternally(link)
+				background: Rectangle {
+					color: "transparent"
+				}
+			}
+		}
+	
+		ButtonBox {
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			FlatButton {
+				text: 'Create anyway'
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 2
+				width: 50
+				isLeftSide: true
+				onClicked: {
+					fontissuedialog.close();
+					createTitlePage();
+				}
+			}
+			FlatButton {
+				text: "Cancel"
+				width: 50
+				buttonRole: ButtonBoxModel.ApplyRole
+				buttonId: ButtonBoxModel.Cancel
+				onClicked: {
+					fontissuedialog.close()
+				}
+			}	
+		}
+	}
+	
+	StyledDialogView {
 		id: styles
 		title: "MN CREATE TITLE PAGE"
 		contentHeight: 580
@@ -492,6 +651,7 @@ MuseScore {
 		property color backgroundColor: ui.theme.backgroundSecondaryColor
 		property var createFrontMatter: false
 		property var changeAllFonts: false
+		property var excludeFromParts: true
 
 		Rectangle {
 			color: styles.backgroundColor
@@ -601,6 +761,15 @@ MuseScore {
 			anchors.topMargin: 20
 			rows: 1
 			columnSpacing: 40
+			
+			CheckBox {
+				checked: styles.excludeFromParts
+				onClicked: {
+					checked = !checked
+					styles.excludeFromParts = checked
+				}
+				text: "Exclude title page from parts"
+			}
 			
 			CheckBox {
 				checked: styles.changeAllFonts

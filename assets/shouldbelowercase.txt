@@ -8,6 +8,9 @@ ord
 pizz
 arco
 div
+tasto
+pont
+ponticello
 legato
 flautando
 flaut
@@ -20,3 +23,5 @@ una corda
 sostenuto
 molto
 poco
+sord
+sordino

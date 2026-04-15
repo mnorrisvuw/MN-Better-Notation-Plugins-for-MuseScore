@@ -53,6 +53,7 @@ MuseScore {
 	property var frames: []
 	property var firstVisibleStaff: 0
 	property var errorMsg: ''
+	property var fontList: Qt.fontFamilies()
 	
 	function getAssetPath(filename) {
         if (Qt.platform.os === "linux") {
@@ -61,6 +62,10 @@ MuseScore {
             return Qt.resolvedUrl("./assets/" + filename).toString().slice(8);
         }
     }
+	
+	function isFontInstalled (fontName) {
+		return fontList.includes(fontName);
+	}
 
     FileIO { 
         id: versionnumberfile; 
@@ -98,8 +103,15 @@ MuseScore {
 		formatTempoMarkingsOption = options.formatTempoMarkings;
 		connectBarlinesOption = options.connectBarlines;
 		removeManualTextFormattingOption = options.removeManualFormatting;
-		
 		options.close();
+
+		if (setTimesOption && !isFontInstalled ('Times New Roman Accidentals')) {
+			dialogMsg = "<p>You have selected ‘Set text font to Times New Roman, but have not installed the Times New Roman Accidentals font. This font is included in the ‘fonts’ folder within the plugin directory. You will need to install it before continuing.</p><p> <a href='https://www.wikihow.com/Install-Fonts-on-Your-PC'>Click here for instructions on how to install fonts on your computer</a>";
+			dialog.msg = dialogMsg;
+			dialog.show();
+			return;
+		}
+		
 		updateLayout();
 		numStaves = curScore.nstaves;
 		for (var i = 0; i < numStaves; i++) if (curScore.staves[i].show) numVisibleStaves ++;

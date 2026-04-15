@@ -106,3 +106,5 @@ tongue
 et
 èt
 et
+trés 
+très 
