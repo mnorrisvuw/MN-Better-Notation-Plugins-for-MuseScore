@@ -138,11 +138,31 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
 * Click **Home→Plugins** or **Plugins→Manage plugins...**
 * For each of the four MN plugins, click on their icon and click ‘**Enable**’
 * The plugins should now be available from the **Plugins** menu
+* If you are using **MN Create Title Page** or **MN Make Recommended Layout Changes**, you will need to manually install some fonts. Please read below.
 
 ## <a id="fonts"></a>Installing fonts
-The templates in the **MN Create Title Page** plugin use the following freely available fonts. Many of these fonts come bundled with the Windows and/or Mac OS operating systems; all are available as a free download.
+Both **MN Create Title Page** and **MN Make Recommended Layout Changes** require some custom fonts to be installed manually.
 
-Depending on your particular combination of OS and other software, you may or may not already have them installed. If you need to install them, below is a list of download links:
+### How to install fonts on your computer
+Please read here for instructions on how to install fonts on your system: https://zeenesia.com/2025/05/15/install-font-for-windows-and-mac/
+
+### Fonts for MN Make Recommended Layout Changes
+Within the MN Better Notation Plugins folder that you downloaded is a subfolder called ‘fonts’containing 4 font files:
+- Times New Roman Accidentals.ttf
+- Times New Roman Accidentals Italic.ttf
+- Times New Roman Accidentals Bold.ttf
+- Times New Roman Accidentals Bold Italic.ttf
+
+Install each of these four fonts, following the instructions at the link above.
+
+### Fonts for MN Create Title Page
+The templates in the *MN Create Title Page* plugin use the following freely available fonts. Many of these fonts come bundled with the Windows and/or Mac OS operating systems; all are available as a free download.
+
+Depending on your particular combination of OS and other software, you may or may not already have them installed.
+
+**A warning dialog will be raised by the plugin if you select a template for which you have not installed the font. You will need to go to the link below to download the required font, then install as per the instructions above. You may need to restart MuseScore before the plugin will create the desired title page.**
+
+If you need to install them, below is a list of download links:
 * **Academy Engraved LET**: bundled with Mac OS X; available for download [here](https://fontsgeek.com/fonts/Academy-Engraved-LET-Plain)
 * **Alegreya Sans**: available for download [here](https://fonts.google.com/specimen/Alegreya+Sans)
 * **Amulya**: available for download [here](https://www.fontshare.com/fonts/amulya)
