@@ -121,24 +121,30 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
   * **Other**: slur line width, title frame height and distance to music
 ***
 
-## <a id="installation"></a>Installation
+## <a id="installation"></a>Installing/updating the plugins
 
-*MN Better Notation Plugins require MuseScore Studio 4.6.1 or later.*
+*MN Better Notation Plugins require MuseScore Studio 4.6.4 or later.*
 
-**YOUTUBE**: Watch [a YouTube video](https://www.youtube.com/watch?v=TztQKb71Rw8) on how to install the plugins.
+**INSTALLATION VIDEO**: Watch [a YouTube video](https://www.youtube.com/watch?v=TztQKb71Rw8) on how to install the plugins.
 
-**INSTRUCTIONS**:
-* **Download** the project as a zip file either from the green Code button above, or from the direct download link below.
-* **Extract it** using archive extraction software
-* **Copy and paste (or move) the entire folder** into MuseScore’s plugins folder, configurable at [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences). The default directories are:
-    * **Mac OS**: ~/Documents/MuseScore4/Plugins/
-    * **Windows**: C:\Users\YourUserName\Documents\MuseScore4\Plugins\
-    * **Linux**: ~/Documents/MuseScore4/Plugins
-* **Open MuseScore** or quit and relaunch it if it was already open
-* Click **Home→Plugins** or **Plugins→Manage plugins...**
-* For each of the four MN plugins, click on their icon and click ‘**Enable**’
-* The plugins should now be available from the **Plugins** menu
-* If you are using **MN Create Title Page** or **MN Make Recommended Layout Changes**, you will need to manually install some fonts. Please read below.
+**INSTALLTION/UPDATE INSTRUCTIONS**:
+* **Download** the latest version of the plugins, which is always found at [http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip](http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip)
+    * *v1.2 and higher of the plug-ins includes an automatic update check and download function*
+* **Expand the Zip file**
+    * **Mac OS**: double-click the file in the Finder to expand
+    * **Windows**: in Explorer, right-click the file and choose ‘Extract All’
+    * You should end up with a folder called ‘MNBetterNotationPlugins’
+* **Copy and paste (or move) this entire folder** into MuseScore’s plugins folder, configurable at [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences).
+    * The default plugin directory is located at:
+        * **Mac OS/Linux**: ~/Documents/MuseScore4/Plugins/
+        * **Windows**: C:\Users\YourUserName\Documents\MuseScore4\Plugins\
+    * If you had a previous version of the plugins installed, you will be prompted to replace the whole folder, which you should do.
+* **Open MuseScore**, or quit and relaunch it if it was already open
+* If you have not previously installed the MN Better Notation Plugins, then you will need to also follow these additional steps:
+    * In MuseScore, choose **Plugins→Manage plugins...** from the menubar
+    * For each of the six MN plugins, click on their icon then click ‘**Enable**’
+    * The plugins should now be available from the **Plugins** menu
+    * Note that if you want to use **MN Create Title Page** or **MN Make Recommended Layout Changes**, you will need to manually install some fonts. Please read below for more details.
 
 ## <a id="fonts"></a>Installing fonts
 Both **MN Create Title Page** and **MN Make Recommended Layout Changes** require some custom fonts to be installed manually.
