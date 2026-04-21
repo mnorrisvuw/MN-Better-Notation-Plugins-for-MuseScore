@@ -127,24 +127,26 @@ A set of plug-ins for [MuseScore Studio 4.6](https://musescore.org/en) that assi
 
 **INSTALLATION VIDEO**: Watch [a YouTube video](https://www.youtube.com/watch?v=TztQKb71Rw8) on how to install the plugins.
 
-**INSTALLTION/UPDATE INSTRUCTIONS**:
-* **Download** the latest version of the plugins, which is always found at [http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip](http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip)
-    * *v1.2 and higher of the plug-ins includes an automatic update check and download function*
+**INSTALLATION/UPDATE INSTRUCTIONS**:
+* **Download the latest version**
+    * The latest version of the plugins can always be found at [http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip](http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip)
 * **Expand the Zip file**
     * **Mac OS**: double-click the file in the Finder to expand
     * **Windows**: in Explorer, right-click the file and choose ‘Extract All’
     * You should end up with a folder called ‘MNBetterNotationPlugins’
-* **Copy and paste (or move) this entire folder** into MuseScore’s plugins folder, configurable at [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences).
+* **Copy and paste (or move) this entire folder** into MuseScore’s plugins folder
     * The default plugin directory is located at:
         * **Mac OS/Linux**: ~/Documents/MuseScore4/Plugins/
         * **Windows**: C:\Users\YourUserName\Documents\MuseScore4\Plugins\
+        * *Note, you may have configured a different plug-in folder in [Preferences→General→Folders](https://musescore.org/en/handbook/4/preferences).*
     * If you had a previous version of the plugins installed, you will be prompted to replace the whole folder, which you should do.
 * **Open MuseScore**, or quit and relaunch it if it was already open
-* If you have not previously installed the MN Better Notation Plugins, then you will need to also follow these additional steps:
-    * In MuseScore, choose **Plugins→Manage plugins...** from the menubar
-    * For each of the six MN plugins, click on their icon then click ‘**Enable**’
-    * The plugins should now be available from the **Plugins** menu
-    * Note that if you want to use **MN Create Title Page** or **MN Make Recommended Layout Changes**, you will need to manually install some fonts. Please read below for more details.
+* **Enable the plugins**
+    * If you have not previously installed the MN Better Notation Plugins, you will need to also follow these additional steps to enable the plugins:
+        * In MuseScore, choose **Plugins→Manage plugins...** from the menubar
+        * For each of the six MN plugins, click on their icon then click ‘**Enable**’
+        * The plugins should now be available from the **Plugins** menu
+* Note that if you want to use **MN Create Title Page** or **MN Make Recommended Layout Changes**, you will need to manually install some fonts. Please read below for more details.
 
 ## <a id="fonts"></a>Installing fonts
 Both **MN Create Title Page** and **MN Make Recommended Layout Changes** require some custom fonts to be installed manually.
