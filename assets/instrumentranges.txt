@@ -1,3 +1,4 @@
+**** DATA FORMAT: id,lowest pitch possible,quiet register threshold (low),highest pitch possible,high loud register (e.g. trumpet),low loud register (e.g. tuba) ****
 brass.french-horn,41,,77,72,
 brass.trombone,36,,70,,
 brass.trombone.bass,29,,65,,
@@ -6,8 +7,8 @@ brass.trumpet,52,,86,77,
 brass.trumpet.bflat,52,,84,77,
 brass.trumpet.c,54,,86,79,
 brass.trumpet.d,56,,88,81,
-brass.tuba,24,,65,,36
-brass.tuba.bass,24,,65,,36
+brass.tuba,24,,65,,31
+brass.tuba.bass,24,,65,,31
 drum.timpani,38,,60,,
 keyboard.celesta,60,,108,,
 keyboard.piano,21,,108,,

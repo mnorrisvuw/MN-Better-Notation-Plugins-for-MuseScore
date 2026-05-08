@@ -21,6 +21,11 @@ MuseScore {
 	title: "MN Make Recommended Layout Changes"
 	id: mnmakerecommendedlayoutchanges
 	thumbnailName: "MNMakeRecommendedLayoutChanges.png"	
+	
+	// **** PROPERTIES **** //
+	
+	property var versionNumber: ''
+	property var checkingScore: false
 	property var selectionArray: null
 	property var firstMeasure: null
 	property var numParts: 0
@@ -42,6 +47,7 @@ MuseScore {
 	property var setTitleFrameOption: false
 	property var formatTempoMarkingsOption: false
 	property var connectBarlinesOption: false
+	property var fixCollisionsOption: false
 	property var spatium: 0
 	property var numGrandStaves: 0
 	property var isGrandStaff: []
@@ -76,7 +82,7 @@ MuseScore {
 	
 	onRun: {
 		if (!curScore) return;
-		var versionNumber = versionnumberfile.read().trim();
+		versionNumber = versionnumberfile.read().trim();
 		dialog.titleText = 'MN MAKE RECOMMENDED LAYOUT CHANGES '+versionNumber;
 		if (Qt.platform.os !== "osx") dialog.fontSize = 12;
 		// Show the options window
@@ -88,8 +94,68 @@ MuseScore {
 			dialog.show();
 			return;
 		}
-		
+				
+		// **** CHECK FOR LATEST PLUG-IN UPDATE **** //
+		checkForUpdate();
+
 		options.open();		
+	}
+	
+	function checkForUpdate() {
+		//logError ('here');
+		var url = "https://api.github.com/repos/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest";
+		var xhr = new XMLHttpRequest();
+	
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== XMLHttpRequest.DONE)
+				return;
+	
+			if (xhr.status !== 200) {
+				//logError("Failed to fetch latest release: HTTP " + xhr.status);
+				return;
+			}
+	
+			var data;
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch (e) {
+				logError("Invalid JSON from GitHub API");
+				return;
+			}
+	
+			var latestVersionNumber = data.tag_name || "";
+			var strippedLatestVersionNumber = latestVersionNumber.replace(/^v(?:\.\s?)?/,"");
+			var strippedCurrentVersionNumber = versionNumber.replace(/^v(?:\.\s?)?/,"");
+	
+			if (isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber)) {
+				update.msg = '<p><font size=\"6\">🔔</font> A new version (v. '+strippedLatestVersionNumber+') of the MN Better Notation Plugins is now available. (You are currently running v. '+strippedCurrentVersionNumber+').</p><p>Click ‘Download new version’ to automatically download the latest versions.<p><b>NOTE: once downloaded, you will need to manually install them — <a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">see here for detailed installation instructions</a>.</b></p>';
+				if (!checkingScore) update.show();
+			}
+		}
+		//logError('here2');
+		xhr.open("GET", url);
+		xhr.send();
+	}
+	
+	function isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber) {
+		var aParts = strippedCurrentVersionNumber.split(".");
+		var bParts = strippedLatestVersionNumber.split(".");
+		var len = Math.max(aParts.length, bParts.length);
+	
+		for (var i = 0; i < len; i++) {
+			var aNum = i < aParts.length ? parseInt(aParts[i], 10) : 0;
+			var bNum = i < bParts.length ? parseInt(bParts[i], 10) : 0;
+	
+			if (aNum > bNum) return false;
+			if (aNum < bNum) return true;
+		}
+		return false;
+	}
+	
+	function downloadNewVersion() {
+		Qt.openUrlExternally("http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
+		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and install the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
+		dialog.show();
 	}
 	
 	function makeChanges() {
@@ -103,6 +169,7 @@ MuseScore {
 		formatTempoMarkingsOption = options.formatTempoMarkings;
 		connectBarlinesOption = options.connectBarlines;
 		removeManualTextFormattingOption = options.removeManualFormatting;
+		fixCollisionsOption = options.fixCollisions;
 		options.close();
 
 		if (setTimesOption && !isFontInstalled ('Times New Roman Accidentals')) {
@@ -117,7 +184,7 @@ MuseScore {
 		for (var i = 0; i < numStaves; i++) if (curScore.staves[i].show) numVisibleStaves ++;
 
 		// *** REMOVE ANY COMMENTS AND HIGHLIGHTS THAT MIGHT BE LEFT OVER FROM OTHER PLUGINS ***
-		getFrames();
+		frames = getFrames();
 		deleteAllCommentsAndHighlights();
 		
 		var finalMsg = '';
@@ -162,10 +229,14 @@ MuseScore {
 		// *** LAYOUT THE TITLE FRAME ON p. 1 *** //
 		if (setTitleFrameOption) setTitleFrame();
 		
-		// *** SET PART SETTINGS
+		// *** SET PART SETTINGS *** //
 		if (setPartsOption) setPartSettings();
 		
+		// *** CONNECTED BARLINES *** //
 		if (connectBarlinesOption) doConnectBarlines();
+
+		// *** FIX COLLISIONS *** //
+		if (fixCollisionsOption) fixCollisions();
 		
 		
 		// CHANGE INSTRUMENT NAMES
@@ -189,16 +260,22 @@ MuseScore {
 	}
 	
 	function getFrames() {
-		var systems = curScore.systems;
-		var numSystems = systems.length;
-		for (var i = 0; i < numSystems; i++ ) {
-			var system = systems[i];
-			var measures = system.measures;
-			for (var j = 0; j < measures.length; j++ ) {
-				var e = measures[j];
-				if (e.type == Element.VBOX) frames.push(e);
+		var theFrames = [];
+		for (var i = 0; i < curScore.systems.length; i++ ) {
+			var theMeasures = curScore.systems[i].measures;
+			for (var j = 0; j < theMeasures.length; j++ ) {
+				var e = theMeasures[j];
+				if (isFrame(e)) theFrames.push(e);
 			}
 		}
+		return theFrames;
+	}
+	
+	function isFrame (theElement) {
+		if (!theElement) return;
+		if (theElement == undefined) return;
+		var type = theElement.type;
+		return (type == Element.FBOX || type == Element.HBOX || type == Element.TBOX || type == Element.VBOX);
 	}
 	
 	function selectNone () {
@@ -227,7 +304,9 @@ MuseScore {
 		}
 		curScore.endCmd();
 		curScore.startCmd();
+		//logError ('I found '+breaks.length+' breaks to delete');
 		for (var i = 0; i < breaks.length; i++ ) removeElement (breaks[i]);
+		curScore.addRemoveSystemLocks(0,false);
 		curScore.endCmd();
 	}
 	
@@ -669,7 +748,7 @@ MuseScore {
 		"figuredBassStyle","",
 		"systemFrameDistance","",
 		"frameSystemDistance","",
-		"minMeasureWidth", isSoloScore ? 14.0 : 16.0, // Bars → Minimum Bar Width
+		"minMeasureWidth", isSoloScore ? 14.0 : 18.0, // Bars → Minimum Bar Width
 		
 		"barWidth", 0.16, // Barlines → Thin Barline Thickness
 		"doubleBarWidth","",
@@ -2218,6 +2297,7 @@ MuseScore {
 						currMeasure = currMeasure.nextMeasure;
 					}
 					for (var j = 0; j < breaks.length; j++ ) removeElement (breaks[j]);
+					thePart.partScore.addRemoveSystemLocks(0,false);
 				}
 			}
 		}
@@ -2333,6 +2413,21 @@ MuseScore {
 
 	}
 	
+	function fixCollisions () {
+		curScore.startCmd();
+		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
+		curScore.endCmd();
+		
+		var elems = curScore.selection.elements;
+		
+		curScore.startCmd();
+		for (var i = 0; i < elems.length; i++) {
+			var e = elems[i];
+			if (e.minDistance != 0.5) e.minDistance = 0.5;
+		}
+		curScore.endCmd();
+	}
+	
 	function removeManualTextFormatting() {
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
@@ -2343,14 +2438,16 @@ MuseScore {
 		
 		var staffTextFont = curScore.style.value('staffTextFontFace');
 		var staffTextFontSize = curScore.style.value('staffTextFontSize');
+		var staffTextFontStyle = curScore.style.value('staffTextFontStyle');
 		var expressionFont = curScore.style.value('expressionFontFace');
 		var expressionFontSize = curScore.style.value('expressionFontSize');
+		var expressionFontStyle = curScore.style.value('expressionFontStyle');
 		
 		for (var i = 0; i < elems.length; i++) {
 			var e = elems[i];
 			
 			if (e.type == Element.STAFF_TEXT || e.type == Element.EXPRESSION) {
-				e.fontStyle = 0;
+				e.fontStyle = (e.type == Element.STAFF_TEXT) ? staffTextFontStyle : expressionFontStyle;
 				e.fontFace = (e.type == Element.STAFF_TEXT) ? staffTextFont : expressionFont;
 				e.fontSize = (e.type == Element.STAFF_TEXT) ? staffTextFontSize : expressionFontSize;
 
@@ -2552,6 +2649,100 @@ MuseScore {
 	}
 	
 	StyledDialogView {
+		id: update
+		title: "Plug-in update available"
+		contentHeight: 252
+		contentWidth: 505
+		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
+	
+		Text {
+			id: updateText
+			width: parent.width-40
+			anchors {
+				left: parent.left
+				top: parent.top
+				leftMargin: 20
+				topMargin: 20
+			}
+			text: "New plug-in update available"
+			font.bold: true
+			font.pointSize: update.fontSize
+			color: ui.theme.fontPrimaryColor
+		}
+		
+		Rectangle {
+			id: updateRect
+			anchors {
+				top: updateText.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			width: parent.width-45
+			height: 2
+			color: ui.theme.fontPrimaryColor
+		}
+	
+		ScrollView {
+			anchors {
+				top: updateRect.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			height: parent.height-100
+			width: parent.width-40
+			leftInset: 0
+			leftPadding: 0
+			ScrollBar.vertical.policy: ScrollBar.AsNeeded
+			TextArea {
+				height: parent.height
+				text: update.msg
+				textFormat: Text.RichText
+				wrapMode: TextEdit.Wrap
+				leftInset: 0
+				leftPadding: 0
+				readOnly: true
+				background: Rectangle {
+					color: "transparent"
+				}
+			}
+		}
+	
+		ButtonBox {
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			FlatButton {
+				text: "Close"
+				width: 50
+				isLeftSide: true
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 1
+				onClicked: {
+					update.close()
+				}
+			}	
+			
+			FlatButton {
+				text: 'Download new version'
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 2
+				width: 100
+				onClicked: {
+					update.close();
+					options.close();
+					downloadNewVersion();
+				}
+			}
+		}
+	}
+	
+	StyledDialogView {
 		id: options
 		title: "MN MAKE RECOMMENDED LAYOUT CHANGES"
 		contentHeight: 480
@@ -2568,6 +2759,7 @@ MuseScore {
 		property var formatTempoMarkings: true
 		property var connectBarlines: true
 		property var removeManualFormatting: true
+		property var fixCollisions: true
 	
 		Text {
 			id: styleText
@@ -2614,7 +2806,7 @@ MuseScore {
 				color: ui.theme.fontPrimaryColor
 			}
 			CheckBox {
-				text: "Remove existing layout breaks"
+				text: "Remove all breaks/locks/stretches"
 				checked: options.removeBreaks
 				onClicked: {
 					checked = !checked
@@ -2667,6 +2859,14 @@ MuseScore {
 				onClicked: {
 					checked = !checked
 					options.connectBarlines = checked
+				}
+			}
+			CheckBox {
+				text: "Fix all collisions"
+				checked: options.fixCollisions
+				onClicked: {
+					checked = !checked
+					options.fixCollisions = checked
 				}
 			}
 			
@@ -2723,23 +2923,50 @@ MuseScore {
 		}
 		
 		ButtonBox {
+			width: parent.width-185;
 			anchors {
-				horizontalCenter: parent.horizontalCenter
-				bottom: parent.bottom
-				margins: 10
+				left: parent.left;
+				bottom: parent.bottom;
+				leftMargin: 20;
+				bottomMargin: 20;
 			}
-			buttons: [ ButtonBoxModel.Cancel, ButtonBoxModel.Ok ]
-			
-			navigationPanel.section: dialog.navigationSection
-			onStandardButtonClicked: function(buttonId) {
-				if (buttonId === ButtonBoxModel.Cancel) {
-					options.close()
+			FlatButton {
+				text: "Cancel"
+				width: 50
+				buttonRole: ButtonBoxModel.ApplyRole
+				buttonId: ButtonBoxModel.Cancel
+				onClicked: {
+					options.close();
 				}
-				if (buttonId === ButtonBoxModel.Ok) {
-					makeChanges()
+			}			
+			
+		}
+		
+		ButtonBox {
+			
+			anchors {
+				right: parent.right;
+				bottom: parent.bottom;
+				rightMargin: 20;
+				bottomMargin: 20;
+			}
+			navigationPanel.section: options.navigationSection;
+			
+			FlatButton {
+				text: "OK"
+				enabled: true
+				visible: true
+				width: 50
+				buttonRole: ButtonBoxModel.AcceptRole
+				buttonId: ButtonBoxModel.Ok
+				isClickOnKeyNavTriggered: true
+				accentButton: true
+				onClicked: {
+					makeChanges();
 				}
 			}
 		}
+		
 		
 		
 	}

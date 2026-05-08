@@ -70,14 +70,14 @@ lengo
 legno
 pos nat
 pos. nat.
-Bela
-Béla
-Bartok
-Bartók
-Bartock
-Bartók
-Riguadon
-Rigaudon
+bela
+béla
+bartok
+bartók
+bartock
+bartók
+riguadon
+rigaudon
 lourdeúr
 lourdeur
 lourduer
@@ -108,3 +108,15 @@ et
 et
 trés 
 très 
+étouffe
+étouffé
+etouffe
+étouffé
+etouffé
+étouffé
+marcarto
+marcato
+macarto
+marcato
+marcartissimo
+marcatissimo

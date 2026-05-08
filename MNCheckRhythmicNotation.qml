@@ -33,6 +33,10 @@ MuseScore {
         source: getAssetPath("versionnumber.txt")
         onError: function(msg) { console.log("Error:", msg); } 
     }
+	
+	// **** VERSION **** //
+	property var versionNumber: ''
+	property var checkingScore: false
 
 	// **** GLOBALS **** //
 	property var numLogs: 0
@@ -64,6 +68,7 @@ MuseScore {
 	property var prevSoundingDur: 0
 	property var noteFinishesBeat: false
 	property var hasBeam: false
+	property var isFeatheredBeam: false
 	property var nextHasBeam: false
 	property var canCheckThisBar: false
 	property var cursor: null
@@ -150,6 +155,10 @@ MuseScore {
 			dialog.show();
 			return;
 		}
+		versionNumber = versionnumberfile.read().trim();
+		
+		// **** CHECK FOR LATEST PLUG-IN UPDATE **** //
+		checkForUpdate();
 				
 		if (Qt.platform.os !== "osx") dialog.fontSize = 12;
 		
@@ -176,8 +185,8 @@ MuseScore {
 		possibleOnbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet", "minim", "dotted minim", "semibreve"];
 		possibleOffbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet];
 		possibleOffbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet"];
-		var versionNumber = versionnumberfile.read().trim();
-		getFrames();
+		
+		frames = getFrames();
 		var actualSystemNum = 0;
 		for (var j = 0; j < curScore.systems.length; j++) {
 			var system = curScore.systems[j];
@@ -415,11 +424,12 @@ MuseScore {
 						currentBeamMode = noteRest.beamMode;
 						currentBeamPos = noteRest.beamPos;
 						hasBeam = currentBeam != null;
+						isFeatheredBeam = hasBeam ? currentBeam.growLeft != currentBeam.growRight : false;
 						isGliss = glisses[currentTrack][currTick] != null;
 						if (!isHidden) totalMusicDurThisTrack += soundingDur;
 						//logError ("track = "+currentTrack+"; noteStart = "+noteStart);
 						//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
-						if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nSelect it and press ‘delete’.",noteRest);
+						if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nTo fix, select it and press ‘delete’.",noteRest);
 						
 						
 						// *** GET INFORMATION ON THE NEXT ITEM AND THE ONE AFTER THAT *** //
@@ -567,9 +577,9 @@ MuseScore {
 							if (isRest && displayDur == semiquaver && !isOnTheBeat && noteStart % quaver > 0) { 
 								if (prevIsNote && nextItemIsNote && prevDisplayDur == semiquaver && !flaggedWrittenStaccato) {
 									flaggedWrittenStaccato = true;
-									if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes)\na quaver and adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
-									if (isStringInstrument) addError ("Consider simplifying this passage by making this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
-									if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by making this note\n(and any similar notes) a quaver.",[prevNoteRest,noteRest]);
+									if (isWindOrBrassInstrument || isVoice || isKeyboardInstrument) addError ("Consider simplifying this passage by\nmaking this note (and any similar notes) a quaver\nand adding a staccato dot(s) as necessary.",[prevNoteRest,noteRest]);
+									if (isStringInstrument) addError ("Consider simplifying this passage by\nmaking this note (and any similar notes) a quaver,\nand adding a staccato dot(s) if arco.",[prevNoteRest,noteRest]);
+									if (!isWindOrBrassInstrument && !isVoice && !isStringInstrument && !isKeyboardInstrument) addError ("Consider simplifying this passage by\nmaking this note (and\nany similar notes) a quaver.",[prevNoteRest,noteRest]);
 								}
 							}
 							
@@ -696,6 +706,63 @@ MuseScore {
 		}
 	}
 	
+	function checkForUpdate() {
+		//logError ('here');
+		var url = "https://api.github.com/repos/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest";
+		var xhr = new XMLHttpRequest();
+	
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== XMLHttpRequest.DONE)
+				return;
+	
+			if (xhr.status !== 200) {
+				//logError("Failed to fetch latest release: HTTP " + xhr.status);
+				return;
+			}
+	
+			var data;
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch (e) {
+				logError("Invalid JSON from GitHub API");
+				return;
+			}
+	
+			var latestVersionNumber = data.tag_name || "";
+			var strippedLatestVersionNumber = latestVersionNumber.replace(/^v(?:\.\s?)?/,"");
+			var strippedCurrentVersionNumber = versionNumber.replace(/^v(?:\.\s?)?/,"");
+	
+			if (isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber)) {
+				update.msg = '<p><font size=\"6\">🔔</font> A new version (v. '+strippedLatestVersionNumber+') of the MN Better Notation Plugins is now available. (You are currently running v. '+strippedCurrentVersionNumber+').</p><p>Click ‘Download new version’ to automatically download the latest versions.<p><b>NOTE: once downloaded, you will need to manually install them — <a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">see here for detailed installation instructions</a>.</b></p>';
+				if (!checkingScore) update.show();
+			}
+		}
+		//logError('here2');
+		xhr.open("GET", url);
+		xhr.send();
+	}
+	
+	function isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber) {
+		var aParts = strippedCurrentVersionNumber.split(".");
+		var bParts = strippedLatestVersionNumber.split(".");
+		var len = Math.max(aParts.length, bParts.length);
+	
+		for (var i = 0; i < len; i++) {
+			var aNum = i < aParts.length ? parseInt(aParts[i], 10) : 0;
+			var bNum = i < bParts.length ? parseInt(bParts[i], 10) : 0;
+	
+			if (aNum > bNum) return false;
+			if (aNum < bNum) return true;
+		}
+		return false;
+	}
+	
+	function downloadNewVersion() {
+		Qt.openUrlExternally("http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
+		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and install the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
+		dialog.show();
+	}
+	
 	function selectNone () {
 		curScore.startCmd();
 		cmd('escape');
@@ -786,7 +853,7 @@ MuseScore {
 		if (isPickupBar) return;
 		isBarRest = isRest && soundingDur == barDur;
 		if (!isBarRest) return; 
-		if (noteRest.durationTypeWithDots.type != DurationType.V_MEASURE) addError ("This bar rest has been manually entered,\nand is therefore incorrectly positioned.\nSelect the bar and press ‘delete’ to\ncreate a correctly positioned bar rest.",noteRest);
+		if (noteRest.durationTypeWithDots.type != DurationType.V_MEASURE) addError ("This bar rest has been manually entered,\nand is therefore incorrectly positioned.\nTo fix, select the bar and press ‘delete’ to\ncreate a correctly positioned bar rest.",noteRest);
 		if (noteRest.posY !== 1) addError ("This bar rest has been moved vertically\nand is therefore incorrectly positioned.",noteRest);
 	}
 	
@@ -806,7 +873,10 @@ MuseScore {
 		var hidingBeatError;
 		var startTick = noteRest.parent.tick;
 		var startOffset = startTick - barStart;
-
+		
+		// ** Don't bother checking feathered beams ** //
+		if (isFeatheredBeam) return;
+		
 		// ** FIRST CHECK IF THIS IS A TUPLET ** //
 		if (noteRest.tuplet == null) {
 			hidingBeatError = noteHidesBeat && !isBarRest && !hasPause; // make a temp version
@@ -900,7 +970,7 @@ MuseScore {
 					}
 					
 					if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
-						addError ("Never write a dotted crotchet rest in "+timeSigStr+"\n(See ‘Behind Bars’ p. 162)",noteRest);
+						addError ("Never write a dotted crotchet rest in\n"+timeSigStr+" (See ‘Behind Bars’ p. 162)",noteRest);
 						return;
 					}
 				}
@@ -1020,10 +1090,10 @@ MuseScore {
 		if (hidingBeatError) {
 			if (isNote) {
 				if (timeSigStr === "5/4" && soundingDur == semibreve) {
-					addError("Never use a semibreve in 5/4\nsplit the note to show the bar division of either 2+3 or 3+2",noteRest);
+					addError("Never use a semibreve in 5/4. Split\nthe note to show the bar division\nof either 2+3 or 3+2 beats.",noteRest);
 				} else {
 					if (numBeatsHidden == 1) {
-						addError("This note is hiding beat "+(noteStartBeat + 2)+".\nSplit the note with a tie, so that it shows beat "+(noteStartBeat + 2),noteRest);
+						addError("This note is hiding beat "+(noteStartBeat + 2)+". Split the note with\na tie, so that it shows beat "+(noteStartBeat + 2)+". (To fix, try selecting\nthe whole bar and choosing Tools→Regroup Rhythms.)",noteRest);
 					} else {
 						var errStr = "This note is hiding beats ";
 	
@@ -1036,7 +1106,7 @@ MuseScore {
 								if (i == numBeatsHidden - 2) {
 									errStr += " &amp; ";									
 								} else {
-									errStr += ".\nSplit it with a tie, so that the beats are shown";
+									errStr += ". Split the note with\na tie, so that the beats are shown. (To fix, try selecting\nthe whole bar and choosing Tools→Regroup Rhythms.)";
 									
 								}
 							}
@@ -1046,10 +1116,10 @@ MuseScore {
 				}
 			} else {
 				if (timeSigStr == "5/4" && soundingDur == semibreve) {
-					addError("Never use a semibreve rest in 5/4\nSplit it to show the bar division of either 2+3 or 3+2 crotchets",noteRest);
+					addError("Never use a semibreve rest in 5/4. Split\nthe rest to show the bar division\nof either 2+3 or 3+2 beats.",noteRest);
 				} else {
 					if (numBeatsHidden == 1) {
-						addError( "This rest is hiding beat "+(noteStartBeat + 2)+".\nSplit it into two rests, so that beat "+(noteStartBeat + 2)+" is shown.",noteRest);
+						addError( "This rest is hiding beat "+(noteStartBeat + 2)+". Split the rest\ninto two rests, so that beat "+(noteStartBeat + 2)+" is shown.\n(To fix, try selecting the whole bar and\nchoosing Tools→Regroup Rhythms.)",noteRest);
 					} else {
 						var errStr = "This rest is hiding beats ";
 	
@@ -1062,7 +1132,7 @@ MuseScore {
 								if (i == numBeatsHidden - 2) {
 									errStr += " &amp; ";
 								} else {
-									errStr += ".\nSplit it so that the beats are shown";
+									errStr += ".\nSplit it so that the beats are shown.\n(To fix, try selecting the whole bar and\nchoosing Tools→Regroup Rhythms.)";
 								}
 							}
 						}
@@ -1077,18 +1147,18 @@ MuseScore {
 	
 	function checkOnbeatRestSpelling (noteRest) {
 		if (timeSigStr == "3/8" && displayDur == crotchet) {
-			addError ("It is recommended to spell crotchet rests in 3/8 as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
+			addError ("It is recommended to spell crotchet rests\nin 3/8 as two quaver rests.\n(See ‘Behind Bars’ p. 161)",noteRest);
 			return;
 		}
 	}
 	
 	function checkOffbeatRestSpelling (noteRest) {
 		if (timeSigDenom < 8 && noteStartFrac == semiquaver && displayDur == dottedquaver) {
-			addError ("It is recommended to spell offbeat dotted quaver rests as\na semiquaver rest followed by a quaver rest\n(See ‘Behind Bars’ p. 162)",noteRest);
+			addError ("It is recommended to spell offbeat\ndotted quaver rests as a\nsemiquaver rest followed by a quaver rest.\n(See ‘Behind Bars’ p. 162)",noteRest);
 			return;
 		}
 		if (isCompound && noteStartFrac == quaver && displayDur == crotchet) {
-			addError ("It is recommended to spell offbeat crotchet rests in\ncompound time as two quaver rests\n(See ‘Behind Bars’ p. 161)",noteRest);
+			addError ("It is recommended to spell offbeat\ncrotchet rests in compound time as\ntwo quaver rests.\n(See ‘Behind Bars’ p. 161)",noteRest);
 			return;
 		}
 	}
@@ -1107,10 +1177,15 @@ MuseScore {
 			return;
 		}
 		
+		// **** CHECK FOR AUTO-BRACKET SWITCHED ON **** //
+		if (theTuplet.bracketType !== TupletBracketType.AUTO_BRACKET) {
+			addError ("This tuplet does not have auto-bracket switched on,\nwhich may result in incorrect bracket display. Consider\nswitching it to auto-bracket. (Select the tuplet, and choose\nProperties→Tuplet→Bracket type→Auto)", theTuplet);
+		}
+		
 		// *** CHECK FOR NON-STANDARD RATIOS ***
 		if (theTuplet.numberType == 0 && a < normalSettings.length) {
 			var normalRatio = normalSettings[a];
-			if (b != normalRatio) addError ("This tuplet is non-standard, and should therefore show the ratio.\nIn Properties, switch Number to ‘Ratio’", theTuplet);
+			if (b != normalRatio) addError ("This tuplet is non-standard, and should\ntherefore show the ratio. To fix, select\nthe tuplet, and choose Properties→Number→Ratio.", theTuplet);
 		}
 		var theNotes = theTuplet.elements;
 		var numNotes = theNotes.length;
@@ -1146,10 +1221,10 @@ MuseScore {
 						//logError ('tuplet.elements[i].actualDuration.ticks = ' + tuplet.elements[i].actualDuration.ticks);
 						if (theNotes[i].actualDuration.ticks != theTuplet.duration.ticks / 6) allNotesEqual = false;
 					}
-					if (allNotesEqual) addError ("This triplet should be a sextuplet", theTuplet);
+					if (allNotesEqual) addError ("This triplet should be a sextuplet.", theTuplet);
 				}
 			} else {
-				addError ("This tuplet is meant to have "+a+" notes/rests,\nbut instead contains "+nn+".\nConsider rewriting the tuplet",theTuplet);
+				addError ("This tuplet is meant to have "+a+" notes/rests,\nbut instead contains "+nn+".\nConsider rewriting the tuplet.",theTuplet);
 			}
 		}
 		
@@ -1163,19 +1238,19 @@ MuseScore {
 			if (numNotes == 2) {
 				
 				if (theNotes[0].duration.ticks == dottedminim && theNotes[1].duration.ticks == dottedminim) {
-					addError ("Two dotted minims under a triplet is the same\nas two minims without a triplet!!!", theTuplet);
+					addError ("Two dotted minims under a triplet is the same\nas two minims without a triplet!\nRewrite this passage.", theTuplet);
 					return;
 				}
 				if (theNotes[0].duration.ticks == dottedcrotchet && theNotes[1].duration.ticks == dottedcrotchet) {
-					addError ("Two dotted crotchets under a triplet is the same\nas two crotchets without a triplet!!!", theTuplet);
+					addError ("Two dotted crotchets under a triplet is the same\nas two crotchets without a triplet!\nRewrite this passage.", theTuplet);
 					return;
 				}
 				if (theNotes[0].duration.ticks == dottedquaver && theNotes[1].duration.ticks == dottedquaver) {
-					addError ("Two dotted quavers under a triplet is the same\nas two quavers without a triplet!!!", theTuplet);
+					addError ("Two dotted quavers under a triplet is the same\nas two quavers without a triplet!\nRewrite this passage.", theTuplet);
 					return;
 				}
 				if (theNotes[0].duration.ticks == dottedsemiquaver && theNotes[1].duration.ticks == dottedsemiquaver) {
-					addError ("Two dotted semiquavers under a triplet is the same\nas two semiquavers without a triplet!!!", theTuplet);
+					addError ("Two dotted semiquavers under a triplet is the same\nas two semiquavers without a triplet!\nRewrite this passage.", theTuplet);
 					return;
 				}
 			}
@@ -1197,9 +1272,7 @@ MuseScore {
 			//logError ('firstNoteDur = '+firstNoteDur+'; tupletDivision = '+tupletDivision);
 	
 			// *** CHECK FOR NOTE NOT REALLY MATCHING THE TUPLET DIVISION ***
-			if (firstNoteDur != tupletDivision) {
-				addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
-			}
+			if (firstNoteDur != tupletDivision) addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
 		}
 	}
 	
@@ -1217,7 +1290,7 @@ MuseScore {
 		
 		// CHECK THAT IT COULD BE SIMPLIFIED AS A BAR REST
 		if (totalRestDur == barDur && !isPickupBar) {
-			addError ('These rests can be turned into a bar rest.\nSelect the bar and press ‘delete’', rests)
+			addError ('These rests can be turned into a bar rest.\nTo fix, select the bar and press ‘delete’', rests)
 		} else {
 			//logError(Here with "+rests.length+" rests"); 
 			var maxSimplificationFound = false;
@@ -1387,15 +1460,15 @@ MuseScore {
 						for (var i = possibleSimplificationFirstRestIndex; i <= possibleSimplificationLastRestIndex; i++) theArray.push(rests[i]);
 						
 						if (restDisplayDur == dottedquaver) {
-							addError(tempText+'Condense rests as a '+simplificationText+'.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+							addError(tempText+"Condense rests as a "+simplificationText+".\n(Ignore if using rest to show placement of fermata/etc.)",theArray);
 							return;
 						}
 						// respell as two quavers if we're in a compound time signature
 						if (restDisplayDur == crotchet && isCompound) {
-							if (tempDisplayDur != quaver) addError('Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)',theArray);
+							if (tempDisplayDur != quaver) addError("Respell rests as two quavers.\n(Ignore if using rest to show placement of fermata/etc.)",theArray);
 							return;
 						}
-						addError(tempText+'Condense rests as a '+simplificationText+' by selecting them\nand choosing Tools→Regroup rhythms. (Ignore if using\nrest to show placement of fermata/etc.)',theArray);
+						addError(tempText+"Condense rests as a "+simplificationText+" by selecting them\nand choosing Tools→Regroup rhythms. (Ignore if\nusing rest to show placement of fermata/etc.)",theArray);
 					}
 				} else {
 					var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
@@ -1409,13 +1482,11 @@ MuseScore {
 						theArray.push(rests[i]);
 					}
 					if (p == dottedquaver) {
-						if (lastRestDur != quaver || totalNumRests > 2) {
-							addError ('Spell as a semiquaver followed by a quaver.',theArray);
-							return;
-						}
-						if (!isCompound) return;
+						if (lastRestDur != quaver || totalNumRests > 2) addError ("It is preferred to spell this rest as a\nsemiquaver rest followed by a quaver rest.",theArray);
+						return;
+						
 					}
-					addError(tempText+'Condense rests as a '+simplificationText+' by selecting them\nand choosing Tools→Regroup rhythms. (Ignore if using\nrest to show placement of fermata/etc.)',theArray);
+					addError(tempText+"Condense rests as a "+simplificationText+" by selecting them\nand choosing Tools→Regroup rhythms. (Ignore if using\nrest to show placement of fermata/etc.)",theArray);
 				}
 			}
 		}		
@@ -1638,7 +1709,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError (tempText+'These tied notes can be simplified as a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
+				addError (tempText+'These tied notes can be simplified as\na '+simplificationText+'. To fix, select them and\nchoose Tools→Regroup Rhythms. (Ignore if the\ntie is being used to show placement of dynamics etc.)', theArray);
 			} else {
 				if (!canCheckThisBar) return;
 				var simplificationText = possibleOffbeatSimplificationLabels[possibleSimplification];
@@ -1648,7 +1719,7 @@ MuseScore {
 				for (var i = possibleSimplificationFirstNoteIndex; i <= possibleSimplificationLastNoteIndex; i++) {
 					theArray.push(tiedNotes[i]);
 				}
-				addError(tempText+'These tied notes can be simplified as a '+simplificationText+'.\nSelect them and choose Tools→Regroup Rhythms.\n(Ignore if the tie is being used to show placement of dynamics etc.)', theArray);
+				addError(tempText+'These tied notes can be simplified\nas a '+simplificationText+'. To fix, select them and\nchoose Tools→Regroup Rhythms. (Ignore if the\ntie is being used to show placement of dynamics etc.)', theArray);
 			}
 		} else {
 			// check for two note ties wrong way around
@@ -1790,16 +1861,16 @@ MuseScore {
 			if (isLastItemInBeat) haveHadFirstNote = false;
 			if (hasBeam) {
 				// only if previous note was less than a quaver
-				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32 && prevBeamMode == Beam.MID && prevPrevDisplayDur < quaver) addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
+				if (displayDur < quaver && currentBeamMode != Beam.BEGIN32 && prevBeamMode == Beam.MID && prevPrevDisplayDur < quaver) addError("This note should have its secondary beam\nbroken. To fix, select it and choose\nProperties→Note→Beam→Beam type→\nBreak inner beams (quaver/8th).",noteRest);
 				return;
 			} else {
-				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
+				if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 				if (displayDur < quaver) {
 					if (currentBeamMode != Beam.BEGIN32 && prevIsNote) {
-						addError("This note should have its secondary beam broken.\nSet its ‘Beam type’ property to ‘Break inner beams (8th)’.",noteRest);
+						addError("This note should have its secondary beam broken.\nTo fix, select it and choose\nProperties→Note→Beam→Beam type→\nBreak inner beams (quaver/8th).",noteRest);
 						return;
 					} else {
-						if (currentBeamMode != Beam.MID && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to ‘AUTO’.",noteRest);
+						if (currentBeamMode != Beam.MID && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 						return;
 					}
 				}
@@ -1809,19 +1880,19 @@ MuseScore {
 		
 		if (isMiddleNoteInBeat) {
 			if (!hasBeam) {
-				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nSet its ‘Beam type’ property to ‘AUTO’.",noteRest);
+				addError("This note should be included in a beam\nwith all other notes and rests in this beat.\nTo fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 			} else {
 				if (prevIsNote) {
-					if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to ‘AUTO’.",noteRest);
+					if (currentBeamMode == Beam.NONE || currentBeamMode == Beam.BEGIN) addError("This note should be beamed to the previous note\nTo fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 				} else {
-					if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to either ‘AUTO’ or ‘Join beams’.",noteRest);
+					if (displayDur >= quaver && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID) addError("This note should be beamed to the previous note\nTo fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 				}
 			}
 			return;
 		}
 		
 		if (isMiddleRestInBeat) {
-			if (!hasBeam) addError("This rest should be included in a beam with\nall other notes and rests in this beat.\nSet its ‘Beam type’ property to ‘Join beams’.",noteRest);
+			if (!hasBeam) addError("This rest should be included in a beam with\nall other notes and rests in this beat.\nTo fix, select it and choose\nProperties→Note→Beam→Beam type→Join beams.",noteRest);
 			return;
 		}
 		
@@ -1834,13 +1905,13 @@ MuseScore {
 		if (!correctlyBeamed) {
 		//logError(Not correctly beamed");
 			if (isNote) {
-				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note\nSet its ‘Beam type’ property to AUTO",noteRest);
+				if (isFirstNoteInBeat && currentBeamMode != Beam.AUTO) addError("This note should be beamed to the next note.\nTo fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 				if (isLastNoteInBeat && currentBeamMode != Beam.AUTO && currentBeamMode != Beam.MID && currentBeamMode != Beam.BEGIN32) {
-					addError("This note should be beamed to the previous note\nSet its ‘Beam type’ property to AUTO",noteRest);
+					addError("This note should be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 				}
 			} else {
-				if (isLastRestBeforeNote) addError("This rest should not be beamed to the next note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
-				if (isLastRestsInBeat) addError("This rest should not be beamed to the previous note\nSet the ‘Beam type’ property of this rest to ‘AUTO’",noteRest);
+				if (isLastRestBeforeNote) addError("This rest should not be beamed to the next\nnote. To fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
+				if (isLastRestsInBeat) addError("This rest should not be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→Beam type→AUTO.",noteRest);
 			}
 		} // end !correctlyBeamed
 	}
@@ -1870,12 +1941,12 @@ MuseScore {
 				if (!exception1) {
 					if (isNote) {
 						if (specificDumbMuseScoreBreakCase) {
-							addError( "This note should not be beamed to the next note.\nSet the ‘Beam type’ property of the following note to ‘No beam’.",noteRest);
+							addError( "This note should not be beamed to the next\nnote. To fix, select the next note and choose\nProperties→Note→Beam→No beam.",noteRest);
 						} else {
-							addError( "This note should not be beamed to the next note.\nSet its ‘Beam type’ property and the following to AUTO.",noteRest);
+							addError( "This note should not be beamed to the next\nnote. To fix, select the note and choose\nProperties→Note→Beam→AUTO.",noteRest);
 						}
 					} else {
-						addError( "This rest should not be included in the beam group of the next beat\nSet its ‘Beam type’ property to AUTO.", noteRest);
+						addError( "This rest should not be included in\nthe beam group of the next beat.\nTo fix, select the note and choose\nProperties→Note→Beam→AUTO.", noteRest);
 					}
 				}
 			}
@@ -2264,16 +2335,22 @@ MuseScore {
 	}
 	
 	function getFrames() {
-		var systems = curScore.systems;
-		var numSystems = systems.length;
-		for (var i = 0; i < numSystems; i++ ) {
-			var system = systems[i];
-			var measures = system.measures;
-			for (var j = 0; j < measures.length; j++ ) {
-				var e = measures[j];
-				if (e.type == Element.VBOX) frames.push(e);
+		var theFrames = [];
+		for (var i = 0; i < curScore.systems.length; i++ ) {
+			var theMeasures = curScore.systems[i].measures;
+			for (var j = 0; j < theMeasures.length; j++ ) {
+				var e = theMeasures[j];
+				if (isFrame(e)) theFrames.push(e);
 			}
 		}
+		return theFrames;
+	}
+	
+	function isFrame (theElement) {
+		if (!theElement) return;
+		if (theElement == undefined) return;
+		var type = theElement.type;
+		return (type == Element.FBOX || type == Element.HBOX || type == Element.TBOX || type == Element.VBOX);
 	}
 	
 	function deleteAllCommentsAndHighlights () {
@@ -2502,6 +2579,99 @@ MuseScore {
 			onStandardButtonClicked: function(buttonId) {
 				if (buttonId === ButtonBoxModel.Ok) {
 					dialog.close()
+				}
+			}
+		}
+	}
+	
+	StyledDialogView {
+		id: update
+		title: "Plug-in update available"
+		contentHeight: 252
+		contentWidth: 505
+		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
+	
+		Text {
+			id: updateText
+			width: parent.width-40
+			anchors {
+				left: parent.left
+				top: parent.top
+				leftMargin: 20
+				topMargin: 20
+			}
+			text: "New plug-in update available"
+			font.bold: true
+			font.pointSize: update.fontSize
+			color: ui.theme.fontPrimaryColor
+		}
+		
+		Rectangle {
+			id: updateRect
+			anchors {
+				top: updateText.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			width: parent.width-45
+			height: 2
+			color: ui.theme.fontPrimaryColor
+		}
+	
+		ScrollView {
+			anchors {
+				top: updateRect.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			height: parent.height-100
+			width: parent.width-40
+			leftInset: 0
+			leftPadding: 0
+			ScrollBar.vertical.policy: ScrollBar.AsNeeded
+			TextArea {
+				height: parent.height
+				text: update.msg
+				textFormat: Text.RichText
+				wrapMode: TextEdit.Wrap
+				leftInset: 0
+				leftPadding: 0
+				readOnly: true
+				background: Rectangle {
+					color: "transparent"
+				}
+			}
+		}
+	
+		ButtonBox {
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			FlatButton {
+				text: "Close"
+				width: 50
+				isLeftSide: true
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 1
+				onClicked: {
+					update.close()
+				}
+			}	
+			
+			FlatButton {
+				text: 'Download new version'
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 2
+				width: 100
+				onClicked: {
+					update.close();
+					downloadNewVersion();
 				}
 			}
 		}

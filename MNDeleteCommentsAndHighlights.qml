@@ -20,13 +20,14 @@ MuseScore {
 	title: "MN Delete Comments and Highlights"
 	id: mndeletecommentsandhighlights
 	thumbnailName: "MNDeleteCommentsAndHighlights.png"	
-	property var selectionArray: [];
-	property var frames: [];
+	property var selectionArray: []
+	property var frames: []
+	property var versionNumber: ''
 	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
 
   onRun: {
 		if (!curScore) return;
-		var versionNumber = versionnumberfile.read().trim();
+		versionNumber = versionnumberfile.read().trim();
 
 		// **** VERSION CHECK **** //
 		var version46 = mscoreMajorVersion > 4 || (mscoreMajorVersion == 4 && mscoreMinorVersion > 5);
@@ -36,7 +37,7 @@ MuseScore {
 			return;
 		}
 		
-		getFrames();
+		frames = getFrames();
 					
 		var elementsToRemove = [];
 		var elementsToRecolor = [];
@@ -138,16 +139,22 @@ MuseScore {
 	}
 	
 	function getFrames() {
-		var systems = curScore.systems;
-		var numSystems = systems.length;
-		for (var i = 0; i < numSystems; i++ ) {
-			var system = systems[i];
-			var measures = system.measures;
-			for (var j = 0; j < measures.length; j++ ) {
-				var e = measures[j];
-				if (e.type == Element.VBOX) frames.push(e);
+		var theFrames = [];
+		for (var i = 0; i < curScore.systems.length; i++ ) {
+			var theMeasures = curScore.systems[i].measures;
+			for (var j = 0; j < theMeasures.length; j++ ) {
+				var e = theMeasures[j];
+				if (isFrame(e)) theFrames.push(e);
 			}
 		}
+		return theFrames;
+	}
+	
+	function isFrame (theElement) {
+		if (!theElement) return;
+		if (theElement == undefined) return;
+		var type = theElement.type;
+		return (type == Element.FBOX || type == Element.HBOX || type == Element.TBOX || type == Element.VBOX);
 	}
 	
 	function saveSelection () {

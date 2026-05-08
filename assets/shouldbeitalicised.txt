@@ -1,0 +1,55 @@
+sempre
+sim.
+sub.
+subito
+espressivo
+espress.
+espr.
+expr.
+expressively
+expressive
+dolce
+cantabile
+leggiero
+legato
+leggiermente
+sostenuto
+marcato
+in rilievo
+sotto voce
+ben marcato
+tenuto
+flaut.
+flautando
+passion
+port.
+portamento
+gliss.
+glissando
+secco
+staccato
+stacc.
+staccatissimo
+staccatiss.
+spiccato
+spicc.
+nat.
+naturale
+smorzando
+quasi
+più
+meno
+mezza voce
+perdendosi
+morendo
+parlando
+calando
+cresc.
+dim.
+crescendo
+diminuendo
+decrescendo
+marcato
+marc.
+marcatiss.
+marcatissimo

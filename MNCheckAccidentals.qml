@@ -33,8 +33,6 @@ MuseScore {
         source: getAssetPath("versionnumber.txt")
         onError: function(msg) { console.log("Error:", msg); } 
     }
-
-
 	
 	// ** DEBUG **
 	property var debug: true
@@ -42,6 +40,8 @@ MuseScore {
 	property var currentZ: 16384
 	property var numLogs: 0
 	property var hasHarp: false
+	property var versionNumber: ''
+	property var checkingScore: false
 	
 	// **** PROPERTIES **** //
 
@@ -55,6 +55,7 @@ MuseScore {
 	property var errorStrings: []
 	property var errorObjects: []
 	property var clefs: []
+	property var prevChord: null
 	property var prevWrittenPitch: -1
 	property var prevPrevWrittenPitch: -1
 	property var prevDiatonicPitch: 0
@@ -77,9 +78,9 @@ MuseScore {
 	property var prevIsTritone: false
 	property var currentKeySig: 0
 	property var prevWhichNoteToRewrite: null
-	property var kFlatStr: 'b'
+	property var kFlatStr: '♭'
 	property var kNaturalStr: '♮'
-	property var kSharpStr: '#'
+	property var kSharpStr: '♯'
 	property var progressStartTime: 0
 	property var currentBarNum: 0
 	property var currentStaffNum: 0
@@ -95,17 +96,21 @@ MuseScore {
 	property var frames: []
 	property var hasMoreThanOneSystem: false
 	property var firstBarInSecondSystem: null
+	property var fontList: Qt.fontFamilies()
 
   onRun: {
 		if (!curScore) return;
 		
 		// **** VERSION CHECK **** //
+		
 		var version46 = mscoreMajorVersion > 4 || mscoreMinorVersion > 5;
 		if (!version46) {
 			dialog.msg = "<p><font size=\"6\">🛑</font> This plugin requires MuseScore v. 4.6 or later.</p> ";
 			dialog.show();
 			return;
 		}
+		versionNumber = versionnumberfile.read().trim();
+		checkForUpdate();
 				
 		if (Qt.platform.os !== "osx") {
 			cmdKey = "ctrl";
@@ -117,8 +122,6 @@ MuseScore {
 		// **** GATHER VARIABLES **** //
 		var staves = curScore.staves;
 		var numStaves = curScore.nstaves;
-		if (Qt.platform.os !== "osx") cmdKey = "ctrl";
-		var versionNumber = versionnumberfile.read().trim();
 		var actualSystemNum = 0;
 		for (var j = 0; j < curScore.systems.length; j++) {
 			var system = curScore.systems[j];
@@ -134,7 +137,7 @@ MuseScore {
 		}
 
 		// ************ DELETE ANY EXISTING COMMENTS AND HIGHLIGHTS ************ //
-		getFrames();
+		frames = getFrames();
 		deleteAllCommentsAndHighlights();
 		
 		// **** SELECT ALL **** //
@@ -245,6 +248,7 @@ MuseScore {
 			if (isHarp) hasHarp = true;
 			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
+			prevChord = null;
 			prevWrittenPitch = -1;
 			prevPrevWrittenPitch = -1;
 			prevDiatonicPitch = -1;
@@ -302,12 +306,13 @@ MuseScore {
 				for (const noteRest of chords) {
 					if (!isPercussionClef && !isHarp) {
 						var noteRestDur = noteRest.actualDuration.ticks;
-						//logError ('noteRest found; dur = '+noteRestDur);
 						var isRest = noteRest.type == Element.REST;
 						var graceNoteChords = noteRest.graceNotes;
 						if (graceNoteChords != null) {
 							for (var g in graceNoteChords) {
 								checkChord (graceNoteChords[g],noteRest.parent,true,currentStaff);
+								checkEnharmonics (graceNoteChords[g], prevChord);
+								prevChord = graceNotesChords[g];
 							}
 						}
 						if (isRest) {
@@ -319,6 +324,8 @@ MuseScore {
 							}
 						} else {
 							checkChord (noteRest,noteRest.parent,false,currentStaff);
+							checkEnharmonics (noteRest, prevChord);
+							prevChord = noteRest;
 						}
 					}
 				} // end track loop
@@ -355,6 +362,106 @@ MuseScore {
 		dialog.msg = errorMsg;
 		dialog.titleText = 'MN CHECK ACCIDENTALS '+versionNumber;
 		dialog.show();
+	}
+	
+	function checkForUpdate() {
+		//logError ('here');
+		var url = "https://api.github.com/repos/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest";
+		var xhr = new XMLHttpRequest();
+	
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== XMLHttpRequest.DONE)
+				return;
+	
+			if (xhr.status !== 200) {
+				//logError("Failed to fetch latest release: HTTP " + xhr.status);
+				return;
+			}
+	
+			var data;
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch (e) {
+				logError("Invalid JSON from GitHub API");
+				return;
+			}
+	
+			var latestVersionNumber = data.tag_name || "";
+			var strippedLatestVersionNumber = latestVersionNumber.replace(/^v(?:\.\s?)?/,"");
+			var strippedCurrentVersionNumber = versionNumber.replace(/^v(?:\.\s?)?/,"");
+	
+			if (isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber)) {
+				update.msg = '<p><font size=\"6\">🔔</font> A new version (v. '+strippedLatestVersionNumber+') of the MN Better Notation Plugins is now available. (You are currently running v. '+strippedCurrentVersionNumber+').</p><p>Click ‘Download new version’ to automatically download the latest versions.<p><b>NOTE: once downloaded, you will need to manually install them — <a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">see here for detailed installation instructions</a>.</b></p>';
+				if (!checkingScore) update.show();
+			}
+		}
+		//logError('here2');
+		xhr.open("GET", url);
+		xhr.send();
+	}
+	
+	function isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber) {
+		var aParts = strippedCurrentVersionNumber.split(".");
+		var bParts = strippedLatestVersionNumber.split(".");
+		var len = Math.max(aParts.length, bParts.length);
+	
+		for (var i = 0; i < len; i++) {
+			var aNum = i < aParts.length ? parseInt(aParts[i], 10) : 0;
+			var bNum = i < bParts.length ? parseInt(bParts[i], 10) : 0;
+	
+			if (aNum > bNum) return false;
+			if (aNum < bNum) return true;
+		}
+		return false;
+	}
+	
+	function downloadNewVersion() {
+		Qt.openUrlExternally("http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
+		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and install the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
+		dialog.show();
+	}
+	
+	function checkEnharmonics (currChord, prevChord) {
+		// check these are less than a bar a part
+		if (prevChord == null || currChord == null) return;
+		if (getBarNumber(currChord) - getBarNumber (prevChord) > 2) return;
+		if (chordPitchesAreIdentical(currChord, prevChord) && !chordSpellingsAreIdentical(currChord, prevChord)) {
+			var chordNote = currChord.notes.length == 1 ? "note" : "chord";
+			addError ("These two "+chordNote+"s sound the same, but\nare spelled differently. This may be\nconfusing to the performer. Consider\nrespelling one of them.", [currChord, prevChord]);	
+		}
+	}
+	
+	function getBarNumber (e) {
+		var theTick = getTick(e);
+		return curScore.tick2measure(fractionFromTicks(theTick)).no;
+	}
+	
+	function chordPitchesAreIdentical (chord1,chord2) {
+		if (chord1 == null || chord2 == null) return false;
+		if (chord1.notes == null || chord2.notes == null) return false;
+		if (chord1.notes.length != chord2.notes.length) return false;
+		for (var i = 0; i < chord1.notes.length; i++) if (!notePitchesAreIdentical(chord1.notes[i], chord2.notes[i])) return false;
+		return true;
+	}
+	
+	function notePitchesAreIdentical (note1, note2) {
+		if (note1.pitch != note2.pitch) return false;
+		return true;
+	}
+	
+	function chordSpellingsAreIdentical (chord1, chord2) {
+		if (chord1 == null || chord2 == null) return false;
+		if (chord1.notes == null || chord2.notes == null) return false;
+		if (chord1.notes.length != chord2.notes.length) return false;
+		for (var i = 0; i < chord1.notes.length; i++) if (!noteSpellingsAreIdentical(chord1.notes[i], chord2.notes[i])) return false;
+		return true;
+	}
+	
+	function noteSpellingsAreIdentical (note1, note2) {
+		// first check the MIDI pitch
+		if (note1.pitch != note2.pitch) return false;
+		// now check the accidental, as microtones don't affect the MIDI pitch
+		return (note1.tpc == note2.tpc);
 	}
 	
 	function checkClef (theClefType) {
@@ -506,7 +613,9 @@ MuseScore {
 			}
 			//logError ('acc is '+acc);
 			
-			// ***** CALCULATE THE PITCH INFORMATION ***** //
+			// *****         CALCULATE THE PITCH INFORMATION       ***** //
+			// ***** SUCH AS DIATONIC PITCH & DIATONIC PITCH CLASS ***** //
+			
 			var dpArray = pitch2absStepByKey (writtenPitch, tpc, currentKeySig);
 			var diatonicPitch = dpArray [0]; // returns absolute diatonic step, where middle C is 35
 			var diatonicPitchClass = diatonicPitch % 7; // step from 0 (C) to 6 (B)
@@ -528,10 +637,9 @@ MuseScore {
 				if (accType == Accidental.FLAT) accInKeySig = accOrder < Math.abs(currentKeySig);
 				if (accType == Accidental.NATURAL) accInKeySig = (accOrder + 1) > Math.abs(currentKeySig);
 			}
-			//errorMsg += "accInKeySig = "+accInKeySig+"; accType = "+accType+";";
 			
 			if (note.tieBack) {
-				if (accVisible) addError ("Don’t show accidentals in the middle of a tie",accObject);
+				if (accVisible) addError ("Don’t show accidentals in the middle of a tie.",accObject);
 			} else {
 				
 				var noteLabel = pitchLabels[diatonicPitchClass]+accidentals[acc+2];
@@ -541,14 +649,14 @@ MuseScore {
 				if (currentKeySig > -3) isBadAcc = (tpc == 6 || tpc == 7);
 				if (!isBadAcc && currentKeySig < 3) isBadAcc = (tpc == 25 || tpc == 26);
 
-				// **** CHECK UNNECESSARY ACCIDENTALS **** //
-				// **** THERE ARE THREE SITUATIONS WE WANT TO FLAG THIS **** //
+				// **** 				CHECK UNNECESSARY ACCIDENTALS 			**** //
+				// **** 	THERE ARE THREE SITUATIONS WE WANT TO FLAG THIS 	**** //
 				
 				// **** First we check when this pitch (any octave) was last altered **** //
 				var prevBarNumSameOctave = barAltered[diatonicPitch];
 				var prevBarNumAnyOctave = barAlteredPC[diatonicPitchClass];
 				
-				// NOTE WE DEFINITELY NEED ONE TO CANCEL ACCIDENTALS IN THIS BAR
+				// **** NOTE WE DEFINITELY NEED ONE TO CANCEL ACCIDENTALS IN THIS BAR **** //
 				var definitelyNeedAccidental = currAccs[diatonicPitch] != acc && currentBarNum == prevBarNumSameOctave && accVisible;
 				
 				if (!definitelyNeedAccidental) {
@@ -556,7 +664,7 @@ MuseScore {
 					// **** 1. WE  DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS SET IN THIS OCTAVE ALREADY IN THIS BAR AND IS NOT BEING USED TO CANCEL THE SAME ACCIDENTAL ELSEWHERE
 					var situation1 = currAccs[diatonicPitch] == acc && currPCAccs[diatonicPitchClass] == acc && currentBarNum == prevBarNumSameOctave && accVisible;
 					
-					// **** 2. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THE PREVIOUS ACCIDENTAL OF THIS NOTE (IN ANY OCTAVE) WAS AT LEAST 2 BARS AGO
+					// **** 2. WE DON’T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THE PREVIOUS ACCIDENTAL OF THIS NOTE (IN ANY OCTAVE) WAS AT LEAST 2 BARS AGO
 					var situation2 = accInKeySig && currentBarNum > prevBarNumAnyOctave + 2 && accVisible;
 					
 					// **** 3. WE DON'T NEED TO SHOW THIS ACCIDENTAL IF IT WAS ALREADY IN THE KEY SIGNATURE AND THIS WAS ALSO THE LAST ACCIDENTAL OF THIS NOTE
@@ -662,7 +770,10 @@ MuseScore {
 						
 						isTritone = (chromaticIntervalClass == 6);
 						
-						// **** CHECK CHROMATIC ASCENTS AND DESCENTS **** //
+						// ************************************************ //
+						// ****  CHECK CHROMATIC ASCENTS AND DESCENTS  **** //
+						// ************************************************ //
+
 						if (prevPrevNote != null) {
 							//logError(prevprevWrittenPitch = "+prevprevWrittenPitch+"); prevWrittenPitch="+prevWrittenPitch+" writtenPitch="+writtenPitch;
 							if (prevWrittenPitch - prevPrevWrittenPitch == 1 && writtenPitch - prevWrittenPitch == 1 && !prevPrevNote.parent.is(prevNote.parent) && !prevNote.parent.is(chord)) {
@@ -682,7 +793,10 @@ MuseScore {
 							}
 						}
 
-						// ****		IS THIS AUGMENTED OR DIMINISHED? 		**** //
+						// ***************************************************** //
+						// ****	  		IS THIS AUGMENTED OR DIMINISHED? 	**** //
+						// ***************************************************** //
+						
 						var isFourthFifthOrUnison = (scalarIntervalClass == 0 || scalarIntervalClass == 3 || scalarIntervalClass == 4);
 						if (isFourthFifthOrUnison) {
 							alterationLabel = perfectIntervalAlts[alteration+3];
@@ -692,8 +806,6 @@ MuseScore {
 							isDoubleAug = alteration > 1;
 						} else {
 							alterationLabel = majorIntervalAlts[alteration+3];
-							
-							//logError ("alteration = "+alteration+"; alterationLabel = "+alterationLabel);
 							isDim = alteration < -1;
 							isDoubleDim = alteration < -2;
 							isAug = alteration > 0;
@@ -933,8 +1045,8 @@ MuseScore {
 							newNoteLabel = newNotePitch+newNoteAccidental;
 							var changeIsBad = newNoteAccidental === "bb" || newNoteAccidental === "x";
 							if (!changeIsBad) {
-								if (currentKeySig > -3) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
-								if (currentKeySig < 3) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
+								if (currentKeySig > -5) changeIsBad = (newNoteLabel === "C"+kFlatStr) || (newNoteLabel === "F"+kFlatStr);
+								if (currentKeySig < 5) changeIsBad = (newNoteLabel === "B"+kSharpStr) || (newNoteLabel === "E"+kSharpStr);
 							}
 							if (changeIsBad) {
 								//logError ('changeIsBad because newNoteLabel = '+newNoteLabel);
@@ -1179,16 +1291,22 @@ MuseScore {
 	}
 	
 	function getFrames() {
-		var systems = curScore.systems;
-		var numSystems = systems.length;
-		for (var i = 0; i < numSystems; i++ ) {
-			var system = systems[i];
-			var measures = system.measures;
-			for (var j = 0; j < measures.length; j++ ) {
-				var e = measures[j];
-				if (e.type == Element.VBOX) frames.push(e);
+		var theFrames = [];
+		for (var i = 0; i < curScore.systems.length; i++ ) {
+			var theMeasures = curScore.systems[i].measures;
+			for (var j = 0; j < theMeasures.length; j++ ) {
+				var e = theMeasures[j];
+				if (isFrame(e)) theFrames.push(e);
 			}
 		}
+		return theFrames;
+	}
+	
+	function isFrame (theElement) {
+		if (!theElement) return;
+		if (theElement == undefined) return;
+		var type = theElement.type;
+		return (type == Element.FBOX || type == Element.HBOX || type == Element.TBOX || type == Element.VBOX);
 	}
 
 	function addError (text,element) {
@@ -1372,7 +1490,7 @@ MuseScore {
 					comment.frameBgColor = "yellow";
 					comment.frameFgColor = "black";
 					comment.fontSize = 7.0;
-					comment.fontFace = "Helvetica";
+					comment.fontFace = fontList.includes("Arial Unicode MS") ? "Arial Unicode MS" : "Helvetica";
 					comment.align = Align.TOP;
 					comment.autoplace = false;
 					comment.offsetX = 0;
@@ -1696,6 +1814,99 @@ MuseScore {
 			onStandardButtonClicked: function(buttonId) {
 				if (buttonId === ButtonBoxModel.Ok) {
 					dialog.close()
+				}
+			}
+		}
+	}
+	
+	StyledDialogView {
+		id: update
+		title: "Plug-in update available"
+		contentHeight: 252
+		contentWidth: 505
+		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
+	
+		Text {
+			id: updateText
+			width: parent.width-40
+			anchors {
+				left: parent.left
+				top: parent.top
+				leftMargin: 20
+				topMargin: 20
+			}
+			text: "New plug-in update available"
+			font.bold: true
+			font.pointSize: update.fontSize
+			color: ui.theme.fontPrimaryColor
+		}
+		
+		Rectangle {
+			id: updateRect
+			anchors {
+				top: updateText.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			width: parent.width-45
+			height: 2
+			color: ui.theme.fontPrimaryColor
+		}
+	
+		ScrollView {
+			anchors {
+				top: updateRect.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			height: parent.height-100
+			width: parent.width-40
+			leftInset: 0
+			leftPadding: 0
+			ScrollBar.vertical.policy: ScrollBar.AsNeeded
+			TextArea {
+				height: parent.height
+				text: update.msg
+				textFormat: Text.RichText
+				wrapMode: TextEdit.Wrap
+				leftInset: 0
+				leftPadding: 0
+				readOnly: true
+				background: Rectangle {
+					color: "transparent"
+				}
+			}
+		}
+	
+		ButtonBox {
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			FlatButton {
+				text: "Close"
+				width: 50
+				isLeftSide: true
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 1
+				onClicked: {
+					update.close()
+				}
+			}	
+			
+			FlatButton {
+				text: 'Download new version'
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 2
+				width: 100
+				onClicked: {
+					update.close();
+					downloadNewVersion();
 				}
 			}
 		}

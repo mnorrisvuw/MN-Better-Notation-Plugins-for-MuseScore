@@ -1,6 +1,6 @@
-con 
+con
 sul
-senza 
+senza
 espr
 espressivo
 col
@@ -25,3 +25,5 @@ molto
 poco
 sord
 sordino
+marcato
+marcatissimo

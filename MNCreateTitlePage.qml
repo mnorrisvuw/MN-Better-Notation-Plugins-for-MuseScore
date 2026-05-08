@@ -22,6 +22,11 @@ MuseScore {
 	title: "MN Create Title Page"
 	id: mncreatetitlepage
 	thumbnailName: "MNCreateTitlePage.png"	
+	
+	// **** PROPERTIES **** //
+	
+	property var versionNumber: ''
+	property var checkingScore: false
 	property var selectionArray: []
 	property var titlePageStyles: []
 	property var frames: []
@@ -70,7 +75,6 @@ MuseScore {
 		spatium = curScore.style.value('spatium')*25.4/mscoreDPI;
 		
 		isMac = Qt.platform.os === 'osx';
-		var versionNumber = versionnumberfile.read().trim();
 		dialog.titleText = 'MN CREATE TITLE PAGE '+versionNumber;
 		if (!isMac) {
 			dialog.fontSize = 12;
@@ -85,6 +89,10 @@ MuseScore {
 			return;
 		}
 		
+		versionNumber = versionnumberfile.read().trim();		
+		
+		// **** CHECK FOR LATEST PLUG-IN UPDATE **** //
+		checkForUpdate();
 		
 		// ** CHECK THERE ISN’T ALREADY A TITLE PAGE ** //
 		var firstBarInScore = curScore.firstMeasure;
@@ -98,7 +106,7 @@ MuseScore {
 		}
 		
 		// **** GET ANY FRAMES **** //
-		getFrames();
+		frames = getFrames();
 		
 		// ** ANALYSE THE EXISTING TITLE, SUBTITLE AND COMPOSER INFO ** //
 		checkTitle ();
@@ -122,16 +130,22 @@ MuseScore {
 	}
 	
 	function getFrames() {
-		var systems = curScore.systems;
-		var numSystems = systems.length;
-		for (var i = 0; i < numSystems; i++ ) {
-			var system = systems[i];
-			var measures = system.measures;
-			for (var j = 0; j < measures.length; j++ ) {
-				var e = measures[j];
-				if (e.type == Element.VBOX) frames.push(e);
+		var theFrames = [];
+		for (var i = 0; i < curScore.systems.length; i++ ) {
+			var theMeasures = curScore.systems[i].measures;
+			for (var j = 0; j < theMeasures.length; j++ ) {
+				var e = theMeasures[j];
+				if (isFrame(e)) theFrames.push(e);
 			}
 		}
+		return theFrames;
+	}
+	
+	function isFrame (theElement) {
+		if (!theElement) return;
+		if (theElement == undefined) return;
+		var type = theElement.type;
+		return (type == Element.FBOX || type == Element.HBOX || type == Element.TBOX || type == Element.VBOX);
 	}
 	
 	function checkTitle () {
@@ -211,8 +225,66 @@ MuseScore {
 			createTitlePage();
 		}
 	}
+	
+	function checkForUpdate() {
+		//logError ('here');
+		var url = "https://api.github.com/repos/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest";
+		var xhr = new XMLHttpRequest();
+	
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState !== XMLHttpRequest.DONE)
+				return;
+	
+			if (xhr.status !== 200) {
+				//logError("Failed to fetch latest release: HTTP " + xhr.status);
+				return;
+			}
+	
+			var data;
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch (e) {
+				logError("Invalid JSON from GitHub API");
+				return;
+			}
+	
+			var latestVersionNumber = data.tag_name || "";
+			var strippedLatestVersionNumber = latestVersionNumber.replace(/^v(?:\.\s?)?/,"");
+			var strippedCurrentVersionNumber = versionNumber.replace(/^v(?:\.\s?)?/,"");
+	
+			if (isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber)) {
+				update.msg = '<p><font size=\"6\">🔔</font> A new version (v. '+strippedLatestVersionNumber+') of the MN Better Notation Plugins is now available. (You are currently running v. '+strippedCurrentVersionNumber+').</p><p>Click ‘Download new version’ to automatically download the latest versions.<p><b>NOTE: once downloaded, you will need to manually install them — <a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">see here for detailed installation instructions</a>.</b></p>';
+				if (!checkingScore) update.show();
+			}
+		}
+		//logError('here2');
+		xhr.open("GET", url);
+		xhr.send();
+	}
+	
+	function isNewVersionAvailable(strippedCurrentVersionNumber,strippedLatestVersionNumber) {
+		var aParts = strippedCurrentVersionNumber.split(".");
+		var bParts = strippedLatestVersionNumber.split(".");
+		var len = Math.max(aParts.length, bParts.length);
+	
+		for (var i = 0; i < len; i++) {
+			var aNum = i < aParts.length ? parseInt(aParts[i], 10) : 0;
+			var bNum = i < bParts.length ? parseInt(bParts[i], 10) : 0;
+	
+			if (aNum > bNum) return false;
+			if (aNum < bNum) return true;
+		}
+		return false;
+	}
+	
+	function downloadNewVersion() {
+		Qt.openUrlExternally("http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
+		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and install the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
+		dialog.show();
+	}
 		
 	function createTitlePage() {
+		checkingScore = true;
 		var hasBottom = false;
 		var titlePageBox = null;
 		var frontMatterBox = null;
@@ -490,6 +562,100 @@ MuseScore {
 	
 	function isFontInstalled (fontName) {
 		return fontList.includes(fontName);
+	}
+	
+	StyledDialogView {
+		id: update
+		title: "Plug-in update available"
+		contentHeight: 252
+		contentWidth: 505
+		property var msg: ""
+		property var titleText: ""
+		property var fontSize: 18
+	
+		Text {
+			id: updateText
+			width: parent.width-40
+			anchors {
+				left: parent.left
+				top: parent.top
+				leftMargin: 20
+				topMargin: 20
+			}
+			text: "New plug-in update available"
+			font.bold: true
+			font.pointSize: update.fontSize
+			color: ui.theme.fontPrimaryColor
+		}
+		
+		Rectangle {
+			id: updateRect
+			anchors {
+				top: updateText.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			width: parent.width-45
+			height: 2
+			color: ui.theme.fontPrimaryColor
+		}
+	
+		ScrollView {
+			anchors {
+				top: updateRect.bottom
+				topMargin: 10
+				left: parent.left
+				leftMargin: 20
+			}
+			height: parent.height-100
+			width: parent.width-40
+			leftInset: 0
+			leftPadding: 0
+			ScrollBar.vertical.policy: ScrollBar.AsNeeded
+			TextArea {
+				height: parent.height
+				text: update.msg
+				textFormat: Text.RichText
+				wrapMode: TextEdit.Wrap
+				leftInset: 0
+				leftPadding: 0
+				readOnly: true
+				background: Rectangle {
+					color: "transparent"
+				}
+			}
+		}
+	
+		ButtonBox {
+			anchors {
+				horizontalCenter: parent.horizontalCenter
+				bottom: parent.bottom
+				margins: 10
+			}
+			FlatButton {
+				text: "Close"
+				width: 50
+				isLeftSide: true
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 1
+				onClicked: {
+					update.close()
+				}
+			}	
+			
+			FlatButton {
+				text: 'Download new version'
+				buttonRole: ButtonBoxModel.CustomRole
+				buttonId: ButtonBoxModel.CustomButton + 2
+				width: 100
+				onClicked: {
+					update.close();
+					styles.close();
+					downloadNewVersion();
+				}
+			}
+		}
 	}
 
 	

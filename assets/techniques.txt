@@ -1,7 +1,19 @@
+tasto
+pont
 arco
-sul pont
-sul tasto
-con sord
-senza sord
+breath
 pizz
-ord.
+ord
+nat
+sord
+vib.
+vibr.
+vibrato
+multiphonic
+key
+slap
+click
+flz
+flutter
+trem
+la touche
