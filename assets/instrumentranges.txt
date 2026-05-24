@@ -1,4 +1,4 @@
-**** DATA FORMAT: id,lowest pitch possible,quiet register threshold (low),highest pitch possible,high loud register (e.g. trumpet),low loud register (e.g. tuba) ****
+**** DATA FORMAT: id,lo pitch,quiet register threshold (low),hi pitch,high loud register (e.g. trumpet),low loud register (e.g. tuba) ****
 brass.french-horn,41,,77,72,
 brass.trombone,36,,70,,
 brass.trombone.bass,29,,65,,
@@ -20,9 +20,9 @@ pitched-percussion.marimba,36,,96,,
 pitched-percussion.tubular-bells,53,,77,,
 pitched-percussion.vibraphone,53,,89,,
 pitched-percussion.xylophone,65,,108,,
-pluck.guitar,40,,77,,
-pluck.guitar.acoustic,40,,77,,
-pluck.guitar.electric,40,,77,,
+pluck.guitar,40,,65,,
+pluck.guitar.acoustic,40,,65,,
+pluck.guitar.electric,40,,65,,
 pluck.harp,23,,104,,
 strings.cello,36,,81,,
 strings.contrabass,24,,62,,

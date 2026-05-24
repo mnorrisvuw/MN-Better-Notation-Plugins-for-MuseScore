@@ -34,8 +34,6 @@ cantabele
 cantabile
 non-legato
 non legato
-lento.
-lento
 tamborine
 tambourine
 picollo
@@ -120,3 +118,5 @@ macarto
 marcato
 marcartissimo
 marcatissimo
+senza cord.
+senza sord.

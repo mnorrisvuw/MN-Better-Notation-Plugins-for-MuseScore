@@ -147,6 +147,9 @@ MuseScore {
 
 		var startStaff = curScore.selection.startStaff;
 		var endStaff = curScore.selection.endStaff;
+		var cursor = curScore.newCursor();
+		var firstBarInScore, firstBarInSelection, firstTickInSelection;
+		var lastBarInScore, lastBarInSelection, lastTickInSelection;
 		var elems = curScore.selection.elements;
 		if (elems.length == 0) {
 			dialog.msg = "<p><font size=\"6\">🛑</font> There were no elements in the score.</p> ";
@@ -180,12 +183,6 @@ MuseScore {
 		currPCAccs = Array(7).fill(0);
 		barAltered = Array(120).fill(0);
 		barAlteredPC = Array(7).fill(0);
-		
-		var startStaff = curScore.selection.startStaff;
-		var endStaff = curScore.selection.endStaff;
-		var cursor = curScore.newCursor();
-		var firstBarInScore, firstBarInSelection, firstTickInSelection;
-		var lastBarInScore, lastBarInSelection, lastTickInSelection;
 		
 		// start
 		firstBarInScore = curScore.firstMeasure;
@@ -312,7 +309,7 @@ MuseScore {
 							for (var g in graceNoteChords) {
 								checkChord (graceNoteChords[g],noteRest.parent,true,currentStaff);
 								checkEnharmonics (graceNoteChords[g], prevChord);
-								prevChord = graceNotesChords[g];
+								prevChord = graceNoteChords[g];
 							}
 						}
 						if (isRest) {
@@ -365,7 +362,7 @@ MuseScore {
 	}
 	
 	function checkForUpdate() {
-		//logError ('here');
+
 		var url = "https://api.github.com/repos/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest";
 		var xhr = new XMLHttpRequest();
 	
@@ -382,7 +379,7 @@ MuseScore {
 			try {
 				data = JSON.parse(xhr.responseText);
 			} catch (e) {
-				logError("Invalid JSON from GitHub API");
+				logError("**** checkForUpdate() — Invalid JSON from GitHub API");
 				return;
 			}
 	
@@ -395,7 +392,6 @@ MuseScore {
 				if (!checkingScore) update.show();
 			}
 		}
-		//logError('here2');
 		xhr.open("GET", url);
 		xhr.send();
 	}
@@ -416,7 +412,7 @@ MuseScore {
 	}
 	
 	function downloadNewVersion() {
-		Qt.openUrlExternally("http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
+		Qt.openUrlExternally("https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
 		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and install the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
 		dialog.show();
 	}
@@ -440,12 +436,7 @@ MuseScore {
 		if (chord1 == null || chord2 == null) return false;
 		if (chord1.notes == null || chord2.notes == null) return false;
 		if (chord1.notes.length != chord2.notes.length) return false;
-		for (var i = 0; i < chord1.notes.length; i++) if (!notePitchesAreIdentical(chord1.notes[i], chord2.notes[i])) return false;
-		return true;
-	}
-	
-	function notePitchesAreIdentical (note1, note2) {
-		if (note1.pitch != note2.pitch) return false;
+		for (var i = 0; i < chord1.notes.length; i++) if (chord1.notes[i].pitch != chord2.notes[i].pitch) return false;
 		return true;
 	}
 	
@@ -550,7 +541,7 @@ MuseScore {
 		var isProblematic, currentAccidental, prevAccidental;
 		var notes = chord.notes;
 		var numNotes = notes.length;
-		var newNoteLabel = '';
+		var newNoteLabel = '', newNotePitch = '';
 
 		prevPrevNoteHighlighted = prevNoteHighlighted;
 		prevNoteHighlighted = thisNoteHighlighted;
@@ -967,7 +958,7 @@ MuseScore {
 									//	trace ("bb");
 									j = thePitchClassToChange - 1;
 									if (j < 0) j += 7;
-									var newNotePitch = pitchLabels[j];
+									newNotePitch = pitchLabels[j];
 									if (newNotePitch === "B" || newNotePitch === "E") {
 										newNoteAccidental = kFlatStr;
 									} else {
@@ -1133,12 +1124,12 @@ MuseScore {
 							break;
 					} // end switch TeAccToChange
 					
-					if (newNotePitch === "") logError("checkChord () — Couldn’t find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
+					if (newNotePitch === "") logError("**** checkChord () — Couldn’t find new note pitch — "+thePitchClassToChange+" "+theAccToChange);
 
 					newNoteLabel = newNotePitch + newNoteAccidental;
 					if (doShowError){
 						if (noteToHighlight == null) {
-							logError ('checkChord () — noteToHighlight = null');
+							logError ('**** checkChord () — noteToHighlight = null');
 						} else {
 							addError("In non-tonal music, avoid writing "+noteLabel+"s. In tonal music,\nhowever, they may clarify scale steps.\nConsider whether respelling as "+newNoteLabel+" would be better here.",noteToHighlight);
 						}
@@ -1303,8 +1294,8 @@ MuseScore {
 	}
 	
 	function isFrame (theElement) {
-		if (!theElement) return;
-		if (theElement == undefined) return;
+		if (!theElement) return false;
+		if (theElement == undefined) return false;
 		var type = theElement.type;
 		return (type == Element.FBOX || type == Element.HBOX || type == Element.TBOX || type == Element.VBOX);
 	}
@@ -1321,7 +1312,7 @@ MuseScore {
 	
 	function getTick (e) {
 		if (e == null) {
-			logError ("getTick() — tried to get tick of null");
+			logError ("**** getTick() — tried to get tick of null");
 			return 0;
 		}
 		var eType = e.type;
@@ -1338,7 +1329,7 @@ MuseScore {
 				return e.firstSegment.tick;
 			} else {
 				if (e.parent == undefined || e.parent == null) {
-					logError("getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
+					logError("**** getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
 				} else {
 					var p;
 					if (eType == Element.TUPLET) {
@@ -1348,7 +1339,7 @@ MuseScore {
 					}
 					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) {
 						if (p.parent == null) {
-							logError ("getTick() — Parent of "+e.name+" was null");
+							logError ("**** getTick() — Parent of "+e.name+" was null");
 							return 0;
 						}
 						p = p.parent;
@@ -1396,6 +1387,7 @@ MuseScore {
 			var isString = typeof element === "string";
 			var objectArray = (element.length == undefined || isString) ? [element] : element;
 			var numObj = objectArray.length;
+			var theLocation = null;
 			
 			for (var j = 0; j < numObj; j++) {
 				desiredPosX = 0;
@@ -1414,7 +1406,7 @@ MuseScore {
 				//		system1 n		— top of bar 1, staff n
 				//		system2 n		— first bar in second system, staff n
 			
-				var theLocation = element;
+				theLocation = element;
 				if (isString) {
 					if (element.includes(' ')) {
 						staffNum = parseInt(element.split(' ')[1]); // put the staff number as an 'argument' in the string
@@ -1424,7 +1416,7 @@ MuseScore {
 				} else {
 					// calculate the staff number that this element is on
 					if (element.bbox == undefined) {
-						logError("showAllErrors() — bbox undefined — elem type is "+element.name);
+						logError("**** showAllErrors() — bbox undefined — elem type is "+element.name);
 					} else {
 						if (eType != Element.MEASURE) {
 							if (element.staff == undefined) {
@@ -1532,8 +1524,8 @@ MuseScore {
 			var commentWidth = comment.bbox.width;
 			var element = null;
 			var eType = 0;
-			if (errorObjects.length < i-1) {
-				logError ('errorObjects too short');
+			if (errorObjects.length <= i) {
+				logError ('**** showAllErrors() — errorObjects too short');
 				element = null;
 			} else {
 				element = errorObjects[i];
@@ -1697,7 +1689,7 @@ MuseScore {
 	
 	// CONVERTS A TPC TO AN ALTERATION, TAKING KEY INTO CONSIDERATION
 	function tpc2alterByKey(tpc, key) {
-		return (tpc - key + 8 + 7) / 7 - 4;
+		return Math.round((tpc - key + 8 + 7) / 7) - 4;
 	}
 	
 	// RETURNS THE NUMBER OF DIATONIC STEPS UP FROM C OF A TPC

@@ -119,7 +119,7 @@ MuseScore {
 			try {
 				data = JSON.parse(xhr.responseText);
 			} catch (e) {
-				logError("Invalid JSON from GitHub API");
+				logError("**** checkForUpdate() — Invalid JSON from GitHub API");
 				return;
 			}
 	

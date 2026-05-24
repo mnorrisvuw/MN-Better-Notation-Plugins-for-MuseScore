@@ -77,7 +77,7 @@ MuseScore {
 	property var noteEndBeat: 0
 	property var barStart: 0
 	property var beatLength: 0
-	property var virtualBeatLength: 0
+	//property var virtualBeatLength: 0
 	property var noteHidesBeat: false
 	property var numBeatsHidden: 0
 	property var noteStart: 0
@@ -283,7 +283,7 @@ MuseScore {
 			
 			var theStaff = staves[currentStaffNum];
 			if (theStaff == undefined) {
-				logError("main loop — staff is undefined");
+				logError("**** main loop — staff is undefined");
 				continue;
 			}
 			
@@ -345,7 +345,7 @@ MuseScore {
 				// **** This is the underlying pulse, e.g. in 5/16, it would be 16th notes **** //
 				// **** However, this is different from the 'beaming beat length'          **** //
 				// **** Beaming beat length is typically either a ¼ or a dotted ¼ note     **** //
-				virtualBeatLength = isCompound ? ((division * 3) / timeSigDenom) : ((division * 4) / timeSigDenom);
+				//virtualBeatLength = isCompound ? ((division * 3) / timeSigDenom) : ((division * 4) / timeSigDenom);
 				
 				// WE CAN'T REALLY CHECK 5/8, 7/8 etc, where the underlying beat patterns may vary
 				// SO WE CAN CHECK THIS BAR IF:
@@ -561,7 +561,7 @@ MuseScore {
 									}
 									isLastRest = (lastNoteInBar || nextItemIsNote || nextItem == null || nextItemHasPause || nextItemIsHidden);
 									//logError("Found a rest: there have now been "+rests.length+" rests; totalRestDur = "+totalRestDur+"; isLastRest = "+isLastRest+" isHidden = "+isHidden);
-									if (isLastRest && rests.length > 1) condenseOverSpecifiedRest();
+									if (isLastRest && rests.length > 1) condenseOverspecifiedRest();
 								}
 							}
 							
@@ -724,7 +724,7 @@ MuseScore {
 			try {
 				data = JSON.parse(xhr.responseText);
 			} catch (e) {
-				logError("Invalid JSON from GitHub API");
+				logError("**** checkForUpdate() — Invalid JSON from GitHub API");
 				return;
 			}
 	
@@ -1276,7 +1276,7 @@ MuseScore {
 		}
 	}
 	
-	function condenseOverSpecifiedRest () {
+	function condenseOverspecifiedRest () {
 		//logError(*** CHECKING CONDENSING OVER-SPECIFIED REST ***"); 
 		
 		var possibleSimplification = -1;
@@ -1396,7 +1396,7 @@ MuseScore {
 								if (restActualDur != p) continue;
 							
 								// don't simplify anything tied over a beat that is less than a crotchet
-								if (p == dottedcrotchet) canBeCondensed = startFrac == quaver && timeSigDenom == 2;
+								if (p == dottedcrotchet) canBeCondensed = false; //startFrac == quaver && timeSigDenom == 2;
 								if (p == crotchet) canBeCondensed = (isCompound && tempDisplayDur !== quaver);
 								if (p < crotchet) canBeCondensed = sameBeat;
 								if (canBeCondensed && isCompound && restActualDur == beatLength * 2 / 3) canBeCondensed = false;
@@ -1924,30 +1924,47 @@ MuseScore {
 	function checkBeamedToNotesInNextBeat (noteRest) {
 
 		var lastNoteInBeat = nextItemBeat != noteStartBeat;
-				
+		
+		// only checks the last note in a beat
 		if (hasBeam && nextHasBeam && lastNoteInBeat) {
 			
 			var beamTriesToGoForwards = currentBeamMode != Beam.NONE;
 			var nextBeamTriesToGoBack = nextBeamMode == Beam.BEGIN32 || nextBeamMode == Beam.BEGIN64 || nextBeamMode == Beam.MID;
-			var specificDumbMuseScoreBreakCase = isNote && nextItemIsNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && !nextNextItemIsNote;
-			// this specific case I disagree with MuseScore's automatic beaming practice. So there.
-			if (specificDumbMuseScoreBreakCase && nextBeamMode == Beam.AUTO) nextBeamTriesToGoBack = true;
+			var fourQuaversInARow = isNote && prevSoundingDur == quaver && soundingDur == quaver &&  nextItemDur == quaver && nextNextItemDur == quaver && nextNextItemIsNote;
+			
+			// **** CASES WHERE I DISAGREE WITH MUSESCORE'S BEAMING RULES **** //
+			// **** Case 1: three quavers plus an offbeat quaver rest **** //
+			
+			var specificDumbMuseScoreBreakCase1 = isNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemIsNote && nextItemDur == quaver && nextNextItemDur == quaver && !nextNextItemIsNote;
+			
+			// **** Case 2: in 2/2, 3/2, etc, beaming things over the beat **** //
+			var specificDumbMuseScoreBreakCase2 = timeSigDenom == 2 && (noteStartBeat % 2 == 0) && nextItemIsNote && nextItemDur <= quaver && !fourQuaversInARow;
+			
+			//if (timeSigDenom == 2) logError ('nsb = '+noteStartBeat+'; nextItemIsNote = '+nextItemIsNote+'; nextItemDur = '+nextItemDur+'; specificDumbMuseScoreBreakCase2 = '+specificDumbMuseScoreBreakCase2);
 
-			if (beamTriesToGoForwards && nextBeamTriesToGoBack) {
-								
-				// ** EXCEPTION WHERE QUAVERS ARE BEAMED TOGETHER IN 4/4 ** //
-				var exception1 = isNote && soundingDur == quaver && prevSoundingDur == quaver && nextItemDur == quaver && nextNextItemDur == quaver && nextNextItemIsNote;
-				
-				if (!exception1) {
-					if (isNote) {
-						if (specificDumbMuseScoreBreakCase) {
-							addError( "This note should not be beamed to the next\nnote. To fix, select the next note and choose\nProperties→Note→Beam→No beam.",noteRest);
+			
+			if (!beamTriesToGoForwards || !nextBeamTriesToGoBack) {
+				if ((specificDumbMuseScoreBreakCase1 || specificDumbMuseScoreBreakCase2) && nextBeamMode == Beam.AUTO) nextBeamTriesToGoBack = true;
+			}
+			
+			//logError ('beamTriesToGoForwards = '+beamTriesToGoForwards+'; nextBeamTriesToGoBack = '+nextBeamTriesToGoBack+'; fourQuaversInARow = '+fourQuaversInARow);
+			
+			if (beamTriesToGoForwards && nextBeamTriesToGoBack && !fourQuaversInARow) {
+												
+				if (isNote) {
+					if (specificDumbMuseScoreBreakCase1) {
+						addError( "This note should not be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→No beam.", nextItem);
+					} else if (specificDumbMuseScoreBreakCase2) {
+						if (nextNextItemIsNote && nextNextItemDur <= quaver) {
+							addError( "This note should not be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→Break beam Left.",nextItem);
 						} else {
-							addError( "This note should not be beamed to the next\nnote. To fix, select the note and choose\nProperties→Note→Beam→AUTO.",noteRest);
+							addError( "This note should not be beamed to the previous\nnote. To fix, select it and choose\nProperties→Note→Beam→No beam.",nextItem);
 						}
 					} else {
-						addError( "This rest should not be included in\nthe beam group of the next beat.\nTo fix, select the note and choose\nProperties→Note→Beam→AUTO.", noteRest);
+						addError( "This note should not be beamed to the next\nnote. To fix, select the note and choose\nProperties→Note→Beam→AUTO.",noteRest);
 					}
+				} else {
+					addError( "This rest should not be included in\nthe beam group of the next beat.\nTo fix, select the note and choose\nProperties→Note→Beam→AUTO.", noteRest);
 				}
 			}
 		}
@@ -2022,7 +2039,7 @@ MuseScore {
 				} else {
 					// calculate the staff number that this element is on
 					if (element.bbox == undefined) {
-						logError("showAllErrors() — bbox undefined — elem type is "+element.name);
+						logError("****showAllErrors() — bbox undefined — elem type is "+element.name);
 					} else {
 						if (eType != Element.MEASURE) {
 							if (element.staff == undefined) {
@@ -2131,7 +2148,7 @@ MuseScore {
 			var element = null;
 			var eType = 0;
 			if (errorObjects.length < i-1) {
-				logError ('errorObjects too short');
+				logError ('**** showAllErrors() — errorObjects too short');
 				element = null;
 			} else {
 				element = errorObjects[i];
@@ -2268,14 +2285,14 @@ MuseScore {
 	
 	function getTick (e) {
 		if (e == null) {
-			logError ("getTick() — tried to get tick of null");
+			logError ("**** getTick() — tried to get tick of null");
 			return 0;
 		}
 		var eType = e.type;
 		if (eType == Element.BEAM) {
 			// In MS 4.6 currently, there's no way to get the tick of a beam, or to get its child elements to get their ticks
 			// as such, we should probably avoid highlighting beams until this is fixed
-			logError ('Found beam: tick = '+e.tick);
+			logError ('**** getTick() — Found beam: tick = '+e.tick);
 		}
 		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
 		if (e.spanner != undefined) {
@@ -2285,7 +2302,7 @@ MuseScore {
 				return e.firstSegment.tick;
 			} else {
 				if (e.parent == undefined || e.parent == null) {
-					logError("getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
+					logError("**** getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
 				} else {
 					var p;
 					if (eType == Element.TUPLET) {
@@ -2295,7 +2312,7 @@ MuseScore {
 					}
 					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) {
 						if (p.parent == null) {
-							logError ("getTick() — Parent of "+e.name+" was null");
+							logError ("**** getTick() — Parent of "+e.name+" was null");
 							return 0;
 						}
 						p = p.parent;
