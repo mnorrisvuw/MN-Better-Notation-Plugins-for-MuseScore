@@ -11,13 +11,13 @@ dolce
 espr.
 espress.
 espressivo
-expressive
+[W] expressive
 expressively
 expr.
 flaut.
 flautando
-gliss.
-glissando
+[W] gliss.
+[W] glissando
 in rilievo
 legato
 lightly

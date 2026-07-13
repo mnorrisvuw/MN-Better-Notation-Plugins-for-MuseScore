@@ -2533,6 +2533,17 @@ MuseScore {
 			}
 		}
 		
+		// ** CHECK BAR NUMBERS ** //
+		var theBar = curScore.firstMeasure;
+		while (theBar) {
+			var barNum = theBar.measureNumber(0);
+			if (barNum) {
+				var c = barNum.color;
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(barNum);
+			}
+			theBar = theBar.nextMeasure;
+		}
+		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
@@ -2561,7 +2572,7 @@ MuseScore {
 			if (segment.segmentType == Segment.TimeSig) {
 				for (var i = 0; i < curScore.nstaves; i++) {
 					var theTimeSig = segment.elementAt(i*4);
-					if (theTimeSig.type == Element.TIMESIG) {
+					if (theTimeSig && theTimeSig.type == Element.TIMESIG) {
 						var c = theTimeSig.color;
 						if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(theTimeSig);
 					}

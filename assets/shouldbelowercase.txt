@@ -27,3 +27,5 @@ sord
 sordino
 marcato
 marcatissimo
+jet whistle
+white noise

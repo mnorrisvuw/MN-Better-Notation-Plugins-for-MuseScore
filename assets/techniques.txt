@@ -6,9 +6,7 @@ pizz
 ord
 nat
 sord
-vib.
-vibr.
-vibrato
+vib
 multiphonic
 key
 slap

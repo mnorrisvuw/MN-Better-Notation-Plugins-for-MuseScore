@@ -707,11 +707,13 @@
 			},
 			"line": {
 				"font" : "Optima",
+				"fontsize" : 28,
 				"char" : "\u2550",
 				"align" : "HCENTER"
 			},
 			"line2": {
 				"font" : "Optima",
+				"fontsize" : 28,
 				"char" : "\u2550",
 				"align" : "HCENTER BOTTOM"
 			}

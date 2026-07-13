@@ -50,6 +50,7 @@ MuseScore {
 	property var errorMsg: ''
 	property var errorStrings: []
 	property var errorObjects: []
+	property var errorExcludes: []
 	property var glisses:[]
 	property var isGliss: false
 	property var currentZ: 16384
@@ -122,6 +123,7 @@ MuseScore {
 	property var dottedsemiquaver: 0
 	property var semiquaver: 0
 	property var semibreve: 0
+	property var dottedsemibreve: 0
 	property var lastCheckedTuplet: null
 	property var numConsecutiveSemiquaverTriplets: 0
 	property var frames: []
@@ -143,6 +145,8 @@ MuseScore {
 	
 	property var hasMoreThanOneSystem: false
 	property var firstBarInSecondSystem: null
+	
+	property var fontList: Qt.fontFamilies()
 
 	onRun: {
 		if (!curScore) return;
@@ -171,6 +175,7 @@ MuseScore {
 		var lastStaffNum, lastBarNum, lastBarInScore, lastBarInSelection, lastTickInSelection, lastStaffInSelection;
 		var numBars, totalNumBars;
 		var d = division;
+		dottedsemibreve = 6*d;
 		semibreve = 4*d;
 		dottedminim = 3*d;
 		minim = 2*d;
@@ -181,8 +186,8 @@ MuseScore {
 		quaver = 0.5*d;
 		dottedsemiquaver = 0.375*d;
 		semiquaver = 0.25*d;
-		possibleOnbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet, minim, dottedminim, semibreve];
-		possibleOnbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet", "minim", "dotted minim", "semibreve"];
+		possibleOnbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet, minim, dottedminim, semibreve, dottedsemibreve];
+		possibleOnbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet", "minim", "dotted minim", "semibreve", "dotted semibreve"];
 		possibleOffbeatSimplificationDurs = [semiquaver, dottedsemiquaver, quaver, dottedquaver, doubledottedquaver, crotchet, dottedcrotchet];
 		possibleOffbeatSimplificationLabels = ["semiquaver", "dotted semiquaver", "quaver", "dotted quaver", "double-dotted quaver", "crotchet", "dotted crotchet"];
 		
@@ -274,6 +279,8 @@ MuseScore {
 		var totalNumLoops = numStaves * numBars * 4;
 		var oddTimeSigPresent = false;
 		setProgress (5);
+		
+		checkingScore = true;
 		
 		// *********************************************************************** //
 		// ****     LOOP THROUGH THE SELECTED STAVES AND THE SELECTED BARS    **** //
@@ -406,6 +413,9 @@ MuseScore {
 						isNote = !isRest;
 						displayDur = noteRest.duration.ticks; // what the note looks like
 						soundingDur = noteRest.actualDuration.ticks; // what its actual length is, taking tuplets into account
+						// allow for decimals
+						var soundingDurFloat = soundingDurToFloat(soundingDur);
+						
 						noteStart = cursor.tick - barStart; // offset from the start of the bar
 						noteEnd = noteStart + soundingDur; // the tick at the end of the note
 						lastNoteInBar = noteStart + soundingDur >= barDur; // is this the last note in the bar (in this track?)
@@ -426,7 +436,7 @@ MuseScore {
 						hasBeam = currentBeam != null;
 						isFeatheredBeam = hasBeam ? currentBeam.growLeft != currentBeam.growRight : false;
 						isGliss = glisses[currentTrack][currTick] != null;
-						if (!isHidden) totalMusicDurThisTrack += soundingDur;
+						if (!isHidden) totalMusicDurThisTrack += soundingDurFloat;
 						//logError ("track = "+currentTrack+"; noteStart = "+noteStart);
 						//logError ("duration ="+noteRest.duration.ticks+" actualDuration = "+noteRest.actualDuration.ticks+" globalDuration = "+noteRest.globalDuration.ticks+" — totalMusic = "+totalMusicDurThisTrack);
 						if (isPickupBar && isRest && noteRest.durationTypeWithDots.type == 14) addError ("This looks like a manually entered bar rest,\nwhich may not match the duration of the pickup bar.\nTo fix, select it and press ‘delete’.",noteRest);
@@ -504,10 +514,9 @@ MuseScore {
 							// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
 							var lastNoteInTie = false;
 							if (isTied) {
-								//logError ('isTied')
-								lastNoteInTie = !allNotesTiedForwardsToIdenticalChord(noteRest,nextItem) || lastNoteInBar || nextItemHasPause;
+								var ident = allNotesTiedForwardsToIdenticalChord(noteRest,nextItem);
+								lastNoteInTie = !ident || lastNoteInBar || nextItemHasPause;
 								tiedNotes.push(noteRest);
-								//if (lastNoteInTie) logError('lastNoteInTie');
 							} else {
 								if (wasTied) tiedNotes.length = 0;
 							}
@@ -662,6 +671,7 @@ MuseScore {
 		
 		// ************ DESELECT ALL AND FORCE REDRAW ************ //
 		selectNone();
+		checkingScore = false;
 
 		// ************ SHOW INFO DIALOG ************ //
 		var numErrors = errorStrings.length;
@@ -759,7 +769,7 @@ MuseScore {
 	
 	function downloadNewVersion() {
 		Qt.openUrlExternally("http://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore/releases/latest/download/MNBetterNotationPlugins.zip");
-		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and install the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
+		dialog.msg = '<p><font size=\"6\">🛑</font> Once you have downloaded and installed the new versions of the MN Better Notation Plugins, restart MuseScore.</p><p><b><a href="https://github.com/mnorrisvuw/MN-Better-Notation-Plugins-for-MuseScore#installation">Click here for installation instructions</a>.</b></p>';
 		dialog.show();
 	}
 	
@@ -767,6 +777,23 @@ MuseScore {
 		curScore.startCmd();
 		cmd('escape');
 		curScore.endCmd();
+	}
+	
+	function soundingDurToFloat (soundingDur) {
+		if (soundingDur == 274) return 1920/7.;
+		else if (soundingDur == 213) return 1920/9.;
+		else if (soundingDur == 175) return 1920/11.;
+		else if (soundingDur == 148) return 1920/13;
+		else if (soundingDur == 137) return 960/7.;
+		else if (soundingDur == 107) return 960/9.;
+		else if (soundingDur == 87) return 960/11.;
+		else if (soundingDur == 74) return 960/13.;
+		else if (soundingDur == 69) return 480/7.;
+		else if (soundingDur == 53) return 480/9.;
+		else if (soundingDur == 44) return 480/11.;
+		else if (soundingDur == 37) return 480/13.;
+		else if (soundingDur == 34) return 480/14.;
+		return soundingDur;
 	}
 	
 	function allNotesTiedForwardsToIdenticalChord (noteRest, nextChord) {
@@ -781,7 +808,9 @@ MuseScore {
 			if (noteRest.notes[i].tieForward == null) {
 				return false;
 			} else {
-				if (noteRest.notes[i].tieForward.type == Element.LAISSEZ_VIB) return false;
+				if (noteRest.notes[i].tieForward.type == Element.LAISSEZ_VIB) {
+					return false;
+				}
 			}
 		}
 		return true;
@@ -810,7 +839,7 @@ MuseScore {
 		// first check the MIDI pitch
 		if (note1.pitch != note2.pitch) return false;
 		// now check the accidental, as microtones don't affect the MIDI pitch
-		if (note1.accidentalType != note2.accidentalType) return false;
+		if (note2.accidentalType != Accidental.NONE && note1.accidentalType != note2.accidentalType) return false;
 		return true;
 	}
 	
@@ -966,7 +995,7 @@ MuseScore {
 						}
 						hidingBeatError = false;
 						if ((timeSigStr === "4/4" || timeSigStr === "5/4" || timeSigStr === "2/2") && noteStartBeat == 1) hidingBeatError = true;
-						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat % 3 > 0;
+						if (timeSigStr === "6/4" || timeSigStr === "9/4") hidingBeatError = noteStartBeat == 1; // beat 5 is marginal but OK in some situations
 					}
 					
 					if (soundingDur == dottedcrotchet && timeSigDenom > 2) {
@@ -1267,9 +1296,9 @@ MuseScore {
 		
 		if (tupletDur > beatLength) {
 			var firstNoteDur = theNotes[0].actualDuration.ticks;
-			var tupletDivision = tupletDur / theTuplet.actualNotes;
+			var tupletDivision = Math.round(tupletDur / theTuplet.actualNotes);
 			
-			//logError ('firstNoteDur = '+firstNoteDur+'; tupletDivision = '+tupletDivision);
+			//logError ('firstNoteDur = '+firstNoteDur+'; tupletDivision = '+tupletDivision+'; theTuplet.actualNotes = '+theTuplet.actualNotes);
 	
 			// *** CHECK FOR NOTE NOT REALLY MATCHING THE TUPLET DIVISION ***
 			if (firstNoteDur != tupletDivision) addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
@@ -1514,7 +1543,6 @@ MuseScore {
 		var maxOffbeatSimplification = possibleOffbeatSimplificationDurs.length-1;
 		var maxSimplificationFound = false;
 		var firstNoteIsOnDownbeat = getPositionInBar(tiedNotes[0]) == 0;
-		
 		for (var i = 0; i < tiedNotes.length-1 && !maxSimplificationFound; i++) {
 			var startNote = tiedNotes[i];
 			var tiedDisplayDur = startNote.duration.ticks;
@@ -1547,7 +1575,6 @@ MuseScore {
 				var canBeSimplified, simplification;
 				
 				if (tieIsOnBeat) {
-					//logError ("Tie is on beat: tiedDisplayDur "+tiedDisplayDur+" tiedActualDur "+tiedActualDur+" tempActualDur "+tempActualDur);
 
 					// ** CHECK ONBEAT TIE SIMPLIFICATIONS ** //
 					for (var k = 0; k < possibleOnbeatSimplificationDurs.length; k++) {
@@ -1555,7 +1582,6 @@ MuseScore {
 						simplification = possibleOnbeatSimplificationDurs[k];
 
 						if (tiedActualDur == simplification) {
-							//logError ("Match ("+tiedActualDur+")");
 
 							if (isCompound) {
 								if (tiedActualDur >= beatLength) canBeSimplified = tiedActualDur % beatLength == 0; // can be simplified if it's a multiple of the beat length
@@ -1580,7 +1606,6 @@ MuseScore {
 									if (tempNextItem.actualDuration.ticks != quaver) canBeSimplified = false; 
 								}
 								//logError ('timeSigDenom = '+timeSigDenom+'; timeSigNum = '+timeSigNum);
-								//logError ('canBeSimplified = '+canBeSimplified);
 							}
 			
 							if (canBeSimplified) {
@@ -1973,6 +1998,7 @@ MuseScore {
 	function addError (text,element) {
 		errorStrings.push(text);
 		errorObjects.push(element);
+		errorExcludes.push(false);
 	}
 	
 	//---------------------------------------------------------
@@ -1986,6 +2012,7 @@ MuseScore {
 		
 		var firstStaffNum = 0;
 		var comments = [];
+		var commentSources = [];
 		var commentPageNumbers = [];
 		var commentsDesiredPosX = [];
 		var commentsDesiredPosY = [];
@@ -1999,7 +2026,7 @@ MuseScore {
 		
 		// create new cursor to add the comments
 		var commentCursor = curScore.newCursor();
-		commentCursor.filter = Segment.ChordRest;
+		//commentCursor.filter = Segment.ChordRest;
 		
 		// save undo state
 		curScore.startCmd();
@@ -2008,8 +2035,13 @@ MuseScore {
 	
 			var theText = errorStrings[i];
 			var element = errorObjects[i];
+			var excludeFromParts = errorExcludes[i];
 			var isString = typeof element === "string";
-			var objectArray = (element.length == undefined || isString) ? [element] : element;
+			if (element === null || element === undefined) {
+				logError("**** showAllErrors() — errorObjects[" + i + "] is null or undefined ****");
+				continue;
+			}			
+			var objectArray = (isString || element.length === undefined) ? [element] : element;
 			var numObj = objectArray.length;
 			
 			for (var j = 0; j < numObj; j++) {
@@ -2039,9 +2071,11 @@ MuseScore {
 				} else {
 					// calculate the staff number that this element is on
 					if (element.bbox == undefined) {
-						logError("****showAllErrors() — bbox undefined — elem type is "+element.name);
+						logError("**** showAllErrors() — bbox undefined — elem type is "+element.name+" ****");
+						continue;
 					} else {
 						if (eType != Element.MEASURE) {
+							//logError ('element = '+element+'; elem.staff = '+element.staff);
 							if (element.staff == undefined) {
 								isString = true;
 								theLocation = "";
@@ -2050,21 +2084,19 @@ MuseScore {
 							} else {
 								staffNum = element.staffIdx;
 								// Handle the case where a system-attached object reports a staff that is hidden
-								if (eType == Element.TEMPO_TEXT || eType == Element.SYSTEM_TEXT || eType == Element.REHEARSAL_MARK || eType == Element.METRONOME) {
-									staffNum = element.effectiveStaffIdx;
-								}
+								if (eType == Element.TEMPO_TEXT || eType == Element.SYSTEM_TEXT || eType == Element.REHEARSAL_MARK || eType == Element.METRONOME) staffNum = element.effectiveStaffIdx;
 							}
 						}
 					}
-				}
 				
-				// style the element
-				if (element !== "pagetop" && element !== "top" && element !== "pagetopright") {
+					// style the element
 					if (eType == Element.CHORD) {
 						element.color = "hotpink";
 						for (var k = 0; k<element.notes.length; k++) element.notes[k].color = "hotpink";
 					} else {
+						//logError ('here');
 						element.color = "hotpink";
+						//logError ('here — element.color is now '+element.color);
 					}
 				}
 				
@@ -2083,15 +2115,21 @@ MuseScore {
 							} else {
 								if (theLocation !== 'system1') {
 									var sysNum = parseInt(theLocation.substring(6));
+									// TO DO — fix this
 									tick = curScore.systems[sysNum-1].firstMeasure.firstSegment.tick;
 								}
 							}
 						}
-					} else {
+					} else {	
 						tick = getTick(element);
-					}
+					}					
 					commentCursor.staffIdx = staffNum;
 					commentCursor.track = staffNum * 4;
+					if (tick < 0) tick = 0;
+					if (tick >= curScore.lastSegment.tick) {
+						tick = curScore.lastSegment.tick - division;
+					}
+					commentCursor.rewind(Cursor.SCORE_START);
 					commentCursor.rewindToTick(tick);
 					
 					// add a text object at the location where the element is
@@ -2105,15 +2143,17 @@ MuseScore {
 					comment.frameBgColor = "yellow";
 					comment.frameFgColor = "black";
 					comment.fontSize = 7.0;
-					comment.fontFace = "Helvetica";
+					comment.fontFace = fontList.includes("Arial Unicode MS") ? "Arial Unicode MS" : "Helvetica";
 					comment.align = Align.TOP;
 					comment.autoplace = false;
 					comment.offsetX = 0;
 					comment.offsetY = 0;
 					commentCursor.add(comment);
 					comment.z = currentZ;
+					comment.excludeFromParts = excludeFromParts;
 					currentZ ++;
 					comments.push (comment);
+					commentSources.push (element);
 					var commentPage = getPage(comment);
 					// NOTE: I had tried pushing the page to an array, but that caused
 					// all sorts of crashes further down the line. Instead, I push the page number
@@ -2129,7 +2169,7 @@ MuseScore {
 			}
 		} // var i
 	
-		// NOW TWEAK LOCATIONS OF COMMENTS
+		// **** NOW TWEAK LOCATIONS OF COMMENTS **** //
 		var offx = [];
 		var offy = [];
 		var checkObjectPage = false;
@@ -2147,11 +2187,11 @@ MuseScore {
 			var commentWidth = comment.bbox.width;
 			var element = null;
 			var eType = 0;
-			if (errorObjects.length < i-1) {
-				logError ('**** showAllErrors() — errorObjects too short');
+			if (i >= commentSources.length) {
+				 logError('**** showAllErrors() — commentSources too short ****');
 				element = null;
 			} else {
-				element = errorObjects[i];
+				element = commentSources[i];
 				eType = element.type;
 			}
 			var isString = eType == undefined;
@@ -2186,7 +2226,7 @@ MuseScore {
 					offy[i] += 4.0;
 				}
 				
-				// check comment box is not covering the element
+				// *** Firstly, check that the comment box is not actually covering the element it's talking about **** //
 				var dontMove = [Element.HBOX, Element.VBOX, Element.TBOX, Element.FBOX, Element.MEASURE, Element.STAFF, Element.KEYSIG, Element.TIMESIG, Element.SYSTEM];
 				if (!isString && !dontMove.includes(eType)) {
 					var r1x = placedX + offx[i];
@@ -2209,66 +2249,223 @@ MuseScore {
 					}
 				}
 	
-				// check to see if this comment has been placed too close to other comments
-				var maxOffset = 10;
+				// **** Check to see if this comment has been placed too close to other comments **** //
 				var minOffset = 1.5;
-				var commentOriginalX = placedX;
-				var commentOriginalY = placedY;
-				var commentRHS = placedX + commentWidth;
-				var commentB = placedY + commentHeight;
+				var alignmentEscapeOffset = minOffset + 0.25;
+				var maxShiftAttempts = 20;
+				var maxMoveFromOriginal = 10;
+				var commentOriginalX = 0;
+				var commentOriginalY = 0;
 				
-				// check comment is within the page bounds
-				if (placedX < 0) offx[i] -= placedX; // LEFT HAND SIDE
-				if (commentRHS > commentPageWidth) offx[i] -= (commentRHS - commentPageWidth); // RIGHT HAND SIDE
-				if (placedY < 0) offy[i] -= placedY; // TOP
-				if (commentB > commentPageHeight) offy[i] -= (commentB - commentPageHeight); // BOTTOM*/
+				function getBox(x, y, w, h) {
+					return {
+						x: x,
+						y: y,
+						r: x + w,
+						b: y + h,
+						w: w,
+						h: h
+					};
+				}
 				
-				for (var k = 0; k < i; k++) {
+				function boxesOverlap(a, b) {
+					return a.x < b.r && a.r > b.x && a.y < b.b && a.b > b.y;
+				}
+				
+				function clampCommentToPage() {
+					var box = getBox(
+						placedX + offx[i],
+						placedY + offy[i],
+						commentWidth,
+						commentHeight
+					);
+				
+					if (box.x < 0) offx[i] -= box.x;
+					if (box.r > commentPageWidth) offx[i] -= (box.r - commentPageWidth);
+					if (box.y < 0) offy[i] -= box.y;
+					if (box.b > commentPageHeight) offy[i] -= (box.b - commentPageHeight);
+				}
+				
+				function getCurrentCommentBox(testOffx, testOffy) {
+					return getBox(
+						placedX + testOffx,
+						placedY + testOffy,
+						commentWidth,
+						commentHeight
+					);
+				}
+				
+				function getPreviousCommentBox(k) {
 					var otherComment = comments[k];
-					var otherCommentPageNumber = commentPageNumbers[k];
-					var otherCommentX = otherComment.pagePos.x + offx[k];
-					var otherCommentY = otherComment.pagePos.y + offy[k];
-					var actualCommentX = placedX + offx[i];
-					var actualCommentRHS = commentRHS + offx[i];
-					var actualCommentY = placedY + offy[i];
-					var actualCommentB = commentB + offy[i];
-	
-					if (commentPageNumber == otherCommentPageNumber) {
-						var dx = Math.abs(actualCommentX - otherCommentX);
-						var dy = Math.abs(actualCommentY - otherCommentY);
-						if (dx <= minOffset || dy <= minOffset) {
-							var otherCommentRHS = otherCommentX + otherComment.bbox.width;
-							var otherCommentB = otherCommentY + otherComment.bbox.height;
-							var overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
-							var overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
-							var generalProximity = dx + dy < maxOffset;
-							var isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
-							var isNotTooFarFromOriginalPosition = true;
-							var shiftAttempts = 0;
-							while (isCloseToOtherComment && isNotTooFarFromOriginalPosition && actualCommentRHS < commentPageWidth && actualCommentY > 0 && shiftAttempts < 5) {
-								shiftAttempts ++;
-								if (actualCommentRHS < commentPageWidth - commentOffset) offx[i] += commentOffset;
-								if (actualCommentY > commentOffset) offy[i] -= commentOffset;
-								actualCommentX = placedX + offx[i];
-								actualCommentY = placedY + offy[i];
-								actualCommentRHS = actualCommentX + commentWidth;
-								actualCommentB = actualCommentY + commentHeight;
-								dx = Math.abs(actualCommentX - otherCommentX);
-								dy = Math.abs(actualCommentY - otherCommentY);
-								overlapsH = dy < minOffset && actualCommentX < otherCommentRHS && actualCommentRHS > otherCommentX;
-								overlapsV = dx < minOffset && actualCommentY < otherCommentB && actualCommentB > otherCommentY;
-								generalProximity = (dx <= minOffset || dy <= minOffset) && (dx + dy < maxOffset);
-								isCloseToOtherComment =  overlapsH || overlapsV || generalProximity;
-								isNotTooFarFromOriginalPosition = Math.abs(actualCommentX - commentOriginalX) < maxOffset && Math.abs(actualCommentY - commentOriginalY) < maxOffset;
-							}
+				
+					return getBox(
+						otherComment.pagePos.x + offx[k],
+						otherComment.pagePos.y + offy[k],
+						otherComment.bbox.width,
+						otherComment.bbox.height
+					);
+				}
+				
+				function getAlignmentConflictBetweenBoxes(a, b) {
+					if (!boxesOverlap(a, b)) return null;
+				
+					var topEdgesAligned = Math.abs(a.y - b.y) <= minOffset;
+					var leftEdgesAligned = Math.abs(a.x - b.x) <= minOffset;
+				
+					if (!topEdgesAligned && !leftEdgesAligned) return null;
+				
+					return {
+						topEdgesAligned: topEdgesAligned,
+						leftEdgesAligned: leftEdgesAligned,
+						otherBox: b
+					};
+				}
+				
+				function getAlignmentConflictWithPreviousComments(testOffx, testOffy) {
+					var actualBox = getCurrentCommentBox(testOffx, testOffy);
+				
+					for (var k = 0; k < i; k++) {
+						if (commentPageNumber != commentPageNumbers[k]) continue;
+				
+						var otherBox = getPreviousCommentBox(k);
+						var conflict = getAlignmentConflictBetweenBoxes(actualBox, otherBox);
+				
+						if (conflict) {
+							conflict.index = k;
+							return conflict;
 						}
 					}
+				
+					return null;
+				}
+				
+				function positionHasAlignmentConflict(testOffx, testOffy) {
+					return getAlignmentConflictWithPreviousComments(testOffx, testOffy) !== null;
+				}
+				
+				function candidateIsOnPage(testOffx, testOffy) {
+					var testBox = getCurrentCommentBox(testOffx, testOffy);
+				
+					if (testBox.x < 0) return false;
+					if (testBox.r > commentPageWidth) return false;
+					if (testBox.y < 0) return false;
+					if (testBox.b > commentPageHeight) return false;
+				
+					return true;
+				}
+				
+				function candidateIsWithinMoveLimit(testOffx, testOffy) {
+					var testX = placedX + testOffx;
+					var testY = placedY + testOffy;
+				
+					if (Math.abs(testX - commentOriginalX) > maxMoveFromOriginal) return false;
+					if (Math.abs(testY - commentOriginalY) > maxMoveFromOriginal) return false;
+				
+					return true;
+				}
+				
+				function candidateIsValid(testOffx, testOffy) {
+					if (!candidateIsOnPage(testOffx, testOffy)) return false;
+					if (!candidateIsWithinMoveLimit(testOffx, testOffy)) return false;
+				
+					return true;
+				}
+				
+				function resolveAlignmentConflict(conflict) {
+					var originalOffx = offx[i];
+					var originalOffy = offy[i];
+				
+					var candidates = [];
+					var step;
+				
+					for (step = 1; step * alignmentEscapeOffset <= maxMoveFromOriginal; step++) {
+						var d = step * alignmentEscapeOffset;
+				
+						if (conflict.topEdgesAligned && conflict.leftEdgesAligned) {
+							candidates.push({ x: d, y: -d });
+							candidates.push({ x: 0, y: -d });
+							candidates.push({ x: d, y: 0 });
+						} else if (conflict.topEdgesAligned) {
+							candidates.push({ x: 0, y: -d });
+							candidates.push({ x: d, y: -d });
+							candidates.push({ x: d, y: 0 });
+						} else if (conflict.leftEdgesAligned) {
+							candidates.push({ x: d, y: 0 });
+							candidates.push({ x: d, y: -d });
+							candidates.push({ x: 0, y: -d });
+						}
+					}
+				
+					for (var c = 0; c < candidates.length; c++) {
+						var testOffx = originalOffx + candidates[c].x;
+						var testOffy = originalOffy + candidates[c].y;
+				
+						if (!candidateIsValid(testOffx, testOffy)) continue;
+				
+						if (!positionHasAlignmentConflict(testOffx, testOffy)) {
+							offx[i] = testOffx;
+							offy[i] = testOffy;
+							return true;
+						}
+					}
+				
+					return false;
+				}
+				
+				function forceResolveAlignmentConflict(conflict) {
+					var testOffx = offx[i];
+					var testOffy = offy[i];
+				
+					if (conflict.topEdgesAligned) {
+						testOffy -= alignmentEscapeOffset;
+					}
+				
+					if (conflict.leftEdgesAligned) {
+						testOffx += alignmentEscapeOffset;
+					}
+				
+					if (!candidateIsOnPage(testOffx, testOffy)) return false;
+					if (!candidateIsWithinMoveLimit(testOffx, testOffy)) return false;
+				
+					offx[i] = testOffx;
+					offy[i] = testOffy;
+				
+					return true;
+				}
+				
+				// First make sure the comment starts within the page bounds.
+				clampCommentToPage();
+				
+				// IMPORTANT:
+				// Store the original *actual* position after clamping.
+				// Do not just use placedX / placedY.
+				commentOriginalX = placedX + offx[i];
+				commentOriginalY = placedY + offy[i];
+				
+				var shiftAttempts = 0;
+				var conflict = getAlignmentConflictWithPreviousComments(offx[i], offy[i]);
+				
+				while (conflict && shiftAttempts < maxShiftAttempts) {
+					shiftAttempts++;
+				
+					var resolved = resolveAlignmentConflict(conflict);
+				
+					if (!resolved) {
+						resolved = forceResolveAlignmentConflict(conflict);
+					}
+				
+					if (!resolved) {
+						break;
+					}
+				
+					conflict = getAlignmentConflictWithPreviousComments(offx[i], offy[i]);
 				}
 				
 				if (checkObjectPage && commentPageNumber != objectPageNumber) comment.text = '[The object this comment refers to is on p. '+(objectPageNumber+1)+']\n' +comment.text;
 			}
+			
 		}
-	
+		
 		// now reposition all the elements
 		for (var i = 0; i < comments.length; i++) {
 			var comment = comments[i];
@@ -2414,6 +2611,17 @@ MuseScore {
 			}
 		}
 		
+		// ** CHECK BAR NUMBERS ** //
+		var theBar = curScore.firstMeasure;
+		while (theBar) {
+			var barNum = theBar.measureNumber(0);
+			if (barNum) {
+				var c = barNum.color;
+				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(barNum);
+			}
+			theBar = theBar.nextMeasure;
+		}
+		
 		// **** SELECT ALL **** //
 		curScore.startCmd();
 		curScore.selection.selectRange(0,curScore.lastSegment.tick+1,0,curScore.nstaves);
@@ -2442,7 +2650,7 @@ MuseScore {
 			if (segment.segmentType == Segment.TimeSig) {
 				for (var i = 0; i < curScore.nstaves; i++) {
 					var theTimeSig = segment.elementAt(i*4);
-					if (theTimeSig.type == Element.TIMESIG) {
+					if (theTimeSig && theTimeSig.type == Element.TIMESIG) {
 						var c = theTimeSig.color;
 						if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(theTimeSig);
 					}
