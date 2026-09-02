@@ -1264,7 +1264,7 @@ MuseScore {
 						isSforzando = false;
 						var currSeg = cursor.segment;
 						currTick = currSeg.tick;
-						
+						isTremolo = false;
 						
 						var elem = cursor.element;
 						var eType = elem.type;
@@ -1275,7 +1275,84 @@ MuseScore {
 							}
 						}
 						
-						if (currTick != barEndTick) {
+						isNote = eType == Element.CHORD;
+						isRest = eType == Element.REST;
+						var isHidden = !elem.visible;
+						if (isNote && !isHidden) {
+							var numHiddenNoteheads = 0;
+							var numNoteheads = elem.notes.length;
+							for (var ni = 0; ni < numNoteheads; ni++) if (!elem.notes[ni].visible) numHiddenNoteheads ++
+							if (numHiddenNoteheads == numNoteheads) isHidden = true;
+						}
+
+						// *** ONLY PROCESS IF WE'RE STILL IN THE BAR, IF IT'S A NOTE OR REST, AND IT'S NOT HIDDEN ***
+						if (currTick != barEndTick && (isNote || isRest) && !isHidden) {
+
+
+							// ************ CHECK IF IT'S A NOTE OR REST FIRST ************ //
+
+							// don't proceed if this is not a chord or rest, or it's hidden
+
+							// ************************************************ //
+							// **											 **	//
+							// **            FOUND A CHORD OR REST           ** //
+							// **											 ** //
+							// ************************************************ //
+
+							numNoteRestsInThisTrack ++;
+							numNoteRestsInThisSystem ++;
+							var noteRest = elem;
+
+							// SET UP PROPERTIES FOR THIS NOTE/REST — e.g. isTremolo, isLv, isTied, isTiedForward, isTiedBack
+							// soundingDur, tuplet, isBarRest, isFermata, isSlash
+
+							// ************ SET UP PROPERTIES ************ //
+							isLv = false;
+							isTremolo = false;
+
+							// ************ SET UP NOTE-ONLY PROPERTIES ************ //
+
+							if (isNote) {
+								// ************ CHECK TREMOLOS ************ //
+								if (doCheckTremolosAndFermatas) {
+									if (noteRest.tremoloSingleChord != undefined && noteRest.tremoloSingleChord != null) {
+										isTremolo = true;
+									} else {
+										if (noteRest.notes[0].tieBack && noteRest.notes[0].firstTiedNote.parent.tremoloSingleChord) {				addError ('It’s best not tie a tremolo note to a non-tremolo note.',noteRest);
+										}
+									}
+									if (noteRest.tremoloTwoChord != undefined && noteRest.tremoloTwoChord != null) {
+										isTremolo = true;
+									}
+								}
+								// ************ CHECK LV ************ //
+
+								var theTie = elem.notes[0].tieForward;
+								if (theTie) {
+									isLv = theTie.type == Element.LAISSEZ_VIB;
+									checkTie (theTie);
+								}
+
+								numNotesInThisTrack ++;
+								var isTiedBack = noteRest.notes[0].tieBack != null;
+								var isTiedForward = noteRest.notes[0].tieForward != null;
+								isTied = isTiedBack || isTiedForward;
+								var isSlash = noteRest.notes[0].headGroup == NoteHeadGroup.HEAD_SLASH
+							}
+							var soundingDur = noteRest.actualDuration.ticks;
+							var tuplet = noteRest.tuplet;
+
+							// ** CHECK TUPLET ** //
+							if (tuplet && !tuplet.is(prevTuplet)) {
+								checkTuplet(tuplet);
+								prevTuplet = tuplet;
+							}
+							var isBarRest = (isRest && noteRest.durationTypeWithDots.type == DurationType.V_MEASURE);
+
+
+							// ** Check if there is a fermata on this note or rest
+							setIsFermata();
+
 							
 							// ************ CHECK TEMPO & TEMPO CHANGE TEXT FOR THIS SEGMENT *********** //
 							if (tempoText.length > 0) {
@@ -1301,23 +1378,17 @@ MuseScore {
 							if (isMelisma[currentTrack] && melismaEndTick[currentTrack] > 0) isMelisma[currentTrack] = currTick <= melismaEndTick[currentTrack];
 							var annotations = currSeg.annotations;
 													
-							// ************ CHECK IF IT'S A NOTE OR REST FIRST ************ //
-							isNote = eType == Element.CHORD;
-							isRest = eType == Element.REST;
-							
-							// ************ IS LV? ************ //
-							isLv = false;
-							if (isNote) {
-								var theTie = elem.notes[0].tieForward;
-								if (theTie) {
-									isLv = theTie.type == Element.LAISSEZ_VIB;
-									checkTie (theTie);
-								}
-							}
-							
 							// ************ CHECK SPANNERS & DYNAMICS ETC. ************ //
 							checkScoreElements(elem);
 							
+							// Check tremolo details only after text annotations and the slur state
+							// for this note have been processed.
+							if (isNote && doCheckTremolosAndFermatas && isTremolo) {
+								theArticulationArray = getArticulations(noteRest);
+								if (noteRest.tremoloSingleChord != undefined && noteRest.tremoloSingleChord != null) checkOneNoteTremolo(noteRest);
+								if (noteRest.tremoloTwoChord != undefined && noteRest.tremoloTwoChord != null) checkTwoNoteTremolo(noteRest);
+							}
+
 							// ************ LOOP THROUGH ANNOTATIONS IN THIS SEGMENT ************ //
 							
 						/*	if (annotations && annotations.length) {
@@ -1333,37 +1404,8 @@ MuseScore {
 								}
 							} */
 							
-							// ************************************************ //
-							// **											 **	//
-							// **            FOUND A CHORD OR REST           ** //
-							// **											 ** //
-							// ************************************************ //
-							
-							var isHidden = !elem.visible;
-							if (isNote && !isHidden) {
-								var numHiddenNoteheads = 0;
-								var numNoteheads = elem.notes.length;
-								for (var ni = 0; ni < numNoteheads; ni++) if (!elem.notes[ni].visible) numHiddenNoteheads ++
-								if (numHiddenNoteheads == numNoteheads) isHidden = true;
-							}
 
-							if ((isNote || isRest) && !isHidden) {
-								//if (isNote) logError('Found note');
-								//if (isRest) logError ('Found rest');
-								numNoteRestsInThisTrack ++;
-								numNoteRestsInThisSystem ++;
-								var noteRest = elem;
 								
-								//var displayDur = noteRest.duration.ticks;
-								var soundingDur = noteRest.actualDuration.ticks;
-								var tuplet = noteRest.tuplet;
-								
-								// ** CHECK TUPLET ** //
-								if (tuplet && !tuplet.is(prevTuplet)) {
-									checkTuplet(tuplet);
-									prevTuplet = tuplet;
-								}
-								var isBarRest = (isRest && noteRest.durationTypeWithDots.type == DurationType.V_MEASURE);
 								
 								// ************ HOW LONG HAS IT BEEN SINCE THE LAST NOTE OR REST? *********** //
 								if (!isBarRest) {
@@ -1386,7 +1428,6 @@ MuseScore {
 									}
 								}
 								
-								
 								// ************ CHECK LEADING SPACE ************ //
 								if ((currSeg.leadingSpace > 0.5 || currSeg.leadingSpace < -0.2) && !flaggedLeadingSpace[currTick]) {
 									if (isNote) {
@@ -1397,8 +1438,6 @@ MuseScore {
 									flaggedLeadingSpace[currTick] = true;
 								}
 									
-								// ** Check if there is a fermata on this note or rest
-								setIsFermata();
 								
 								if (flaggedClefTooLow) if (flaggedClefTooLowBarNum < currentBarNum - 4) flaggedClefTooLow = false;
 								if (flaggedClefTooHigh) if (flaggedClefTooHighBarNum < currentBarNum - 4) flaggedClefTooHigh = false;
@@ -1409,6 +1448,12 @@ MuseScore {
 								
 								if (isRest) {
 									
+								// ************************************************ //
+								// **											 **	//
+								// ************** 	FOUND A REST	 ************** //
+								// **											 ** //
+								// ************************************************ //
+
 									// ************ CHECK DYNAMICS UNDER RESTS ********** //
 									if (doCheckDynamics && tickHasDynamic() && (!isGrandStaff[currentStaffNum] || isTopOfGrandStaff[currentStaffNum])) {
 										var theDynamic = dynamicAtCurrTick();
@@ -1428,11 +1473,6 @@ MuseScore {
 									// **											 ** //
 									// ************************************************ //
 									
-									numNotesInThisTrack ++;
-									var isTiedBack = noteRest.notes[0].tieBack != null;
-									var isTiedForward = noteRest.notes[0].tieForward != null;
-									isTied = isTiedBack || isTiedForward;
-									var isSlash = noteRest.notes[0].headGroup == NoteHeadGroup.HEAD_SLASH;
 									
 									if (!isTremolo) flzFound = false;
 									if (isTiedForward && !isLv && numVoicesInThisBar == 1) {
@@ -1537,22 +1577,6 @@ MuseScore {
 									// ************ CHECK WHETHER CHORD NOTES ARE TIED ************ //
 									if (doCheckSlursAndTies && isChord && !isSlash) checkChordNotesTied(noteRest);
 									
-									// ************ CHECK TREMOLOS ************ //
-									isTremolo = false;
-									if (doCheckTremolosAndFermatas) {
-										if (noteRest.tremoloSingleChord != undefined && noteRest.tremoloSingleChord != null) {
-											isTremolo = true;
-											checkOneNoteTremolo(noteRest);
-										} else {
-											if (noteRest.notes[0].tieBack && noteRest.notes[0].firstTiedNote.parent.tremoloSingleChord) {				addError ('It’s best not tie a tremolo note to a non-tremolo note.',noteRest);
-											}
-										}
-										if (noteRest.tremoloTwoChord != undefined && noteRest.tremoloTwoChord != null) {
-											isTremolo = true;
-											checkTwoNoteTremolo(noteRest);
-										}
-									}
-								
 									// ************ CHECK OTTAVA ************ //
 									if (doCheckOttavas && isOttava && !isSlash) checkOttava(noteRest,currentOttava);
 								
@@ -1647,8 +1671,7 @@ MuseScore {
 							
 								prevSoundingDur = soundingDur;
 							
-							} // end if eType == Element.Chord || .Rest
-						}
+						} // end if currTick != barEndTick
 						
 						// **** CHECK FOR UNTERMINATED GRADUAL TEMPO CHANGES **** //
 						if (doCheckTempoMarkings && tempoChangeMarkingEnd != -1 && currTick > tempoChangeMarkingEnd + division * 2 && currTick < endOfScoreTick - (division * 5)) {
@@ -2611,7 +2634,8 @@ MuseScore {
 			}
 			
 			// *** TRILLS *** //
-			if ((etype == Element.TRILL_SEGMENT || etype == Element.ORNAMENT) && !containsSameSpanner(trills[staffIdx],e)) trills[staffIdx].push(e);
+			var isTrillOrnament = etype == Element.ORNAMENT && e.symbol == SymId.ornamentTrill;
+			if ((etype == Element.TRILL_SEGMENT || isTrillOrnament) && !containsSameSpanner(trills[staffIdx],e)) trills[staffIdx].push(e);
 			
 			// *** OTTAVAS *** //
 			if (etype == Element.OTTAVA_SEGMENT && !containsSameSpanner(ottavas[staffIdx],e)) ottavas[staffIdx].push(e);
@@ -4490,7 +4514,7 @@ const transposingInstrumentRegex =
 			if (lowerCaseText.substring(0,3) === "flz") {
 				// check trem
 				flzFound = true;
-				if (!isTremolo) addError ("Fluttertongue notes should also have tremolo lines through the stem.",textObject);
+				if (!isTremolo) addError ("Fluttertongue notes should also have\ntremolo lines through the stem.",textObject);
 			}
 		}
 		if (lowerCaseText.substring(0,4) === "arco") isArco = isStringInstrument;
@@ -4908,6 +4932,23 @@ const transposingInstrumentRegex =
 		// **** Check if this trill has a wavy line (Element.TRILL_SEGMENT) or not (Element.ORNAMENT)
 		var isOrn = trill.type == Element.ORNAMENT;
 		
+		// A staff-level trill can be encountered while another voice has a rest at
+		// the same tick. Resolve the chord to which the trill is actually attached
+		// before accessing its notes.
+		if (noteRest == null || noteRest == undefined || noteRest.type != Element.CHORD || noteRest.notes == undefined || noteRest.notes.length == 0) {
+			var trillAnchor = isOrn ? trill.parent : trill.spanner.startElement;
+			var parentDepth = 0;
+			while (trillAnchor != null && trillAnchor != undefined && trillAnchor.type != Element.CHORD && parentDepth < 4) {
+				trillAnchor = trillAnchor.parent;
+				parentDepth ++;
+			}
+			if (trillAnchor == null || trillAnchor == undefined || trillAnchor.type != Element.CHORD || trillAnchor.notes == undefined || trillAnchor.notes.length == 0) {
+				logError("**** checkTrill() — couldn't find the chord associated with this trill ****");
+				return;
+			}
+			noteRest = trillAnchor;
+		}
+
 		// **** Flag if this is an Ornament (no wavy line), but the note is tied, so should be a Trill Segment
 		if (isOrn && noteRest.notes[0].tieForward) addError ("Trills on tied notes need a wavy line after\nthe ‘tr.’ symbol. Delete the ‘tr.’ ornament,\nand replace with a ‘Trill line’ from the\nOrnaments palette.", trill);
 		
@@ -5549,7 +5590,7 @@ const transposingInstrumentRegex =
 					var textX = textObject.pagePos.x;
 					//logError ('textX = '+textX+'; barX = '+barX);
 					if (textX < barX-1.5) addError ("This tempo marking is significantly to the left\nof the first element of the bar. It should align\nwith the first element of notation (including time signatures).\nTo return to its default position, select the\nobject and press "+cmdKey+"-R.", textObject);	
-					if (textX > barX+1.5) addError ("This tempo marking is significantly to the right\nof the first element of the bar. It should align\nwith the first element of notation (including time signatures).\nTo return to its default position, select the\nobject and press "+cmdKey+"-R.", textObject);					
+					if (textX > barX+1.5) addError ("This tempo marking is significantly to the right\nof the first element of the bar. If it is meant to occur on beat 1,\nit should align with the first element of notation (including time signatures).\nTo return to its default position, select the\nobject and press "+cmdKey+"-R.", textObject);
 				}
 				//logError ('2: containsTempoComponent = '+containsTempoComponent);
 	
@@ -6676,7 +6717,7 @@ const transposingInstrumentRegex =
 	}
 	
 	function checkMinDistance (obj) {
-		if (obj.minDistance < 0) addError ("This object has a negative minimum distance,\nwhich means it is possibly colliding with\nanother object. You can reset its layout by\nselecting the object and pressing "+cmdKey+"-R",obj);
+		if (obj.minDistance < -0.35) addError ("This object has a negative minimum distance,\nwhich means it is possibly colliding with\nanother object. You can reset its layout by\nselecting the object and pressing "+cmdKey+"-R",obj);
 	}
 	
 	function allTracksHaveRestsAtTick (theTick) {

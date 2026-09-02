@@ -1,4 +1,17 @@
-MNCheckLayout.sublime-project
-MNCheckLayout.sublime-workspace
+# macOS metadata
 .DS_Store
-/.nova
+
+# Editor project and workspace state
+*.sublime-project
+*.sublime-workspace
+/.nova/
+.vscode/
+*.swp
+*~
+
+# Local logs, caches, and temporary files
+*.log
+*.tmp
+*.qmlc
+*.jsc
+__pycache__/
