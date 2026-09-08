@@ -20,10 +20,21 @@ MuseScore {
 	title: "MN Delete Comments and Highlights"
 	id: mndeletecommentsandhighlights
 	thumbnailName: "MNDeleteCommentsAndHighlights.png"	
+	property bool isMuseScore5: mscoreMajorVersion >= 5
 	property var selectionArray: []
 	property var frames: []
 	property var versionNumber: ''
 	FileIO { id: versionnumberfile; source: Qt.resolvedUrl("./assets/versionnumber.txt").toString().slice(8); onError: { console.log(msg); } }
+
+	function getStaffBrackets(staffIndex) {
+		return isMuseScore5 ? curScore.brackets(staffIndex) : curScore.staves[staffIndex].brackets;
+	}
+
+	function getMeasureNumberElement(measure, staffIndex) {
+		// In MS5 the numeric measureNumber property shadows
+		// the measureNumber(staffIndex) callback in QML.
+		return isMuseScore5 ? null : measure.measureNumber(staffIndex);
+	}
 
   onRun: {
 		if (!curScore) return;
@@ -58,8 +69,7 @@ MuseScore {
 		
 		// ** CHECK BRACKETS FOR HIGHLIGHTS ** //
 		for (var i = 0; i < curScore.nstaves; i++) {
-			var staff = curScore.staves[i];
-			var brackets = staff.brackets;
+			var brackets = getStaffBrackets(i);
 			for (j = 0; j < brackets.length; j++) {
 				var e = brackets[j];
 				var c = e.color;
@@ -86,7 +96,7 @@ MuseScore {
 		// ** CHECK BAR NUMBERS ** //
 		var theBar = curScore.firstMeasure;
 		while (theBar) {
-			var barNum = theBar.measureNumber(0);
+			var barNum = getMeasureNumberElement(theBar, 0);
 			if (barNum) {
 				var c = barNum.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(barNum);

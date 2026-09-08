@@ -20,6 +20,18 @@ MuseScore {
 	id: mncheckrhythmicnotation
 	thumbnailName: "MNCheckRhythmicNotation.png"
 	menuPath: "Plugins.MNCheckRhythmicNotation"
+	property bool isMuseScore5: mscoreMajorVersion >= 5
+
+	function getStaffBrackets(staffIndex) {
+		return isMuseScore5 ? curScore.brackets(staffIndex) : curScore.staves[staffIndex].brackets;
+	}
+
+	function getMeasureNumberElement(measure, staffIndex) {
+		// In MS5 the numeric measureNumber property shadows
+		// the measureNumber(staffIndex) callback in QML.
+		return isMuseScore5 ? null : measure.measureNumber(staffIndex);
+	}
+
 		function getAssetPath(filename) {
         if (Qt.platform.os === "linux") {
             return Qt.resolvedUrl("./assets/" + filename).toString();
@@ -124,6 +136,7 @@ MuseScore {
 	property var dottedsemibreve: 0
 	property var lastCheckedTuplet: null
 	property var numConsecutiveSemiquaverTriplets: 0
+	property var lastSemiquaverTripletNote: null
 	property var frames: []
 	
 	property var possibleOnbeatSimplificationDurs: []
@@ -303,6 +316,7 @@ MuseScore {
 			firstNoteInTuplet = false;
 			prevTuplet = null;
 			numConsecutiveSemiquaverTriplets = 0;
+			lastSemiquaverTripletNote = null;
 			
 			// ** REWIND TO START OF SELECTION ** //
 			cursor.filter = Segment.All;
@@ -398,6 +412,8 @@ MuseScore {
 						lastRest = false;
 						cursor2.track = currentTrack;
 						prevBeamMode = 0;
+						numConsecutiveSemiquaverTriplets = 0;
+						lastSemiquaverTripletNote = null;
 					}
 					
 					while (processingThisBar) {
@@ -506,6 +522,9 @@ MuseScore {
 						}
 						
 						if (!isHidden) {
+							if (isNote && noteRest.durationTypeWithDots.dots == 3) {
+								addError("In general, avoid triple-dotted notes.",noteRest);
+							}
 							
 							// *** CALCULATE IF THIS IS THE END OF A TIE OR NOTE *** ///
 							var lastNoteInTie = false;
@@ -610,7 +629,7 @@ MuseScore {
 							// ** ————————————————————————————————————————————————— ** //
 							if (noteRest.tuplet == null) {
 								firstNoteInTuplet = null;
-								numConsecutiveSemiquaverTriplets = 0;
+								finishSemiquaverTripletRun();
 							} else {
 								if (!noteRest.tuplet.is(prevTuplet) || !firstNoteInTuplet) {
 									firstNoteInTuplet = true;
@@ -627,9 +646,9 @@ MuseScore {
 									} else {
 										numConsecutiveSemiquaverTriplets ++;
 									}
-									if (numConsecutiveSemiquaverTriplets == 6) addError ('These semiquaver triplets could be rewritten\nas a semiquaver sextuplet.',noteRest);
+									if (numConsecutiveSemiquaverTriplets > 0) lastSemiquaverTripletNote = noteRest;
 								} else {
-									numConsecutiveSemiquaverTriplets = 0;
+									finishSemiquaverTripletRun();
 								}
 							}
 							
@@ -653,6 +672,7 @@ MuseScore {
 						prevNoteRest = noteRest;
 						prevBeamMode = currentBeamMode;
 					} // end while processingThisBar
+					finishSemiquaverTripletRun();
 					if (totalMusicDurThisTrack > maxMusicDurThisBar) maxMusicDurThisBar = totalMusicDurThisTrack;
 				} // end track loop
 				
@@ -948,7 +968,18 @@ MuseScore {
 								if (e.type == Element.CHORD && e.duration.ticks != d) hidingBeatError = true;
 							}
 							if (hidingBeatError && !isPartOfSingleMinimTripletRewrite(theTuplet)) {
-								addError ("This tuplet crosses a beat and has complex rhythms.\nIt is therefore potentially difficult to read.\nConsider splitting it up into one-beat tuplets.",theTuplet);
+								var tupletElements = theTuplet.elements;
+								var hasMinimAsSecondNote = theTuplet.actualNotes == 3
+									&& theTuplet.normalNotes == 2
+									&& theTuplet.actualDuration.ticks == minim
+									&& tupletElements.length == 2
+									&& tupletElements[1].type == Element.CHORD
+									&& tupletElements[1].duration.ticks == minim;
+								if (hasMinimAsSecondNote) {
+									addError("This rhythm might be better rewritten\nas a crotchet-quaver triplet tied to\na crotchet.",theTuplet);
+								} else {
+									addError ("This tuplet crosses a beat and has complex rhythms.\nIt is therefore potentially difficult to read.\nConsider splitting it up into one-beat tuplets.",theTuplet);
+								}
 							}
 						}
 					}
@@ -1243,6 +1274,22 @@ MuseScore {
 		}
 		var nn = 0;
 		for (var i = 0; i < numNotes; i++) nn += theNotes[i].type == Element.CHORD || theNotes[i].type == Element.REST;
+
+		// Classify regular sextuplets by the written duration MuseScore reports
+		// for their first element. In x/2 time, do not flag quaver sextuplets.
+		var firstTupletElementDur = numNotes > 0 ? theNotes[0].duration.ticks : -1;
+		var writtenDurationConditionSatisfied = a == 6 && b == 4
+			&& firstTupletElementDur == quaver && timeSigDenom != 2;
+		if (a == 6 && b == 4) {
+			if (writtenDurationConditionSatisfied) {
+				addError("This is better notated as two\nquaver triplets.",theTuplet);
+			}
+			var crotchetSextupletConditionSatisfied = firstTupletElementDur == crotchet;
+			if (crotchetSextupletConditionSatisfied) {
+				addError("This is better notated as two\ncrotchet triplets.",theTuplet);
+			}
+		}
+
 		if (nn >= a * 2) {
 			if (nn == 6 && a == 3) {
 				//logError ('actualDuration = ' + tuplet.actualDuration.ticks);
@@ -1307,6 +1354,15 @@ MuseScore {
 			// *** CHECK FOR NOTE NOT REALLY MATCHING THE TUPLET DIVISION ***
 			if (firstNoteDur != tupletDivision && !suppressPrimarySubdivisionWarning) addError ("The first note in this tuplet does not match the tuplet’s primary subdivision.\nConsider splitting the tuplet up into one-beat tuplets.", theTuplet);
 		}
+	}
+
+	function finishSemiquaverTripletRun () {
+		if (numConsecutiveSemiquaverTriplets == 6
+				&& lastSemiquaverTripletNote != null) {
+			addError("These semiquaver triplets could be\nrewritten as a semiquaver sextuplet.",lastSemiquaverTripletNote);
+		}
+		numConsecutiveSemiquaverTriplets = 0;
+		lastSemiquaverTripletNote = null;
 	}
 
 	function checkForSingleCrotchetTriplet (firstTuplet) {
@@ -1842,11 +1898,11 @@ MuseScore {
 			// semiquaver crotchet
 			// quaver crotchet
 			if (beatLength == crotchet) {
-				if ((timeSigStr == "4/4" || timeSigStr == "2/2") && startBeat == 1 && d1 == crotchet && d2 == dottedcrotchet) addError ("These tied notes are easier to read\nas a minim tied to a quaver.",noteArray);
+				if ((timeSigStr == "4/4" || timeSigStr == "2/2") && startBeat == 1 && d1 == crotchet && d2 == dottedcrotchet) addError ("These tied notes are better notated\nas a minim tied to a quaver.",noteArray);
 				if (d1 < crotchet && d2 == crotchet) addError ("Consider putting the crotchet first in this tie.",noteArray);
 				if (d1 < crotchet && d2 == minim) addError ("Consider putting the minim first in this tie.",noteArray);
 				if (d1 == crotchet && d2 == dottedcrotchet && startBeat % 2 == 0) addError ("Consider rewriting these tied notes as\na minim tied to a quaver.",noteArray);
-				if (d1 == dottedcrotchet && d2 == crotchet) addError ("These tied notes are easier to read as\na minim tied to a quaver.",noteArray);
+				if (d1 == dottedcrotchet && d2 == crotchet) addError ("These tied notes are better notated\nas a minim tied to a quaver.",noteArray);
 				if (d1 == minim && d2 == dottedcrotchet) addError ("These tied notes are easier to read as\na dotted minim tied to a quaver.",noteArray);
 				if (d1 == dottedcrotchet && d2 == semiquaver) addError ("These tied notes are easier to read as\na crotchet tied to a dotted quaver.", noteArray);
 			} 
@@ -1879,6 +1935,9 @@ MuseScore {
 	}
 
 	function addShouldBeamForwardError (noteRest,nextNoteRest) {
+		if (nextNoteRest == null) return;
+		if (nextNoteRest.type == Element.CHORD
+				&& nextNoteRest.duration.ticks >= crotchet) return;
 		if (hasFeatheredBeam(noteRest) || hasFeatheredBeam(nextNoteRest)) {
 			addError("I think this note should be beamed to\nthe next note. If the feathered beaming\nis intentional, ensure that its\nduration is clear.",noteRest);
 			return;
@@ -2579,16 +2638,18 @@ MuseScore {
 	
 	function getTick (e) {
 		if (e == null) {
-			logError ("**** getTick() — tried to get tick of null");
+			logError ("**** getTick() — tried to get tick of null ****");
 			return 0;
 		}
 		var eType = e.type;
 		if (eType == Element.BEAM) {
-			// In MS 4.6 currently, there's no way to get the tick of a beam, or to get its child elements to get their ticks
-			// as such, we should probably avoid highlighting beams until this is fixed
-			logError ('**** getTick() — Found beam: tick = '+e.tick);
+			var beamElements = e.elements;
+			if (beamElements && beamElements.length > 0) {
+				e = beamElements[0];
+			} else {
+				return 0;
+			}
 		}
-		// var spannerArray = [Element.HAIRPIN, Element.HAIRPIN_SEGMENT, Element.SLUR, Element.SLUR_SEGMENT, Element.PEDAL, Element.PEDAL_SEGMENT, Element.OTTAVA, Element.OTTAVA_SEGMENT, Element.GLISSANDO, Element.GLISSANDO_SEGMENT, Element.GRADUAL_TEMPO_CHANGE];
 		if (e.spanner != undefined) {
 			return e.spanner.spannerTick.ticks;
 		} else {
@@ -2596,17 +2657,16 @@ MuseScore {
 				return e.firstSegment.tick;
 			} else {
 				if (e.parent == undefined || e.parent == null) {
-					logError("**** getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name);
+					logError("**** getTick() — ELEMENT PARENT IS "+e.parent+"); etype is "+e.name+" ****");
 				} else {
 					var p;
-					if (eType == Element.TUPLET) {
-						p = e.elements[0].parent;
-					} else {
-						p = e.parent;
-					}
+					if (eType == Element.TUPLET) p = e.elements[0].parent;
+					else if (eType == Element.MEASURE_NUMBER) p = e.parent.firstSegment;
+					else p = e.parent;
+
 					if (p != null) for (var i = 0; i < 10 && p.type != Element.SEGMENT; i++) {
 						if (p.parent == null) {
-							logError ("**** getTick() — Parent of "+e.name+" was null");
+							logError ("**** getTick() — Parent of "+e.name+" was null ****");
 							return 0;
 						}
 						p = p.parent;
@@ -2683,8 +2743,7 @@ MuseScore {
 		
 		// ** CHECK BRACKETS FOR HIGHLIGHTS ** //
 		for (var i = 0; i < curScore.nstaves; i++) {
-			var staff = curScore.staves[i];
-			var brackets = staff.brackets;
+			var brackets = getStaffBrackets(i);
 			for (j = 0; j < brackets.length; j++) {
 				var e = brackets[j];
 				var c = e.color;
@@ -2711,7 +2770,7 @@ MuseScore {
 		// ** CHECK BAR NUMBERS ** //
 		var theBar = curScore.firstMeasure;
 		while (theBar) {
-			var barNum = theBar.measureNumber(0);
+			var barNum = getMeasureNumberElement(theBar, 0);
 			if (barNum) {
 				var c = barNum.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(barNum);

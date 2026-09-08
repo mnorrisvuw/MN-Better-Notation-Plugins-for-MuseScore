@@ -20,6 +20,18 @@ MuseScore {
 	title: "MN Check Accidentals"
 	id: mncheckaccidentals
 	thumbnailName: "MNCheckAccidentals.png"
+	property bool isMuseScore5: mscoreMajorVersion >= 5
+
+	function getStaffBrackets(staffIndex) {
+		return isMuseScore5 ? curScore.brackets(staffIndex) : curScore.staves[staffIndex].brackets;
+	}
+
+	function getMeasureNumberElement(measure, staffIndex) {
+		// In MS5 the numeric measureNumber property shadows
+		// the measureNumber(staffIndex) callback in QML.
+		return isMuseScore5 ? null : measure.measureNumber(staffIndex);
+	}
+
 	function getAssetPath(filename) {
         if (Qt.platform.os === "linux") {
             return Qt.resolvedUrl("./assets/" + filename).toString();
@@ -93,6 +105,7 @@ MuseScore {
 	property var firstBarInSecondSystem: null
 	property var fontList: Qt.fontFamilies()
 	property var isStringInstrument: false
+	property var stringsArray: []
 
   onRun: {
 		if (!curScore) return;
@@ -242,6 +255,7 @@ MuseScore {
 			var isHarp = currentInstrumentId === "pluck.harp";
 			if (isHarp) hasHarp = true;
 			isStringInstrument = currentInstrumentId.includes("strings.");
+			setOpenStringPitches(currentInstrumentId, part.longName || "");
 			
 			// ** RESET ALL VARIABLES TO THEIR DEFAULTS ** //
 			prevChord = null;
@@ -511,6 +525,30 @@ MuseScore {
 		//for (var i = 0; i < chordArray.length; i++) logError (getTick(chordArray[i]));
 		return chordArray;
 	}
+
+	function setOpenStringPitches (instrumentId, instrumentName) {
+		var violinStrings = [55,62,69,76];
+		var violaStrings = [48,55,62,69];
+		var celloStrings = [36,43,50,57];
+		var bassStrings = [28,33,38,43];
+		var calculatedId = instrumentId;
+
+		stringsArray = [];
+		if (!isStringInstrument) return;
+
+		if (instrumentId.includes(".group")) {
+			var lowerInstrumentName = instrumentName.toLowerCase();
+			if (lowerInstrumentName.includes("violin")) calculatedId = "strings.violin";
+			if (lowerInstrumentName.includes("viola")) calculatedId = "strings.viola";
+			if (lowerInstrumentName.includes("cello")) calculatedId = "strings.cello";
+			if (lowerInstrumentName.includes("bass")) calculatedId = "strings.contrabass";
+		}
+
+		if (calculatedId.includes("violin")) stringsArray = violinStrings;
+		if (calculatedId.includes("viola")) stringsArray = violaStrings;
+		if (calculatedId.includes("cello")) stringsArray = celloStrings;
+		if (calculatedId.includes("contrabass")) stringsArray = bassStrings;
+	}
 	
 	function checkChord (chord, theSegment, isGraceNote, currentStaff) {
 		//logError("checking chord");
@@ -558,10 +596,16 @@ MuseScore {
 			var tpc = note.tpc; // tpc of written pitch
 			var theLine = note.line;
 			
-			if (i > 0 && theLine == prevLine && !flaggedSharedLineSpace && !isStringInstrument) {
-				addError ("Try and avoid having two noteheads\non the same line/space.", [notes[i], notes[i-1]]);
-				flaggedSharedLineSpace = true;
-				continue;
+			if (i > 0 && theLine == prevLine && !flaggedSharedLineSpace) {
+				var oneNoteIsOpenString = isStringInstrument
+					&& stringsArray.length > 0
+					&& (stringsArray.includes(note.pitch)
+						|| stringsArray.includes(notes[i-1].pitch));
+				if (!oneNoteIsOpenString) {
+					addError ("Try and avoid having two noteheads\non the same line/space.", [notes[i], notes[i-1]]);
+					flaggedSharedLineSpace = true;
+					continue;
+				}
 			}
 			prevLine = theLine;
 
@@ -1202,8 +1246,7 @@ MuseScore {
 		
 		// ** CHECK BRACKETS FOR HIGHLIGHTS ** //
 		for (var i = 0; i < curScore.nstaves; i++) {
-			var staff = curScore.staves[i];
-			var brackets = staff.brackets;
+			var brackets = getStaffBrackets(i);
 			for (j = 0; j < brackets.length; j++) {
 				var e = brackets[j];
 				var c = e.color;
@@ -1230,7 +1273,7 @@ MuseScore {
 		// ** CHECK BAR NUMBERS ** //
 		var theBar = curScore.firstMeasure;
 		while (theBar) {
-			var barNum = theBar.measureNumber(0);
+			var barNum = getMeasureNumberElement(theBar, 0);
 			if (barNum) {
 				var c = barNum.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(barNum);

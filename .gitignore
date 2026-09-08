@@ -1,12 +1,18 @@
 # macOS metadata
 .DS_Store
 
+# Windows metadata
+Thumbs.db
+Desktop.ini
+
 # Editor project and workspace state
 *.sublime-project
 *.sublime-workspace
 /.nova/
+.idea/
 .vscode/
 *.swp
+*.bak
 *~
 
 # Local logs, caches, and temporary files

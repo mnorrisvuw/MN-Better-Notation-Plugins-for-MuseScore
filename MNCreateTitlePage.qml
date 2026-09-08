@@ -22,6 +22,7 @@ MuseScore {
 	title: "MN Create Title Page"
 	id: mncreatetitlepage
 	thumbnailName: "MNCreateTitlePage.png"	
+	property bool isMuseScore5: mscoreMajorVersion >= 5
 	
 	// **** PROPERTIES **** //
 	

@@ -21,6 +21,17 @@ MuseScore {
 	title: "MN Make Recommended Layout Changes"
 	id: mnmakerecommendedlayoutchanges
 	thumbnailName: "MNMakeRecommendedLayoutChanges.png"	
+	property bool isMuseScore5: mscoreMajorVersion >= 5
+
+	function getStaffBrackets(staffIndex) {
+		return isMuseScore5 ? curScore.brackets(staffIndex) : curScore.staves[staffIndex].brackets;
+	}
+
+	function getMeasureNumberElement(measure, staffIndex) {
+		// In MS5 the numeric measureNumber property shadows
+		// the measureNumber(staffIndex) callback in QML.
+		return isMuseScore5 ? null : measure.measureNumber(staffIndex);
+	}
 	
 	// **** PROPERTIES **** //
 	
@@ -548,11 +559,11 @@ MuseScore {
 			for (var i = 0; i < numStaves; i ++) {
 				if (staffVisible[i]) {
 					var staff = curScore.staves[i];
-					if (i < lastWindPart && staff.staffBarlineSpan == 0) staff.staffBarlineSpan == 1;
-					if (i == lastWindPart && staff.staffBarlineSpan != 0) staff.staffBarlineSpan == 0;
-					if (i >= firstBrassPart && i < lastBrassPart && staff.staffBarlineSpan == 0) staff.staffBarlineSpan == 1;
-					if (i == lastBrassPart && staff.staffBarlineSpan != 0) staff.staffBarlineSpan == 0;
-					if (i >= firstStringPart && i < lastStringPart && staff.staffBarlineSpan == 0) staff.staffBarlineSpan == 1;
+					if (i < lastWindPart && staff.staffBarlineSpan == 0) staff.staffBarlineSpan = 1;
+					if (i == lastWindPart && staff.staffBarlineSpan != 0) staff.staffBarlineSpan = 0;
+					if (i >= firstBrassPart && i < lastBrassPart && staff.staffBarlineSpan == 0) staff.staffBarlineSpan = 1;
+					if (i == lastBrassPart && staff.staffBarlineSpan != 0) staff.staffBarlineSpan = 0;
+					if (i >= firstStringPart && i < lastStringPart && staff.staffBarlineSpan == 0) staff.staffBarlineSpan = 1;
 				}
 			}
 			curScore.endCmd();
@@ -2508,8 +2519,7 @@ MuseScore {
 		
 		// ** CHECK BRACKETS FOR HIGHLIGHTS ** //
 		for (var i = 0; i < curScore.nstaves; i++) {
-			var staff = curScore.staves[i];
-			var brackets = staff.brackets;
+			var brackets = getStaffBrackets(i);
 			for (j = 0; j < brackets.length; j++) {
 				var e = brackets[j];
 				var c = e.color;
@@ -2536,7 +2546,7 @@ MuseScore {
 		// ** CHECK BAR NUMBERS ** //
 		var theBar = curScore.firstMeasure;
 		while (theBar) {
-			var barNum = theBar.measureNumber(0);
+			var barNum = getMeasureNumberElement(theBar, 0);
 			if (barNum) {
 				var c = barNum.color;
 				if (Qt.colorEqual(c,"hotpink")) elementsToRecolor.push(barNum);
